@@ -1,0 +1,1018 @@
+import {
+  Animal,
+  FosterParent,
+  AnimalPlacement,
+  MedicalRecord,
+  AnimalNote,
+  AnimalRelationship,
+  AnimalPhoto,
+  Person,
+  Product,
+  SupplyRequest,
+  SupplyRequestItem } from
+'../types';
+
+export const seedAnimals: Animal[] = [
+{
+  id: 'a1',
+  name: 'Biscuit',
+  species: 'Dog',
+  sex: 'Male',
+  estimated_birth_date: '2022-05-10',
+  intake_date: '2023-10-01',
+  intake_source: 'City Shelter Transfer',
+  status: 'adoptable',
+  priority: 'normal',
+  description:
+  'A sweet, goofy Golden Retriever mix who loves everyone. Great with kids and other dogs. Needs a yard to run in.',
+  microchip_number: '981020000000001',
+  adoption_profile_url: 'https://www.petfinder.com/dog/biscuit-pawprint-a1',
+  primary_photo_url:
+  'https://images.unsplash.com/photo-1552053831-71594a27632d?auto=format&fit=crop&q=80&w=800',
+  created_at: '2023-10-01T10:00:00Z',
+  updated_at: '2023-11-15T10:00:00Z'
+},
+{
+  id: 'a2',
+  name: 'Marmalade',
+  species: 'Cat',
+  sex: 'Female',
+  estimated_birth_date: '2020-08-15',
+  intake_date: '2023-11-05',
+  intake_source: 'Owner Surrender',
+  status: 'medical',
+  priority: 'needs_attention',
+  action_needed:
+  'Soft food only + finish 10-day antibiotic course (3 days remaining). Recheck on Nov 25.',
+  description:
+  'Chonky orange tabby. Very affectionate but currently recovering from a minor dental surgery. Needs soft food.',
+  microchip_number: '981020000000002',
+  primary_photo_url:
+  'https://images.unsplash.com/photo-1513360371669-4adf3dd7dff8?auto=format&fit=crop&q=80&w=800',
+  created_at: '2023-11-05T14:30:00Z',
+  updated_at: '2023-11-20T09:00:00Z'
+},
+{
+  id: 'a3',
+  name: 'Juniper',
+  species: 'Dog',
+  sex: 'Female',
+  estimated_birth_date: '2023-09-01',
+  intake_date: '2023-11-10',
+  intake_source: 'Stray',
+  status: 'fostered',
+  priority: 'normal',
+  description:
+  'Energetic terrier mix puppy. Learning basic commands and doing well with crate training.',
+  primary_photo_url:
+  'https://images.unsplash.com/photo-1537151608804-ea6f11cc98f9?auto=format&fit=crop&q=80&w=800',
+  created_at: '2023-11-10T11:15:00Z',
+  updated_at: '2023-11-12T16:00:00Z'
+},
+{
+  id: 'a4',
+  name: 'Pepper',
+  species: 'Cat',
+  sex: 'Male',
+  estimated_birth_date: '2023-10-20',
+  intake_date: '2023-11-22',
+  intake_source: 'Stray Litter',
+  status: 'medical',
+  priority: 'critical',
+  action_needed:
+  'Start URI antibiotics today and find an isolated foster — cannot be housed with other kittens.',
+  description:
+  'Tiny black kitten found alone. Currently battling an upper respiratory infection. Needs immediate foster placement.',
+  primary_photo_url:
+  'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&q=80&w=800',
+  created_at: '2023-11-22T08:00:00Z',
+  updated_at: '2023-11-22T08:00:00Z'
+},
+{
+  id: 'a5',
+  name: 'Luna',
+  species: 'Dog',
+  sex: 'Female',
+  estimated_birth_date: '2019-03-12',
+  intake_date: '2023-09-15',
+  intake_source: 'City Shelter Transfer',
+  status: 'adopted',
+  priority: 'normal',
+  description:
+  'Calm, older husky mix. Loves long walks and naps on the couch.',
+  microchip_number: '981020000000005',
+  primary_photo_url:
+  'https://images.unsplash.com/photo-1605568420105-eb2a4caa5e3e?auto=format&fit=crop&q=80&w=800',
+  created_at: '2023-09-15T09:00:00Z',
+  updated_at: '2023-10-30T14:00:00Z'
+},
+{
+  id: 'a6',
+  name: 'Hazel',
+  species: 'Dog',
+  sex: 'Female',
+  estimated_birth_date: '2021-02-10',
+  intake_date: '2023-11-25',
+  intake_source: 'Owner Surrender',
+  status: 'intake',
+  priority: 'normal',
+  description:
+  'Shy but sweet mixed breed. Needs patience and a quiet home to decompress.',
+  microchip_number: '981020000000006',
+  primary_photo_url:
+  'https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?auto=format&fit=crop&q=80&w=800',
+  created_at: '2023-11-25T10:00:00Z',
+  updated_at: '2023-11-25T10:00:00Z'
+},
+{
+  id: 'a7',
+  name: 'Cobbler',
+  species: 'Cat',
+  sex: 'Male',
+  estimated_birth_date: '2018-06-01',
+  intake_date: '2023-10-20',
+  intake_source: 'Stray',
+  status: 'adoptable',
+  priority: 'normal',
+  description:
+  'A distinguished older gentleman. Loves window watching and chin scratches.',
+  microchip_number: '981020000000007',
+  adoption_profile_url: 'https://www.petfinder.com/cat/cobbler-pawprint-a7',
+  primary_photo_url:
+  'https://images.unsplash.com/photo-1511044568932-338cba0ad803?auto=format&fit=crop&q=80&w=800',
+  created_at: '2023-10-20T10:00:00Z',
+  updated_at: '2023-11-01T10:00:00Z'
+},
+{
+  id: 'a8',
+  name: 'Sage',
+  species: 'Cat',
+  sex: 'Female',
+  estimated_birth_date: '2023-05-15',
+  intake_date: '2023-11-15',
+  intake_source: 'Hoarding Case',
+  status: 'fostered',
+  priority: 'normal',
+  description:
+  'Timid young cat learning to trust humans. Making great progress in foster.',
+  microchip_number: '981020000000008',
+  primary_photo_url:
+  'https://images.unsplash.com/photo-1573865526739-10659fec78a5?auto=format&fit=crop&q=80&w=800',
+  created_at: '2023-11-15T10:00:00Z',
+  updated_at: '2023-11-18T10:00:00Z'
+},
+{
+  id: 'a9',
+  name: 'Otis',
+  species: 'Dog',
+  sex: 'Male',
+  estimated_birth_date: '2022-11-01',
+  intake_date: '2023-11-28',
+  intake_source: 'Stray',
+  status: 'intake',
+  priority: 'urgent',
+  action_needed:
+  'Schedule vet eval for right hind leg limp this week and identify a medical foster home.',
+  description:
+  'Found wandering with a slight limp. Needs vet evaluation and a medical foster ASAP.',
+  primary_photo_url:
+  'https://images.unsplash.com/photo-1543466835-00a7907e9de1?auto=format&fit=crop&q=80&w=800',
+  created_at: '2023-11-28T10:00:00Z',
+  updated_at: '2023-11-28T10:00:00Z'
+},
+{
+  id: 'a10',
+  name: 'Willow',
+  species: 'Cat',
+  sex: 'Female',
+  estimated_birth_date: '2023-11-01',
+  intake_date: '2023-11-20',
+  intake_source: 'Born in Care',
+  status: 'fostered',
+  priority: 'normal',
+  description: 'Playful kitten, part of a litter of 4.',
+  primary_photo_url:
+  'https://images.unsplash.com/photo-1596854407944-bf87f6fdd49e?auto=format&fit=crop&q=80&w=800',
+  created_at: '2023-11-20T10:00:00Z',
+  updated_at: '2023-11-20T10:00:00Z'
+},
+{
+  id: 'a11',
+  name: 'Mochi',
+  species: 'Dog',
+  sex: 'Male',
+  estimated_birth_date: '2020-04-10',
+  intake_date: '2023-11-01',
+  intake_source: 'Owner Surrender',
+  status: 'adoptable',
+  priority: 'normal',
+  description: 'Fluffy small breed mix. Very cuddly and house trained.',
+  microchip_number: '981020000000011',
+  primary_photo_url:
+  'https://images.unsplash.com/photo-1583337130417-3346a1be7dee?auto=format&fit=crop&q=80&w=800',
+  created_at: '2023-11-01T10:00:00Z',
+  updated_at: '2023-11-15T10:00:00Z'
+},
+{
+  id: 'a12',
+  name: 'Clementine',
+  species: 'Cat',
+  sex: 'Female',
+  estimated_birth_date: '2017-09-20',
+  intake_date: '2023-10-10',
+  intake_source: 'City Shelter Transfer',
+  status: 'fostered',
+  priority: 'needs_attention',
+  action_needed:
+  'Review senior bloodwork results with vet and confirm renal diet plan.',
+  description: 'Senior kitty who loves heated blankets and quiet afternoons.',
+  microchip_number: '981020000000012',
+  primary_photo_url:
+  'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&q=80&w=800',
+  created_at: '2023-10-10T10:00:00Z',
+  updated_at: '2023-10-15T10:00:00Z'
+}];
+
+
+export const seedFosters: FosterParent[] = [
+{
+  id: 'f1',
+  first_name: 'Sarah',
+  last_name: 'Jenkins',
+  email: 'sarah.j@example.com',
+  phone: '(555) 123-4567',
+  address: '123 Maple St, Portland, OR',
+  max_capacity: 2,
+  preferred_species: ['Dog'],
+  notes: 'Has a fenced yard. Works from home. Prefers medium to large dogs.',
+  active: true,
+  photo_url:
+  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200'
+},
+{
+  id: 'f2',
+  first_name: 'Marcus',
+  last_name: 'Chen',
+  email: 'mchen@example.com',
+  phone: '(555) 987-6543',
+  address: '456 Oak Ave, Apt 3B, Portland, OR',
+  max_capacity: 3,
+  preferred_species: ['Cat'],
+  notes:
+  'Experienced with neonatal kittens and bottle feeding. No other pets in home.',
+  active: true
+},
+{
+  id: 'f3',
+  first_name: 'Elena',
+  last_name: 'Rodriguez',
+  email: 'elena.r@example.com',
+  phone: '(555) 456-7890',
+  address: '789 Pine Ln, Portland, OR',
+  max_capacity: 1,
+  preferred_species: ['Dog', 'Cat'],
+  notes: 'Great with medical recovery cases. Has a quiet home.',
+  active: true
+},
+{
+  id: 'f4',
+  first_name: 'David',
+  last_name: 'Kim',
+  email: 'dkim@example.com',
+  phone: '(555) 222-3333',
+  address: '101 Elm St, Portland, OR',
+  max_capacity: 2,
+  preferred_species: ['Dog'],
+  notes: 'Active runner, loves high-energy dogs.',
+  active: true
+},
+{
+  id: 'f5',
+  first_name: 'Anita',
+  last_name: 'Patel',
+  email: 'anita.p@example.com',
+  phone: '(555) 444-5555',
+  address: '202 Birch Rd, Portland, OR',
+  max_capacity: 4,
+  preferred_species: ['Cat'],
+  notes: 'Has a dedicated kitten room. Very experienced.',
+  active: true,
+  photo_url:
+  'https://images.unsplash.com/photo-1558377235-76f53857000b?auto=format&fit=crop&q=80&w=200'
+},
+{
+  id: 'f6',
+  first_name: 'James',
+  last_name: 'Wilson',
+  email: 'jwilson@example.com',
+  phone: '(555) 666-7777',
+  address: '303 Cedar Ct, Portland, OR',
+  max_capacity: 1,
+  preferred_species: ['Dog', 'Other'],
+  notes: 'Good with large breeds and behavioral challenges.',
+  active: true
+},
+{
+  id: 'f7',
+  first_name: 'Maria',
+  last_name: 'Garcia',
+  email: 'mgarcia@example.com',
+  phone: '(555) 888-9999',
+  address: '404 Spruce Way, Portland, OR',
+  max_capacity: 2,
+  preferred_species: ['Cat'],
+  notes: 'Prefers adult or senior cats.',
+  active: true
+},
+{
+  id: 'f8',
+  first_name: 'Tom',
+  last_name: 'Baker',
+  email: 'tbaker@example.com',
+  phone: '(555) 111-2222',
+  address: '505 Walnut Dr, Portland, OR',
+  max_capacity: 1,
+  preferred_species: ['Dog'],
+  notes: 'Apartment living, small dogs only.',
+  active: false
+},
+{
+  id: 'f9',
+  first_name: 'Linda',
+  last_name: 'Martinez',
+  email: 'linda.m@example.com',
+  phone: '(555) 333-4444',
+  address: '606 Ash St, Portland, OR',
+  max_capacity: 3,
+  preferred_species: ['Cat', 'Dog'],
+  notes: 'Flexible, works part-time.',
+  active: true
+},
+{
+  id: 'f10',
+  first_name: 'Robert',
+  last_name: 'Taylor',
+  email: 'rtaylor@example.com',
+  phone: '(555) 555-6666',
+  address: '707 Fir Ave, Portland, OR',
+  max_capacity: 2,
+  preferred_species: ['Dog'],
+  notes: 'Has two resident dogs, good for socialization.',
+  active: true,
+  photo_url:
+  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200'
+}];
+
+
+export const seedPlacements: AnimalPlacement[] = [
+{
+  id: 'p1',
+  animal_id: 'a3',
+  foster_parent_id: 'f1',
+  start_date: '2023-11-12T10:00:00Z',
+  placement_status: 'active'
+},
+{
+  id: 'p2',
+  animal_id: 'a2',
+  foster_parent_id: 'f3',
+  start_date: '2023-11-06T14:00:00Z',
+  placement_status: 'active',
+  notes: 'Recovering from dental surgery.'
+},
+{
+  id: 'p3',
+  animal_id: 'a5',
+  foster_parent_id: 'f1',
+  start_date: '2023-09-16T09:00:00Z',
+  end_date: '2023-10-30T14:00:00Z',
+  placement_status: 'completed',
+  notes: 'Adopted!'
+},
+{
+  id: 'p4',
+  animal_id: 'a8',
+  foster_parent_id: 'f5',
+  start_date: '2023-11-18T10:00:00Z',
+  placement_status: 'active'
+},
+{
+  id: 'p5',
+  animal_id: 'a10',
+  foster_parent_id: 'f2',
+  start_date: '2023-11-20T10:00:00Z',
+  placement_status: 'active'
+},
+{
+  id: 'p6',
+  animal_id: 'a12',
+  foster_parent_id: 'f7',
+  start_date: '2023-10-15T10:00:00Z',
+  placement_status: 'active'
+},
+{
+  id: 'p7',
+  animal_id: 'a11',
+  foster_parent_id: 'f10',
+  start_date: '2023-11-05T10:00:00Z',
+  end_date: '2023-11-15T10:00:00Z',
+  placement_status: 'completed',
+  notes: 'Returned to shelter for adoption events.'
+}];
+
+
+export const seedMedicalRecords: MedicalRecord[] = [
+{
+  id: 'm1',
+  animal_id: 'a1',
+  procedure_type: 'vaccine',
+  procedure_name: 'Rabies',
+  performed_date: '2023-10-05',
+  status: 'completed',
+  provider_name: 'Dr. Smith'
+},
+{
+  id: 'm2',
+  animal_id: 'a1',
+  procedure_type: 'exam',
+  procedure_name: 'Annual Checkup',
+  due_date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).
+  toISOString().
+  split('T')[0],
+  status: 'due'
+},
+{
+  id: 'm3',
+  animal_id: 'a2',
+  procedure_type: 'surgery',
+  procedure_name: 'Dental Extraction',
+  performed_date: '2023-11-18',
+  status: 'completed',
+  provider_name: 'Dr. Evans',
+  notes: 'Extracted 2 premolars. Healing well.'
+},
+{
+  id: 'm4',
+  animal_id: 'a4',
+  procedure_type: 'medication',
+  procedure_name: 'Antibiotics (URI)',
+  due_date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).
+  toISOString().
+  split('T')[0],
+  status: 'overdue',
+  notes: 'Needs amoxicillin twice daily.'
+},
+{
+  id: 'm5',
+  animal_id: 'a3',
+  procedure_type: 'vaccine',
+  procedure_name: 'DHPP Booster',
+  due_date: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).
+  toISOString().
+  split('T')[0],
+  status: 'scheduled'
+},
+{
+  id: 'm6',
+  animal_id: 'a9',
+  procedure_type: 'exam',
+  procedure_name: 'Limp Evaluation',
+  due_date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).
+  toISOString().
+  split('T')[0],
+  status: 'overdue',
+  notes: 'Urgent evaluation needed for right hind leg.'
+},
+{
+  id: 'm7',
+  animal_id: 'a7',
+  procedure_type: 'exam',
+  procedure_name: 'Senior Bloodwork',
+  performed_date: '2023-10-25',
+  status: 'completed',
+  provider_name: 'Bridge City Veterinary'
+}];
+
+
+export const seedNotes: AnimalNote[] = [
+{
+  id: 'n1',
+  animal_id: 'a1',
+  author_name: 'Volunteer Team',
+  note_type: 'behavior',
+  body: 'Biscuit passed his dog-to-dog assessment with flying colors today. Very playful but respects boundaries.',
+  created_at: '2023-10-15T14:00:00Z'
+},
+{
+  id: 'n2',
+  animal_id: 'a2',
+  author_name: 'Elena Rodriguez',
+  note_type: 'foster_update',
+  body: 'Marmalade is eating her soft food well. Still a bit groggy from the meds but purring constantly.',
+  created_at: '2023-11-19T09:30:00Z'
+},
+{
+  id: 'n3',
+  animal_id: 'a8',
+  author_name: 'Anita Patel',
+  note_type: 'foster_update',
+  body: 'Sage came out from under the bed today and accepted some treats from my hand!',
+  created_at: '2023-11-20T18:00:00Z'
+}];
+
+
+export const seedRelationships: AnimalRelationship[] = [
+// Marmalade gave birth in care — Willow is her kitten.
+{
+  id: 'r1',
+  animal_id: 'a2',
+  related_animal_id: 'a10',
+  relationship_type: 'mother',
+  notes: 'Litter born during intake stay.'
+},
+// Willow and Pepper are littermates (cross-listed for demo richness).
+{
+  id: 'r2',
+  animal_id: 'a10',
+  related_animal_id: 'a4',
+  relationship_type: 'littermate'
+},
+// Biscuit and Mochi are a bonded pair — must be adopted together.
+{
+  id: 'r3',
+  animal_id: 'a1',
+  related_animal_id: 'a11',
+  relationship_type: 'bonded_pair',
+  notes: 'Adopt together — they get anxious when separated.'
+}];
+
+
+export const seedPhotos: AnimalPhoto[] = [
+// Marmalade
+{
+  id: 'ph1',
+  animal_id: 'a2',
+  url: 'https://images.unsplash.com/photo-1513360371669-4adf3dd7dff8?auto=format&fit=crop&q=80&w=1200',
+  category: 'profile',
+  caption: 'Sun nap on the windowsill.',
+  uploaded_at: '2023-11-06T10:00:00Z'
+},
+{
+  id: 'ph2',
+  animal_id: 'a2',
+  url: 'https://images.unsplash.com/photo-1561948955-570b270e7c36?auto=format&fit=crop&q=80&w=1200',
+  category: 'intake',
+  caption: 'Day of intake — owner surrender.',
+  uploaded_at: '2023-11-05T14:30:00Z'
+},
+{
+  id: 'ph3',
+  animal_id: 'a2',
+  url: 'https://images.unsplash.com/photo-1574158622682-e40e69881006?auto=format&fit=crop&q=80&w=1200',
+  category: 'medical',
+  caption: 'Recovering after dental surgery — Dr. Evans.',
+  uploaded_at: '2023-11-18T17:00:00Z'
+},
+// Biscuit
+{
+  id: 'ph4',
+  animal_id: 'a1',
+  url: 'https://images.unsplash.com/photo-1552053831-71594a27632d?auto=format&fit=crop&q=80&w=1200',
+  category: 'profile',
+  caption: 'Adoption-listing headshot.',
+  uploaded_at: '2023-10-20T11:00:00Z'
+},
+{
+  id: 'ph5',
+  animal_id: 'a1',
+  url: 'https://images.unsplash.com/photo-1587300003388-59208cc962cb?auto=format&fit=crop&q=80&w=1200',
+  category: 'intake',
+  caption: 'Arrival from City Shelter Transfer.',
+  uploaded_at: '2023-10-01T10:00:00Z'
+},
+{
+  id: 'ph6',
+  animal_id: 'a1',
+  url: 'https://images.unsplash.com/photo-1477884213360-7e9d7dcc1e48?auto=format&fit=crop&q=80&w=1200',
+  category: 'foster',
+  caption: 'First weekend at meet-and-greet.',
+  uploaded_at: '2023-11-04T15:00:00Z'
+},
+// Pepper
+{
+  id: 'ph7',
+  animal_id: 'a4',
+  url: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&q=80&w=1200',
+  category: 'intake',
+  caption: 'Pulled from a feral colony at 4 weeks.',
+  uploaded_at: '2023-11-22T08:00:00Z'
+},
+{
+  id: 'ph8',
+  animal_id: 'a4',
+  url: 'https://images.unsplash.com/photo-1573865526739-10659fec78a5?auto=format&fit=crop&q=80&w=1200',
+  category: 'medical',
+  caption: 'Started on URI antibiotics.',
+  uploaded_at: '2023-11-23T09:00:00Z'
+},
+// Luna (already adopted — show full lifecycle)
+{
+  id: 'ph9',
+  animal_id: 'a5',
+  url: 'https://images.unsplash.com/photo-1605568420105-eb2a4caa5e3e?auto=format&fit=crop&q=80&w=1200',
+  category: 'profile',
+  caption: 'Adoption-ready profile shot.',
+  uploaded_at: '2023-10-01T10:00:00Z'
+},
+{
+  id: 'ph10',
+  animal_id: 'a5',
+  url: 'https://images.unsplash.com/photo-1568393691622-c7ba131d63b4?auto=format&fit=crop&q=80&w=1200',
+  category: 'adoption',
+  caption: 'Going-home day with her new family!',
+  uploaded_at: '2023-10-30T14:00:00Z'
+}];
+
+
+export const seedPeople: Person[] = [
+{
+  id: 'pe1',
+  first_name: 'Dr. Emily',
+  last_name: 'Smith',
+  email: 'esmith@bridgecityvet.com',
+  phone: '(555) 101-2020',
+  role: 'vet',
+  organization_name: 'Bridge City Veterinary',
+  active: true,
+  created_at: '2023-01-10T10:00:00Z'
+},
+{
+  id: 'pe2',
+  first_name: 'Dr. Mark',
+  last_name: 'Evans',
+  email: 'mevans@pdxanimalhospital.com',
+  phone: '(555) 202-3030',
+  role: 'vet',
+  organization_name: 'PDX Animal Hospital',
+  active: true,
+  created_at: '2023-02-15T10:00:00Z',
+  photo_url:
+  'https://images.unsplash.com/photo-1741455620227-3b1c51e01419?auto=format&fit=crop&q=80&w=200'
+},
+{
+  id: 'pe3',
+  first_name: 'Jessica',
+  last_name: 'Wong',
+  email: 'jwong@pawprintrescue.org',
+  phone: '(555) 303-4040',
+  role: 'rescue_staff',
+  notes: 'Executive Director',
+  active: true,
+  created_at: '2022-05-01T10:00:00Z',
+  photo_url:
+  'https://images.unsplash.com/photo-1589553009868-c7b2bb474531?auto=format&fit=crop&q=80&w=200'
+},
+{
+  id: 'pe4',
+  first_name: 'Brian',
+  last_name: "O'Connor",
+  email: 'boconnor@pawprintrescue.org',
+  phone: '(555) 404-5050',
+  role: 'rescue_staff',
+  notes: 'Intake Coordinator',
+  active: true,
+  created_at: '2022-08-12T10:00:00Z',
+  photo_url:
+  'https://images.unsplash.com/photo-1536548665027-b96d34a005ae?auto=format&fit=crop&q=80&w=200'
+},
+{
+  id: 'pe5',
+  first_name: 'Chloe',
+  last_name: 'Davis',
+  email: 'chloe.d@example.com',
+  phone: '(555) 505-6060',
+  role: 'volunteer',
+  volunteer_type: 'administrative',
+  active: true,
+  created_at: '2023-03-20T10:00:00Z'
+},
+{
+  id: 'pe6',
+  first_name: 'Sam',
+  last_name: 'Miller',
+  email: 'smiller@example.com',
+  phone: '(555) 606-7070',
+  role: 'volunteer',
+  volunteer_type: 'trapper',
+  active: true,
+  created_at: '2023-04-10T10:00:00Z'
+},
+{
+  id: 'pe7',
+  first_name: 'Rachel',
+  last_name: 'Green',
+  email: 'rgreen@example.com',
+  phone: '(555) 707-8080',
+  role: 'volunteer',
+  volunteer_type: 'transport',
+  active: true,
+  created_at: '2023-05-15T10:00:00Z'
+},
+{
+  id: 'pe8',
+  first_name: 'Ian',
+  last_name: 'Wright',
+  email: 'iwright@example.com',
+  phone: '(555) 808-9090',
+  role: 'volunteer',
+  volunteer_type: 'event_support',
+  active: true,
+  created_at: '2023-06-20T10:00:00Z'
+},
+{
+  id: 'pe9',
+  first_name: 'Zoe',
+  last_name: 'Lee',
+  email: 'zlee@example.com',
+  phone: '(555) 909-0101',
+  role: 'volunteer',
+  volunteer_type: 'social_media',
+  active: true,
+  created_at: '2023-07-25T10:00:00Z'
+},
+{
+  id: 'pe10',
+  first_name: 'Alex',
+  last_name: 'Johnson',
+  email: 'ajohnson@example.com',
+  phone: '(555) 010-1212',
+  role: 'volunteer',
+  volunteer_type: 'other',
+  notes: 'Helps with laundry and cleaning.',
+  active: true,
+  created_at: '2023-08-30T10:00:00Z'
+},
+{
+  id: 'pe11',
+  first_name: 'Megan',
+  last_name: 'Fox',
+  email: 'mfox@example.com',
+  phone: '(555) 121-2323',
+  role: 'adopter',
+  notes: 'Adopted Luna (a5)',
+  active: true,
+  created_at: '2023-09-15T10:00:00Z'
+},
+{
+  id: 'pe12',
+  first_name: 'Chris',
+  last_name: 'Hemsworth',
+  email: 'chemsworth@example.com',
+  phone: '(555) 232-3434',
+  role: 'adopter',
+  notes: 'Looking to adopt a large dog.',
+  active: true,
+  created_at: '2023-10-05T10:00:00Z'
+}];
+
+
+export const seedProducts: Product[] = [
+{
+  id: 'prod1',
+  name: 'Kitten Formula',
+  category: 'food',
+  default_unit: 'can',
+  active: true
+},
+{
+  id: 'prod2',
+  name: 'Wet Cat Food',
+  category: 'food',
+  default_unit: 'case',
+  active: true
+},
+{
+  id: 'prod3',
+  name: 'Dry Cat Food',
+  category: 'food',
+  default_unit: 'lb',
+  active: true
+},
+{
+  id: 'prod4',
+  name: 'Wet Dog Food',
+  category: 'food',
+  default_unit: 'case',
+  active: true
+},
+{
+  id: 'prod5',
+  name: 'Dry Dog Food',
+  category: 'food',
+  default_unit: 'lb',
+  active: true
+},
+{
+  id: 'prod6',
+  name: 'Cat Litter',
+  category: 'litter',
+  default_unit: 'bag',
+  active: true
+},
+{
+  id: 'prod7',
+  name: 'Pee Pads',
+  category: 'bedding',
+  default_unit: 'pack',
+  active: true
+},
+{
+  id: 'prod8',
+  name: 'Heating Pad',
+  category: 'bedding',
+  default_unit: 'each',
+  active: true
+},
+{
+  id: 'prod9',
+  name: 'Pet Carrier',
+  category: 'other',
+  default_unit: 'each',
+  active: true
+},
+{
+  id: 'prod10',
+  name: 'Antibiotic - Amoxicillin',
+  category: 'medical',
+  default_unit: 'bottle',
+  active: true
+}];
+
+
+export const seedSupplyRequests: SupplyRequest[] = [
+{
+  id: 'sr1',
+  requester_person_id: 'pe5', // Chloe (volunteer)
+  requested_for_animal_id: 'a4', // Pepper (critical kitten)
+  status: 'submitted',
+  priority: 'urgent',
+  requested_date: '2023-11-23T08:00:00Z',
+  needed_by_date: '2023-11-24T08:00:00Z',
+  notes: 'Pepper is out of formula and needs pee pads ASAP.',
+  created_at: '2023-11-23T08:00:00Z',
+  updated_at: '2023-11-23T08:00:00Z'
+},
+{
+  id: 'sr2',
+  requester_person_id: 'pe6', // Sam
+  requested_for_animal_id: 'a10', // Willow
+  status: 'reviewing',
+  priority: 'normal',
+  requested_date: '2023-11-22T10:00:00Z',
+  created_at: '2023-11-22T10:00:00Z',
+  updated_at: '2023-11-22T14:00:00Z'
+},
+{
+  id: 'sr3',
+  requester_person_id: 'pe7', // Rachel
+  requested_for_animal_id: 'a2', // Marmalade
+  status: 'approved',
+  priority: 'normal',
+  requested_date: '2023-11-20T09:00:00Z',
+  approved_by_person_id: 'pe3', // Jessica (staff)
+  notes: 'Approved soft food for post-dental recovery.',
+  created_at: '2023-11-20T09:00:00Z',
+  updated_at: '2023-11-21T10:00:00Z'
+},
+{
+  id: 'sr4',
+  requester_person_id: 'pe8', // Ian
+  status: 'ordered',
+  priority: 'normal',
+  requested_date: '2023-11-18T11:00:00Z',
+  approved_by_person_id: 'pe4', // Brian (staff)
+  created_at: '2023-11-18T11:00:00Z',
+  updated_at: '2023-11-19T09:00:00Z'
+},
+{
+  id: 'sr5',
+  requester_person_id: 'pe9', // Zoe
+  requested_for_animal_id: 'a3', // Juniper
+  status: 'ready_for_pickup',
+  priority: 'normal',
+  requested_date: '2023-11-15T14:00:00Z',
+  approved_by_person_id: 'pe3',
+  delivery_method: 'pickup',
+  created_at: '2023-11-15T14:00:00Z',
+  updated_at: '2023-11-17T10:00:00Z'
+},
+{
+  id: 'sr6',
+  requester_person_id: 'pe10', // Alex
+  requested_for_animal_id: 'a12', // Clementine
+  status: 'delivered',
+  priority: 'normal',
+  requested_date: '2023-11-10T09:00:00Z',
+  approved_by_person_id: 'pe2', // Dr. Evans
+  fulfilled_by_person_id: 'pe4',
+  fulfilled_date: '2023-11-12T15:00:00Z',
+  delivery_method: 'drop_off',
+  created_at: '2023-11-10T09:00:00Z',
+  updated_at: '2023-11-12T15:00:00Z'
+},
+{
+  id: 'sr7',
+  requester_person_id: 'pe5', // Chloe
+  status: 'completed',
+  priority: 'normal',
+  requested_date: '2023-10-01T10:00:00Z',
+  approved_by_person_id: 'pe3',
+  fulfilled_by_person_id: 'pe3',
+  fulfilled_date: '2023-10-05T10:00:00Z',
+  delivery_method: 'pickup',
+  created_at: '2023-10-01T10:00:00Z',
+  updated_at: '2023-10-05T10:00:00Z'
+}];
+
+
+export const seedSupplyRequestItems: SupplyRequestItem[] = [
+// sr1 (Pepper - urgent)
+{
+  id: 'sri1',
+  supply_request_id: 'sr1',
+  product_id: 'prod1',
+  quantity: 10,
+  unit: 'can'
+},
+{
+  id: 'sri2',
+  supply_request_id: 'sr1',
+  product_id: 'prod7',
+  quantity: 2,
+  unit: 'pack'
+},
+{
+  id: 'sri3',
+  supply_request_id: 'sr1',
+  custom_item_name: 'Goat milk replacer',
+  quantity: 1,
+  unit: 'tub',
+  notes: 'Specific brand if possible'
+},
+// sr2 (Willow)
+{
+  id: 'sri4',
+  supply_request_id: 'sr2',
+  product_id: 'prod2',
+  quantity: 1,
+  unit: 'case'
+},
+// sr3 (Marmalade)
+{
+  id: 'sri5',
+  supply_request_id: 'sr3',
+  product_id: 'prod2',
+  quantity: 2,
+  unit: 'case',
+  notes: 'Pate style only for dental recovery'
+},
+// sr4 (Ian - general)
+{
+  id: 'sri6',
+  supply_request_id: 'sr4',
+  product_id: 'prod6',
+  quantity: 4,
+  unit: 'bag'
+},
+{
+  id: 'sri7',
+  supply_request_id: 'sr4',
+  product_id: 'prod9',
+  quantity: 1,
+  unit: 'each'
+},
+// sr5 (Juniper)
+{
+  id: 'sri8',
+  supply_request_id: 'sr5',
+  product_id: 'prod5',
+  quantity: 1,
+  unit: 'bag'
+},
+// sr6 (Clementine)
+{
+  id: 'sri9',
+  supply_request_id: 'sr6',
+  product_id: 'prod2',
+  quantity: 2,
+  unit: 'case',
+  notes: 'Renal diet specific'
+},
+// sr7 (Chloe - general)
+{
+  id: 'sri10',
+  supply_request_id: 'sr7',
+  product_id: 'prod7',
+  quantity: 5,
+  unit: 'pack'
+}];

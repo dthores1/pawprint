@@ -1,0 +1,269 @@
+import React from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { useWhisker } from '../context/WhiskerContext';
+import { Card } from '../components/ui/Card';
+import { Avatar } from '../components/ui/Avatar';
+import { StatusBadge } from '../components/ui/Badge';
+import {
+  ArrowLeftIcon,
+  MapPinIcon,
+  PhoneIcon,
+  MailIcon,
+  HomeIcon,
+  CheckCircle2Icon,
+  InfoIcon } from
+'lucide-react';
+export function FosterProfile() {
+  const { id } = useParams<{
+    id: string;
+  }>();
+  const { fosters, placements, animals } = useWhisker();
+  const foster = fosters.find((f) => f.id === id);
+  if (!foster) {
+    return <div className="p-8 text-center">Foster not found.</div>;
+  }
+  const fosterPlacements = placements.filter(
+    (p) => p.foster_parent_id === foster.id
+  );
+  const activePlacements = fosterPlacements.filter(
+    (p) => p.placement_status === 'active'
+  );
+  const pastPlacements = fosterPlacements.filter(
+    (p) => p.placement_status === 'completed'
+  );
+  const activeCount = activePlacements.length;
+  const isFull = activeCount >= foster.max_capacity;
+  const capacityPercent = activeCount / foster.max_capacity * 100;
+  return (
+    <div className="space-y-6 pb-12">
+      <Link
+        to="/fosters"
+        className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-text-primary transition-colors">
+        
+        <ArrowLeftIcon className="w-4 h-4" /> Back to Fosters
+      </Link>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left Column: Profile Info */}
+        <div className="space-y-6">
+          <Card className="p-6">
+            <div className="flex flex-col items-center text-center mb-6">
+              <Avatar
+                src={foster.photo_url}
+                name={`${foster.first_name} ${foster.last_name}`}
+                colorKey={foster.id}
+                type="person"
+                size="xl"
+                className="mb-4" />
+              
+              <h1 className="text-2xl font-heading font-bold text-text-primary">
+                {foster.first_name} {foster.last_name}
+              </h1>
+              <div className="flex gap-2 mt-2">
+                {foster.active ?
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#DDEFE2] text-[#3E7B52]">
+                    <CheckCircle2Icon className="w-3.5 h-3.5" /> Active Foster
+                  </span> :
+
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-background text-text-secondary border border-border">
+                    Inactive
+                  </span>
+                }
+              </div>
+            </div>
+
+            <div className="space-y-4 pt-6 border-t border-border">
+              <div className="flex items-start gap-3">
+                <MapPinIcon className="w-5 h-5 text-text-secondary shrink-0 mt-0.5" />
+                <span className="text-text-primary">{foster.address}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <PhoneIcon className="w-5 h-5 text-text-secondary shrink-0" />
+                <a
+                  href={`tel:${foster.phone}`}
+                  className="text-primary hover:underline">
+                  
+                  {foster.phone}
+                </a>
+              </div>
+              <div className="flex items-center gap-3">
+                <MailIcon className="w-5 h-5 text-text-secondary shrink-0" />
+                <a
+                  href={`mailto:${foster.email}`}
+                  className="text-primary hover:underline">
+                  
+                  {foster.email}
+                </a>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-6">
+            <h3 className="text-lg font-heading font-bold mb-4 flex items-center gap-2">
+              <InfoIcon className="w-5 h-5 text-secondary" />
+              Preferences & Notes
+            </h3>
+            <div className="mb-4">
+              <p className="text-sm text-text-secondary mb-2">
+                Preferred Species
+              </p>
+              <div className="flex gap-2">
+                {foster.preferred_species.map((s) =>
+                <span
+                  key={s}
+                  className="px-3 py-1 bg-accent text-secondary rounded-lg text-sm font-medium">
+                  
+                    {s}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div>
+              <p className="text-sm text-text-secondary mb-1">Notes</p>
+              <p className="text-text-primary text-sm leading-relaxed">
+                {foster.notes || 'No notes provided.'}
+              </p>
+            </div>
+          </Card>
+        </div>
+
+        {/* Right Column: Placements */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Capacity Overview */}
+          <Card className="p-6">
+            <div className="flex justify-between items-end mb-4">
+              <div>
+                <h2 className="text-xl font-heading font-bold">
+                  Current Capacity
+                </h2>
+                <p className="text-text-secondary">Animals currently in care</p>
+              </div>
+              <div className="text-right">
+                <span className="text-3xl font-heading font-bold text-primary">
+                  {activeCount}
+                </span>
+                <span className="text-text-secondary text-lg">
+                  {' '}
+                  / {foster.max_capacity}
+                </span>
+              </div>
+            </div>
+            <div className="w-full bg-background rounded-full h-4 overflow-hidden mb-2">
+              <div
+                className={`h-4 rounded-full transition-all duration-1000 ${isFull ? 'bg-status-urgent-text' : 'bg-[#3E7B52]'}`}
+                style={{
+                  width: `${Math.min(100, capacityPercent)}%`
+                }} />
+              
+            </div>
+            {isFull &&
+            <p className="text-sm text-status-urgent-text font-medium text-right">
+                At maximum capacity
+              </p>
+            }
+          </Card>
+
+          {/* Current Placements */}
+          <div>
+            <h3 className="text-lg font-heading font-bold mb-4 flex items-center gap-2">
+              <HomeIcon className="w-5 h-5 text-primary" />
+              Current Placements
+            </h3>
+            {activePlacements.length === 0 ?
+            <Card className="p-8 text-center text-text-secondary">
+                No animals currently placed with this foster.
+              </Card> :
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {activePlacements.map((placement) => {
+                const animal = animals.find(
+                  (a) => a.id === placement.animal_id
+                );
+                if (!animal) return null;
+                return (
+                  <Link key={placement.id} to={`/animals/${animal.id}`}>
+                      <Card hoverLift className="p-4 flex items-center gap-4">
+                        <Avatar
+                        src={animal.primary_photo_url}
+                        type="animal"
+                        size="lg" />
+                      
+                        <div>
+                          <h4 className="font-bold text-text-primary">
+                            {animal.name}
+                          </h4>
+                          <p className="text-sm text-text-secondary mb-1">
+                            {animal.species} • {animal.sex}
+                          </p>
+                          <StatusBadge
+                          status={animal.status}
+                          className="scale-90 origin-left" />
+                        
+                        </div>
+                      </Card>
+                    </Link>);
+
+              })}
+              </div>
+            }
+          </div>
+
+          {/* Past Placements */}
+          {pastPlacements.length > 0 &&
+          <div className="pt-4">
+              <h3 className="text-lg font-heading font-bold mb-4 text-text-secondary">
+                Past Placements
+              </h3>
+              <Card>
+                <div className="divide-y divide-border">
+                  {pastPlacements.map((placement) => {
+                  const animal = animals.find(
+                    (a) => a.id === placement.animal_id
+                  );
+                  if (!animal) return null;
+                  return (
+                    <div
+                      key={placement.id}
+                      className="p-4 flex items-center justify-between">
+                      
+                        <div className="flex items-center gap-4">
+                          <Avatar
+                          src={animal.primary_photo_url}
+                          type="animal"
+                          size="sm" />
+                        
+                          <div>
+                            <Link
+                            to={`/animals/${animal.id}`}
+                            className="font-medium text-text-primary hover:text-primary">
+                            
+                              {animal.name}
+                            </Link>
+                            <p className="text-sm text-text-secondary">
+                              {new Date(
+                              placement.start_date
+                            ).toLocaleDateString()}{' '}
+                              -{' '}
+                              {placement.end_date ?
+                            new Date(
+                              placement.end_date
+                            ).toLocaleDateString() :
+                            'Unknown'}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-sm text-text-secondary bg-background px-2 py-1 rounded-md">
+                          {placement.notes || 'Completed'}
+                        </span>
+                      </div>);
+
+                })}
+                </div>
+              </Card>
+            </div>
+          }
+        </div>
+      </div>
+    </div>);
+
+}

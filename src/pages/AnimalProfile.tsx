@@ -1,0 +1,705 @@
+import React, { useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { useWhisker } from '../context/WhiskerContext';
+import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { StatusBadge, PriorityBadge } from '../components/ui/Badge';
+import { SpeciesBadge } from '../components/ui/SpeciesBadge';
+import { Avatar } from '../components/ui/Avatar';
+import { AddMedicalModal } from '../components/animals/AddMedicalModal';
+import { AddNoteModal } from '../components/animals/AddNoteModal';
+import { ChangeStatusModal } from '../components/animals/ChangeStatusModal';
+import { PlaceAnimalModal } from '../components/animals/PlaceAnimalModal';
+import { ActionNeededCallout } from '../components/animals/ActionNeededCallout';
+import { RelationshipsCard } from '../components/animals/RelationshipsCard';
+import { AdoptionProfileCard } from '../components/animals/AdoptionProfileCard';
+import { PhotoGallery } from '../components/animals/PhotoGallery';
+import { calculateAge, formatDate } from '../lib/utils';
+import {
+  SyringeIcon,
+  FileTextIcon,
+  HomeIcon,
+  CheckCircle2Icon,
+  CircleIcon,
+  ArrowLeftIcon,
+  Edit2Icon,
+  ActivityIcon,
+  MessageSquareIcon,
+  ClockIcon,
+  AlertCircleIcon,
+  ImageIcon } from
+'lucide-react';
+import { motion } from 'framer-motion';
+import { MedicalKitIcon } from '../components/ui/MedicalKitIcon';
+import { PawPrintIcon as PawPrintGlyph } from '../components/ui/PawPrintIcon';
+export function AnimalProfile() {
+  const { id } = useParams<{
+    id: string;
+  }>();
+  const { animals, placements, fosters, medicalRecords, notes, photos } =
+  useWhisker();
+  const [isMedicalModalOpen, setIsMedicalModalOpen] = useState(false);
+  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [isPlaceModalOpen, setIsPlaceModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'timeline' | 'medical' | 'photos'>(
+    'timeline'
+  );
+  const animal = animals.find((a) => a.id === id);
+  if (!animal) {
+    return <div className="p-8 text-center">Animal not found.</div>;
+  }
+  // Derived data
+  const animalPlacements = placements.filter((p) => p.animal_id === animal.id);
+  const activePlacement = animalPlacements.find(
+    (p) => p.placement_status === 'active'
+  );
+  const currentFoster = activePlacement ?
+  fosters.find((f) => f.id === activePlacement.foster_parent_id) :
+  null;
+  const animalMedical = medicalRecords.filter((m) => m.animal_id === animal.id);
+  const upcomingMedical = animalMedical.filter(
+    (m) =>
+    m.status === 'due' || m.status === 'scheduled' || m.status === 'overdue'
+  );
+  const animalNotes = notes.filter((n) => n.animal_id === animal.id);
+  const animalPhotosCount = photos.filter(
+    (p) => p.animal_id === animal.id
+  ).length;
+  // Build Timeline
+  type TimelineEvent = {
+    id: string;
+    date: string;
+    type: 'intake' | 'medical' | 'placement' | 'note';
+    title: string;
+    description: string;
+    icon: React.ElementType;
+    color: string;
+  };
+  const timeline: TimelineEvent[] = [
+  {
+    id: 'intake',
+    date: animal.intake_date,
+    type: 'intake',
+    title: 'Intake',
+    description: `Source: ${animal.intake_source}`,
+    icon: ActivityIcon,
+    color: 'bg-[#E5E2DC] text-[#6B6B6B]'
+  },
+  ...animalMedical.
+  filter((m) => m.status === 'completed').
+  map((m) => ({
+    id: m.id,
+    date: m.performed_date!,
+    type: 'medical' as const,
+    title: `Medical: ${m.procedure_name}`,
+    description: `Provider: ${m.provider_name || 'Unknown'}${m.notes ? ` - ${m.notes}` : ''}`,
+    icon: SyringeIcon,
+    color: 'bg-[#F3E4D7] text-[#D98C5F]'
+  })),
+  ...animalPlacements.map((p) => {
+    const foster = fosters.find((f) => f.id === p.foster_parent_id);
+    return {
+      id: p.id,
+      date: p.start_date.split('T')[0],
+      type: 'placement' as const,
+      title: `Placed in Foster`,
+      description: `With ${foster?.first_name} ${foster?.last_name}`,
+      icon: HomeIcon,
+      color: 'bg-[#DCEAF7] text-[#356A9A]'
+    };
+  }),
+  ...animalNotes.map((n) => ({
+    id: n.id,
+    date: n.created_at.split('T')[0],
+    type: 'note' as const,
+    title: `Note: ${n.note_type}`,
+    description: n.body,
+    icon: MessageSquareIcon,
+    color: 'bg-background text-text-secondary'
+  }))].
+  sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // Newest first
+  // Readiness Checklist logic
+  const hasRabies = animalMedical.some(
+    (m) =>
+    m.procedure_name.toLowerCase().includes('rabies') &&
+    m.status === 'completed'
+  );
+  const isSpayed = animalMedical.some(
+    (m) => m.procedure_type === 'spay_neuter' && m.status === 'completed'
+  );
+  const hasMicrochip = !!animal.microchip_number;
+  const hasBehaviorNote = animalNotes.some((n) => n.note_type === 'behavior');
+  const checklist = [
+  {
+    label: 'Spay/Neuter Complete',
+    done: isSpayed
+  },
+  {
+    label: 'Rabies Vaccine',
+    done: hasRabies
+  },
+  {
+    label: 'Microchipped',
+    done: hasMicrochip
+  },
+  {
+    label: 'Behavior Assessed',
+    done: hasBehaviorNote
+  }];
+
+  const readinessPercent =
+  checklist.filter((c) => c.done).length / checklist.length * 100;
+  return (
+    <div className="space-y-6 pb-12">
+      <Link
+        to="/animals"
+        className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-text-primary transition-colors">
+        
+        <ArrowLeftIcon className="w-4 h-4" /> Back to Animals
+      </Link>
+
+      {/* Hero Section */}
+      <Card className="overflow-hidden">
+        <div className="flex flex-col md:flex-row">
+          <div className="w-full md:w-1/3 h-64 md:h-auto bg-accent relative">
+            {animal.primary_photo_url ?
+            <img
+              src={animal.primary_photo_url}
+              alt={animal.name}
+              className="w-full h-full object-cover" /> :
+
+
+            <div className="w-full h-full flex items-center justify-center text-secondary">
+                <ActivityIcon className="w-16 h-16 opacity-20" />
+              </div>
+            }
+          </div>
+          <div className="flex-1 p-6 md:p-8 flex flex-col justify-between">
+            <div>
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <h1 className="text-4xl font-heading font-bold text-text-primary">
+                      {animal.name}
+                    </h1>
+                    <span className="font-mono text-xs font-medium bg-background border border-border text-text-secondary px-2 py-1 rounded-md">
+                      #{animal.id}
+                    </span>
+                  </div>
+                  <p className="text-lg text-text-secondary">
+                    {animal.species} • {animal.sex} •{' '}
+                    {calculateAge(animal.estimated_birth_date)}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  {!currentFoster &&
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setIsPlaceModalOpen(true)}>
+                    
+                      <HomeIcon className="w-4 h-4 mr-2" /> Place in Foster
+                    </Button>
+                  }
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsStatusModalOpen(true)}>
+                    
+                    <Edit2Icon className="w-4 h-4 mr-2" /> Change Status
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 mb-6">
+                <StatusBadge
+                  status={animal.status}
+                  className="text-sm px-3 py-1" />
+                
+                <PriorityBadge
+                  priority={animal.priority}
+                  className="text-sm px-3 py-1" />
+                
+                <SpeciesBadge species={animal.species} showLabel size="md" />
+                {animal.microchip_number &&
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-background border border-border text-text-secondary">
+                    Chip: {animal.microchip_number}
+                  </span>
+                }
+              </div>
+
+              <p className="text-text-primary mb-6 max-w-2xl leading-relaxed">
+                {animal.description}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-6 border-t border-border">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-[#DCEAF7] text-[#356A9A] rounded-lg">
+                  <HomeIcon className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-sm text-text-secondary">Current Foster</p>
+                  {currentFoster ?
+                  <Link
+                    to={`/fosters/${currentFoster.id}`}
+                    className="font-medium text-primary hover:underline">
+                    
+                      {currentFoster.first_name} {currentFoster.last_name}
+                    </Link> :
+
+                  <p className="font-medium text-text-primary">
+                      None (Needs Placement)
+                    </p>
+                  }
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-[#F3E4D7] text-[#D98C5F] rounded-lg">
+                  <SyringeIcon className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-sm text-text-secondary">Next Medical</p>
+                  {upcomingMedical.length > 0 ?
+                  <p className="font-medium text-status-urgent-text">
+                      {upcomingMedical[0].procedure_name} (
+                      {formatDate(upcomingMedical[0].due_date!)})
+                    </p> :
+
+                  <p className="font-medium text-text-primary">Up to date</p>
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <ActionNeededCallout
+        animalId={animal.id}
+        priority={animal.priority}
+        actionNeeded={animal.action_needed} />
+      
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left Column: Tabs (Timeline / Medical History) */}
+        <div className="lg:col-span-2 space-y-5">
+          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+            {/* Tabs */}
+            <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-card border border-border shadow-soft self-start">
+              <button
+                onClick={() => setActiveTab('timeline')}
+                className={`flex items-center gap-2 px-3 h-9 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'timeline' ? 'bg-primary/10 text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-background'}`}>
+                
+                <ActivityIcon className="w-4 h-4" /> Timeline
+              </button>
+              <button
+                onClick={() => setActiveTab('medical')}
+                className={`flex items-center gap-2 px-3 h-9 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'medical' ? 'bg-primary/10 text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-background'}`}>
+                
+                <MedicalKitIcon className="w-4 h-4" /> Medical History
+                {animalMedical.length > 0 &&
+                <span className="text-xs px-1.5 py-0.5 rounded-full bg-background text-text-secondary font-semibold">
+                    {animalMedical.length}
+                  </span>
+                }
+              </button>
+              <button
+                onClick={() => setActiveTab('photos')}
+                className={`flex items-center gap-2 px-3 h-9 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'photos' ? 'bg-primary/10 text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-background'}`}>
+                
+                <ImageIcon className="w-4 h-4" /> Photos
+                {animalPhotosCount > 0 &&
+                <span className="text-xs px-1.5 py-0.5 rounded-full bg-background text-text-secondary font-semibold">
+                    {animalPhotosCount}
+                  </span>
+                }
+              </button>
+            </div>
+
+            {activeTab !== 'photos' &&
+            <div className="flex gap-2">
+                <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsNoteModalOpen(true)}>
+                
+                  <FileTextIcon className="w-4 h-4 mr-2" /> Add Note
+                </Button>
+                <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsMedicalModalOpen(true)}>
+                
+                  <SyringeIcon className="w-4 h-4 mr-2" /> Add Medical
+                </Button>
+              </div>
+            }
+          </div>
+
+          {activeTab === 'timeline' &&
+          <Card className="p-6">
+              <div className="relative border-l-2 border-border ml-4 space-y-8 pb-4">
+                {timeline.map((event, index) =>
+              <motion.div
+                key={`${event.id}-${index}`}
+                initial={{
+                  opacity: 0,
+                  x: -20
+                }}
+                animate={{
+                  opacity: 1,
+                  x: 0
+                }}
+                transition={{
+                  delay: index * 0.05
+                }}
+                className="relative pl-8">
+                
+                    <div
+                  className={`absolute -left-[17px] top-1 w-8 h-8 rounded-full flex items-center justify-center border-4 border-card ${event.color}`}>
+                  
+                      <event.icon className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <div className="flex items-baseline gap-2 mb-1">
+                        <h3 className="font-bold text-text-primary">
+                          {event.title}
+                        </h3>
+                        <span className="text-sm text-text-secondary">
+                          {formatDate(event.date)}
+                        </span>
+                      </div>
+                      <p className="text-text-secondary">{event.description}</p>
+                    </div>
+                  </motion.div>
+              )}
+              </div>
+            </Card>
+          }
+
+          {activeTab === 'medical' &&
+          <MedicalHistoryView records={animalMedical} />
+          }
+
+          {activeTab === 'photos' && <PhotoGallery animalId={animal.id} />}
+        </div>
+
+        {/* Right Column: Sidebar Widgets */}
+        <div className="space-y-6">
+          {/* Adoption Listing (only shown when adoptable) */}
+          <AdoptionProfileCard
+            animalId={animal.id}
+            status={animal.status}
+            adoptionProfileUrl={animal.adoption_profile_url} />
+          
+
+          {/* Relationships (auto-hides when none exist) */}
+          <RelationshipsCard animalId={animal.id} />
+
+          {/* Adoption Readiness */}
+          <Card className="p-6">
+            <h3 className="text-lg font-heading font-bold mb-4">
+              Adoption Readiness
+            </h3>
+            <div className="w-full bg-background rounded-full h-2 mb-4 overflow-hidden">
+              <div
+                className="bg-[#3E7B52] h-2 rounded-full transition-all duration-1000"
+                style={{
+                  width: `${readinessPercent}%`
+                }} />
+              
+            </div>
+            <div className="space-y-3">
+              {checklist.map((item, i) =>
+              <div key={i} className="flex items-center gap-3">
+                  {item.done ?
+                <CheckCircle2Icon className="w-5 h-5 text-[#3E7B52]" /> :
+
+                <PawPrintGlyph className="w-5 h-5 text-border" />
+                }
+                  <span
+                  className={
+                  item.done ? 'text-text-primary' : 'text-text-secondary'
+                  }>
+                  
+                    {item.label}
+                  </span>
+                </div>
+              )}
+            </div>
+            {readinessPercent === 100 &&
+            animal.status !== 'adoptable' &&
+            animal.status !== 'adopted' &&
+            <Button
+              className="w-full mt-6 bg-[#DDEFE2] text-[#3E7B52] hover:bg-[#C8E6D0]"
+              onClick={() => setIsStatusModalOpen(true)}>
+              
+                  Mark as Adoptable
+                </Button>
+            }
+          </Card>
+
+          {/* Upcoming Medical Widget */}
+          {upcomingMedical.length > 0 &&
+          <Card className="p-6">
+              <h3 className="text-lg font-heading font-bold mb-4">
+                Care Schedule
+              </h3>
+              <div className="space-y-4">
+                {upcomingMedical.map((m) =>
+              <div
+                key={m.id}
+                className="flex items-start gap-3 p-3 rounded-lg bg-background border border-border">
+                
+                    <SyringeIcon
+                  className={`w-5 h-5 mt-0.5 ${m.status === 'overdue' ? 'text-status-urgent-text' : 'text-primary'}`} />
+                
+                    <div>
+                      <p className="font-medium text-text-primary">
+                        {m.procedure_name}
+                      </p>
+                      <p
+                    className={`text-sm ${m.status === 'overdue' ? 'text-status-urgent-text font-medium' : 'text-text-secondary'}`}>
+                    
+                        {m.status === 'overdue' ? 'Overdue: ' : 'Due: '}
+                        {formatDate(m.due_date!)}
+                      </p>
+                    </div>
+                  </div>
+              )}
+              </div>
+            </Card>
+          }
+        </div>
+      </div>
+
+      <AddMedicalModal
+        isOpen={isMedicalModalOpen}
+        onClose={() => setIsMedicalModalOpen(false)}
+        animalId={animal.id} />
+      
+      <AddNoteModal
+        isOpen={isNoteModalOpen}
+        onClose={() => setIsNoteModalOpen(false)}
+        animalId={animal.id} />
+      
+      <ChangeStatusModal
+        isOpen={isStatusModalOpen}
+        onClose={() => setIsStatusModalOpen(false)}
+        animalId={animal.id}
+        currentStatus={animal.status}
+        currentPriority={animal.priority} />
+      
+      <PlaceAnimalModal
+        isOpen={isPlaceModalOpen}
+        onClose={() => setIsPlaceModalOpen(false)}
+        animalId={animal.id} />
+      
+    </div>);
+
+}
+// — Medical History View ————————————————————————————————————
+const PROCEDURE_TYPE_LABELS: Record<string, string> = {
+  vaccine: 'Vaccine',
+  exam: 'Exam',
+  spay_neuter: 'Spay/Neuter',
+  medication: 'Medication',
+  surgery: 'Surgery',
+  microchip: 'Microchip',
+  deworming: 'Deworming',
+  test: 'Test'
+};
+const STATUS_TONE: Record<
+  string,
+  {
+    wrap: string;
+    label: string;
+  }> =
+{
+  completed: {
+    wrap: 'bg-[#DDEFE2] text-[#3E7B52]',
+    label: 'Completed'
+  },
+  scheduled: {
+    wrap: 'bg-[#DCEAF7] text-[#356A9A]',
+    label: 'Scheduled'
+  },
+  due: {
+    wrap: 'bg-[#F8E7C8] text-[#A36B00]',
+    label: 'Due'
+  },
+  overdue: {
+    wrap: 'bg-[#F5D7D7] text-[#9B3A3A]',
+    label: 'Overdue'
+  },
+  canceled: {
+    wrap: 'bg-background text-text-secondary border border-border',
+    label: 'Canceled'
+  }
+};
+interface MedicalHistoryViewProps {
+  records: ReturnType<typeof useWhisker>['medicalRecords'];
+}
+function MedicalHistoryView({ records }: MedicalHistoryViewProps) {
+  if (records.length === 0) {
+    return (
+      <Card className="p-10 text-center text-text-secondary">
+        <MedicalKitIcon className="w-10 h-10 mx-auto mb-3 opacity-30" />
+        <p className="font-medium text-text-primary mb-1">
+          No medical records yet
+        </p>
+        <p className="text-sm">
+          Add a vaccine, exam, or procedure to start the medical record.
+        </p>
+      </Card>);
+
+  }
+  // Group by status bucket
+  const overdue = records.filter((r) => r.status === 'overdue');
+  const upcoming = records.filter(
+    (r) => r.status === 'due' || r.status === 'scheduled'
+  );
+  const completed = records.
+  filter((r) => r.status === 'completed').
+  sort(
+    (a, b) =>
+    new Date(b.performed_date || 0).getTime() -
+    new Date(a.performed_date || 0).getTime()
+  );
+  const other = records.filter((r) => r.status === 'canceled');
+  // Sort upcoming by soonest due
+  upcoming.sort(
+    (a, b) =>
+    new Date(a.due_date || 0).getTime() - new Date(b.due_date || 0).getTime()
+  );
+  return (
+    <div className="space-y-4">
+      {overdue.length > 0 &&
+      <MedicalGroup
+        title="Overdue"
+        icon={AlertCircleIcon}
+        tone="urgent"
+        count={overdue.length}
+        records={overdue} />
+
+      }
+      {upcoming.length > 0 &&
+      <MedicalGroup
+        title="Upcoming"
+        icon={ClockIcon}
+        tone="info"
+        count={upcoming.length}
+        records={upcoming} />
+
+      }
+      {completed.length > 0 &&
+      <MedicalGroup
+        title="Completed"
+        icon={CheckCircle2Icon}
+        tone="success"
+        count={completed.length}
+        records={completed} />
+
+      }
+      {other.length > 0 &&
+      <MedicalGroup
+        title="Other"
+        icon={CircleIcon}
+        tone="neutral"
+        count={other.length}
+        records={other} />
+
+      }
+    </div>);
+
+}
+interface MedicalGroupProps {
+  title: string;
+  icon: React.ElementType;
+  tone: 'urgent' | 'info' | 'success' | 'neutral';
+  count: number;
+  records: ReturnType<typeof useWhisker>['medicalRecords'];
+}
+function MedicalGroup({
+  title,
+  icon: Icon,
+  tone,
+  count,
+  records
+}: MedicalGroupProps) {
+  const toneColor = {
+    urgent: 'text-status-urgent-text',
+    info: 'text-primary',
+    success: 'text-[#3E7B52]',
+    neutral: 'text-text-secondary'
+  }[tone];
+  return (
+    <Card className="overflow-hidden">
+      <div className="px-5 py-3 border-b border-border bg-background/60 flex items-center gap-2">
+        <Icon className={`w-4 h-4 ${toneColor}`} />
+        <span className={`text-sm font-semibold ${toneColor}`}>{title}</span>
+        <span className="text-xs text-text-secondary">({count})</span>
+      </div>
+      <div className="divide-y divide-border">
+        {records.map((r) => {
+          const tone = STATUS_TONE[r.status] || STATUS_TONE.canceled;
+          const dateLabel = r.performed_date ?
+          formatDate(r.performed_date) :
+          r.due_date ?
+          formatDate(r.due_date) :
+          '—';
+          const datePrefix =
+          r.status === 'completed' ?
+          'Performed' :
+          r.status === 'overdue' ?
+          'Was due' :
+          'Due';
+          return (
+            <div
+              key={r.id}
+              className="px-5 py-4 hover:bg-background/40 transition-colors">
+              
+              <div className="flex items-start justify-between gap-3 mb-1.5">
+                <div className="min-w-0">
+                  <h4 className="font-semibold text-text-primary truncate">
+                    {r.procedure_name}
+                  </h4>
+                  <p className="text-xs text-text-secondary mt-0.5">
+                    {PROCEDURE_TYPE_LABELS[r.procedure_type] ||
+                    r.procedure_type}
+                  </p>
+                </div>
+                <span
+                  className={`shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${tone.wrap}`}>
+                  
+                  {tone.label}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-text-secondary">
+                <span>
+                  <span className="text-text-secondary/70">{datePrefix}:</span>{' '}
+                  <span className="text-text-primary font-medium">
+                    {dateLabel}
+                  </span>
+                </span>
+                {r.provider_name &&
+                <span>
+                    <span className="text-text-secondary/70">Provider:</span>{' '}
+                    <span className="text-text-primary">{r.provider_name}</span>
+                  </span>
+                }
+              </div>
+              {r.notes &&
+              <p className="text-sm text-text-secondary mt-2 italic">
+                  {r.notes}
+                </p>
+              }
+            </div>);
+
+        })}
+      </div>
+    </Card>);
+
+}

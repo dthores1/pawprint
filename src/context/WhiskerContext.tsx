@@ -1,0 +1,331 @@
+import React, { useState, createContext, useContext } from 'react';
+import {
+  Animal,
+  FosterParent,
+  AnimalPlacement,
+  MedicalRecord,
+  AnimalNote,
+  AnimalRelationship,
+  AnimalPhoto,
+  Person,
+  Product,
+  SupplyRequest,
+  SupplyRequestItem } from
+'../types';
+import {
+  seedAnimals,
+  seedFosters,
+  seedPlacements,
+  seedMedicalRecords,
+  seedNotes,
+  seedRelationships,
+  seedPhotos,
+  seedPeople,
+  seedProducts,
+  seedSupplyRequests,
+  seedSupplyRequestItems } from
+'../data/seed';
+import { generateId } from '../lib/utils';
+interface WhiskerContextType {
+  animals: Animal[];
+  fosters: FosterParent[];
+  placements: AnimalPlacement[];
+  medicalRecords: MedicalRecord[];
+  notes: AnimalNote[];
+  relationships: AnimalRelationship[];
+  photos: AnimalPhoto[];
+  people: Person[];
+  products: Product[];
+  supplyRequests: SupplyRequest[];
+  supplyRequestItems: SupplyRequestItem[];
+  addAnimal: (animal: Omit<Animal, 'id' | 'created_at' | 'updated_at'>) => void;
+  updateAnimal: (id: string, updates: Partial<Animal>) => void;
+  addFoster: (foster: Omit<FosterParent, 'id'>) => void;
+  updateFoster: (id: string, updates: Partial<FosterParent>) => void;
+  addMedicalRecord: (record: Omit<MedicalRecord, 'id'>) => void;
+  updateMedicalRecord: (id: string, updates: Partial<MedicalRecord>) => void;
+  addNote: (note: Omit<AnimalNote, 'id' | 'created_at'>) => void;
+  addPlacement: (placement: Omit<AnimalPlacement, 'id'>) => void;
+  updatePlacement: (id: string, updates: Partial<AnimalPlacement>) => void;
+  addPerson: (person: Omit<Person, 'id' | 'created_at'>) => void;
+  updatePerson: (id: string, updates: Partial<Person>) => void;
+  addPhoto: (photo: Omit<AnimalPhoto, 'id' | 'uploaded_at'>) => void;
+  deletePhoto: (id: string) => void;
+  addRelationship: (rel: Omit<AnimalRelationship, 'id'>) => void;
+  deleteRelationship: (id: string) => void;
+  placeAnimal: (
+  animal_id: string,
+  foster_parent_id: string,
+  start_date: string,
+  notes?: string)
+  => void;
+  addSupplyRequest: (
+  req: Omit<SupplyRequest, 'id' | 'created_at' | 'updated_at'>)
+  => string;
+  updateSupplyRequest: (id: string, updates: Partial<SupplyRequest>) => void;
+  addSupplyRequestItem: (item: Omit<SupplyRequestItem, 'id'>) => void;
+}
+const WhiskerContext = createContext<WhiskerContextType | undefined>(undefined);
+export function WhiskerProvider({ children }: {children: ReactNode;}) {
+  const [animals, setAnimals] = useState<Animal[]>(seedAnimals);
+  const [fosters, setFosters] = useState<FosterParent[]>(seedFosters);
+  const [placements, setPlacements] =
+  useState<AnimalPlacement[]>(seedPlacements);
+  const [medicalRecords, setMedicalRecords] =
+  useState<MedicalRecord[]>(seedMedicalRecords);
+  const [notes, setNotes] = useState<AnimalNote[]>(seedNotes);
+  const [relationships, setRelationships] =
+  useState<AnimalRelationship[]>(seedRelationships);
+  const [photos, setPhotos] = useState<AnimalPhoto[]>(seedPhotos);
+  const [people, setPeople] = useState<Person[]>(seedPeople);
+  const [products, setProducts] = useState<Product[]>(seedProducts);
+  const [supplyRequests, setSupplyRequests] =
+  useState<SupplyRequest[]>(seedSupplyRequests);
+  const [supplyRequestItems, setSupplyRequestItems] = useState<
+    SupplyRequestItem[]>(
+    seedSupplyRequestItems);
+  const addAnimal = (
+  animal: Omit<Animal, 'id' | 'created_at' | 'updated_at'>) =>
+  {
+    const newAnimal: Animal = {
+      ...animal,
+      id: `a${generateId()}`,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    setAnimals((prev) => [newAnimal, ...prev]);
+  };
+  const updateAnimal = (id: string, updates: Partial<Animal>) => {
+    setAnimals((prev) =>
+    prev.map((a) =>
+    a.id === id ?
+    {
+      ...a,
+      ...updates,
+      updated_at: new Date().toISOString()
+    } :
+    a
+    )
+    );
+  };
+  const addFoster = (foster: Omit<FosterParent, 'id'>) => {
+    setFosters((prev) => [
+    {
+      ...foster,
+      id: `f${generateId()}`
+    },
+    ...prev]
+    );
+  };
+  const updateFoster = (id: string, updates: Partial<FosterParent>) => {
+    setFosters((prev) =>
+    prev.map((f) =>
+    f.id === id ?
+    {
+      ...f,
+      ...updates
+    } :
+    f
+    )
+    );
+  };
+  const addMedicalRecord = (record: Omit<MedicalRecord, 'id'>) => {
+    setMedicalRecords((prev) => [
+    {
+      ...record,
+      id: `m${generateId()}`
+    },
+    ...prev]
+    );
+  };
+  const updateMedicalRecord = (id: string, updates: Partial<MedicalRecord>) => {
+    setMedicalRecords((prev) =>
+    prev.map((m) =>
+    m.id === id ?
+    {
+      ...m,
+      ...updates
+    } :
+    m
+    )
+    );
+  };
+  const addNote = (note: Omit<AnimalNote, 'id' | 'created_at'>) => {
+    setNotes((prev) => [
+    {
+      ...note,
+      id: `n${generateId()}`,
+      created_at: new Date().toISOString()
+    },
+    ...prev]
+    );
+  };
+  const addPlacement = (placement: Omit<AnimalPlacement, 'id'>) => {
+    setPlacements((prev) => [
+    {
+      ...placement,
+      id: `p${generateId()}`
+    },
+    ...prev]
+    );
+  };
+  const updatePlacement = (id: string, updates: Partial<AnimalPlacement>) => {
+    setPlacements((prev) =>
+    prev.map((p) =>
+    p.id === id ?
+    {
+      ...p,
+      ...updates
+    } :
+    p
+    )
+    );
+  };
+  const addPerson = (person: Omit<Person, 'id' | 'created_at'>) => {
+    setPeople((prev) => [
+    {
+      ...person,
+      id: `pe${generateId()}`,
+      created_at: new Date().toISOString()
+    },
+    ...prev]
+    );
+  };
+  const updatePerson = (id: string, updates: Partial<Person>) => {
+    setPeople((prev) =>
+    prev.map((p) =>
+    p.id === id ?
+    {
+      ...p,
+      ...updates
+    } :
+    p
+    )
+    );
+  };
+  const addPhoto = (photo: Omit<AnimalPhoto, 'id' | 'uploaded_at'>) => {
+    setPhotos((prev) => [
+    {
+      ...photo,
+      id: `ph${generateId()}`,
+      uploaded_at: new Date().toISOString()
+    },
+    ...prev]
+    );
+  };
+  const deletePhoto = (id: string) => {
+    setPhotos((prev) => prev.filter((p) => p.id !== id));
+  };
+  const addRelationship = (rel: Omit<AnimalRelationship, 'id'>) => {
+    setRelationships((prev) => [
+    {
+      ...rel,
+      id: `r${generateId()}`
+    },
+    ...prev]
+    );
+  };
+  const deleteRelationship = (id: string) => {
+    setRelationships((prev) => prev.filter((r) => r.id !== id));
+  };
+  const placeAnimal = (
+  animal_id: string,
+  foster_parent_id: string,
+  start_date: string,
+  notes?: string) =>
+  {
+    addPlacement({
+      animal_id,
+      foster_parent_id,
+      start_date,
+      placement_status: 'active',
+      notes
+    });
+    updateAnimal(animal_id, {
+      status: 'fostered'
+    });
+  };
+  const addSupplyRequest = (
+  req: Omit<SupplyRequest, 'id' | 'created_at' | 'updated_at'>) =>
+  {
+    const id = `sr${generateId()}`;
+    const now = new Date().toISOString();
+    setSupplyRequests((prev) => [
+    {
+      ...req,
+      id,
+      created_at: now,
+      updated_at: now
+    },
+    ...prev]
+    );
+    return id;
+  };
+  const updateSupplyRequest = (id: string, updates: Partial<SupplyRequest>) => {
+    setSupplyRequests((prev) =>
+    prev.map((sr) =>
+    sr.id === id ?
+    {
+      ...sr,
+      ...updates,
+      updated_at: new Date().toISOString()
+    } :
+    sr
+    )
+    );
+  };
+  const addSupplyRequestItem = (item: Omit<SupplyRequestItem, 'id'>) => {
+    setSupplyRequestItems((prev) => [
+    {
+      ...item,
+      id: `sri${generateId()}`
+    },
+    ...prev]
+    );
+  };
+  return (
+    <WhiskerContext.Provider
+      value={{
+        animals,
+        fosters,
+        placements,
+        medicalRecords,
+        notes,
+        relationships,
+        photos,
+        people,
+        products,
+        supplyRequests,
+        supplyRequestItems,
+        addAnimal,
+        updateAnimal,
+        addFoster,
+        updateFoster,
+        addMedicalRecord,
+        updateMedicalRecord,
+        addNote,
+        addPlacement,
+        updatePlacement,
+        addPerson,
+        updatePerson,
+        addPhoto,
+        deletePhoto,
+        addRelationship,
+        deleteRelationship,
+        placeAnimal,
+        addSupplyRequest,
+        updateSupplyRequest,
+        addSupplyRequestItem
+      }}>
+      
+      {children}
+    </WhiskerContext.Provider>);
+
+}
+export function useWhisker() {
+  const context = useContext(WhiskerContext);
+  if (context === undefined) {
+    throw new Error('useWhisker must be used within a WhiskerProvider');
+  }
+  return context;
+}
