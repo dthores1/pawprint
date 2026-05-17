@@ -4,6 +4,9 @@ An operationally-focused animal rescue management app. Pawprint helps small-to-m
 
 This document is the canonical reference for **product logic, data model, and design conventions**. Update it whenever a meaningful behavior changes.
 
+
+![Application Dashboard / Landing page](docs/images/Landing_Page.png "Dashboard of the application where users can determine organization status at a glance and review items that need attention.")
+
 ---
 
 ## 1. Domain model
@@ -28,6 +31,8 @@ The central record. Every animal has both a **lifecycle status** and an orthogon
 | `microchip_number` | string? | |
 | `primary_photo_url` | string? | |
 | `adoption_profile_url` | string? | External Petfinder / Adopt-a-Pet / org listing URL. See §8. |
+
+![Animal Detail page](docs/images/Animal_Detail.png "The animal detail page that shows their timeline, medical history, notes, relationships to other animals, and adoption readiness. Specific details on the animal's species, status, priority, etc. are tracked at the top level.")
 
 ### Other entities
 
@@ -137,6 +142,8 @@ Hierarchy is intentional:
 
 **Bonded pair indicator.** When an animal has a `bonded_pair` relationship, a small lavender-gray "Bonded Pair" chip with a two-pets glyph renders under its name in the table. Coordinators can spot inseparable pairs without opening the profile.
 
+![Animal List](docs/images/Animal_Tab.png "The animal list shows the organization's animals at a glance and allows quick filtering and sorting based on Status, Priority, or Species.")
+
 ---
 
 ## 8. Relationships, photos, and the adoption listing
@@ -195,6 +202,8 @@ Three tables back the feature:
 
 A request can have many items. Each item is for the same request — multi-animal requests are intentionally out of scope for now.
 
+![Supply Requests tab](docs/images/Supply_Requests_Tab.png "The Supply Requests tab allows quick review of existing Requests, linking to volunteer and animal.")
+
 ### Status lifecycle
 
 | Value | Label | Meaning |
@@ -209,6 +218,8 @@ A request can have many items. Each item is for the same request — multi-anima
 | `canceled` | Canceled | Soft exit at any point. |
 
 `SupplyRequestPriority` is `normal | urgent | critical`, orthogonal to status (same pattern as animals — see §3).
+
+![Supply Requests example](docs/images/Supply_Requests_Detail.png "The Supply Requests modal allows requesting multiple items at once.")
 
 ### Surfaces
 
@@ -258,6 +269,8 @@ A handful of glyphs are hand-rolled to give the app a distinct, warmer feel than
 - **`PawPrintIcon`** (`components/ui/PawPrintIcon.tsx`) — used as the Avatar fallback for cats / other species without a photo, the Animals list empty state, and the unchecked items in the Adoption Readiness checklist.
 
 The Avatar primitive also supports a fixed `tone` prop (currently `'peach'`) for surfaces that want consistent initial-avatar styling — used on the Supplies list to give every requester the same warm peach + terracotta palette regardless of name.
+
+![Contacts tab](docs/images/Contacts_Tab.png "The Contacts tab allows people management and organization.")
 
 ---
 
