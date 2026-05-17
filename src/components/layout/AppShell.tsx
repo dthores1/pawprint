@@ -12,7 +12,7 @@ export function AppShell() {
         {/* Mobile Header */}
         <header className="md:hidden h-16 bg-card border-b border-border flex items-center justify-between px-4 shrink-0">
           <div className="flex items-center gap-2 text-primary">
-            <PawPrintIcon className="w-6 h-6" />
+            <PawPrintIcon className="w-7 h-7" />
             <span className="font-heading font-bold text-xl tracking-tight">
               Pawprint
             </span>
@@ -21,7 +21,7 @@ export function AppShell() {
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="p-2 text-text-secondary hover:bg-background rounded-lg">
             
-            <MenuIcon className="w-6 h-6" />
+            <MenuIcon className="w-7 h-7" />
           </button>
         </header>
 

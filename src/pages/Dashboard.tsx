@@ -117,7 +117,7 @@ export function Dashboard() {
       </motion.div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
         {[
         {
           label: 'Total Animals',
@@ -148,16 +148,17 @@ export function Dashboard() {
           bg: 'bg-[#DDEFE2]'
         }].
         map((stat, i) =>
-        <motion.div key={i} variants={item}>
-            <Card className="p-5 flex items-center gap-4">
-              <div className={`p-3 rounded-xl ${stat.bg} ${stat.color}`}>
-                <stat.icon className="w-6 h-6" />
+        <motion.div key={i} variants={item} className="h-full min-w-0">
+            <Card className="h-full p-4 xl:p-5 flex items-start gap-3 xl:gap-4">
+              <div
+                className={`shrink-0 p-2 xl:p-3 rounded-xl ${stat.bg} ${stat.color}`}>
+                <stat.icon className="w-5 h-5 xl:w-6 xl:h-6" />
               </div>
-              <div>
-                <p className="text-sm font-medium text-text-secondary">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs xl:text-sm font-medium text-text-secondary leading-snug line-clamp-2 min-h-[2.5em]">
                   {stat.label}
                 </p>
-                <p className="text-2xl font-heading font-bold text-text-primary">
+                <p className="text-xl xl:text-2xl font-heading font-bold text-text-primary">
                   {stat.value}
                 </p>
               </div>

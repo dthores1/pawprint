@@ -42,7 +42,7 @@ export function Sidebar() {
     <aside className="w-64 bg-card border-r border-border h-full flex flex-col hidden md:flex">
       <div className="h-16 flex items-center px-6 border-b border-border">
         <div className="flex items-center gap-2 text-primary">
-          <PawPrintIcon className="w-6 h-6" />
+          <PawPrintIcon className="w-7 h-7" />
           <span className="font-heading font-bold text-xl tracking-tight">
             Pawprint
           </span>
