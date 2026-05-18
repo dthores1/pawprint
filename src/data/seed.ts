@@ -29,8 +29,8 @@ export const seedAnimals: Animal[] = [
   adoption_profile_url: 'https://www.petfinder.com/dog/biscuit-pawprint-a1',
   primary_photo_url:
   'https://images.unsplash.com/photo-1552053831-71594a27632d?auto=format&fit=crop&q=80&w=800',
-  created_at: '2023-10-01T10:00:00Z',
-  updated_at: '2023-11-15T10:00:00Z'
+  created_at: '2025-10-01T10:00:00Z',
+  updated_at: '2025-11-15T10:00:00Z'
 },
 {
   id: 'a2',
@@ -49,8 +49,8 @@ export const seedAnimals: Animal[] = [
   microchip_number: '981020000000002',
   primary_photo_url:
   'https://images.unsplash.com/photo-1513360371669-4adf3dd7dff8?auto=format&fit=crop&q=80&w=800',
-  created_at: '2023-11-05T14:30:00Z',
-  updated_at: '2023-11-20T09:00:00Z'
+  created_at: '2025-11-05T14:30:00Z',
+  updated_at: '2025-11-20T09:00:00Z'
 },
 {
   id: 'a3',
@@ -66,12 +66,12 @@ export const seedAnimals: Animal[] = [
   'Energetic terrier mix puppy. Learning basic commands and doing well with crate training.',
   primary_photo_url:
   'https://images.unsplash.com/photo-1537151608804-ea6f11cc98f9?auto=format&fit=crop&q=80&w=800',
-  created_at: '2023-11-10T11:15:00Z',
-  updated_at: '2023-11-12T16:00:00Z'
+  created_at: '2025-11-10T11:15:00Z',
+  updated_at: '2025-11-12T16:00:00Z'
 },
 {
   id: 'a4',
-  name: 'Pepper',
+  name: 'Milkshake',
   species: 'Cat',
   sex: 'Male',
   estimated_birth_date: '2023-10-20',
@@ -85,8 +85,8 @@ export const seedAnimals: Animal[] = [
   'Tiny black kitten found alone. Currently battling an upper respiratory infection. Needs immediate foster placement.',
   primary_photo_url:
   'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&q=80&w=800',
-  created_at: '2023-11-22T08:00:00Z',
-  updated_at: '2023-11-22T08:00:00Z'
+  created_at: '2025-11-22T08:00:00Z',
+  updated_at: '2025-11-22T08:00:00Z'
 },
 {
   id: 'a5',
@@ -103,8 +103,8 @@ export const seedAnimals: Animal[] = [
   microchip_number: '981020000000005',
   primary_photo_url:
   'https://images.unsplash.com/photo-1605568420105-eb2a4caa5e3e?auto=format&fit=crop&q=80&w=800',
-  created_at: '2023-09-15T09:00:00Z',
-  updated_at: '2023-10-30T14:00:00Z'
+  created_at: '2025-09-15T09:00:00Z',
+  updated_at: '2025-10-30T14:00:00Z'
 },
 {
   id: 'a6',
@@ -121,31 +121,30 @@ export const seedAnimals: Animal[] = [
   microchip_number: '981020000000006',
   primary_photo_url:
   'https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?auto=format&fit=crop&q=80&w=800',
-  created_at: '2023-11-25T10:00:00Z',
-  updated_at: '2023-11-25T10:00:00Z'
+  created_at: '2025-11-25T10:00:00Z',
+  updated_at: '2025-11-25T10:00:00Z'
 },
 {
   id: 'a7',
-  name: 'Cobbler',
+  name: 'Pip',
   species: 'Cat',
   sex: 'Male',
-  estimated_birth_date: '2018-06-01',
-  intake_date: '2023-10-20',
+  estimated_birth_date: '2025-07-01',
+  intake_date: '2025-08-13',
   intake_source: 'Stray',
   status: 'adoptable',
   priority: 'normal',
   description:
-  'A distinguished older gentleman. Loves window watching and chin scratches.',
+  'Trapped in Columbia City, Seattle with four of his littermates and his mother.',
   microchip_number: '981020000000007',
-  adoption_profile_url: 'https://www.petfinder.com/cat/cobbler-pawprint-a7',
-  primary_photo_url:
-  'https://images.unsplash.com/photo-1511044568932-338cba0ad803?auto=format&fit=crop&q=80&w=800',
-  created_at: '2023-10-20T10:00:00Z',
-  updated_at: '2023-11-01T10:00:00Z'
+  adoption_profile_url: 'https://www.petfinder.com/cat/pip-pawprint-a7',
+  primary_photo_url: '/images/animals/pip-1.jpg',
+  created_at: '2025-10-20T10:00:00Z',
+  updated_at: '2025-11-01T10:00:00Z'
 },
 {
   id: 'a8',
-  name: 'Sage',
+  name: 'Pepper',
   species: 'Cat',
   sex: 'Female',
   estimated_birth_date: '2023-05-15',
@@ -158,8 +157,8 @@ export const seedAnimals: Animal[] = [
   microchip_number: '981020000000008',
   primary_photo_url:
   'https://images.unsplash.com/photo-1573865526739-10659fec78a5?auto=format&fit=crop&q=80&w=800',
-  created_at: '2023-11-15T10:00:00Z',
-  updated_at: '2023-11-18T10:00:00Z'
+  created_at: '2025-11-15T10:00:00Z',
+  updated_at: '2025-11-18T10:00:00Z'
 },
 {
   id: 'a9',
@@ -177,8 +176,8 @@ export const seedAnimals: Animal[] = [
   'Found wandering with a slight limp. Needs vet evaluation and a medical foster ASAP.',
   primary_photo_url:
   'https://images.unsplash.com/photo-1543466835-00a7907e9de1?auto=format&fit=crop&q=80&w=800',
-  created_at: '2023-11-28T10:00:00Z',
-  updated_at: '2023-11-28T10:00:00Z'
+  created_at: '2025-11-28T10:00:00Z',
+  updated_at: '2025-11-28T10:00:00Z'
 },
 {
   id: 'a10',
@@ -193,12 +192,12 @@ export const seedAnimals: Animal[] = [
   description: 'Playful kitten, part of a litter of 4.',
   primary_photo_url:
   'https://images.unsplash.com/photo-1596854407944-bf87f6fdd49e?auto=format&fit=crop&q=80&w=800',
-  created_at: '2023-11-20T10:00:00Z',
-  updated_at: '2023-11-20T10:00:00Z'
+  created_at: '2025-11-20T10:00:00Z',
+  updated_at: '2025-11-20T10:00:00Z'
 },
 {
   id: 'a11',
-  name: 'Mochi',
+  name: 'Duffy',
   species: 'Dog',
   sex: 'Male',
   estimated_birth_date: '2020-04-10',
@@ -210,8 +209,8 @@ export const seedAnimals: Animal[] = [
   microchip_number: '981020000000011',
   primary_photo_url:
   'https://images.unsplash.com/photo-1583337130417-3346a1be7dee?auto=format&fit=crop&q=80&w=800',
-  created_at: '2023-11-01T10:00:00Z',
-  updated_at: '2023-11-15T10:00:00Z'
+  created_at: '2025-11-01T10:00:00Z',
+  updated_at: '2025-11-15T10:00:00Z'
 },
 {
   id: 'a12',
@@ -229,8 +228,8 @@ export const seedAnimals: Animal[] = [
   microchip_number: '981020000000012',
   primary_photo_url:
   'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&q=80&w=800',
-  created_at: '2023-10-10T10:00:00Z',
-  updated_at: '2023-10-15T10:00:00Z'
+  created_at: '2025-10-10T10:00:00Z',
+  updated_at: '2025-10-15T10:00:00Z'
 }];
 
 
@@ -264,15 +263,16 @@ export const seedFosters: FosterParent[] = [
 },
 {
   id: 'f3',
-  first_name: 'Elena',
-  last_name: 'Rodriguez',
-  email: 'elena.r@example.com',
-  phone: '(555) 456-7890',
-  address: '789 Pine Ln, Portland, OR',
-  max_capacity: 1,
+  first_name: 'Dan',
+  last_name: 'Thoreson',
+  email: 'thoreson.dan@gmail.com',
+  phone: '(555) 390-2847',
+  address: '789 Pine Ln, Seattle, WA',
+  max_capacity: 5,
   preferred_species: ['Dog', 'Cat'],
   notes: 'Great with medical recovery cases. Has a quiet home.',
-  active: true
+  active: true,
+  photo_url: '/images/contacts/Dan_Thoreson.jpeg'
 },
 {
   id: 'f4',
@@ -501,7 +501,7 @@ export const seedNotes: AnimalNote[] = [
   author_name: 'Volunteer Team',
   note_type: 'behavior',
   body: 'Biscuit passed his dog-to-dog assessment with flying colors today. Very playful but respects boundaries.',
-  created_at: '2023-10-15T14:00:00Z'
+  created_at: '2025-10-15T14:00:00Z'
 },
 {
   id: 'n2',
@@ -509,15 +509,15 @@ export const seedNotes: AnimalNote[] = [
   author_name: 'Elena Rodriguez',
   note_type: 'foster_update',
   body: 'Marmalade is eating her soft food well. Still a bit groggy from the meds but purring constantly.',
-  created_at: '2023-11-19T09:30:00Z'
+  created_at: '2025-11-19T09:30:00Z'
 },
 {
   id: 'n3',
   animal_id: 'a8',
   author_name: 'Anita Patel',
   note_type: 'foster_update',
-  body: 'Sage came out from under the bed today and accepted some treats from my hand!',
-  created_at: '2023-11-20T18:00:00Z'
+  body: 'Pepper came out from under the bed today and accepted some treats from my hand!',
+  created_at: '2025-11-20T18:00:00Z'
 }];
 
 
@@ -530,14 +530,14 @@ export const seedRelationships: AnimalRelationship[] = [
   relationship_type: 'mother',
   notes: 'Litter born during intake stay.'
 },
-// Willow and Pepper are littermates (cross-listed for demo richness).
+// Willow and Milkshake are littermates (cross-listed for demo richness).
 {
   id: 'r2',
   animal_id: 'a10',
   related_animal_id: 'a4',
   relationship_type: 'littermate'
 },
-// Biscuit and Mochi are a bonded pair — must be adopted together.
+// Biscuit and Duffy are a bonded pair — must be adopted together.
 {
   id: 'r3',
   animal_id: 'a1',
@@ -598,7 +598,7 @@ export const seedPhotos: AnimalPhoto[] = [
   caption: 'First weekend at meet-and-greet.',
   uploaded_at: '2023-11-04T15:00:00Z'
 },
-// Pepper
+// Milkshake
 {
   id: 'ph7',
   animal_id: 'a4',
@@ -644,7 +644,7 @@ export const seedPeople: Person[] = [
   role: 'vet',
   organization_name: 'Bridge City Veterinary',
   active: true,
-  created_at: '2023-01-10T10:00:00Z'
+  created_at: '2025-01-10T10:00:00Z'
 },
 {
   id: 'pe2',
@@ -655,7 +655,7 @@ export const seedPeople: Person[] = [
   role: 'vet',
   organization_name: 'PDX Animal Hospital',
   active: true,
-  created_at: '2023-02-15T10:00:00Z',
+  created_at: '2025-02-15T10:00:00Z',
   photo_url:
   'https://images.unsplash.com/photo-1741455620227-3b1c51e01419?auto=format&fit=crop&q=80&w=200'
 },
@@ -694,7 +694,7 @@ export const seedPeople: Person[] = [
   role: 'volunteer',
   volunteer_type: 'administrative',
   active: true,
-  created_at: '2023-03-20T10:00:00Z'
+  created_at: '2025-03-20T10:00:00Z'
 },
 {
   id: 'pe6',
@@ -705,7 +705,7 @@ export const seedPeople: Person[] = [
   role: 'volunteer',
   volunteer_type: 'trapper',
   active: true,
-  created_at: '2023-04-10T10:00:00Z'
+  created_at: '2025-04-10T10:00:00Z'
 },
 {
   id: 'pe7',
@@ -716,7 +716,7 @@ export const seedPeople: Person[] = [
   role: 'volunteer',
   volunteer_type: 'transport',
   active: true,
-  created_at: '2023-05-15T10:00:00Z'
+  created_at: '2025-05-15T10:00:00Z'
 },
 {
   id: 'pe8',
@@ -727,7 +727,7 @@ export const seedPeople: Person[] = [
   role: 'volunteer',
   volunteer_type: 'event_support',
   active: true,
-  created_at: '2023-06-20T10:00:00Z'
+  created_at: '2025-06-20T10:00:00Z'
 },
 {
   id: 'pe9',
@@ -738,7 +738,7 @@ export const seedPeople: Person[] = [
   role: 'volunteer',
   volunteer_type: 'social_media',
   active: true,
-  created_at: '2023-07-25T10:00:00Z'
+  created_at: '2025-07-25T10:00:00Z'
 },
 {
   id: 'pe10',
@@ -750,7 +750,7 @@ export const seedPeople: Person[] = [
   volunteer_type: 'other',
   notes: 'Helps with laundry and cleaning.',
   active: true,
-  created_at: '2023-08-30T10:00:00Z'
+  created_at: '2025-08-30T10:00:00Z'
 },
 {
   id: 'pe11',
@@ -761,7 +761,7 @@ export const seedPeople: Person[] = [
   role: 'adopter',
   notes: 'Adopted Luna (a5)',
   active: true,
-  created_at: '2023-09-15T10:00:00Z'
+  created_at: '2025-09-15T10:00:00Z'
 },
 {
   id: 'pe12',
@@ -772,7 +772,7 @@ export const seedPeople: Person[] = [
   role: 'adopter',
   notes: 'Looking to adopt a large dog.',
   active: true,
-  created_at: '2023-10-05T10:00:00Z'
+  created_at: '2025-10-05T10:00:00Z'
 }];
 
 
@@ -853,14 +853,14 @@ export const seedSupplyRequests: SupplyRequest[] = [
 {
   id: 'sr1',
   requester_person_id: 'pe5', // Chloe (volunteer)
-  requested_for_animal_id: 'a4', // Pepper (critical kitten)
+  requested_for_animal_id: 'a4', // Milkshake (critical kitten)
   status: 'submitted',
   priority: 'urgent',
   requested_date: '2023-11-23T08:00:00Z',
   needed_by_date: '2023-11-24T08:00:00Z',
-  notes: 'Pepper is out of formula and needs pee pads ASAP.',
-  created_at: '2023-11-23T08:00:00Z',
-  updated_at: '2023-11-23T08:00:00Z'
+  notes: 'Milkshake is out of formula and needs pee pads ASAP.',
+  created_at: '2025-11-23T08:00:00Z',
+  updated_at: '2025-11-23T08:00:00Z'
 },
 {
   id: 'sr2',
@@ -869,8 +869,8 @@ export const seedSupplyRequests: SupplyRequest[] = [
   status: 'reviewing',
   priority: 'normal',
   requested_date: '2023-11-22T10:00:00Z',
-  created_at: '2023-11-22T10:00:00Z',
-  updated_at: '2023-11-22T14:00:00Z'
+  created_at: '2025-11-22T10:00:00Z',
+  updated_at: '2025-11-22T14:00:00Z'
 },
 {
   id: 'sr3',
@@ -881,8 +881,8 @@ export const seedSupplyRequests: SupplyRequest[] = [
   requested_date: '2023-11-20T09:00:00Z',
   approved_by_person_id: 'pe3', // Jessica (staff)
   notes: 'Approved soft food for post-dental recovery.',
-  created_at: '2023-11-20T09:00:00Z',
-  updated_at: '2023-11-21T10:00:00Z'
+  created_at: '2025-11-20T09:00:00Z',
+  updated_at: '2025-11-21T10:00:00Z'
 },
 {
   id: 'sr4',
@@ -891,8 +891,8 @@ export const seedSupplyRequests: SupplyRequest[] = [
   priority: 'normal',
   requested_date: '2023-11-18T11:00:00Z',
   approved_by_person_id: 'pe4', // Brian (staff)
-  created_at: '2023-11-18T11:00:00Z',
-  updated_at: '2023-11-19T09:00:00Z'
+  created_at: '2025-11-18T11:00:00Z',
+  updated_at: '2025-11-19T09:00:00Z'
 },
 {
   id: 'sr5',
@@ -903,8 +903,8 @@ export const seedSupplyRequests: SupplyRequest[] = [
   requested_date: '2023-11-15T14:00:00Z',
   approved_by_person_id: 'pe3',
   delivery_method: 'pickup',
-  created_at: '2023-11-15T14:00:00Z',
-  updated_at: '2023-11-17T10:00:00Z'
+  created_at: '2025-11-15T14:00:00Z',
+  updated_at: '2025-11-17T10:00:00Z'
 },
 {
   id: 'sr6',
@@ -917,8 +917,8 @@ export const seedSupplyRequests: SupplyRequest[] = [
   fulfilled_by_person_id: 'pe4',
   fulfilled_date: '2023-11-12T15:00:00Z',
   delivery_method: 'drop_off',
-  created_at: '2023-11-10T09:00:00Z',
-  updated_at: '2023-11-12T15:00:00Z'
+  created_at: '2025-11-10T09:00:00Z',
+  updated_at: '2025-11-12T15:00:00Z'
 },
 {
   id: 'sr7',
@@ -930,13 +930,13 @@ export const seedSupplyRequests: SupplyRequest[] = [
   fulfilled_by_person_id: 'pe3',
   fulfilled_date: '2023-10-05T10:00:00Z',
   delivery_method: 'pickup',
-  created_at: '2023-10-01T10:00:00Z',
-  updated_at: '2023-10-05T10:00:00Z'
+  created_at: '2025-10-01T10:00:00Z',
+  updated_at: '2025-10-05T10:00:00Z'
 }];
 
 
 export const seedSupplyRequestItems: SupplyRequestItem[] = [
-// sr1 (Pepper - urgent)
+// sr1 (Milkshake - urgent)
 {
   id: 'sri1',
   supply_request_id: 'sr1',
