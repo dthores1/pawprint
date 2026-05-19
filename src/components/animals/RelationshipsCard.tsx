@@ -1,27 +1,33 @@
-import React, { useState, Children } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useWhisker } from '../../context/WhiskerContext';
 import { Card } from '../ui/Card';
 import { Avatar } from '../ui/Avatar';
 import { SpeciesBadge } from '../ui/SpeciesBadge';
-import { HeartIcon, PlusIcon } from 'lucide-react';
+import { HeartIcon, PlusIcon, XIcon } from 'lucide-react';
 import { BoneIcon } from '../ui/BoneIcon';
 import { Animal } from '../../types';
 import { AddRelationshipModal } from './AddRelationshipModal';
 interface RelationshipsCardProps {
   animalId: string;
 }
+// Each rendered relationship preserves the underlying record id so the user
+// can remove a single accidental link without affecting the rest of the group.
+interface RelEntry {
+  relationshipId: string;
+  animal: Animal;
+}
 interface GroupedRelationships {
-  mother: Animal | null;
-  father: Animal | null;
-  parents: Animal[];
-  children: Animal[];
-  littermates: Animal[];
-  siblings: Animal[];
-  bondedWith: Animal[];
+  mother: RelEntry | null;
+  father: RelEntry | null;
+  parents: RelEntry[];
+  children: RelEntry[];
+  littermates: RelEntry[];
+  siblings: RelEntry[];
+  bondedWith: RelEntry[];
 }
 export function RelationshipsCard({ animalId }: RelationshipsCardProps) {
-  const { relationships, animals } = useWhisker();
+  const { relationships, animals, deleteRelationship } = useWhisker();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const grouped = computeRelationships(animalId, relationships, animals);
   const isEmpty =
@@ -32,6 +38,15 @@ export function RelationshipsCard({ animalId }: RelationshipsCardProps) {
   grouped.littermates.length === 0 &&
   grouped.siblings.length === 0 &&
   grouped.bondedWith.length === 0;
+  const handleDelete = (entry: RelEntry, label: string) => {
+    if (
+    window.confirm(
+      `Remove the ${label.toLowerCase()} link to ${entry.animal.name}? This only removes the relationship, not the animal.`
+    ))
+    {
+      deleteRelationship(entry.relationshipId);
+    }
+  };
   return (
     <>
       <Card className="p-6">
@@ -64,18 +79,31 @@ export function RelationshipsCard({ animalId }: RelationshipsCardProps) {
 
         <div className="space-y-4">
             {grouped.mother &&
-          <RelationshipRow label="Mother" animals={[grouped.mother]} />
+          <RelationshipRow
+            label="Mother"
+            entries={[grouped.mother]}
+            onDelete={handleDelete} />
+
           }
             {grouped.father &&
-          <RelationshipRow label="Father" animals={[grouped.father]} />
+          <RelationshipRow
+            label="Father"
+            entries={[grouped.father]}
+            onDelete={handleDelete} />
+
           }
             {grouped.parents.length > 0 &&
-          <RelationshipRow label="Parent" animals={grouped.parents} />
+          <RelationshipRow
+            label="Parent"
+            entries={grouped.parents}
+            onDelete={handleDelete} />
+
           }
             {grouped.children.length > 0 &&
           <RelationshipRow
             label={grouped.children.length === 1 ? 'Child' : 'Children'}
-            animals={grouped.children} />
+            entries={grouped.children}
+            onDelete={handleDelete} />
 
           }
             {grouped.littermates.length > 0 &&
@@ -85,19 +113,22 @@ export function RelationshipsCard({ animalId }: RelationshipsCardProps) {
             'Littermate' :
             'Littermates'
             }
-            animals={grouped.littermates} />
+            entries={grouped.littermates}
+            onDelete={handleDelete} />
 
           }
             {grouped.siblings.length > 0 &&
           <RelationshipRow
             label={grouped.siblings.length === 1 ? 'Sibling' : 'Siblings'}
-            animals={grouped.siblings} />
+            entries={grouped.siblings}
+            onDelete={handleDelete} />
 
           }
             {grouped.bondedWith.length > 0 &&
           <RelationshipRow
             label="Bonded With"
-            animals={grouped.bondedWith}
+            entries={grouped.bondedWith}
+            onDelete={handleDelete}
             highlight />
 
           }
@@ -115,13 +146,15 @@ export function RelationshipsCard({ animalId }: RelationshipsCardProps) {
 }
 function RelationshipRow({
   label,
-  animals,
+  entries,
+  onDelete,
   highlight
-
-
-
-
-}: {label: string;animals: Animal[];highlight?: boolean;}) {
+}: {
+  label: string;
+  entries: RelEntry[];
+  onDelete: (entry: RelEntry, label: string) => void;
+  highlight?: boolean;
+}) {
   return (
     <div>
       <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary mb-2 flex items-center gap-1.5">
@@ -129,27 +162,43 @@ function RelationshipRow({
         {label}
       </p>
       <div className="space-y-2">
-        {animals.map((animal) =>
-        <Link
-          key={animal.id}
-          to={`/animals/${animal.id}`}
-          className="flex items-center gap-3 p-2 -mx-2 rounded-lg hover:bg-background transition-colors group">
-          
-            <div className="relative shrink-0">
-              <Avatar src={animal.primary_photo_url} type="animal" size="sm" />
-              <div className="absolute -bottom-1 -right-1 ring-2 ring-card rounded-full">
-                <SpeciesBadge species={animal.species} />
+        {entries.map((entry) =>
+        <div
+          key={entry.relationshipId}
+          className="group flex items-center gap-3 p-2 -mx-2 rounded-lg hover:bg-background transition-colors">
+
+            <Link
+            to={`/animals/${entry.animal.id}`}
+            className="flex items-center gap-3 flex-1 min-w-0">
+
+              <div className="relative shrink-0">
+                <Avatar
+                src={entry.animal.primary_photo_url}
+                type="animal"
+                size="sm" />
+
+                <div className="absolute -bottom-1 -right-1 ring-2 ring-card rounded-full">
+                  <SpeciesBadge species={entry.animal.species} />
+                </div>
               </div>
-            </div>
-            <div className="min-w-0">
-              <p className="font-medium text-text-primary group-hover:text-primary transition-colors truncate">
-                {animal.name}
-              </p>
-              <p className="text-xs text-text-secondary font-mono">
-                #{animal.id}
-              </p>
-            </div>
-          </Link>
+              <div className="min-w-0">
+                <p className="font-medium text-text-primary hover:text-primary transition-colors truncate">
+                  {entry.animal.name}
+                </p>
+                <p className="text-xs text-text-secondary font-mono">
+                  #{entry.animal.id}
+                </p>
+              </div>
+            </Link>
+            <button
+            type="button"
+            onClick={() => onDelete(entry, label)}
+            aria-label={`Remove ${label.toLowerCase()} link to ${entry.animal.name}`}
+            className="shrink-0 p-1.5 rounded-md text-text-secondary opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-[#9B3A3A] hover:bg-[#F5D7D7]/60 transition-opacity transition-colors">
+
+              <XIcon className="w-3.5 h-3.5" />
+            </button>
+          </div>
         )}
       </div>
     </div>);
@@ -176,49 +225,51 @@ animals: Animal[])
       // This animal is the subject. r.relationship_type describes its role toward related_animal_id.
       const other = find(r.related_animal_id);
       if (!other) continue;
+      const entry: RelEntry = { relationshipId: r.id, animal: other };
       switch (r.relationship_type) {
         case 'mother':
         case 'father':
           // I am the parent → other is my child
-          result.children.push(other);
+          result.children.push(entry);
           break;
         case 'child':
           // I am a child → other is a parent
-          result.parents.push(other);
+          result.parents.push(entry);
           break;
         case 'sibling':
-          result.siblings.push(other);
+          result.siblings.push(entry);
           break;
         case 'littermate':
-          result.littermates.push(other);
+          result.littermates.push(entry);
           break;
         case 'bonded_pair':
-          result.bondedWith.push(other);
+          result.bondedWith.push(entry);
           break;
       }
     } else if (r.related_animal_id === animalId) {
       // This animal is the related party. Invert the relationship.
       const other = find(r.animal_id);
       if (!other) continue;
+      const entry: RelEntry = { relationshipId: r.id, animal: other };
       switch (r.relationship_type) {
         case 'mother':
-          result.mother = other;
+          result.mother = entry;
           break;
         case 'father':
-          result.father = other;
+          result.father = entry;
           break;
         case 'child':
           // other is my child → I'm the parent
-          result.children.push(other);
+          result.children.push(entry);
           break;
         case 'sibling':
-          result.siblings.push(other);
+          result.siblings.push(entry);
           break;
         case 'littermate':
-          result.littermates.push(other);
+          result.littermates.push(entry);
           break;
         case 'bonded_pair':
-          result.bondedWith.push(other);
+          result.bondedWith.push(entry);
           break;
       }
     }

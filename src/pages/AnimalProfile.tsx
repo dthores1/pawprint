@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useWhisker } from '../context/WhiskerContext';
 import { Card } from '../components/ui/Card';
@@ -32,6 +32,8 @@ import {
 import { motion } from 'framer-motion';
 import { MedicalKitIcon } from '../components/ui/MedicalKitIcon';
 import { PawPrintIcon as PawPrintGlyph } from '../components/ui/PawPrintIcon';
+import { BoneIcon } from '../components/ui/BoneIcon';
+import { CatIcon } from '../components/icons/CatIcon';
 export function AnimalProfile() {
   const { id } = useParams<{
     id: string;
@@ -45,6 +47,15 @@ export function AnimalProfile() {
   const [activeTab, setActiveTab] = useState<'timeline' | 'medical' | 'photos'>(
     'timeline'
   );
+  const [timelineFilter, setTimelineFilter] = useState<
+    'all' | 'placements' | 'medical' | 'notes'>(
+    'all');
+  const [heroImageError, setHeroImageError] = useState(false);
+  // Reset the image-error state when navigating between animals so the
+  // placeholder doesn't persist after the photo URL changes.
+  useEffect(() => {
+    setHeroImageError(false);
+  }, [id]);
   const animal = animals.find((a) => a.id === id);
   if (!animal) {
     return <div className="p-8 text-center">Animal not found.</div>;
@@ -163,24 +174,35 @@ export function AnimalProfile() {
       <Card className="overflow-hidden">
         <div className="flex flex-col md:flex-row">
           <div className="w-full md:w-1/3 h-64 md:h-auto bg-accent relative">
-            {animal.primary_photo_url ?
+            {animal.primary_photo_url && !heroImageError ?
             <img
               src={animal.primary_photo_url}
               alt={animal.name}
-              className="w-full h-full object-cover" /> :
+              className="w-full h-full object-cover"
+              onError={() => setHeroImageError(true)} /> :
 
 
-            <div className="w-full h-full flex items-center justify-center text-secondary">
-                <ActivityIcon className="w-16 h-16 opacity-20" />
+            <div className="w-full h-full flex items-center justify-center">
+                {/* Avatar-style fallback — matches the "peach" tone used for
+                   requester avatars elsewhere in the app. */}
+                <div className="w-32 h-32 rounded-full bg-[#EBD4C0] text-[#A85A2A] flex items-center justify-center">
+                  {animal.species === 'Dog' ?
+                <BoneIcon className="w-14 h-14" /> :
+                animal.species === 'Cat' ?
+                <CatIcon className="w-14 h-14" /> :
+
+                <PawPrintGlyph className="w-14 h-14" />
+                }
+                </div>
               </div>
             }
           </div>
-          <div className="flex-1 p-6 md:p-8 flex flex-col justify-between">
+          <div className="flex-1 p-6 md:p-8 flex flex-col justify-between min-w-0">
             <div>
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <h1 className="text-4xl font-heading font-bold text-text-primary">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-4">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-2">
+                    <h1 className="text-4xl font-heading font-bold text-text-primary break-words">
                       {animal.name}
                     </h1>
                     <span className="font-mono text-xs font-medium bg-background border border-border text-text-secondary px-2 py-1 rounded-md">
@@ -189,25 +211,26 @@ export function AnimalProfile() {
                   </div>
                   <p className="text-lg text-text-secondary">
                     {animal.species} • {animal.sex} •{' '}
-                    {calculateAge(animal.estimated_birth_date)}
+                    <span className="whitespace-nowrap">
+                      {calculateAge(animal.estimated_birth_date)}
+                    </span>
                   </p>
                 </div>
-                <div className="flex gap-2">
-                  {!currentFoster &&
+                <div className="flex flex-wrap gap-2 sm:shrink-0">
                   <Button
                     variant="primary"
                     size="sm"
                     onClick={() => setIsPlaceModalOpen(true)}>
-                    
-                      <HomeIcon className="w-4 h-4 mr-2" /> Place in Foster
-                    </Button>
-                  }
+
+                    <HomeIcon className="w-4 h-4 mr-2" />
+                    {currentFoster ? 'Reassign Foster' : 'Place in Foster'}
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setIsStatusModalOpen(true)}>
-                    
-                    <Edit2Icon className="w-4 h-4 mr-2" /> Change Status
+
+                    <Edit2Icon className="w-4 h-4 mr-2" /> Edit
                   </Button>
                 </div>
               </div>
@@ -339,43 +362,84 @@ export function AnimalProfile() {
           </div>
 
           {activeTab === 'timeline' &&
-          <Card className="p-6">
-              <div className="relative border-l-2 border-border ml-4 space-y-8 pb-4">
-                {timeline.map((event, index) =>
-              <motion.div
-                key={`${event.id}-${index}`}
-                initial={{
-                  opacity: 0,
-                  x: -20
-                }}
-                animate={{
-                  opacity: 1,
-                  x: 0
-                }}
-                transition={{
-                  delay: index * 0.05
-                }}
-                className="relative pl-8">
-                
-                    <div
-                  className={`absolute -left-[17px] top-1 w-8 h-8 rounded-full flex items-center justify-center border-4 border-card ${event.color}`}>
-                  
-                      <event.icon className="w-3.5 h-3.5" />
-                    </div>
-                    <div>
-                      <div className="flex items-baseline gap-2 mb-1">
-                        <h3 className="font-bold text-text-primary">
-                          {event.title}
-                        </h3>
-                        <span className="text-sm text-text-secondary">
-                          {formatDate(event.date)}
-                        </span>
-                      </div>
-                      <p className="text-text-secondary">{event.description}</p>
-                    </div>
-                  </motion.div>
+          <Card className="overflow-hidden">
+              {/* Filter subtabs — sit inside the card so they read as part of
+                 the timeline, not a separate floating element. */}
+              <div className="flex flex-wrap gap-1 px-3 py-2 border-b border-border bg-background/40">
+                {(
+                [
+                { key: 'all', label: 'All Activity' },
+                { key: 'placements', label: 'Placements' },
+                { key: 'medical', label: 'Medical' },
+                { key: 'notes', label: 'Notes' }] as const).
+                map((f) =>
+                <button
+                  key={f.key}
+                  type="button"
+                  onClick={() => setTimelineFilter(f.key)}
+                  className={`px-3 h-8 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${timelineFilter === f.key ? 'bg-primary/10 text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-background'}`}>
+
+                    {f.label}
+                  </button>
               )}
               </div>
+
+              {timelineFilter === 'placements' ?
+            <PlacementTimelineList
+              placements={animalPlacements}
+              fosters={fosters} /> :
+
+
+            <div className="p-6">
+                  {(() => {
+                const filtered = timeline.filter((e) => {
+                  if (timelineFilter === 'all') return true;
+                  if (timelineFilter === 'medical') return e.type === 'medical';
+                  if (timelineFilter === 'notes') return e.type === 'note';
+                  return true;
+                });
+                if (filtered.length === 0) {
+                  return (
+                    <div className="text-center py-6 text-sm text-text-secondary">
+                          No {timelineFilter === 'medical' ? 'medical events' : 'notes'} yet.
+                        </div>);
+
+                }
+                return (
+                  <div className="relative border-l-2 border-border ml-4 space-y-8 pb-4">
+                        {filtered.map((event, index) =>
+                    <motion.div
+                      key={`${event.id}-${index}`}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className="relative pl-8">
+
+                            <div
+                        className={`absolute -left-[17px] top-1 w-8 h-8 rounded-full flex items-center justify-center border-4 border-card ${event.color}`}>
+
+                              <event.icon className="w-3.5 h-3.5" />
+                            </div>
+                            <div>
+                              <div className="flex items-baseline gap-2 mb-1">
+                                <h3 className="font-bold text-text-primary">
+                                  {event.title}
+                                </h3>
+                                <span className="text-sm text-text-secondary">
+                                  {formatDate(event.date)}
+                                </span>
+                              </div>
+                              <p className="text-text-secondary">
+                                {event.description}
+                              </p>
+                            </div>
+                          </motion.div>
+                    )}
+                      </div>);
+
+              })()}
+                </div>
+            }
             </Card>
           }
 
@@ -488,15 +552,138 @@ export function AnimalProfile() {
       <ChangeStatusModal
         isOpen={isStatusModalOpen}
         onClose={() => setIsStatusModalOpen(false)}
-        animalId={animal.id}
-        currentStatus={animal.status}
-        currentPriority={animal.priority} />
-      
+        animalId={animal.id} />
+
       <PlaceAnimalModal
         isOpen={isPlaceModalOpen}
         onClose={() => setIsPlaceModalOpen(false)}
         animalId={animal.id} />
-      
+
+    </div>);
+
+}
+// — Placement Timeline View ————————————————————————————————————
+// Compact, range-based history of an animal's fosters. Each row shows
+// "MMM YYYY – MMM YYYY" (or "MMM YYYY – Present" for the active row) and
+// the foster's name, linked. Newest first.
+function formatPlacementRange(startISO: string, endISO?: string): string {
+  const start = new Date(startISO);
+  const sm = start.toLocaleString('en-US', { month: 'short' });
+  const sy = start.getFullYear();
+  if (!endISO) return `${sm} ${sy} – Present`;
+  const end = new Date(endISO);
+  const em = end.toLocaleString('en-US', { month: 'short' });
+  const ey = end.getFullYear();
+  return sy === ey ? `${sm} – ${em} ${sy}` : `${sm} ${sy} – ${em} ${ey}`;
+}
+// Friendly duration between two dates: "11 days", "6 months", "1 yr 5 mo".
+// `endISO` undefined means "still active" — measured against now.
+function formatPlacementDuration(startISO: string, endISO?: string): string {
+  const start = new Date(startISO);
+  const end = endISO ? new Date(endISO) : new Date();
+  const days = Math.max(
+    1,
+    Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+  );
+  if (days < 30) return `${days} day${days === 1 ? '' : 's'}`;
+  let months =
+  (end.getFullYear() - start.getFullYear()) * 12 +
+  (end.getMonth() - start.getMonth());
+  if (end.getDate() < start.getDate()) months -= 1;
+  months = Math.max(1, months);
+  if (months < 12) return `${months} month${months === 1 ? '' : 's'}`;
+  const years = Math.floor(months / 12);
+  const rem = months % 12;
+  if (rem === 0) return `${years} year${years === 1 ? '' : 's'}`;
+  return `${years} yr ${rem} mo`;
+}
+interface PlacementTimelineListProps {
+  placements: ReturnType<typeof useWhisker>['placements'];
+  fosters: ReturnType<typeof useWhisker>['fosters'];
+}
+function PlacementTimelineList({
+  placements,
+  fosters
+}: PlacementTimelineListProps) {
+  if (placements.length === 0) {
+    return (
+      <div className="p-10 text-center text-text-secondary">
+        <HomeIcon className="w-10 h-10 mx-auto mb-3 opacity-30" />
+        <p className="font-medium text-text-primary mb-1">
+          No foster history yet
+        </p>
+        <p className="text-sm">
+          When this animal is placed with a foster, the timeline will start here.
+        </p>
+      </div>);
+
+  }
+  // Active first (no end_date), then completed by recency.
+  const sorted = [...placements].sort((a, b) => {
+    if (!a.end_date && b.end_date) return -1;
+    if (a.end_date && !b.end_date) return 1;
+    return new Date(b.start_date).getTime() - new Date(a.start_date).getTime();
+  });
+  return (
+    <div className="p-6">
+      <div className="relative border-l-2 border-border ml-4 space-y-8 pb-4">
+        {sorted.map((p) => {
+          const foster = fosters.find((f) => f.id === p.foster_parent_id);
+          const isActive = p.placement_status === 'active';
+          return (
+            <div key={p.id} className="relative pl-8">
+              <div className="absolute -left-[17px] top-1 w-8 h-8 rounded-full flex items-center justify-center border-4 border-card bg-[#DCEAF7] text-[#356A9A]">
+                <HomeIcon className="w-3.5 h-3.5" />
+              </div>
+              <div>
+                <div className="flex items-baseline gap-2 flex-wrap mb-1">
+                  <span className="text-sm font-semibold text-text-primary tabular-nums">
+                    {formatPlacementRange(p.start_date, p.end_date)}
+                  </span>
+                  <span className="text-xs text-text-secondary tabular-nums">
+                    · {formatPlacementDuration(p.start_date, p.end_date)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap text-text-secondary">
+                  <span>
+                    Placed with{' '}
+                    {foster ?
+                    <Link
+                      to={`/fosters/${foster.id}`}
+                      className="font-medium text-primary hover:underline">
+                        {foster.first_name} {foster.last_name}
+                      </Link> :
+                    <span className="font-medium text-text-secondary italic">
+                        Unknown foster
+                      </span>
+                    }
+                  </span>
+                  {isActive &&
+                  <span className="text-[10px] uppercase tracking-wide font-bold px-1.5 py-0.5 rounded bg-[#DDEFE2] text-[#3E7B52]">
+                      Active
+                    </span>
+                  }
+                  {p.placement_type && p.placement_type !== 'foster' &&
+                  <span className="text-[10px] uppercase tracking-wide font-bold px-1.5 py-0.5 rounded bg-[#DCEAF7] text-[#356A9A]">
+                      {p.placement_type.replace('_', ' ')}
+                    </span>
+                  }
+                </div>
+                {p.reason_ended &&
+                <p className="text-xs text-text-secondary mt-1">
+                    {p.reason_ended}
+                  </p>
+                }
+                {p.notes &&
+                <p className="text-sm text-text-secondary mt-1 italic">
+                    {p.notes}
+                  </p>
+                }
+              </div>
+            </div>);
+
+        })}
+      </div>
     </div>);
 
 }

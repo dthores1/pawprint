@@ -6,7 +6,10 @@ import {
   HomeIcon,
   SettingsIcon,
   UsersIcon,
-  PackageOpenIcon } from
+  PackageOpenIcon,
+  TruckIcon,
+  HeartHandshakeIcon,
+  StethoscopeIcon } from
 'lucide-react';
 import { cn } from '../../lib/utils';
 export function Sidebar() {
@@ -26,6 +29,21 @@ export function Sidebar() {
     to: '/fosters',
     icon: HomeIcon,
     label: 'Fosters'
+  },
+  {
+    to: '/clinics',
+    icon: StethoscopeIcon,
+    label: 'Clinics'
+  },
+  {
+    to: '/transports',
+    icon: TruckIcon,
+    label: 'Transport Requests'
+  },
+  {
+    to: '/sitting',
+    icon: HeartHandshakeIcon,
+    label: 'Sitting Requests'
   },
   {
     to: '/supplies',

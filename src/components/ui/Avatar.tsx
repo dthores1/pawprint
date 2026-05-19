@@ -4,6 +4,7 @@ import { UserIcon } from 'lucide-react';
 import { getInitialsColor, getInitials } from '../../lib/colors';
 import { PawPrintIcon } from './PawPrintIcon';
 import { BoneIcon } from './BoneIcon';
+import { CatIcon } from '../icons/CatIcon';
 import { Species } from '../../types';
 interface AvatarProps {
   src?: string;
@@ -87,6 +88,8 @@ export function Avatar({
           type === 'animal' ?
           species === 'Dog' ?
           <BoneIcon className="w-1/2 h-1/2 opacity-50" /> :
+          species === 'Cat' ?
+          <CatIcon className="w-1/2 h-1/2 opacity-50" /> :
 
           <PawPrintIcon className="w-1/2 h-1/2 opacity-50" /> :
 

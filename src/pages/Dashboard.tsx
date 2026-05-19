@@ -1,7 +1,7 @@
-import React, { Children } from 'react';
+import React from 'react';
 import { useWhisker } from '../context/WhiskerContext';
 import { Card } from '../components/ui/Card';
-import { StatusBadge, PriorityBadge } from '../components/ui/Badge';
+import { PriorityBadge } from '../components/ui/Badge';
 import { SpeciesBadge } from '../components/ui/SpeciesBadge';
 import { Avatar } from '../components/ui/Avatar';
 import { GlobalSearch } from '../components/search/GlobalSearch';
@@ -11,7 +11,10 @@ import {
   HomeIcon,
   ActivityIcon,
   ChevronRightIcon,
-  PackageOpenIcon } from
+  PackageOpenIcon,
+  StethoscopeIcon,
+  HeartHandshakeIcon,
+  MapPinIcon } from
 'lucide-react';
 import { getDaysUntil, formatDate, getGreeting } from '../lib/utils';
 import { Link } from 'react-router-dom';
@@ -27,8 +30,18 @@ const PRIORITY_RANK: Record<Priority, number> = {
   normal: 1
 };
 export function Dashboard() {
-  const { animals, medicalRecords, fosters, placements, supplyRequests } =
-  useWhisker();
+  const {
+    animals,
+    medicalRecords,
+    fosters,
+    placements,
+    supplyRequests,
+    sittingRequests,
+    sittingRequestPlacements,
+    clinicEvents,
+    clinicSlots,
+    people
+  } = useWhisker();
   const activePlacements = placements.filter(
     (p) => p.placement_status === 'active'
   );
@@ -76,6 +89,18 @@ export function Dashboard() {
   const awaitingDeliveryRequests = supplyRequests.filter(
     (r) => r.status === 'ready_for_pickup' || r.status === 'ordered'
   );
+  const now = Date.now();
+  const upcomingClinics = clinicEvents.
+  filter(
+    (e) =>
+    new Date(e.date_time).getTime() >= now && e.status !== 'canceled'
+  ).
+  sort(
+    (a, b) =>
+    new Date(a.date_time).getTime() - new Date(b.date_time).getTime()
+  ).
+  slice(0, 2);
+  const unclaimedSitting = sittingRequests.filter((s) => s.status === 'open');
   const container = {
     hidden: {
       opacity: 0
@@ -103,7 +128,7 @@ export function Dashboard() {
       variants={container}
       initial="hidden"
       animate="show">
-      
+
       <motion.div variants={item} className="space-y-5">
         <div>
           <h1 className="text-3xl font-heading font-bold text-text-primary mb-2">
@@ -155,7 +180,7 @@ export function Dashboard() {
                 <stat.icon className="w-5 h-5 xl:w-6 xl:h-6" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-xs xl:text-sm font-medium text-text-secondary leading-snug line-clamp-2 min-h-[2.5em]">
+                <p className="text-xs xl:text-sm font-medium text-text-secondary leading-snug line-clamp-2 min-h-[1.5em]">
                   {stat.label}
                 </p>
                 <p className="text-xl xl:text-2xl font-heading font-bold text-text-primary">
@@ -168,7 +193,7 @@ export function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column: Action & Medical */}
+        {/* Left Column: Needs Action → Clinics → Upcoming Medical */}
         <div className="lg:col-span-2 space-y-8">
           {/* Needs Action */}
           <motion.div variants={item}>
@@ -198,13 +223,13 @@ export function Dashboard() {
                       key={animal.id}
                       to={`/animals/${animal.id}`}
                       className="flex items-center justify-between p-4 hover:bg-background transition-colors group">
-                      
+
                         <div className="flex items-center gap-4">
                           <div className="relative">
                             <Avatar
                             src={animal.primary_photo_url}
                             type="animal" />
-                          
+
                             <div className="absolute -bottom-1 -right-1 ring-2 ring-card rounded-full">
                               <SpeciesBadge species={animal.species} />
                             </div>
@@ -224,7 +249,7 @@ export function Dashboard() {
                         <PriorityBadge
                         priority={animal.priority}
                         className="shrink-0" />
-                      
+
                       </Link>);
 
                 })}
@@ -238,13 +263,13 @@ export function Dashboard() {
                       key={record.id}
                       to={`/animals/${animal.id}`}
                       className="flex items-center justify-between p-4 hover:bg-background transition-colors group">
-                      
+
                         <div className="flex items-center gap-4">
                           <div className="relative">
                             <Avatar
                             src={animal.primary_photo_url}
                             type="animal" />
-                          
+
                             <div className="absolute -bottom-1 -right-1 ring-2 ring-card rounded-full">
                               <SpeciesBadge species={animal.species} />
                             </div>
@@ -259,6 +284,96 @@ export function Dashboard() {
                           </div>
                         </div>
                         <ChevronRightIcon className="w-5 h-5 text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </Link>);
+
+                })}
+                </div>
+              }
+            </Card>
+          </motion.div>
+
+          {/* Clinics — between Needs Action and Upcoming Medical */}
+          <motion.div variants={item}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-heading font-bold flex items-center gap-2">
+                <StethoscopeIcon className="w-5 h-5 text-primary" />
+                Clinics
+              </h2>
+              <Link
+                to="/clinics"
+                className="text-sm font-medium text-primary hover:underline">
+
+                View all
+              </Link>
+            </div>
+            <Card>
+              {upcomingClinics.length === 0 ?
+              <div className="p-8 text-center text-text-secondary">
+                  <p>No upcoming clinics on the calendar.</p>
+                </div> :
+
+              <div className="divide-y divide-border">
+                  {upcomingClinics.map((e) => {
+                  const slotsFilled = clinicSlots.filter(
+                    (s) =>
+                    s.clinic_event_id === e.id &&
+                    s.status !== 'canceled'
+                  ).length;
+                  const vet = e.veterinarian_person_id ?
+                  people.find((p) => p.id === e.veterinarian_person_id) :
+                  undefined;
+                  const date = new Date(e.date_time);
+                  const dayLabel = date.toLocaleString('en-US', {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric'
+                  });
+                  const timeLabel = date.toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit'
+                  });
+                  const percent = Math.min(
+                    100,
+                    Math.round(
+                      slotsFilled / Math.max(1, e.slot_capacity) * 100
+                    )
+                  );
+                  return (
+                    <Link
+                      key={e.id}
+                      to="/clinics"
+                      className="block p-4 hover:bg-background transition-colors">
+
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                          <div>
+                            <p className="font-semibold text-text-primary">
+                              {dayLabel} · {timeLabel}
+                            </p>
+                            <p className="text-sm text-text-secondary flex items-center gap-1.5 mt-0.5 truncate">
+                              <MapPinIcon className="w-3.5 h-3.5 shrink-0" />
+                              <span className="truncate">{e.location}</span>
+                            </p>
+                            {vet &&
+                          <p className="text-xs text-text-secondary mt-0.5">
+                                {vet.first_name} {vet.last_name}
+                              </p>
+                          }
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-semibold text-text-primary tabular-nums">
+                              {slotsFilled} / {e.slot_capacity}
+                            </p>
+                            <p className="text-xs text-text-secondary">
+                              slots
+                            </p>
+                          </div>
+                        </div>
+                        <div className="w-full bg-background rounded-full h-1.5 overflow-hidden">
+                          <div
+                          className="h-1.5 rounded-full bg-primary transition-all duration-500"
+                          style={{ width: `${percent}%` }} />
+
+                        </div>
                       </Link>);
 
                 })}
@@ -293,13 +408,13 @@ export function Dashboard() {
                       key={record.id}
                       to={`/animals/${animal.id}`}
                       className="flex items-center justify-between p-4 hover:bg-background transition-colors group">
-                      
+
                         <div className="flex items-center gap-4">
                           <Avatar
                           src={animal.primary_photo_url}
                           type="animal"
                           size="sm" />
-                        
+
                           <div>
                             <p className="font-medium text-text-primary">
                               {animal.name}{' '}
@@ -324,108 +439,8 @@ export function Dashboard() {
           </motion.div>
         </div>
 
-        {/* Right Column: Stats & Capacity */}
+        {/* Right Column: Animals by Status → Supply Requests → Sitting Requests */}
         <div className="space-y-8">
-          {/* Supply Requests Widget */}
-          <motion.div variants={item}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-heading font-bold flex items-center gap-2">
-                <PackageOpenIcon className="w-5 h-5 text-[#D98C5F]" />
-                Supply Requests
-              </h2>
-              <Link
-                to="/supplies"
-                className="text-sm font-medium text-primary hover:underline">
-                
-                View all
-              </Link>
-            </div>
-            <Card className="p-4">
-              <div className="space-y-3">
-                <Link
-                  to="/supplies?filter=urgent"
-                  className="flex items-center justify-between p-3 rounded-lg bg-background hover:bg-background/80 transition-colors group">
-                  
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full bg-[#9B3A3A]" />
-                    <span className="text-sm font-medium text-text-primary group-hover:text-primary transition-colors">
-                      Urgent requests
-                    </span>
-                  </div>
-                  <span className="text-sm font-bold text-text-primary">
-                    {urgentSupplyRequests.length}
-                  </span>
-                </Link>
-                <Link
-                  to="/supplies?filter=pending"
-                  className="flex items-center justify-between p-3 rounded-lg bg-background hover:bg-background/80 transition-colors group">
-                  
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full bg-[#A36B00]" />
-                    <span className="text-sm font-medium text-text-primary group-hover:text-primary transition-colors">
-                      Pending review
-                    </span>
-                  </div>
-                  <span className="text-sm font-bold text-text-primary">
-                    {pendingReviewRequests.length}
-                  </span>
-                </Link>
-                <Link
-                  to="/supplies?filter=delivery"
-                  className="flex items-center justify-between p-3 rounded-lg bg-background hover:bg-background/80 transition-colors group">
-                  
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full bg-[#356A9A]" />
-                    <span className="text-sm font-medium text-text-primary group-hover:text-primary transition-colors">
-                      Awaiting delivery
-                    </span>
-                  </div>
-                  <span className="text-sm font-bold text-text-primary">
-                    {awaitingDeliveryRequests.length}
-                  </span>
-                </Link>
-              </div>
-            </Card>
-          </motion.div>
-
-          {/* Foster Capacity */}
-          <motion.div variants={item}>
-            <h2 className="text-xl font-heading font-bold mb-4">
-              Foster Capacity
-            </h2>
-            <Card className="p-6">
-              <div className="mb-4 flex justify-between items-end">
-                <div>
-                  <p className="text-4xl font-heading font-bold text-primary">
-                    {activePlacementsCount}
-                  </p>
-                  <p className="text-sm text-text-secondary">
-                    Animals in foster
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xl font-heading font-bold text-text-primary">
-                    {totalCapacity}
-                  </p>
-                  <p className="text-sm text-text-secondary">Total capacity</p>
-                </div>
-              </div>
-
-              <div className="w-full bg-background rounded-full h-3 mb-2 overflow-hidden">
-                <div
-                  className="bg-primary h-3 rounded-full transition-all duration-1000 ease-out"
-                  style={{
-                    width: `${Math.min(100, activePlacementsCount / totalCapacity * 100)}%`
-                  }} />
-                
-              </div>
-              <p className="text-sm text-text-secondary text-center mt-4">
-                {availableSpots} spots available across {fosters.length} active
-                fosters.
-              </p>
-            </Card>
-          </motion.div>
-
           {/* Status Breakdown */}
           <motion.div variants={item}>
             <h2 className="text-xl font-heading font-bold mb-4">
@@ -474,7 +489,7 @@ export function Dashboard() {
                           style={{
                             width: `${percentage}%`
                           }} />
-                        
+
                         <span className="relative z-10 pl-3 text-sm font-bold text-text-primary">
                           {count}
                         </span>
@@ -483,6 +498,146 @@ export function Dashboard() {
 
                 })}
               </div>
+            </Card>
+          </motion.div>
+
+          {/* Supply Requests Widget */}
+          <motion.div variants={item}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-heading font-bold flex items-center gap-2">
+                <PackageOpenIcon className="w-5 h-5 text-[#D98C5F]" />
+                Supply Requests
+              </h2>
+              <Link
+                to="/supplies"
+                className="text-sm font-medium text-primary hover:underline">
+
+                View all
+              </Link>
+            </div>
+            <Card className="p-4">
+              <div className="space-y-3">
+                <Link
+                  to="/supplies?filter=urgent"
+                  className="flex items-center justify-between p-3 rounded-lg bg-background hover:bg-background/80 transition-colors group">
+
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 rounded-full bg-[#9B3A3A]" />
+                    <span className="text-sm font-medium text-text-primary group-hover:text-primary transition-colors">
+                      Urgent requests
+                    </span>
+                  </div>
+                  <span className="text-sm font-bold text-text-primary">
+                    {urgentSupplyRequests.length}
+                  </span>
+                </Link>
+                <Link
+                  to="/supplies?filter=pending"
+                  className="flex items-center justify-between p-3 rounded-lg bg-background hover:bg-background/80 transition-colors group">
+
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 rounded-full bg-[#A36B00]" />
+                    <span className="text-sm font-medium text-text-primary group-hover:text-primary transition-colors">
+                      Pending review
+                    </span>
+                  </div>
+                  <span className="text-sm font-bold text-text-primary">
+                    {pendingReviewRequests.length}
+                  </span>
+                </Link>
+                <Link
+                  to="/supplies?filter=delivery"
+                  className="flex items-center justify-between p-3 rounded-lg bg-background hover:bg-background/80 transition-colors group">
+
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 rounded-full bg-[#356A9A]" />
+                    <span className="text-sm font-medium text-text-primary group-hover:text-primary transition-colors">
+                      Awaiting delivery
+                    </span>
+                  </div>
+                  <span className="text-sm font-bold text-text-primary">
+                    {awaitingDeliveryRequests.length}
+                  </span>
+                </Link>
+              </div>
+            </Card>
+          </motion.div>
+
+          {/* Sitting Requests Widget */}
+          <motion.div variants={item}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-heading font-bold flex items-center gap-2">
+                <HeartHandshakeIcon className="w-5 h-5 text-primary" />
+                Sitting Requests
+              </h2>
+              <Link
+                to="/sitting"
+                className="text-sm font-medium text-primary hover:underline">
+
+                View all
+              </Link>
+            </div>
+            <Card>
+              {unclaimedSitting.length === 0 ?
+              <div className="p-6 text-center text-text-secondary text-sm">
+                  No coverage needed right now.
+                </div> :
+
+              <div className="divide-y divide-border">
+                  {unclaimedSitting.slice(0, 3).map((s) => {
+                  // Resolve covered animals via the join table.
+                  const coveredAnimals = sittingRequestPlacements.
+                  filter((srp) => srp.sitting_request_id === s.id).
+                  map((srp) =>
+                  placements.find((p) => p.id === srp.foster_placement_id)
+                  ).
+                  filter((p) => !!p).
+                  map((p) => animals.find((a) => a.id === p!.animal_id)).
+                  filter((a): a is NonNullable<typeof a> => !!a);
+                  const lead = coveredAnimals[0];
+                  const moreCount = coveredAnimals.length - 1;
+                  const labelNames = lead ?
+                  moreCount > 0 ?
+                  `${lead.name} + ${moreCount} more` :
+                  lead.name :
+                  'Unknown';
+                  const start = new Date(s.start_date);
+                  const end = new Date(s.end_date);
+                  const sameYear = start.getFullYear() === end.getFullYear();
+                  const startStr = start.toLocaleString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: sameYear ? undefined : 'numeric'
+                  });
+                  const endStr = end.toLocaleString('en-US', {
+                    month: 'short',
+                    day: 'numeric'
+                  });
+                  return (
+                    <Link
+                      key={s.id}
+                      to="/sitting"
+                      className="flex items-center gap-3 p-4 hover:bg-background transition-colors">
+
+                        <Avatar
+                        src={lead?.primary_photo_url}
+                        type="animal"
+                        species={lead?.species}
+                        size="sm" />
+
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-text-primary truncate">
+                            {labelNames}
+                          </p>
+                          <p className="text-xs text-text-secondary">
+                            {startStr} – {endStr}
+                          </p>
+                        </div>
+                      </Link>);
+
+                })}
+                </div>
+              }
             </Card>
           </motion.div>
         </div>

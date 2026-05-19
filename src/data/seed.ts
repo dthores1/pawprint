@@ -1,7 +1,7 @@
 import {
   Animal,
   FosterParent,
-  AnimalPlacement,
+  FosterPlacement,
   MedicalRecord,
   AnimalNote,
   AnimalRelationship,
@@ -9,7 +9,12 @@ import {
   Person,
   Product,
   SupplyRequest,
-  SupplyRequestItem } from
+  SupplyRequestItem,
+  TransportRequest,
+  SittingRequest,
+  SittingRequestPlacement,
+  ClinicEvent,
+  ClinicSlot } from
 '../types';
 
 export const seedAnimals: Animal[] = [
@@ -49,6 +54,7 @@ export const seedAnimals: Animal[] = [
   microchip_number: '981020000000002',
   primary_photo_url:
   'https://images.unsplash.com/photo-1513360371669-4adf3dd7dff8?auto=format&fit=crop&q=80&w=800',
+  current_foster_id: 'f3',
   created_at: '2025-11-05T14:30:00Z',
   updated_at: '2025-11-20T09:00:00Z'
 },
@@ -66,6 +72,7 @@ export const seedAnimals: Animal[] = [
   'Energetic terrier mix puppy. Learning basic commands and doing well with crate training.',
   primary_photo_url:
   'https://images.unsplash.com/photo-1537151608804-ea6f11cc98f9?auto=format&fit=crop&q=80&w=800',
+  current_foster_id: 'f1',
   created_at: '2025-11-10T11:15:00Z',
   updated_at: '2025-11-12T16:00:00Z'
 },
@@ -157,6 +164,7 @@ export const seedAnimals: Animal[] = [
   microchip_number: '981020000000008',
   primary_photo_url:
   'https://images.unsplash.com/photo-1573865526739-10659fec78a5?auto=format&fit=crop&q=80&w=800',
+  current_foster_id: 'f5',
   created_at: '2025-11-15T10:00:00Z',
   updated_at: '2025-11-18T10:00:00Z'
 },
@@ -192,6 +200,7 @@ export const seedAnimals: Animal[] = [
   description: 'Playful kitten, part of a litter of 4.',
   primary_photo_url:
   'https://images.unsplash.com/photo-1596854407944-bf87f6fdd49e?auto=format&fit=crop&q=80&w=800',
+  current_foster_id: 'f7',
   created_at: '2025-11-20T10:00:00Z',
   updated_at: '2025-11-20T10:00:00Z'
 },
@@ -226,8 +235,7 @@ export const seedAnimals: Animal[] = [
   'Review senior bloodwork results with vet and confirm renal diet plan.',
   description: 'Senior kitty who loves heated blankets and quiet afternoons.',
   microchip_number: '981020000000012',
-  primary_photo_url:
-  'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&q=80&w=800',
+  current_foster_id: 'f7',
   created_at: '2025-10-10T10:00:00Z',
   updated_at: '2025-10-15T10:00:00Z'
 }];
@@ -364,13 +372,14 @@ export const seedFosters: FosterParent[] = [
 }];
 
 
-export const seedPlacements: AnimalPlacement[] = [
+export const seedPlacements: FosterPlacement[] = [
 {
   id: 'p1',
   animal_id: 'a3',
   foster_parent_id: 'f1',
   start_date: '2023-11-12T10:00:00Z',
-  placement_status: 'active'
+  placement_status: 'active',
+  placement_type: 'foster'
 },
 {
   id: 'p2',
@@ -378,6 +387,7 @@ export const seedPlacements: AnimalPlacement[] = [
   foster_parent_id: 'f3',
   start_date: '2023-11-06T14:00:00Z',
   placement_status: 'active',
+  placement_type: 'medical_foster',
   notes: 'Recovering from dental surgery.'
 },
 {
@@ -387,6 +397,8 @@ export const seedPlacements: AnimalPlacement[] = [
   start_date: '2023-09-16T09:00:00Z',
   end_date: '2023-10-30T14:00:00Z',
   placement_status: 'completed',
+  placement_type: 'foster',
+  reason_ended: 'Adopted',
   notes: 'Adopted!'
 },
 {
@@ -394,21 +406,46 @@ export const seedPlacements: AnimalPlacement[] = [
   animal_id: 'a8',
   foster_parent_id: 'f5',
   start_date: '2023-11-18T10:00:00Z',
-  placement_status: 'active'
+  placement_status: 'active',
+  placement_type: 'foster'
 },
+// — Willow (a10) historical chain — demonstrates the Placement Timeline.
 {
-  id: 'p5',
+  id: 'p5a',
   animal_id: 'a10',
   foster_parent_id: 'f2',
-  start_date: '2023-11-20T10:00:00Z',
-  placement_status: 'active'
+  start_date: '2024-01-08T10:00:00Z',
+  end_date: '2024-06-15T10:00:00Z',
+  placement_status: 'completed',
+  placement_type: 'foster',
+  reason_ended: 'Reassigned — foster took a break for travel.',
+  notes: 'Bottle-fed through weaning.'
+},
+{
+  id: 'p5b',
+  animal_id: 'a10',
+  foster_parent_id: 'f9',
+  start_date: '2024-06-15T10:00:00Z',
+  end_date: '2025-09-30T10:00:00Z',
+  placement_status: 'completed',
+  placement_type: 'foster',
+  reason_ended: 'Reassigned — moved to a quieter home for socialization.'
+},
+{
+  id: 'p5c',
+  animal_id: 'a10',
+  foster_parent_id: 'f7',
+  start_date: '2025-09-30T10:00:00Z',
+  placement_status: 'active',
+  placement_type: 'foster'
 },
 {
   id: 'p6',
   animal_id: 'a12',
   foster_parent_id: 'f7',
   start_date: '2023-10-15T10:00:00Z',
-  placement_status: 'active'
+  placement_status: 'active',
+  placement_type: 'foster'
 },
 {
   id: 'p7',
@@ -417,6 +454,8 @@ export const seedPlacements: AnimalPlacement[] = [
   start_date: '2023-11-05T10:00:00Z',
   end_date: '2023-11-15T10:00:00Z',
   placement_status: 'completed',
+  placement_type: 'foster',
+  reason_ended: 'Returned to shelter for adoption events.',
   notes: 'Returned to shelter for adoption events.'
 }];
 
@@ -730,6 +769,19 @@ export const seedPeople: Person[] = [
   created_at: '2025-06-20T10:00:00Z'
 },
 {
+  // The demo current-user. Matches CURRENT_USER.person_id used across forms.
+  id: 'p_dan',
+  first_name: 'Dan',
+  last_name: 'Thoreson',
+  email: 'thoreson.dan@gmail.com',
+  phone: '(555) 390-2847',
+  role: 'volunteer',
+  volunteer_type: 'foster_parent',
+  active: true,
+  created_at: '2024-09-10T10:00:00Z',
+  photo_url: '/images/contacts/Dan_Thoreson.jpeg'
+},
+{
   id: 'pe9',
   first_name: 'Zoe',
   last_name: 'Lee',
@@ -1015,4 +1067,236 @@ export const seedSupplyRequestItems: SupplyRequestItem[] = [
   product_id: 'prod7',
   quantity: 5,
   unit: 'pack'
+}];
+
+export const seedTransportRequests: TransportRequest[] = [
+{
+  id: 'tr1',
+  type: 'animal',
+  status: 'open',
+  requested_by_person_id: 'pe3',
+  animal_id: 'a8', // Pepper
+  pickup_location: '202 Birch Rd, Portland, OR (Anita Patel)',
+  dropoff_location: 'Greenwood Vet Clinic',
+  requested_pickup_time: '2026-05-19T09:00:00Z',
+  notes: 'Needs carrier transport.',
+  urgency: 'normal',
+  created_at: '2026-05-17T14:00:00Z',
+  updated_at: '2026-05-17T14:00:00Z'
+},
+{
+  id: 'tr2',
+  type: 'supplies',
+  status: 'claimed',
+  requested_by_person_id: 'pe3',
+  assigned_volunteer_person_id: 'pe7', // Rachel Green
+  supply_request_id: 'sr4',
+  pickup_location: 'Pawprint office storage',
+  dropoff_location: '505 Walnut Dr, Portland, OR (Tom Baker)',
+  requested_pickup_time: '2026-05-20T16:00:00Z',
+  notes: 'Drop on porch; foster will text back when they have it.',
+  urgency: 'normal',
+  created_at: '2026-05-16T11:00:00Z',
+  updated_at: '2026-05-16T18:30:00Z'
+},
+{
+  id: 'tr3',
+  type: 'animal',
+  status: 'open',
+  requested_by_person_id: 'pe4',
+  animal_id: 'a9', // Otis
+  pickup_location: "Pawprint intake (Brian O'Connor)",
+  dropoff_location: 'Bridge City Veterinary',
+  requested_pickup_time: '2026-05-19T11:30:00Z',
+  notes: 'Right hind leg eval; please use the larger carrier.',
+  urgency: 'urgent',
+  created_at: '2026-05-17T09:15:00Z',
+  updated_at: '2026-05-17T09:15:00Z'
+},
+{
+  id: 'tr4',
+  type: 'animal',
+  status: 'open',
+  requested_by_person_id: 'pe3',
+  clinic_event_id: 'ce1',
+  animal_id: 'a4', // Milkshake
+  pickup_location: 'Foster home (TBD)',
+  dropoff_location: 'Stanton Spay/Neuter Clinic',
+  requested_pickup_time: '2026-05-23T07:30:00Z',
+  notes: 'Clinic intake at 8am — please be early.',
+  urgency: 'normal',
+  created_at: '2026-05-15T13:00:00Z',
+  updated_at: '2026-05-15T13:00:00Z'
+},
+{
+  id: 'tr5',
+  type: 'animal',
+  status: 'completed',
+  requested_by_person_id: 'pe6',
+  assigned_volunteer_person_id: 'pe7',
+  animal_id: 'a7', // Pip
+  pickup_location: 'Columbia City trap site',
+  dropoff_location: 'Anita Patel (foster)',
+  requested_pickup_time: '2025-08-13T19:00:00Z',
+  completed_at: '2025-08-13T20:45:00Z',
+  notes: 'Trap-to-foster handoff after intake.',
+  urgency: 'normal',
+  created_at: '2025-08-13T17:00:00Z',
+  updated_at: '2025-08-13T20:45:00Z'
+}];
+
+export const seedSittingRequests: SittingRequest[] = [
+{
+  id: 'sit1',
+  requested_by_person_id: 'pe3',
+  coverage_scope: 'all_current_placements',
+  start_date: '2026-05-25',
+  end_date: '2026-05-28',
+  notes: 'Heading to a family wedding. Juniper is house-trained and crate-friendly.',
+  medication_required: false,
+  foster_provides_supplies: true,
+  transport_needed: true,
+  status: 'open',
+  created_at: '2026-05-15T10:00:00Z',
+  updated_at: '2026-05-15T10:00:00Z'
+},
+{
+  id: 'sit2',
+  requested_by_person_id: 'pe3',
+  sitter_person_id: 'pe5', // Chloe
+  coverage_scope: 'selected_placements',
+  start_date: '2026-05-20',
+  end_date: '2026-05-22',
+  notes: 'Still on antibiotics — 1 pill twice daily wrapped in pill pockets.',
+  medication_required: true,
+  foster_provides_supplies: true,
+  transport_needed: false,
+  status: 'claimed',
+  created_at: '2026-05-12T14:00:00Z',
+  updated_at: '2026-05-13T09:30:00Z'
+},
+{
+  id: 'sit3',
+  requested_by_person_id: 'pe3',
+  coverage_scope: 'selected_placements',
+  start_date: '2026-06-10',
+  end_date: '2026-06-14',
+  notes: 'Senior cat on renal diet. Quiet home preferred. Foster will pre-portion meals.',
+  medication_required: false,
+  foster_provides_supplies: true,
+  transport_needed: false,
+  status: 'open',
+  created_at: '2026-05-17T08:00:00Z',
+  updated_at: '2026-05-17T08:00:00Z'
+}];
+
+// Snapshot rows: which placements each request covers. Even for
+// `all_current_placements` requests, we resolve and store the IDs at
+// submit time so the request reflects the original intent.
+export const seedSittingRequestPlacements: SittingRequestPlacement[] = [
+// sit1 — Juniper (p1)
+{ id: 'srp1', sitting_request_id: 'sit1', foster_placement_id: 'p1' },
+// sit2 — Marmalade (p2)
+{ id: 'srp2', sitting_request_id: 'sit2', foster_placement_id: 'p2' },
+// sit3 — Clementine (p6)
+{ id: 'srp3', sitting_request_id: 'sit3', foster_placement_id: 'p6' }];
+
+
+export const seedClinicEvents: ClinicEvent[] = [
+{
+  id: 'ce1',
+  date_time: '2026-05-23T08:00:00Z',
+  location: 'Stanton Spay/Neuter Clinic — 4205 NE Stanton, Portland OR',
+  veterinarian_person_id: 'pe1', // Dr. Emily Smith
+  contact_person_id: 'pe4', // Brian O'Connor, intake coordinator
+  slot_capacity: 8,
+  transport_coordinator_person_id: 'pe7', // Rachel Green
+  intake_coordinator_person_id: 'pe4',
+  notes: 'Weekly TNR clinic. Drop-off 7:30–8:00am; pickup 4:00–5:00pm.',
+  status: 'scheduled',
+  created_at: '2026-05-09T10:00:00Z',
+  updated_at: '2026-05-15T10:00:00Z'
+},
+{
+  id: 'ce2',
+  date_time: '2026-06-06T08:00:00Z',
+  location: 'PDX Animal Hospital — 1422 SE Powell, Portland OR',
+  veterinarian_person_id: 'pe2', // Dr. Mark Evans
+  contact_person_id: 'pe2',
+  slot_capacity: 6,
+  transport_coordinator_person_id: 'pe7',
+  intake_coordinator_person_id: 'pe4',
+  notes: 'Smaller batch — Dr. Evans is solo this date.',
+  status: 'planning',
+  created_at: '2026-05-12T10:00:00Z',
+  updated_at: '2026-05-12T10:00:00Z'
+},
+{
+  id: 'ce3',
+  date_time: '2026-04-25T08:00:00Z',
+  location: 'Stanton Spay/Neuter Clinic — 4205 NE Stanton, Portland OR',
+  veterinarian_person_id: 'pe1',
+  contact_person_id: 'pe4',
+  slot_capacity: 8,
+  transport_coordinator_person_id: 'pe7',
+  intake_coordinator_person_id: 'pe4',
+  notes: 'Standard weekly clinic.',
+  status: 'completed',
+  created_at: '2026-04-11T10:00:00Z',
+  updated_at: '2026-04-25T17:00:00Z'
+}];
+
+export const seedClinicSlots: ClinicSlot[] = [
+// ce1 — upcoming clinic
+{
+  id: 'cs1',
+  clinic_event_id: 'ce1',
+  animal_id: 'a4', // Milkshake
+  procedure_type: 'spay_neuter',
+  reserved_by_person_id: 'pe3',
+  status: 'reserved',
+  notes: 'Pending URI clearance; recheck day-before.'
+},
+{
+  id: 'cs2',
+  clinic_event_id: 'ce1',
+  animal_id: 'a7', // Pip
+  procedure_type: 'spay_neuter',
+  reserved_by_person_id: 'pe3',
+  status: 'confirmed'
+},
+{
+  id: 'cs3',
+  clinic_event_id: 'ce1',
+  animal_id: 'a10', // Willow
+  procedure_type: 'spay_neuter',
+  reserved_by_person_id: 'pe3',
+  status: 'confirmed'
+},
+{
+  id: 'cs4',
+  clinic_event_id: 'ce1',
+  animal_id: 'a9', // Otis
+  procedure_type: 'exam',
+  reserved_by_person_id: 'pe4',
+  status: 'reserved',
+  notes: 'Right hind leg limp eval.'
+},
+// ce2 — next clinic
+{
+  id: 'cs5',
+  clinic_event_id: 'ce2',
+  animal_id: 'a6', // Hazel
+  procedure_type: 'spay_neuter',
+  reserved_by_person_id: 'pe3',
+  status: 'reserved'
+},
+// ce3 — past clinic
+{
+  id: 'cs6',
+  clinic_event_id: 'ce3',
+  animal_id: 'a5', // Luna
+  procedure_type: 'spay_neuter',
+  reserved_by_person_id: 'pe3',
+  status: 'completed'
 }];

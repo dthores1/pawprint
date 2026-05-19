@@ -42,6 +42,22 @@ export function AppShell() {
             label: 'Fosters'
           },
           {
+            to: '/clinics',
+            label: 'Clinics'
+          },
+          {
+            to: '/transports',
+            label: 'Transports'
+          },
+          {
+            to: '/sitting',
+            label: 'Sitting'
+          },
+          {
+            to: '/supplies',
+            label: 'Supplies'
+          },
+          {
             to: '/contacts',
             label: 'Contacts'
           }].

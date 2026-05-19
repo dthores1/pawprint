@@ -36,6 +36,15 @@ export interface Animal {
    * Meaningful when status is 'adoptable'.
    */
   adoption_profile_url?: string;
+  /**
+   * Denormalized cache: foster_parent_id of the active FosterPlacement, if any.
+   * The placements collection remains the source of truth for history; kept
+   * in sync by placeAnimal / reassignFoster. Components may prefer the
+   * derived check (active placement) for consistency with seed data.
+   */
+  current_foster_id?: string;
+  /** Staff-only notes, separate from the public-facing `description` blurb. */
+  internal_notes?: string;
   created_at: string;
   updated_at: string;
 }
@@ -72,13 +81,20 @@ export interface FosterParent {
   photo_url?: string;
 }
 
-export interface AnimalPlacement {
+export type PlacementType = 'foster' | 'medical_foster' | 'trial_adoption';
+
+export interface FosterPlacement {
   id: string;
   animal_id: string;
   foster_parent_id: string;
   start_date: string;
+  /** Nullable while the placement is active. */
   end_date?: string;
   placement_status: 'active' | 'completed' | 'interrupted';
+  /** Defaults to 'foster' on creation; more types may be added later. */
+  placement_type: PlacementType;
+  /** Free-form reason a placement ended (e.g. "Reassigned", "Adopted"). */
+  reason_ended?: string;
   notes?: string;
 }
 
@@ -221,5 +237,140 @@ export interface SupplyRequestItem {
   custom_item_name?: string;
   quantity: number;
   unit: string;
+  notes?: string;
+}
+
+// — Transport Requests —————————————————————————————————————
+// Volunteers ferry animals or supplies. Common at orgs like Alley Cat Project
+// where cats move between trap site → vet → foster, and supplies are dropped
+// off at remote foster homes.
+export type TransportRequestType = 'animal' | 'supplies' | 'emergency';
+
+export type TransportRequestStatus =
+'open' |
+'claimed' |
+'in_progress' |
+'completed' |
+'canceled';
+
+export type TransportRequestUrgency = 'normal' | 'urgent' | 'critical';
+
+export interface TransportRequest {
+  id: string;
+  type: TransportRequestType;
+  status: TransportRequestStatus;
+  requested_by_person_id: string;
+  assigned_volunteer_person_id?: string;
+  /** Optional links to whatever is being moved. */
+  animal_id?: string;
+  clinic_event_id?: string;
+  supply_request_id?: string;
+  pickup_location: string;
+  dropoff_location: string;
+  requested_pickup_time: string;
+  completed_at?: string;
+  notes?: string;
+  urgency: TransportRequestUrgency;
+  created_at: string;
+  updated_at: string;
+}
+
+// — Sitting Requests —————————————————————————————————————
+// Short-term foster coverage. A foster going out of town requests coverage
+// for some or all of their active placements; another org member accepts.
+//
+// Coverage scope is captured in two parts:
+//   - `coverage_scope` records *intent* ("all my current placements" vs.
+//     "these specific placements") for display copy.
+//   - `SittingRequestPlacement` rows snapshot the actual placement IDs at
+//     submit time. Even when scope is `all_current_placements`, we resolve
+//     and store the IDs so the request stays accurate if the foster's
+//     placements change later.
+export type SittingRequestStatus =
+'open' |
+'claimed' |
+'in_progress' |
+'completed' |
+'canceled';
+
+export type SittingCoverageScope =
+'all_current_placements' |
+'selected_placements';
+
+export interface SittingRequest {
+  id: string;
+  requested_by_person_id: string;
+  sitter_person_id?: string;
+  coverage_scope: SittingCoverageScope;
+  start_date: string;
+  end_date: string;
+  notes?: string;
+  medication_required: boolean;
+  foster_provides_supplies: boolean;
+  transport_needed: boolean;
+  status: SittingRequestStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SittingRequestPlacement {
+  id: string;
+  sitting_request_id: string;
+  foster_placement_id: string;
+}
+
+// — Clinic Planning ————————————————————————————————————
+// TNR (Trap-Neuter-Return) orgs run periodic clinics — usually weekly — where
+// a vet handles a batch of spay/neuter + vaccines. Cats are matched to slots,
+// transport is coordinated, and intake paperwork is prepped.
+export type ClinicEventStatus =
+'planning' |
+'scheduled' |
+'in_progress' |
+'completed' |
+'canceled';
+
+export interface ClinicEvent {
+  id: string;
+  date_time: string;
+  location: string;
+  /** Vet performing procedures. Person with role 'vet' in `people`. */
+  veterinarian_person_id?: string;
+  /**
+   * Org-side point of contact (often a vet tech, clinic admin, or office
+   * manager). Can be the same as veterinarian_person_id or different.
+   */
+  contact_person_id?: string;
+  slot_capacity: number;
+  transport_coordinator_person_id?: string;
+  intake_coordinator_person_id?: string;
+  notes?: string;
+  status: ClinicEventStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ClinicSlotProcedureType =
+'spay_neuter' |
+'vaccines' |
+'dental' |
+'exam' |
+'recheck' |
+'other';
+
+export type ClinicSlotStatus =
+'reserved' |
+'confirmed' |
+'completed' |
+'no_show' |
+'canceled';
+
+export interface ClinicSlot {
+  id: string;
+  clinic_event_id: string;
+  animal_id: string;
+  procedure_type: ClinicSlotProcedureType;
+  reserved_by_person_id?: string;
+  status: ClinicSlotStatus;
   notes?: string;
 }

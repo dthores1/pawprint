@@ -60,7 +60,6 @@ export function SupplyRequestDetailModal({
     supplyRequestItems,
     products,
     people,
-    animals,
     updateSupplyRequest
   } = useWhisker();
   if (!requestId) return null;
@@ -70,9 +69,8 @@ export function SupplyRequestDetailModal({
     (i) => i.supply_request_id === requestId
   );
   const requester = people.find((p) => p.id === request.requester_person_id);
-  const animal = request.requested_for_animal_id ?
-  animals.find((a) => a.id === request.requested_for_animal_id) :
-  null;
+  // "For animal" intentionally not surfaced — supplies don't map 1:1 to a
+  // single animal. Mirror of the create form (NewSupplyRequestModal).
   const approver = request.approved_by_person_id ?
   people.find((p) => p.id === request.approved_by_person_id) :
   null;
@@ -135,53 +133,19 @@ export function SupplyRequestDetailModal({
       
       <div className="space-y-8">
         {/* Header Info */}
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <Avatar src={requester?.photo_url} type="person" size="md" />
-            <div>
-              <p className="text-xs uppercase tracking-wider text-text-secondary mb-0.5">
-                Requested by
-              </p>
-              <p className="font-medium text-text-primary text-lg">
-                {requester?.first_name} {requester?.last_name}
-              </p>
-              <p className="text-xs text-text-secondary mt-0.5">
-                {formatDate(request.requested_date)}
-              </p>
-            </div>
+        <div className="flex items-center gap-4">
+          <Avatar src={requester?.photo_url} type="person" size="md" />
+          <div>
+            <p className="text-xs uppercase tracking-wider text-text-secondary mb-0.5">
+              Requested by
+            </p>
+            <p className="font-medium text-text-primary text-lg">
+              {requester?.first_name} {requester?.last_name}
+            </p>
+            <p className="text-xs text-text-secondary mt-0.5">
+              {formatDate(request.requested_date)}
+            </p>
           </div>
-
-          {animal &&
-          <div className="flex items-center gap-4 sm:text-right">
-              <div className="sm:hidden">
-                <Avatar
-                src={animal.primary_photo_url}
-                type="animal"
-                species={animal.species}
-                size="md" />
-              
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wider text-text-secondary mb-0.5">
-                  For animal
-                </p>
-                <p className="font-medium text-text-primary text-lg">
-                  {animal.name}
-                </p>
-                <p className="text-xs text-text-secondary font-mono mt-0.5">
-                  #{animal.id}
-                </p>
-              </div>
-              <div className="hidden sm:block">
-                <Avatar
-                src={animal.primary_photo_url}
-                type="animal"
-                species={animal.species}
-                size="md" />
-              
-              </div>
-            </div>
-          }
         </div>
 
         {/* Status — softer, current-emphasis layout */}

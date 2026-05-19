@@ -16,7 +16,8 @@ export function PlaceAnimalModal({
   onClose,
   animalId
 }: PlaceAnimalModalProps) {
-  const { fosters, placements, animals, placeAnimal } = useWhisker();
+  const { fosters, placements, animals, placeAnimal, reassignFoster } =
+  useWhisker();
   const [fosterId, setFosterId] = useState('');
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -24,9 +25,19 @@ export function PlaceAnimalModal({
     new Date().toISOString().split('T')[0]
   );
   const [notes, setNotes] = useState('');
+  const [reasonEnded, setReasonEnded] = useState('');
   const wrapperRef = useRef<HTMLDivElement>(null);
   const animal = animals.find((a) => a.id === animalId);
   const selectedFoster = fosters.find((f) => f.id === fosterId);
+  // Source of truth for "currently in foster": an active placement.
+  // (See CLAUDE.md — animal.current_foster_id is a denormalized cache.)
+  const activePlacement = placements.find(
+    (p) => p.animal_id === animalId && p.placement_status === 'active'
+  );
+  const currentFoster = activePlacement ?
+  fosters.find((f) => f.id === activePlacement.foster_parent_id) :
+  undefined;
+  const isReassign = !!activePlacement;
   const getActivePlacementsCount = (fId: string) =>
   placements.filter(
     (p) => p.foster_parent_id === fId && p.placement_status === 'active'
@@ -35,6 +46,8 @@ export function PlaceAnimalModal({
     const q = query.trim().toLowerCase();
     return fosters.
     filter((f) => f.active).
+    // Exclude the current foster — reassigning to themselves is a no-op.
+    filter((f) => !currentFoster || f.id !== currentFoster.id).
     filter((f) => {
       if (!q) return true;
       const hay = `${f.first_name} ${f.last_name} ${f.email}`.toLowerCase();
@@ -50,7 +63,7 @@ export function PlaceAnimalModal({
       };
     }).
     sort((a, b) => Number(a.isFull) - Number(b.isFull));
-  }, [fosters, placements, query]);
+  }, [fosters, placements, query, currentFoster]);
   // Close panel on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -71,13 +84,24 @@ export function PlaceAnimalModal({
       setQuery('');
       setOpen(false);
       setNotes('');
+      setReasonEnded('');
       setStartDate(new Date().toISOString().split('T')[0]);
     }
   }, [isOpen]);
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!fosterId) return;
-    placeAnimal(animalId, fosterId, startDate, notes);
+    if (isReassign) {
+      reassignFoster(
+        animalId,
+        fosterId,
+        startDate,
+        reasonEnded.trim() || undefined,
+        notes.trim() || undefined
+      );
+    } else {
+      placeAnimal(animalId, fosterId, startDate, notes);
+    }
     onClose();
   };
   const handleSelect = (id: string, isFull: boolean) => {
@@ -95,13 +119,42 @@ export function PlaceAnimalModal({
       isOpen={isOpen}
       onClose={onClose}
       title={
-      animal ? `Place ${animal.name} in Foster Care` : 'Place in Foster Care'
+      isReassign && animal ?
+      `Reassign Foster for ${animal.name}` :
+      animal ?
+      `Place ${animal.name} in Foster Care` :
+      'Place in Foster Care'
       }>
-      
+
       <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Reassign mode: show who is being replaced */}
+        {isReassign && currentFoster &&
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-background border border-border">
+            <Avatar
+            src={currentFoster.photo_url}
+            name={`${currentFoster.first_name} ${currentFoster.last_name}`}
+            colorKey={currentFoster.id}
+            size="sm" />
+
+            <div className="min-w-0 flex-1">
+              <p className="text-xs uppercase tracking-wider text-text-secondary">
+                Currently with
+              </p>
+              <p className="font-medium text-text-primary truncate">
+                {currentFoster.first_name} {currentFoster.last_name}
+              </p>
+            </div>
+            <span className="text-xs text-text-secondary shrink-0">
+              Will be closed on submit
+            </span>
+          </div>
+        }
+
         {/* Foster Parent Typeahead */}
         <div ref={wrapperRef}>
-          <Label htmlFor="foster_search">Foster Parent</Label>
+          <Label htmlFor="foster_search">
+            {isReassign ? 'New Foster Parent' : 'Foster Parent'}
+          </Label>
 
           {selectedFoster ?
           <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border border-primary/30 bg-primary/5">
@@ -225,10 +278,25 @@ export function PlaceAnimalModal({
             type="date"
             required
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="text-left appearance-none [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-60 [&::-webkit-date-and-time-value]:text-left [&::-webkit-datetime-edit]:text-left" />
-          
+            onChange={(e) => setStartDate(e.target.value)} />
+
         </div>
+
+        {/* Reason for ending the previous placement — reassign only */}
+        {isReassign &&
+        <div>
+            <Label htmlFor="reason_ended">
+              Reason for reassignment (optional)
+            </Label>
+            <Input
+            id="reason_ended"
+            type="text"
+            value={reasonEnded}
+            onChange={(e) => setReasonEnded(e.target.value)}
+            placeholder="e.g. Foster moved, medical hand-off, capacity…" />
+
+          </div>
+        }
 
         {/* Notes */}
         <div>
@@ -238,7 +306,7 @@ export function PlaceAnimalModal({
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Any specific instructions or notes for this placement…" />
-          
+
         </div>
 
         <div className="pt-4 flex justify-end gap-3 border-t border-border mt-6">
@@ -247,7 +315,7 @@ export function PlaceAnimalModal({
           </Button>
           <Button type="submit" disabled={!fosterId}>
             <CheckIcon className="w-4 h-4 mr-2" />
-            Place Animal
+            {isReassign ? 'Reassign Foster' : 'Place Animal'}
           </Button>
         </div>
       </form>

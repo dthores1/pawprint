@@ -4,7 +4,17 @@ import { Input, Select, Textarea, Label } from '../ui/Forms';
 import { Button } from '../ui/Button';
 import { useWhisker } from '../../context/WhiskerContext';
 import { SupplyRequestPriority, SupplyRequestItem } from '../../types';
-import { PlusIcon, Trash2Icon, BookmarkIcon } from 'lucide-react';
+import { PlusIcon, Trash2Icon, BookmarkIcon, BookmarkCheckIcon } from 'lucide-react';
+
+// TODO(auth): replace with the signed-in user once an auth/session layer exists.
+// Today the app has no current-user concept (see WhiskerContext); we hardcode
+// the demo user so "Requesting as" reads correctly. The Person row exists in
+// seed.ts as a foster parent (f3), but Person and FosterParent are separate
+// tables — wire requester_person_id properly when auth lands.
+const CURRENT_USER = {
+  person_id: 'p_dan',
+  display_name: 'Dan Thoreson'
+};
 interface NewSupplyRequestModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -38,17 +48,15 @@ export function NewSupplyRequestModal({
   isOpen,
   onClose
 }: NewSupplyRequestModalProps) {
-  const { addSupplyRequest, addSupplyRequestItem, people, animals, products } =
-  useWhisker();
-  const [requesterId, setRequesterId] = useState('');
-  const [animalId, setAnimalId] = useState('');
+  const { addSupplyRequest, addSupplyRequestItem, products } = useWhisker();
+  // Admin-on-behalf-of flow is stubbed until we have roles. When enabled,
+  // an admin would pick a contact/foster from `people` here.
+  // const { people, animals } = useWhisker();
   const [priority, setPriority] = useState<SupplyRequestPriority>('normal');
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<DraftItem[]>([emptyItem()]);
   const [saveAsCommon, setSaveAsCommon] = useState(false);
   const reset = () => {
-    setRequesterId('');
-    setAnimalId('');
     setPriority('normal');
     setNotes('');
     setItems([emptyItem()]);
@@ -85,15 +93,16 @@ export function NewSupplyRequestModal({
   };
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!requesterId || items.length === 0) return;
+    if (items.length === 0) return;
     // Filter out empty items
     const validItems = items.filter(
       (i) => i.product_id && i.product_id !== 'custom' || i.custom_item_name
     );
     if (validItems.length === 0) return;
     const requestId = addSupplyRequest({
-      requester_person_id: requesterId,
-      requested_for_animal_id: animalId || undefined,
+      requester_person_id: CURRENT_USER.person_id,
+      // requested_for_animal_id intentionally omitted — supplies don't map
+      // 1:1 to a single animal. See commented-out "For Animal" field below.
       status: 'submitted',
       priority,
       requested_date: new Date().toISOString(),
@@ -110,8 +119,10 @@ export function NewSupplyRequestModal({
         notes: item.notes?.trim() || undefined
       });
     });
-    // NOTE: "Save as common request" is captured but does not persist yet
-    // (no templates store exists). Wire to a templates collection when added.
+    // TODO(persistence): "Save as common request" is captured but does not
+    // persist — there is no template/abstraction for reusable request
+    // bundles yet. Add a `requestTemplates` collection (or similar) in
+    // WhiskerContext when persistence lands, then write here.
     handleClose();
   };
   return (
@@ -124,52 +135,64 @@ export function NewSupplyRequestModal({
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="requester">Requested By *</Label>
+            <Label>Requesting as</Label>
+            <div className="h-11 px-3.5 flex items-center rounded-lg border border-border bg-background/60 text-sm font-medium text-text-primary">
+              {CURRENT_USER.display_name}
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="priority">Priority</Label>
             <Select
-              id="requester"
-              required
-              value={requesterId}
-              onChange={(e) => setRequesterId(e.target.value)}>
-              
-              <option value="">Select person...</option>
-              {people.map((p) =>
-              <option key={p.id} value={p.id}>
-                  {p.first_name} {p.last_name} ({p.role})
-                </option>
-              )}
+              id="priority"
+              value={priority}
+              onChange={(e) =>
+              setPriority(e.target.value as SupplyRequestPriority)
+              }>
+
+              <option value="normal">Normal</option>
+              <option value="urgent">Urgent</option>
+              <option value="critical">Critical</option>
             </Select>
           </div>
+        </div>
+
+        {/*
+          Admin / staff only: "Create request on behalf of…" with a search
+          lookup over the Contact / Foster Parent table. Stubbed until we
+          have roles + permissions.
+
+          {isAdmin && (
+            <div>
+              <Label htmlFor="onBehalfOf">Create request on behalf of…</Label>
+              <PersonSearchInput
+                value={onBehalfOfId}
+                onChange={setOnBehalfOfId}
+                people={people}
+                placeholder="Search contacts and foster parents…"
+              />
+            </div>
+          )}
+        */}
+
+        {/*
+          "For Animal" intentionally removed — supplies rarely map cleanly to
+          a single animal. Keeping this comment as a marker in case we
+          revisit; the SupplyRequest schema still has `requested_for_animal_id`
+          as optional, so re-enabling is a UI-only change.
+
           <div>
             <Label htmlFor="animal">For Animal (Optional)</Label>
             <Select
               id="animal"
               value={animalId}
               onChange={(e) => setAnimalId(e.target.value)}>
-              
               <option value="">General / No specific animal</option>
-              {animals.map((a) =>
-              <option key={a.id} value={a.id}>
-                  {a.name} (#{a.id})
-                </option>
-              )}
+              {animals.map((a) => (
+                <option key={a.id} value={a.id}>{a.name} (#{a.id})</option>
+              ))}
             </Select>
           </div>
-        </div>
-
-        <div>
-          <Label htmlFor="priority">Priority</Label>
-          <Select
-            id="priority"
-            value={priority}
-            onChange={(e) =>
-            setPriority(e.target.value as SupplyRequestPriority)
-            }>
-            
-            <option value="normal">Normal</option>
-            <option value="urgent">Urgent</option>
-            <option value="critical">Critical</option>
-          </Select>
-        </div>
+        */}
 
         {/* Items — card-style stacked layout */}
         <div>
@@ -322,25 +345,38 @@ export function NewSupplyRequestModal({
           
         </div>
 
-        {/* Save as common request */}
-        <label className="flex items-start gap-3 p-3 rounded-xl bg-background/60 border border-border cursor-pointer hover:bg-background transition-colors">
-          <input
-            type="checkbox"
-            checked={saveAsCommon}
-            onChange={(e) => setSaveAsCommon(e.target.checked)}
-            className="mt-1 w-4 h-4 rounded border-border text-primary focus:ring-primary" />
-          
-          <div className="flex-1">
-            <div className="flex items-center gap-2 text-sm font-medium text-text-primary">
-              <BookmarkIcon className="w-3.5 h-3.5 text-text-secondary" />
-              Save as common request
+        {/* Save as common request — the bookmark icon itself is the toggle. */}
+        {/* TODO(persistence): the toggled value is currently dropped on submit;
+            see handleSubmit. Wire to a `requestTemplates` store when added. */}
+        <div className="flex items-start gap-3 p-3 rounded-xl bg-background/60 border border-border">
+          <button
+            type="button"
+            onClick={() => setSaveAsCommon((v) => !v)}
+            aria-pressed={saveAsCommon}
+            aria-label={
+            saveAsCommon ?
+            'Unsave as common request' :
+            'Save as common request'
+            }
+            className={`shrink-0 p-2 rounded-lg transition-colors ${saveAsCommon ? 'bg-primary/10 text-primary hover:bg-primary/15' : 'text-text-secondary hover:bg-background hover:text-text-primary'}`}>
+
+            {saveAsCommon ?
+            <BookmarkCheckIcon className="w-5 h-5" /> :
+            <BookmarkIcon className="w-5 h-5" />
+            }
+          </button>
+          <div className="flex-1 pt-0.5">
+            <div className="text-sm font-medium text-text-primary">
+              {saveAsCommon ?
+              'Saved as common request' :
+              'Save as common request'}
             </div>
             <p className="text-xs text-text-secondary mt-0.5">
               Reuse these items next time you need to restock for the same
               situation.
             </p>
           </div>
-        </label>
+        </div>
 
         <div className="pt-5 flex justify-end gap-3 border-t border-border mt-7">
           <Button type="button" variant="ghost" onClick={handleClose}>

@@ -34,16 +34,24 @@ The central record. Every animal has both a **lifecycle status** and an orthogon
 
 ![Animal Detail page](docs/images/Animal_Detail.png "The animal detail page that shows their timeline, medical history, notes, relationships to other animals, and adoption readiness. Specific details on the animal's species, status, priority, etc. are tracked at the top level.")
 
+Two more Animal fields worth calling out:
+
+- **`current_foster_id`** — denormalized cache of the active placement's `foster_parent_id`. The placements collection is still the source of truth for history; `placeAnimal` and `reassignFoster` keep this field in sync.
+- **`internal_notes`** — staff-only free-form notes. Separate from `description`, which is the public-facing blurb.
+
 ### Other entities
 
-- **`FosterParent`** — has `max_capacity`, `preferred_species`, an `active` flag, and is paired to animals via `AnimalPlacement`.
-- **`AnimalPlacement`** — links one animal to one foster with a `start_date`, optional `end_date`, and `placement_status` (`active` / `completed` / `interrupted`). An animal is considered "in foster" if any placement with `placement_status: 'active'` exists.
+- **`FosterParent`** — has `max_capacity`, `preferred_species`, an `active` flag, and is paired to animals via `FosterPlacement`.
+- **`FosterPlacement`** — links one animal to one foster with a `start_date`, optional `end_date`, `placement_status` (`active` / `completed` / `interrupted`), `placement_type` (`foster` / `medical_foster` / `trial_adoption`), and optional `reason_ended`. An animal is considered "in foster" if any placement with `placement_status: 'active'` exists. The Placement Timeline on the Animal Profile renders this history as a date-range stack. (Type renamed from `AnimalPlacement` — the codebase consistently uses `FosterPlacement` now.)
 - **`MedicalRecord`** — procedure log with `procedure_type`, `procedure_name`, `status` (`completed` / `due` / `scheduled` / `overdue` / `canceled`), `performed_date` and/or `due_date`, `provider_name`, `notes`.
 - **`AnimalNote`** — timestamped free-text note with a `note_type` (`behavior` / `medical` / `foster_update` / `adoption` / `general`).
 - **`AnimalRelationship`** — animal-to-animal link (mother, father, sibling, etc.). See §8.
 - **`AnimalPhoto`** — gallery photo with a `category`. See §8.
-- **`Person`** — non-foster contacts: vets, rescue staff, volunteers, adopters. Used by the Contacts page and as the requester on supply requests.
+- **`Person`** — non-foster contacts: vets, rescue staff, volunteers, adopters. Used by the Contacts page and as the requester on supply / transport / sitting requests.
 - **`Product`**, **`SupplyRequest`**, **`SupplyRequestItem`** — supply ordering. See §10.
+- **`TransportRequest`** — request to move an animal or supplies between locations. See §11.
+- **`SittingRequest`** — temporary foster coverage when a placement's foster is unavailable. See §11.
+- **`ClinicEvent`**, **`ClinicSlot`** — TNR clinic planning: a vet date with a fixed capacity, and the animals assigned to it. See §11.
 
 ---
 
@@ -225,7 +233,7 @@ A request can have many items. Each item is for the same request — multi-anima
 
 - **Supplies page (`/supplies`)** — tabbed list of Active vs. Completed/Canceled requests. Each row leads with the requester avatar (rendered in a consistent peach tone using the `Avatar` `tone="peach"` variant) and the animal avatar; the line-item summary, requested date, and status pill sit to the right. When no specific animal is set, a "General supplies" placeholder fills the animal slot so the row stays visually balanced.
 - **Request detail modal** — opened by clicking any row. Shows requester + animal, a **current-status pill** with a colored dot, a **History** list derived from `created_at`, `approved_by_person_id`, `fulfilled_date`, `fulfilled_by_person_id`, and `updated_at`, the line items as a table, and quick-advance / cancel buttons. The presentation is deliberately soft — no horizontal lifecycle stepper, no progress bar. Status feels like a current moment + a short paper trail, not a corporate workflow.
-- **New request modal** — requester + optional animal + priority + per-item cards. Each item card has a product dropdown (with an "Other" custom-item option), quantity + unit (unit is a dropdown of common units; auto-fills from the product's `default_unit` when a catalog product is selected), and optional notes. A dashed "+ Add another item" CTA appends a card. A "Save as common request" checkbox at the bottom is wired to form state for a future templates feature.
+- **New request modal** — "Requesting as" (read-only current user) + priority + per-item cards. Each item card has a product dropdown (with an "Other" custom-item option), quantity + unit (unit is a dropdown of common units; auto-fills from the product's `default_unit` when a catalog product is selected), and optional notes. A dashed "+ Add another item" CTA appends a card. A clickable bookmark icon at the bottom toggles "Save as common request" for a future templates feature (carries a `TODO(persistence)`). The "For Animal" picker was intentionally removed — supplies rarely map 1:1 to a single animal — and the staff-only "Create request on behalf of…" lookup is stubbed in code comments.
 - **Dashboard widget** — three soft counts on the dashboard: Urgent requests, Pending review (submitted + reviewing), Awaiting delivery (approved + ordered + ready_for_pickup). Each row links to `/supplies`.
 
 ### UX north star
@@ -234,7 +242,56 @@ Wherever supply requests render, **the requester and animal are the subject of t
 
 ---
 
-## 11. Org-level configuration
+## 11. Coordination workflows: Transports, Sitting, Clinics
+
+These three features are most common at TNR-focused orgs (e.g. Alley Cat Project) but the patterns generalize to any rescue that coordinates volunteer help over Slack and Sheets today. All three share a common shape: an authenticated requester, a definable date/time, and a "claim" or "accept" affordance for whoever picks up the work.
+
+### Transport Requests (`/transports`)
+
+Volunteers ferry animals or supplies. The list view leads with **subject → destination**, the date in human terms ("Tomorrow @ 9:00 AM", "Mon · 9:00 AM", or a calendar date past a week out), and the requester. Open requests show a **Claim Request** button that assigns the current user as the volunteer and flips status to `claimed`.
+
+**Type:** `animal | supplies | medical | emergency` — drives whether the form shows the optional animal picker.
+**Status:** `open | claimed | in_progress | completed | canceled`.
+**Urgency:** `normal | urgent | critical` — same orthogonal pattern as animals (§3). Urgency only renders as a pill when non-normal.
+
+**Optional links:** `animal_id`, `clinic_event_id`, and `supply_request_id` are all nullable so a transport can target whichever thing is being moved. Clinic-tied transports are how a Saturday clinic gets cats from foster homes to the vet.
+
+**UX intent:** this should not feel like dispatch software. The card is "Pepper → Greenwood Vet Clinic, Tomorrow @ 9:00 AM, Requested by Jessica Wong, needs carrier transport," not a row in a queue.
+
+### Sitting Requests (`/sitting`)
+
+Short-term foster coverage. A foster who's traveling or otherwise unavailable requests a sitter; another org member accepts. The request is keyed off a `foster_placement_id` — it can't exist without an active placement.
+
+**Fields surfaced as sitter requirements** (chips on the card): `medication_required`, `supplies_included`, `transport_needed`. Sitters know up front what they're signing up for.
+
+**Status:** `open | claimed | in_progress | completed | canceled`. Open requests show **Accept Sitting Request**, which sets `sitter_person_id` and moves to `claimed`.
+
+**Tabs:** the page splits into **Unclaimed** (everyone can pick from these) and **My Requests** (requests I submitted or am sitting). The Dashboard also carries a Sitting Requests widget showing unclaimed coverage at a glance.
+
+**UX intent:** framed gently — "Need temporary coverage?" — not as a job board.
+
+### Clinic Planning (`/clinics`)
+
+The most operationally complex of the three. TNR orgs run periodic clinics (typically weekly) where a vet handles a batch of spay/neuter + vaccines. A lot of manual coordination goes into filling slots, lining up transport, and prepping intake paperwork.
+
+**`ClinicEvent`** captures the date/time, location, and the people involved:
+- `veterinarian_person_id` — the vet performing procedures (Person with `role: 'vet'`).
+- `contact_person_id` — org-side point of contact (vet tech, clinic admin); may be the same as the vet, or different.
+- `transport_coordinator_person_id` / `intake_coordinator_person_id` — internal roles for the day.
+- `slot_capacity` — hard cap that drives the capacity bar on cards.
+- `status` — `planning | scheduled | in_progress | completed | canceled`.
+
+**`ClinicSlot`** links an animal to a clinic for a specific `procedure_type` (`spay_neuter | vaccines | dental | exam | recheck | other`) with its own `status` (`reserved | confirmed | completed | no_show | canceled`). Slots are added inline in the **Clinic Detail modal** — pick an animal from a dropdown that excludes anyone already on this clinic's roster, pick a procedure, optionally add notes.
+
+**Cross-feature ties:**
+- A `TransportRequest` can carry a `clinic_event_id` so transport-to-clinic gets coordinated alongside everything else.
+- Filled slots that resolve to `completed` are the natural source for future `MedicalRecord` rows (not auto-generated yet, but the data shape supports it).
+
+**Dashboard widget:** the Clinics card sits in the main column between **Needs Action** and **Upcoming Medical**, showing the next 1–2 upcoming clinics with their fill bar.
+
+---
+
+## 12. Org-level configuration
 
 `lib/config.ts` is the seed of a future settings layer. Today it exports:
 
@@ -244,7 +301,7 @@ When auth/settings persistence land, these constants should move to a per-organi
 
 ---
 
-## 12. Design tokens
+## 13. Design tokens
 
 Defined in `tailwind.config.js`:
 
@@ -274,7 +331,7 @@ The Avatar primitive also supports a fixed `tone` prop (currently `'peach'`) for
 
 ---
 
-## 13. File structure
+## 14. File structure
 
 ```
 /
@@ -298,21 +355,28 @@ The Avatar primitive also supports a fixed `tone` prop (currently `'peach'`) for
 │   │                                AddRelationshipModal
 │   ├── fosters/                     Foster-specific modals
 │   ├── supplies/                    NewSupplyRequestModal, SupplyRequestDetailModal
+│   ├── transports/                  NewTransportRequestModal
+│   ├── sitting/                     NewSittingRequestModal
+│   ├── clinics/                     NewClinicEventModal, ClinicDetailModal
+│   ├── icons/                       CatIcon (and future custom SVG icons)
 │   └── search/GlobalSearch.tsx      Global search component
 └── pages/                           Dashboard, AnimalsList, AnimalProfile,
-                                     FostersList, FosterProfile, Contacts, SupplyRequests
+                                     FostersList, FosterProfile, Contacts,
+                                     SupplyRequests, Transports, Sitting, Clinics
 ```
 
 ---
 
-## 14. Conventions
+## 15. Conventions
 
 - **Components**: one per file, named exports only, PascalCase.
 - **Types**: shared types live in `types/index.ts`. Local component prop types stay inline.
-- **State**: all entity state lives in `WhiskerContext` and is mutated via context actions (`addAnimal`, `updateAnimal`, `placeAnimal`, `addNote`, `addRelationship`, `addPhoto`, `addSupplyRequest`, `updateSupplyRequest`, `addSupplyRequestItem`, etc.). Components never mutate data directly.
-- **Status / Priority changes** flow through the `ChangeStatusModal` (which captures both fields together and can record a reason as a `general` note). Supply request status advances go through quick-action buttons on the detail modal.
+- **State**: all entity state lives in `WhiskerContext` and is mutated via context actions (`addAnimal`, `updateAnimal`, `placeAnimal`, `reassignFoster`, `addNote`, `addRelationship`, `addPhoto`, `addSupplyRequest`, `updateSupplyRequest`, `addSupplyRequestItem`, `addTransportRequest` / `claimTransportRequest`, `addSittingRequest` / `acceptSittingRequest`, `addClinicEvent` / `addClinicSlot` / `updateClinicSlot`, etc.). Components never mutate data directly.
+- **Status / Priority / animal edits** flow through the `ChangeStatusModal` — now an "Edit" modal that also covers Name, Species, Sex, DOB, and Internal Notes. Status/priority changes are still logged as a `general` note when the reason field is filled. Supply / transport / sitting status advances go through quick-action buttons on their respective surfaces.
 - **Date inputs** use the shared `Input` component, which auto-normalizes Safari's native date picker rendering. Never apply per-instance date styling.
 - **Avatars in lists** prefer photos when available, fall back to initials when a `name` is passed, and only fall back to icons when neither is available. Pass `species` for animal avatars so the dog/cat fallback glyph is correct.
+- **Relational pickers** (Animals, Fosters, Contacts) use search-driven typeahead — not dropdowns. Even small datasets grow, and forcing search keeps the interaction consistent at scale.
+- **Demo current user**. There's no auth yet. Forms that need a "requested by" / "claimed by" identity reference a `CURRENT_USER` constant (`person_id: 'p_dan'`) which resolves to a real `Person` row in the seed. Multiple TODOs across modals call this out — replace with the real session user when auth lands.
 
 ---
 
