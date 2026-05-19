@@ -17,6 +17,23 @@ import {
   ClinicSlot } from
 '../types';
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/** YYYY-MM-DD, N calendar days from today (local). Demo seed only. */
+function seedDateOnly(daysFromNow: number): string {
+  return new Date(Date.now() + daysFromNow * MS_PER_DAY).
+  toISOString().
+  split('T')[0];
+}
+
+/** ISO datetime N calendar days from today at a fixed local clock time. */
+function seedDateTime(daysFromNow: number, hour: number, minute = 0): string {
+  const d = new Date();
+  d.setDate(d.getDate() + daysFromNow);
+  d.setHours(hour, minute, 0, 0);
+  return d.toISOString();
+}
+
 export const seedAnimals: Animal[] = [
 {
   id: 'a1',
@@ -1078,7 +1095,7 @@ export const seedTransportRequests: TransportRequest[] = [
   animal_id: 'a8', // Pepper
   pickup_location: '202 Birch Rd, Portland, OR (Anita Patel)',
   dropoff_location: 'Greenwood Vet Clinic',
-  requested_pickup_time: '2026-05-19T09:00:00Z',
+  requested_pickup_time: seedDateTime(1, 9, 0),
   notes: 'Needs carrier transport.',
   urgency: 'normal',
   created_at: '2026-05-17T14:00:00Z',
@@ -1093,7 +1110,7 @@ export const seedTransportRequests: TransportRequest[] = [
   supply_request_id: 'sr4',
   pickup_location: 'Pawprint office storage',
   dropoff_location: '505 Walnut Dr, Portland, OR (Tom Baker)',
-  requested_pickup_time: '2026-05-20T16:00:00Z',
+  requested_pickup_time: seedDateTime(2, 16, 0),
   notes: 'Drop on porch; foster will text back when they have it.',
   urgency: 'normal',
   created_at: '2026-05-16T11:00:00Z',
@@ -1107,7 +1124,7 @@ export const seedTransportRequests: TransportRequest[] = [
   animal_id: 'a9', // Otis
   pickup_location: "Pawprint intake (Brian O'Connor)",
   dropoff_location: 'Bridge City Veterinary',
-  requested_pickup_time: '2026-05-19T11:30:00Z',
+  requested_pickup_time: seedDateTime(1, 11, 30),
   notes: 'Right hind leg eval; please use the larger carrier.',
   urgency: 'urgent',
   created_at: '2026-05-17T09:15:00Z',
@@ -1122,7 +1139,7 @@ export const seedTransportRequests: TransportRequest[] = [
   animal_id: 'a4', // Milkshake
   pickup_location: 'Foster home (TBD)',
   dropoff_location: 'Stanton Spay/Neuter Clinic',
-  requested_pickup_time: '2026-05-23T07:30:00Z',
+  requested_pickup_time: seedDateTime(4, 7, 30),
   notes: 'Clinic intake at 8am — please be early.',
   urgency: 'normal',
   created_at: '2026-05-15T13:00:00Z',
@@ -1150,8 +1167,8 @@ export const seedSittingRequests: SittingRequest[] = [
   id: 'sit1',
   requested_by_person_id: 'pe3',
   coverage_scope: 'all_current_placements',
-  start_date: '2026-05-25',
-  end_date: '2026-05-28',
+  start_date: seedDateOnly(6),
+  end_date: seedDateOnly(9),
   notes: 'Heading to a family wedding. Juniper is house-trained and crate-friendly.',
   medication_required: false,
   foster_provides_supplies: true,
@@ -1165,8 +1182,8 @@ export const seedSittingRequests: SittingRequest[] = [
   requested_by_person_id: 'pe3',
   sitter_person_id: 'pe5', // Chloe
   coverage_scope: 'selected_placements',
-  start_date: '2026-05-20',
-  end_date: '2026-05-22',
+  start_date: seedDateOnly(1),
+  end_date: seedDateOnly(3),
   notes: 'Still on antibiotics — 1 pill twice daily wrapped in pill pockets.',
   medication_required: true,
   foster_provides_supplies: true,
@@ -1179,8 +1196,8 @@ export const seedSittingRequests: SittingRequest[] = [
   id: 'sit3',
   requested_by_person_id: 'pe3',
   coverage_scope: 'selected_placements',
-  start_date: '2026-06-10',
-  end_date: '2026-06-14',
+  start_date: seedDateOnly(22),
+  end_date: seedDateOnly(26),
   notes: 'Senior cat on renal diet. Quiet home preferred. Foster will pre-portion meals.',
   medication_required: false,
   foster_provides_supplies: true,
@@ -1205,7 +1222,7 @@ export const seedSittingRequestPlacements: SittingRequestPlacement[] = [
 export const seedClinicEvents: ClinicEvent[] = [
 {
   id: 'ce1',
-  date_time: '2026-05-23T08:00:00Z',
+  date_time: seedDateTime(4, 8, 0),
   location: 'Stanton Spay/Neuter Clinic — 4205 NE Stanton, Portland OR',
   veterinarian_person_id: 'pe1', // Dr. Emily Smith
   contact_person_id: 'pe4', // Brian O'Connor, intake coordinator
@@ -1219,7 +1236,7 @@ export const seedClinicEvents: ClinicEvent[] = [
 },
 {
   id: 'ce2',
-  date_time: '2026-06-06T08:00:00Z',
+  date_time: seedDateTime(18, 8, 0),
   location: 'PDX Animal Hospital — 1422 SE Powell, Portland OR',
   veterinarian_person_id: 'pe2', // Dr. Mark Evans
   contact_person_id: 'pe2',
