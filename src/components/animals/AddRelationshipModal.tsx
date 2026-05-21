@@ -33,10 +33,6 @@ const RELATIONSHIP_TYPES: {
   label: 'Sibling'
 },
 {
-  value: 'littermate',
-  label: 'Littermate'
-},
-{
   value: 'bonded_pair',
   label: 'Bonded Pair'
 }];
@@ -50,7 +46,7 @@ export function AddRelationshipModal({
   const [search, setSearch] = useState('');
   const [selectedAnimal, setSelectedAnimal] = useState<Animal | null>(null);
   const [type, setType] =
-  useState<AnimalRelationship['relationship_type']>('littermate');
+  useState<AnimalRelationship['relationship_type']>('sibling');
   const [notes, setNotes] = useState('');
   // Filter out the current animal and any animals it is already related to
   const availableAnimals = useMemo(() => {
@@ -74,7 +70,7 @@ export function AddRelationshipModal({
   const reset = () => {
     setSearch('');
     setSelectedAnimal(null);
-    setType('littermate');
+    setType('sibling');
     setNotes('');
   };
   const handleClose = () => {

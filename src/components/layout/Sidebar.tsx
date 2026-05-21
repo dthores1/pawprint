@@ -4,15 +4,18 @@ import {
   LayoutDashboardIcon,
   PawPrintIcon,
   HomeIcon,
-  SettingsIcon,
   UsersIcon,
   PackageOpenIcon,
   TruckIcon,
   HeartHandshakeIcon,
-  StethoscopeIcon } from
+  StethoscopeIcon,
+  LogOutIcon } from
 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useAuth } from '../../context/AuthContext';
+import { isDemoMode } from '../../lib/appMode';
 export function Sidebar() {
+  const { user, currentOrg, signOut } = useAuth();
   const navItems = [
   {
     to: '/',
@@ -88,11 +91,31 @@ export function Sidebar() {
         )}
       </nav>
 
-      <div className="p-4 border-t border-border">
-        <button className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm font-semibold text-text-primary/80 hover:bg-background hover:text-text-primary transition-colors">
-          <SettingsIcon className="w-5 h-5" />
-          Settings
-        </button>
+      <div className="p-4 border-t border-border space-y-1">
+        {currentOrg &&
+        <div className="px-3 pb-1">
+            <p className="text-xs uppercase tracking-wider text-text-secondary">
+              Organization
+            </p>
+            <p className="text-sm font-semibold text-text-primary truncate">
+              {currentOrg.name}
+            </p>
+          </div>
+        }
+        {user &&
+        <p className="px-3 text-xs text-text-secondary truncate" title={user.email}>
+            {user.email}
+          </p>
+        }
+        {!isDemoMode &&
+        <button
+          onClick={signOut}
+          className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm font-semibold text-text-primary/80 hover:bg-background hover:text-text-primary transition-colors">
+
+            <LogOutIcon className="w-5 h-5" />
+            Sign out
+          </button>
+        }
       </div>
     </aside>);
 

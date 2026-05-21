@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useWhisker } from '../context/WhiskerContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -71,10 +72,18 @@ export function SupplyRequests() {
             Keep fosters stocked and animals cared for.
           </p>
         </div>
-        <Button onClick={() => setIsNewModalOpen(true)} className="gap-2">
-          <PlusIcon className="w-4 h-4" />
-          Request Supplies
-        </Button>
+        <div className="flex gap-2">
+          <Link to="/supplies/catalog">
+            <Button variant="outline" className="gap-2">
+              <PackageIcon className="w-4 h-4" />
+              Manage Catalog
+            </Button>
+          </Link>
+          <Button onClick={() => setIsNewModalOpen(true)} className="gap-2">
+            <PlusIcon className="w-4 h-4" />
+            Request Supplies
+          </Button>
+        </div>
       </div>
 
       <div className="flex gap-2 border-b border-border">

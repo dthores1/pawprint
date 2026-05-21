@@ -10,15 +10,13 @@ import {
   AlertCircleIcon } from
 'lucide-react';
 import { cn } from '../lib/utils';
+import { useAuth } from '../context/AuthContext';
 import {
   TransportRequest,
   TransportRequestStatus,
   TransportRequestType,
   TransportRequestUrgency } from
 '../types';
-
-// Demo current user — see other modals for the same TODO(auth).
-const CURRENT_USER = { person_id: 'p_dan' };
 
 const STATUS_LABEL: Record<TransportRequestStatus, string> = {
   open: 'Open',
@@ -75,6 +73,7 @@ export function Transports() {
     animals,
     claimTransportRequest
   } = useWhisker();
+  const { currentPersonId } = useAuth();
   const [isNewOpen, setIsNewOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<
     'open' | 'claimed' | 'completed'>(
@@ -173,7 +172,8 @@ export function Transports() {
             return p ? `${p.first_name} ${p.last_name}` : undefined;
           })()}
           onClaim={() =>
-          claimTransportRequest(r.id, CURRENT_USER.person_id)
+          currentPersonId &&
+          claimTransportRequest(r.id, currentPersonId)
           } />
 
         )}

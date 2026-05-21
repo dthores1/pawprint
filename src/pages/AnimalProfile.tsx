@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useWhisker } from '../context/WhiskerContext';
 import { Card } from '../components/ui/Card';
@@ -27,19 +27,29 @@ import {
   MessageSquareIcon,
   ClockIcon,
   AlertCircleIcon,
-  ImageIcon } from
+  ImageIcon,
+  CameraIcon } from
 'lucide-react';
 import { motion } from 'framer-motion';
 import { MedicalKitIcon } from '../components/ui/MedicalKitIcon';
 import { PawPrintIcon as PawPrintGlyph } from '../components/ui/PawPrintIcon';
 import { BoneIcon } from '../components/ui/BoneIcon';
 import { CatIcon } from '../components/icons/CatIcon';
+import { animalBreedLabel } from '../lib/breedsApi';
 export function AnimalProfile() {
   const { id } = useParams<{
     id: string;
   }>();
-  const { animals, placements, fosters, medicalRecords, notes, photos } =
-  useWhisker();
+  const {
+    animals,
+    placements,
+    fosters,
+    medicalRecords,
+    notes,
+    photos,
+    breeds,
+    addPhoto
+  } = useWhisker();
   const [isMedicalModalOpen, setIsMedicalModalOpen] = useState(false);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
@@ -51,6 +61,8 @@ export function AnimalProfile() {
     'all' | 'placements' | 'medical' | 'notes'>(
     'all');
   const [heroImageError, setHeroImageError] = useState(false);
+  const [heroUploading, setHeroUploading] = useState(false);
+  const heroFileInputRef = useRef<HTMLInputElement>(null);
   // Reset the image-error state when navigating between animals so the
   // placeholder doesn't persist after the photo URL changes.
   useEffect(() => {
@@ -60,6 +72,25 @@ export function AnimalProfile() {
   if (!animal) {
     return <div className="p-8 text-center">Animal not found.</div>;
   }
+  // Profile-image upload from the hero (LinkedIn/Twitter-style). Uploads the
+  // file, files it under the Photos gallery as a profile photo, and sets it
+  // as the animal's profile picture.
+  const handleHeroUpload = async (
+  e: React.ChangeEvent<HTMLInputElement>) =>
+  {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setHeroUploading(true);
+    setHeroImageError(false);
+    await addPhoto({
+      animal_id: animal.id,
+      category: 'profile',
+      file,
+      setAsProfile: true
+    });
+    setHeroUploading(false);
+    if (heroFileInputRef.current) heroFileInputRef.current.value = '';
+  };
   // Derived data
   const animalPlacements = placements.filter((p) => p.animal_id === animal.id);
   const activePlacement = animalPlacements.find(
@@ -93,7 +124,7 @@ export function AnimalProfile() {
     date: animal.intake_date,
     type: 'intake',
     title: 'Intake',
-    description: `Source: ${animal.intake_source}`,
+    description: `Source: ${animal.intake_source || 'Not specified'}`,
     icon: ActivityIcon,
     color: 'bg-[#E5E2DC] text-[#6B6B6B]'
   },
@@ -173,7 +204,7 @@ export function AnimalProfile() {
       {/* Hero Section */}
       <Card className="overflow-hidden">
         <div className="flex flex-col md:flex-row">
-          <div className="w-full md:w-1/3 h-64 md:h-auto bg-accent relative">
+          <div className="w-full md:w-1/3 h-64 md:h-auto bg-accent relative group">
             {animal.primary_photo_url && !heroImageError ?
             <img
               src={animal.primary_photo_url}
@@ -196,6 +227,35 @@ export function AnimalProfile() {
                 </div>
               </div>
             }
+
+            {/* Hover-to-change profile photo (LinkedIn/Twitter-style). */}
+            <button
+              type="button"
+              onClick={() => heroFileInputRef.current?.click()}
+              disabled={heroUploading}
+              aria-label={
+              animal.primary_photo_url ?
+              'Change profile photo' :
+              'Upload profile photo'
+              }
+              className={`absolute inset-0 flex flex-col items-center justify-center gap-2 text-white transition-all focus:outline-none ${heroUploading ? 'bg-black/50 opacity-100' : 'bg-black/0 opacity-0 hover:bg-black/40 hover:opacity-100 focus-visible:bg-black/40 focus-visible:opacity-100'}`}>
+
+              <CameraIcon className="w-7 h-7" />
+              <span className="text-sm font-medium">
+                {heroUploading ?
+                'Uploading…' :
+                animal.primary_photo_url ?
+                'Change photo' :
+                'Upload photo'}
+              </span>
+            </button>
+            <input
+              ref={heroFileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleHeroUpload} />
+
           </div>
           <div className="flex-1 p-6 md:p-8 flex flex-col justify-between min-w-0">
             <div>
@@ -210,11 +270,22 @@ export function AnimalProfile() {
                     </span>
                   </div>
                   <p className="text-lg text-text-secondary">
-                    {animal.species} • {animal.sex} •{' '}
+                    {animalBreedLabel(animal, breeds) || animal.species} •{' '}
+                    {animal.sex} •{' '}
                     <span className="whitespace-nowrap">
                       {calculateAge(animal.estimated_birth_date)}
                     </span>
                   </p>
+                  {animal.birthdate_source === 'estimated_age' &&
+                  animal.estimated_age_value != null &&
+                  <p className="text-xs text-text-secondary mt-0.5">
+                      Estimated {animal.estimated_age_value}{' '}
+                      {animal.estimated_age_unit}
+                      {animal.estimated_age_as_of ?
+                    ` as of ${formatDate(animal.estimated_age_as_of)}` :
+                    ''}
+                    </p>
+                  }
                 </div>
                 <div className="flex flex-wrap gap-2 sm:shrink-0">
                   <Button

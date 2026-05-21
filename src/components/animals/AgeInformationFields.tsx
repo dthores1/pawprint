@@ -1,0 +1,138 @@
+import React, { useState } from 'react';
+import { Input, Select, Label } from '../ui/Forms';
+import { AgeUnit } from '../../types';
+import { deriveAgeInfo } from '../../lib/age';
+import { calculateAge } from '../../lib/utils';
+
+// Estimated Birthdate OR Estimated Age, chosen via a radio so only one set of
+// inputs shows at a time (progressive disclosure — no competing fields).
+interface AgeInformationFieldsProps {
+  birthdate: string;
+  ageValue: string;
+  ageUnit: AgeUnit;
+  asOfDate: string;
+  onBirthdate: (v: string) => void;
+  onAgeValue: (v: string) => void;
+  onAgeUnit: (v: AgeUnit) => void;
+  error?: string;
+}
+const UNIT_OPTIONS: AgeUnit[] = ['days', 'weeks', 'months', 'years'];
+
+export function AgeInformationFields({
+  birthdate,
+  ageValue,
+  ageUnit,
+  asOfDate,
+  onBirthdate,
+  onAgeValue,
+  onAgeUnit,
+  error
+}: AgeInformationFieldsProps) {
+  // Start on whichever the data already reflects (age path if an age is set
+  // and no birthdate). Remounts on modal open, so it re-syncs per animal.
+  const [mode, setMode] = useState<'birthdate' | 'age'>(() =>
+  ageValue && !birthdate ? 'age' : 'birthdate'
+  );
+
+  const selectMode = (next: 'birthdate' | 'age') => {
+    setMode(next);
+    // Clear the inactive path so the derived birthdate is unambiguous.
+    if (next === 'birthdate') onAgeValue('');else
+    onBirthdate('');
+  };
+
+  const derived = deriveAgeInfo({ birthdate, ageValue, ageUnit, asOf: asOfDate });
+  const agePreview =
+  mode === 'age' && derived.valid ?
+  `≈ born ${new Date(
+    derived.estimated_birth_date + 'T00:00:00'
+  ).toLocaleDateString('en-US', {
+    month: 'short',
+    year: 'numeric'
+  })} · current age ${calculateAge(derived.estimated_birth_date)}` :
+  null;
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-text-secondary">
+        Provide a birthdate if known. Otherwise enter an estimated age.
+      </p>
+
+      {/* Radio toggle between the two input modes */}
+      <div className="flex flex-wrap gap-x-5 gap-y-2">
+        <label className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
+          <input
+            type="radio"
+            name="age_mode"
+            checked={mode === 'birthdate'}
+            onChange={() => selectMode('birthdate')}
+            className="w-4 h-4 text-primary focus:ring-primary" />
+
+          Birthdate
+        </label>
+        <label className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
+          <input
+            type="radio"
+            name="age_mode"
+            checked={mode === 'age'}
+            onChange={() => selectMode('age')}
+            className="w-4 h-4 text-primary focus:ring-primary" />
+
+          Estimated Age
+        </label>
+      </div>
+
+      {mode === 'birthdate' ?
+      <div>
+          <Label htmlFor="estimated_birthdate" className="text-xs">
+            Birthdate
+          </Label>
+          <Input
+          id="estimated_birthdate"
+          type="date"
+          value={birthdate}
+          onChange={(e) => onBirthdate(e.target.value)} />
+
+        </div> :
+
+      <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label htmlFor="estimated_age_value" className="text-xs">
+              Age
+            </Label>
+            <Input
+            id="estimated_age_value"
+            type="number"
+            min="1"
+            inputMode="numeric"
+            placeholder="e.g. 3"
+            value={ageValue}
+            onChange={(e) => onAgeValue(e.target.value)} />
+
+          </div>
+          <div>
+            <Label htmlFor="estimated_age_unit" className="text-xs">
+              Unit
+            </Label>
+            <Select
+            id="estimated_age_unit"
+            value={ageUnit}
+            onChange={(e) => onAgeUnit(e.target.value as AgeUnit)}>
+
+              {UNIT_OPTIONS.map((u) =>
+            <option key={u} value={u}>
+                  {u}
+                </option>
+            )}
+            </Select>
+          </div>
+        </div>
+      }
+
+      {agePreview &&
+      <p className="text-xs text-text-secondary">{agePreview}</p>
+      }
+      {error && <p className="text-sm text-[#9B3A3A]">{error}</p>}
+    </div>);
+
+}

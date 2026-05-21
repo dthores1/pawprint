@@ -12,9 +12,8 @@ import {
   PackageIcon } from
 'lucide-react';
 import { cn } from '../lib/utils';
+import { useAuth } from '../context/AuthContext';
 import { SittingRequest, SittingRequestStatus, Animal } from '../types';
-
-const CURRENT_USER = { person_id: 'p_dan' };
 
 const STATUS_LABEL: Record<SittingRequestStatus, string> = {
   open: 'Unclaimed',
@@ -57,6 +56,7 @@ export function Sitting() {
     people,
     acceptSittingRequest
   } = useWhisker();
+  const { currentPersonId } = useAuth();
   const [isNewOpen, setIsNewOpen] = useState(false);
   const [tab, setTab] = useState<'unclaimed' | 'mine'>('unclaimed');
 
@@ -68,8 +68,9 @@ export function Sitting() {
   // "Mine" = requests I submitted OR placements I'm sitting.
   const mine = sorted.filter(
     (s) =>
-    s.requested_by_person_id === CURRENT_USER.person_id ||
-    s.sitter_person_id === CURRENT_USER.person_id
+    !!currentPersonId && (
+    s.requested_by_person_id === currentPersonId ||
+    s.sitter_person_id === currentPersonId)
   );
 
   const display = tab === 'unclaimed' ? unclaimed : mine;
@@ -161,7 +162,8 @@ export function Sitting() {
               sitter ? `${sitter.first_name} ${sitter.last_name}` : undefined
               }
               onAccept={() =>
-              acceptSittingRequest(s.id, CURRENT_USER.person_id)
+              currentPersonId &&
+              acceptSittingRequest(s.id, currentPersonId)
               } />);
 
 

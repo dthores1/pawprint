@@ -1,5 +1,7 @@
 import {
   Animal,
+  Breed,
+  BreedSpecies,
   FosterParent,
   FosterPlacement,
   MedicalRecord,
@@ -33,6 +35,40 @@ function seedDateTime(daysFromNow: number, hour: number, minute = 0): string {
   d.setHours(hour, minute, 0, 0);
   return d.toISOString();
 }
+
+// Global breed catalog (mirrors the `breeds` table seed). Demo mode reads this;
+// production reads the Supabase table.
+const BREED_DATA: [BreedSpecies, string[]][] = [
+['dog', [
+'Mixed Breed', 'Unknown', 'Labrador Retriever', 'Labrador Mix',
+'German Shepherd', 'German Shepherd Mix', 'Golden Retriever',
+'Golden Retriever Mix', 'Pit Bull', 'Pit Bull Mix',
+'American Staffordshire Terrier', 'Staffordshire Bull Terrier',
+'Chihuahua', 'Chihuahua Mix', 'Husky', 'Husky Mix', 'Australian Shepherd',
+'Border Collie', 'Boxer', 'Poodle', 'Standard Poodle', 'Miniature Poodle',
+'Shih Tzu', 'Yorkshire Terrier', 'Dachshund', 'Beagle', 'Corgi',
+'Great Pyrenees', 'Mastiff', 'Doberman Pinscher', 'Rottweiler',
+'Pomeranian', 'French Bulldog', 'Bulldog', 'Cocker Spaniel',
+'Jack Russell Terrier', 'Boston Terrier']],
+['cat', [
+'Domestic Shorthair', 'Domestic Medium Hair', 'Domestic Longhair',
+'Mixed Breed', 'Unknown', 'Siamese', 'Maine Coon', 'Persian', 'Ragdoll',
+'Bengal', 'Russian Blue', 'British Shorthair', 'Sphynx', 'Scottish Fold',
+'Norwegian Forest Cat']],
+['rabbit', [
+'Mixed Breed', 'Unknown', 'Lionhead', 'Mini Rex', 'Holland Lop',
+'Netherland Dwarf']],
+['bird', [
+'Parakeet', 'Cockatiel', 'Lovebird', 'Canary', 'Conure', 'Unknown']]];
+
+export const seedBreeds: Breed[] = BREED_DATA.flatMap(([species, names]) =>
+names.map((name, i) => ({
+  id: `br_${species}_${i}`,
+  species,
+  name,
+  active: true
+}))
+);
 
 export const seedAnimals: Animal[] = [
 {
@@ -109,6 +145,7 @@ export const seedAnimals: Animal[] = [
   'Tiny black kitten found alone. Currently battling an upper respiratory infection. Needs immediate foster placement.',
   primary_photo_url:
   'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&q=80&w=800',
+  litter_id: 'litter_demo',
   created_at: '2025-11-22T08:00:00Z',
   updated_at: '2025-11-22T08:00:00Z'
 },
@@ -218,6 +255,7 @@ export const seedAnimals: Animal[] = [
   primary_photo_url:
   'https://images.unsplash.com/photo-1596854407944-bf87f6fdd49e?auto=format&fit=crop&q=80&w=800',
   current_foster_id: 'f7',
+  litter_id: 'litter_demo',
   created_at: '2025-11-20T10:00:00Z',
   updated_at: '2025-11-20T10:00:00Z'
 },
@@ -586,13 +624,8 @@ export const seedRelationships: AnimalRelationship[] = [
   relationship_type: 'mother',
   notes: 'Litter born during intake stay.'
 },
-// Willow and Milkshake are littermates (cross-listed for demo richness).
-{
-  id: 'r2',
-  animal_id: 'a10',
-  related_animal_id: 'a4',
-  relationship_type: 'littermate'
-},
+// (Willow & Milkshake littermate link is now expressed via a shared
+//  litter_id on those seed animals — see seedAnimals — not a relationship row.)
 // Biscuit and Duffy are a bonded pair — must be adopted together.
 {
   id: 'r3',

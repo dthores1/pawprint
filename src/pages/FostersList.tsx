@@ -17,7 +17,7 @@ import {
 'lucide-react';
 import { motion } from 'framer-motion';
 export function FostersList() {
-  const { fosters, placements } = useWhisker();
+  const { fosters, fostersLoading, placements } = useWhisker();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [view, setView] = useState<'table' | 'grid'>('table');
@@ -74,7 +74,11 @@ export function FostersList() {
         </div>
       </Card>
 
-      {view === 'grid' ?
+      {fostersLoading && fosters.length === 0 ?
+      <div className="p-12 text-center text-text-secondary bg-card rounded-2xl border border-border">
+          Loading fosters…
+        </div> :
+      view === 'grid' ?
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredFosters.length === 0 ?
         <div className="col-span-full p-12 text-center text-text-secondary bg-card rounded-2xl border border-border">

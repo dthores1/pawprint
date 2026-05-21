@@ -16,6 +16,8 @@ interface RelationshipsCardProps {
 interface RelEntry {
   relationshipId: string;
   animal: Animal;
+  /** Derived links (e.g. littermates from a shared litter_id) aren't removable. */
+  derived?: boolean;
 }
 interface GroupedRelationships {
   mother: RelEntry | null;
@@ -190,7 +192,8 @@ function RelationshipRow({
                 </p>
               </div>
             </Link>
-            <button
+            {!entry.derived &&
+          <button
             type="button"
             onClick={() => onDelete(entry, label)}
             aria-label={`Remove ${label.toLowerCase()} link to ${entry.animal.name}`}
@@ -198,6 +201,7 @@ function RelationshipRow({
 
               <XIcon className="w-3.5 h-3.5" />
             </button>
+          }
           </div>
         )}
       </div>
@@ -239,9 +243,6 @@ animals: Animal[])
         case 'sibling':
           result.siblings.push(entry);
           break;
-        case 'littermate':
-          result.littermates.push(entry);
-          break;
         case 'bonded_pair':
           result.bondedWith.push(entry);
           break;
@@ -265,13 +266,23 @@ animals: Animal[])
         case 'sibling':
           result.siblings.push(entry);
           break;
-        case 'littermate':
-          result.littermates.push(entry);
-          break;
         case 'bonded_pair':
           result.bondedWith.push(entry);
           break;
       }
+    }
+  }
+  // Littermates are derived from a shared litter_id, not stored as relationship
+  // rows. These links are read-only (no delete button).
+  const self = find(animalId);
+  if (self?.litter_id) {
+    for (const other of animals) {
+      if (other.id === animalId || other.litter_id !== self.litter_id) continue;
+      result.littermates.push({
+        relationshipId: `litter-${other.id}`,
+        animal: other,
+        derived: true
+      });
     }
   }
   return result;

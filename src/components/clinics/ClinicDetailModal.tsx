@@ -20,8 +20,7 @@ import {
   PlusIcon,
   Trash2Icon } from
 'lucide-react';
-
-const CURRENT_USER = { person_id: 'p_dan' };
+import { useAuth } from '../../context/AuthContext';
 
 interface Props {
   isOpen: boolean;
@@ -75,6 +74,7 @@ export function ClinicDetailModal({ isOpen, onClose, clinicEventId }: Props) {
     updateClinicSlot,
     deleteClinicSlot
   } = useWhisker();
+  const { currentPersonId } = useAuth();
 
   const [adding, setAdding] = useState(false);
   const [newAnimalId, setNewAnimalId] = useState('');
@@ -115,7 +115,7 @@ export function ClinicDetailModal({ isOpen, onClose, clinicEventId }: Props) {
       clinic_event_id: clinicEventId,
       animal_id: newAnimalId,
       procedure_type: newProcedure,
-      reserved_by_person_id: CURRENT_USER.person_id,
+      reserved_by_person_id: currentPersonId ?? undefined,
       status: 'reserved',
       notes: newNotes.trim() || undefined
     });

@@ -4,19 +4,19 @@ import { Input, Select, Textarea, Label } from '../ui/Forms';
 import { Button } from '../ui/Button';
 import { AnimalSearchPicker } from '../ui/AnimalSearchPicker';
 import { useWhisker } from '../../context/WhiskerContext';
+import { useAuth } from '../../context/AuthContext';
 import {
   TransportRequestType,
   TransportRequestUrgency } from
 '../../types';
 
-// See NewSupplyRequestModal — same demo current-user pattern.
-const CURRENT_USER = { person_id: 'p_dan' };
 interface Props {
   isOpen: boolean;
   onClose: () => void;
 }
 export function NewTransportRequestModal({ isOpen, onClose }: Props) {
   const { addTransportRequest, animals } = useWhisker();
+  const { currentPersonId } = useAuth();
   const [type, setType] = useState<TransportRequestType>('animal');
   const [urgency, setUrgency] = useState<TransportRequestUrgency>('normal');
   const [animalId, setAnimalId] = useState('');
@@ -46,7 +46,7 @@ export function NewTransportRequestModal({ isOpen, onClose }: Props) {
       type,
       status: 'open',
       urgency,
-      requested_by_person_id: CURRENT_USER.person_id,
+      requested_by_person_id: currentPersonId ?? '',
       animal_id: animalId || undefined,
       pickup_location: pickup.trim(),
       dropoff_location: dropoff.trim(),

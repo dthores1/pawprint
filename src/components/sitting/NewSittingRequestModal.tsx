@@ -4,35 +4,22 @@ import { Input, Textarea, Label } from '../ui/Forms';
 import { Button } from '../ui/Button';
 import { AnimalMultiPicker } from '../ui/AnimalMultiPicker';
 import { useWhisker } from '../../context/WhiskerContext';
+import { useAuth } from '../../context/AuthContext';
 import { SittingCoverageScope } from '../../types';
 
-// Demo current user — see other modals.
-const CURRENT_USER = { person_id: 'p_dan' };
-
-// TODO(auth): once auth + roles exist, link a Person row to their
-// FosterParent row (e.g. a `foster_parent_id` foreign key on Person) so the
-// modal can derive this. For staff/admin creating on behalf of a foster,
-// also surface a person lookup labeled "Animals currently with …".
-const CURRENT_FOSTER_ID = 'f3';
 interface Props {
   isOpen: boolean;
   onClose: () => void;
 }
 export function NewSittingRequestModal({ isOpen, onClose }: Props) {
-  const { addSittingRequest, placements, animals, fosters } = useWhisker();
-  const foster = fosters.find((f) => f.id === CURRENT_FOSTER_ID);
-  const fosterName = foster ?
-  `${foster.first_name} ${foster.last_name}` :
-  'this foster';
+  const { addSittingRequest, placements, animals } = useWhisker();
+  const { currentPersonId } = useAuth();
 
-  // Active placements that belong to the current user.
+  // TODO(auth): scope to the signed-in user's OWN placements once Person↔
+  // FosterParent linking exists. For now we cover all active placements in
+  // the org, so "in my care" reads as "currently in foster".
   const myPlacements = useMemo(
-    () =>
-    placements.filter(
-      (p) =>
-      p.placement_status === 'active' &&
-      p.foster_parent_id === CURRENT_FOSTER_ID
-    ),
+    () => placements.filter((p) => p.placement_status === 'active'),
     [placements]
   );
   const myAnimals = myPlacements.
@@ -82,7 +69,7 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
 
     addSittingRequest(
       {
-        requested_by_person_id: CURRENT_USER.person_id,
+        requested_by_person_id: currentPersonId ?? '',
         coverage_scope: scope,
         start_date: startDate,
         end_date: endDate,
@@ -136,7 +123,7 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
                   </p>
                   <p className="text-sm text-text-secondary mt-0.5">
                     {myAnimals.length === 0 ?
-                    `No active placements for ${fosterName} right now.` :
+                    'No animals are currently in foster.' :
                     <>Includes {namesList}</>}
                   </p>
                 </div>

@@ -18,6 +18,7 @@ import {
   PawPrintIcon } from
 'lucide-react';
 import { calculateAge, formatDate } from '../lib/utils';
+import { animalBreedLabel } from '../lib/breedsApi';
 import { motion } from 'framer-motion';
 import { ENABLED_SPECIES } from '../lib/config';
 import { Species, AnimalStatus, Priority } from '../types';
@@ -44,8 +45,15 @@ const PRIORITY_LABELS: Record<Priority, string> = {
   critical: 'Critical'
 };
 export function AnimalsList() {
-  const { animals, placements, fosters, medicalRecords, relationships } =
-  useWhisker();
+  const {
+    animals,
+    animalsLoading,
+    placements,
+    fosters,
+    medicalRecords,
+    relationships,
+    breeds
+  } = useWhisker();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -281,12 +289,24 @@ export function AnimalsList() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filteredAnimals.length === 0 ?
+              {animalsLoading && animals.length === 0 ?
               <tr>
                   <td
                   colSpan={6}
                   className="py-12 text-center text-text-secondary">
-                  
+
+                    <div className="flex flex-col items-center gap-3">
+                      <PawPrintGlyph className="w-10 h-10 text-text-secondary/30 animate-pulse" />
+                      <p>Loading animals…</p>
+                    </div>
+                  </td>
+                </tr> :
+              filteredAnimals.length === 0 ?
+              <tr>
+                  <td
+                  colSpan={6}
+                  className="py-12 text-center text-text-secondary">
+
                     <div className="flex flex-col items-center gap-3">
                       <PawPrintGlyph className="w-10 h-10 text-text-secondary/30" />
                       <p>No animals found matching your filters.</p>
@@ -353,8 +373,8 @@ export function AnimalsList() {
                                 Bonded Pair
                               </span>
                           }
-                            <p className="text-xs text-text-secondary font-mono mt-0.5">
-                              #{animal.id}
+                            <p className="text-xs text-text-secondary mt-0.5">
+                              {animalBreedLabel(animal, breeds) || animal.species}
                             </p>
                           </div>
                         </div>

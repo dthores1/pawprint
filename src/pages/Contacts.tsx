@@ -3,22 +3,28 @@ import { useWhisker } from '../context/WhiskerContext';
 import { Card } from '../components/ui/Card';
 import { Avatar } from '../components/ui/Avatar';
 import { Input } from '../components/ui/Forms';
+import { Button } from '../components/ui/Button';
+import { AddContactModal } from '../components/contacts/AddContactModal';
 import {
   SearchIcon,
   MapPinIcon,
   PhoneIcon,
   MailIcon,
-  BuildingIcon } from
+  BuildingIcon,
+  PlusIcon } from
 'lucide-react';
 import { motion } from 'framer-motion';
 import { PersonRole } from '../types';
 export function Contacts() {
-  const { people, fosters } = useWhisker();
+  const { people, peopleLoading, fosters } = useWhisker();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<PersonRole | 'all'>('all');
-  // Merge fosters into volunteers for display
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  // Merge fosters into volunteers for display. Account/self records (those
+  // linked to an app user) are identity rows, not directory contacts — keep
+  // them out of the directory.
   const mergedPeople = [
-  ...people,
+  ...people.filter((p) => !p.user_id),
   ...fosters.map((f) => ({
     id: f.id,
     first_name: f.first_name,
@@ -66,13 +72,19 @@ export function Contacts() {
 
   return (
     <div className="space-y-6 pb-8">
-      <div>
-        <h1 className="text-3xl font-heading font-bold text-text-primary">
-          Contacts
-        </h1>
-        <p className="text-text-secondary">
-          Directory of vets, staff, volunteers, and adopters.
-        </p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-heading font-bold text-text-primary">
+            Contacts
+          </h1>
+          <p className="text-text-secondary">
+            Directory of vets, staff, volunteers, and adopters.
+          </p>
+        </div>
+        <Button onClick={() => setIsAddOpen(true)} className="gap-2">
+          <PlusIcon className="w-4 h-4" />
+          New Contact
+        </Button>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
@@ -99,7 +111,11 @@ export function Contacts() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredPeople.length === 0 ?
+        {peopleLoading && people.length === 0 ?
+        <div className="col-span-full p-12 text-center text-text-secondary bg-card rounded-2xl border border-border">
+            Loading contacts…
+          </div> :
+        filteredPeople.length === 0 ?
         <div className="col-span-full p-12 text-center text-text-secondary bg-card rounded-2xl border border-border">
             No contacts found.
           </div> :
@@ -186,6 +202,8 @@ export function Contacts() {
         )
         }
       </div>
+
+      <AddContactModal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} />
     </div>);
 
 }

@@ -13,12 +13,38 @@ export type Priority = 'normal' | 'needs_attention' | 'urgent' | 'critical';
 export type Species = 'Dog' | 'Cat' | 'Other';
 export type Sex = 'Male' | 'Female' | 'Unknown';
 
+/** How `estimated_birth_date` was derived. */
+export type BirthdateSource =
+'exact_birthdate' |
+'estimated_birthdate' |
+'estimated_age';
+export type AgeUnit = 'days' | 'weeks' | 'months' | 'years';
+
 export interface Animal {
   id: string;
   name: string;
   species: Species;
   sex: Sex;
+  /**
+   * Canonical date used to compute current age everywhere. Always set — when
+   * the user gives an estimated age instead, it's computed from that.
+   */
   estimated_birth_date: string;
+  /** Known breed from the `breeds` catalog (mutually exclusive with breed_text). */
+  breed_id?: string;
+  /** Free-text breed for custom / messy real-world values ("Pit mix", etc.). */
+  breed_text?: string;
+  is_mixed_breed?: boolean;
+  /** Set when this animal belongs to a litter (see Litter). Littermates are
+   *  derived from shared litter_id, not from AnimalRelationship rows. */
+  litter_id?: string;
+  /** Metadata: how `estimated_birth_date` was arrived at. Defaults to estimated_birthdate. */
+  birthdate_source?: BirthdateSource;
+  /** Original age estimate (audit/context), set when birthdate_source === 'estimated_age'. */
+  estimated_age_value?: number;
+  estimated_age_unit?: AgeUnit;
+  /** The date the age estimate was anchored to (usually intake or today). */
+  estimated_age_as_of?: string;
   intake_date: string;
   intake_source: string;
   status: AnimalStatus;
@@ -49,6 +75,16 @@ export interface Animal {
   updated_at: string;
 }
 
+// Breed reference catalog (global, shared across orgs). `species` is lowercase
+// and includes rabbit/bird/other, unlike the app's TitleCase `Species`.
+export type BreedSpecies = 'dog' | 'cat' | 'rabbit' | 'bird' | 'other';
+export interface Breed {
+  id: string;
+  species: BreedSpecies;
+  name: string;
+  active: boolean;
+}
+
 export type PhotoCategory =
 'intake' |
 'profile' |
@@ -62,6 +98,11 @@ export interface AnimalPhoto {
   id: string;
   animal_id: string;
   url: string;
+  /**
+   * Path within the Supabase Storage `animal-photos` bucket. Present for
+   * uploaded files (used to delete the object); absent for external URLs.
+   */
+  storage_path?: string;
   category: PhotoCategory;
   caption?: string;
   uploaded_at: string;
@@ -147,13 +188,23 @@ export interface AnimalRelationship {
   id: string;
   animal_id: string;
   related_animal_id: string;
-  relationship_type:
-  'mother' |
-  'father' |
-  'sibling' |
-  'child' |
-  'bonded_pair' |
-  'littermate';
+  // 'littermate' intentionally removed — littermates are derived from a shared
+  // litter_id (avoids the N² relationship rows). See Litter + RelationshipsCard.
+  relationship_type: 'mother' | 'father' | 'sibling' | 'child' | 'bonded_pair';
+  notes?: string;
+}
+
+// A litter groups animals that share intake/age/origin metadata. Members link
+// via animals.litter_id; littermates are derived from that, not relationships.
+export interface Litter {
+  id: string;
+  name?: string;
+  species: Species;
+  breed_id?: string;
+  breed_text?: string;
+  estimated_birth_date?: string;
+  intake_date: string;
+  intake_source?: string;
   notes?: string;
 }
 
@@ -180,6 +231,12 @@ export interface Person {
   photo_url?: string;
   active: boolean;
   created_at: string;
+  /**
+   * Set when this record is an app-user account (the signed-in user's "self"
+   * record), as opposed to a directory contact. Account records are used for
+   * attribution but hidden from the Contacts directory.
+   */
+  user_id?: string;
 }
 
 export type SupplyRequestStatus =

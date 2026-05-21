@@ -3,18 +3,10 @@ import { Modal } from '../ui/Modal';
 import { Input, Select, Textarea, Label } from '../ui/Forms';
 import { Button } from '../ui/Button';
 import { useWhisker } from '../../context/WhiskerContext';
+import { useAuth } from '../../context/AuthContext';
 import { SupplyRequestPriority, SupplyRequestItem } from '../../types';
 import { PlusIcon, Trash2Icon, BookmarkIcon, BookmarkCheckIcon } from 'lucide-react';
 
-// TODO(auth): replace with the signed-in user once an auth/session layer exists.
-// Today the app has no current-user concept (see WhiskerContext); we hardcode
-// the demo user so "Requesting as" reads correctly. The Person row exists in
-// seed.ts as a foster parent (f3), but Person and FosterParent are separate
-// tables — wire requester_person_id properly when auth lands.
-const CURRENT_USER = {
-  person_id: 'p_dan',
-  display_name: 'Dan Thoreson'
-};
 interface NewSupplyRequestModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -48,7 +40,13 @@ export function NewSupplyRequestModal({
   isOpen,
   onClose
 }: NewSupplyRequestModalProps) {
-  const { addSupplyRequest, addSupplyRequestItem, products } = useWhisker();
+  const { addSupplyRequest, addSupplyRequestItem, products, people } =
+  useWhisker();
+  const { currentPersonId } = useAuth();
+  const currentPerson = people.find((p) => p.id === currentPersonId);
+  const currentDisplayName = currentPerson ?
+  `${currentPerson.first_name} ${currentPerson.last_name}` :
+  'You';
   // Admin-on-behalf-of flow is stubbed until we have roles. When enabled,
   // an admin would pick a contact/foster from `people` here.
   // const { people, animals } = useWhisker();
@@ -91,7 +89,7 @@ export function NewSupplyRequestModal({
     }
     setItems(newItems);
   };
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (items.length === 0) return;
     // Filter out empty items
@@ -99,8 +97,9 @@ export function NewSupplyRequestModal({
       (i) => i.product_id && i.product_id !== 'custom' || i.custom_item_name
     );
     if (validItems.length === 0) return;
-    const requestId = addSupplyRequest({
-      requester_person_id: CURRENT_USER.person_id,
+    // Create the request first; its id keys the line items.
+    const requestId = await addSupplyRequest({
+      requester_person_id: currentPersonId ?? '',
       // requested_for_animal_id intentionally omitted — supplies don't map
       // 1:1 to a single animal. See commented-out "For Animal" field below.
       status: 'submitted',
@@ -108,7 +107,9 @@ export function NewSupplyRequestModal({
       requested_date: new Date().toISOString(),
       notes: notes.trim() || undefined
     });
-    validItems.forEach((item) => {
+    if (!requestId) return;
+    await Promise.all(
+      validItems.map((item) =>
       addSupplyRequestItem({
         supply_request_id: requestId,
         product_id: item.product_id === 'custom' ? undefined : item.product_id,
@@ -117,8 +118,9 @@ export function NewSupplyRequestModal({
         quantity: Number(item.quantity) || 1,
         unit: item.unit || 'each',
         notes: item.notes?.trim() || undefined
-      });
-    });
+      })
+      )
+    );
     // TODO(persistence): "Save as common request" is captured but does not
     // persist — there is no template/abstraction for reusable request
     // bundles yet. Add a `requestTemplates` collection (or similar) in
@@ -137,7 +139,7 @@ export function NewSupplyRequestModal({
           <div>
             <Label>Requesting as</Label>
             <div className="h-11 px-3.5 flex items-center rounded-lg border border-border bg-background/60 text-sm font-medium text-text-primary">
-              {CURRENT_USER.display_name}
+              {currentDisplayName}
             </div>
           </div>
           <div>

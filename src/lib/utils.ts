@@ -3,6 +3,10 @@ export function cn(...classes: (string | undefined | null | false)[]) {
 }
 
 export function calculateAge(birthDate: string): string {
+  if (!birthDate) {
+    return 'Unknown';
+  }
+  
   const birth = new Date(birthDate);
   const now = new Date();
 
@@ -19,6 +23,7 @@ export function calculateAge(birthDate: string): string {
   } else {
     const years = Math.floor(months / 12);
     const remainingMonths = months % 12;
+
     // For senior animals (10+ years), months are noise — show years only.
     if (years >= 10) return `${years} years`;
     if (remainingMonths === 0) return `${years} year${years > 1 ? 's' : ''}`;

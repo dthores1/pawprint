@@ -7,7 +7,8 @@ import {
   Trash2Icon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  UploadCloudIcon } from
+  UploadCloudIcon,
+  StarIcon } from
 'lucide-react';
 import { useWhisker } from '../../context/WhiskerContext';
 import { Card } from '../ui/Card';
@@ -47,7 +48,9 @@ const CATEGORY_ORDER: PhotoCategory[] = [
 'other'];
 
 export function PhotoGallery({ animalId }: PhotoGalleryProps) {
-  const { photos, deletePhoto, addPhoto } = useWhisker();
+  const { photos, deletePhoto, addPhoto, updateAnimal, animals } = useWhisker();
+  const animal = animals.find((a) => a.id === animalId);
+  const profileUrl = animal?.primary_photo_url;
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -76,6 +79,27 @@ export function PhotoGallery({ animalId }: PhotoGalleryProps) {
   }, [animalPhotos]);
   // Flat list for lightbox navigation (in category order)
   const flatPhotos = useMemo(() => grouped.flatMap((g) => g.photos), [grouped]);
+  const handleSetProfile = useCallback(
+    (photo: AnimalPhoto) => {
+      updateAnimal(animalId, { primary_photo_url: photo.url });
+    },
+    [updateAnimal, animalId]
+  );
+  const handleRemovePhoto = useCallback(
+    (photo: AnimalPhoto) => {
+      if (!window.confirm('Delete this photo? This removes it permanently.')) {
+        return;
+      }
+      // If we're removing the current profile photo, move the badge to the
+      // next remaining photo (or clear it) so the hero doesn't break.
+      if (profileUrl && profileUrl === photo.url) {
+        const next = animalPhotos.find((p) => p.id !== photo.id);
+        updateAnimal(animalId, { primary_photo_url: next?.url ?? '' });
+      }
+      deletePhoto(photo.id);
+    },
+    [profileUrl, animalPhotos, updateAnimal, animalId, deletePhoto]
+  );
   // Lightbox keyboard nav
   useEffect(() => {
     if (lightboxIndex === null) return;
@@ -107,18 +131,13 @@ export function PhotoGallery({ animalId }: PhotoGalleryProps) {
       f.type.startsWith('image/')
       );
       if (files.length === 0) return;
+      // Upload each dropped file to Storage via the context action.
       files.forEach((file) => {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          if (typeof event.target?.result === 'string') {
-            addPhoto({
-              animal_id: animalId,
-              url: event.target.result,
-              category: 'other'
-            });
-          }
-        };
-        reader.readAsDataURL(file);
+        addPhoto({
+          animal_id: animalId,
+          category: 'other',
+          file
+        });
       });
     },
     [addPhoto, animalId]
@@ -197,28 +216,63 @@ export function PhotoGallery({ animalId }: PhotoGalleryProps) {
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4">
                 {catPhotos.map((photo) => {
               const flatIdx = flatPhotos.findIndex((p) => p.id === photo.id);
+              const isProfile = !!profileUrl && photo.url === profileUrl;
               return (
-                <button
+                <div
                   key={photo.id}
-                  type="button"
-                  onClick={() => setLightboxIndex(flatIdx)}
-                  className="group relative aspect-square overflow-hidden rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary">
-                  
-                      <img
-                    src={photo.url}
-                    alt={
-                    photo.caption || `${CATEGORY_LABELS[category]} photo`
+                  className="group relative aspect-square overflow-hidden rounded-lg bg-background border border-border">
+
+                      <button
+                    type="button"
+                    onClick={() => setLightboxIndex(flatIdx)}
+                    className="absolute inset-0 w-full h-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary">
+
+                        <img
+                      src={photo.url}
+                      alt={
+                      photo.caption || `${CATEGORY_LABELS[category]} photo`
+                      }
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+
+                        {photo.caption &&
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <p className="text-xs text-white line-clamp-2 text-left">
+                              {photo.caption}
+                            </p>
+                          </div>
                     }
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                  
-                      {photo.caption &&
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <p className="text-xs text-white line-clamp-2 text-left">
-                            {photo.caption}
-                          </p>
-                        </div>
+                      </button>
+
+                      {isProfile &&
+                  <span className="absolute top-2 left-2 z-10 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#DDEFE2] text-[#3E7B52] text-[10px] font-bold uppercase tracking-wide shadow-soft">
+                          <StarIcon className="w-3 h-3 fill-current" />
+                          Profile
+                        </span>
                   }
-                    </button>);
+
+                      <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                        {!isProfile &&
+                    <button
+                      type="button"
+                      onClick={() => handleSetProfile(photo)}
+                      aria-label="Set as profile picture"
+                      title="Set as profile picture"
+                      className="p-1.5 rounded-md bg-card/95 text-text-secondary hover:text-[#3E7B52] shadow-soft transition-colors">
+
+                            <StarIcon className="w-3.5 h-3.5" />
+                          </button>
+                    }
+                        <button
+                      type="button"
+                      onClick={() => handleRemovePhoto(photo)}
+                      aria-label="Delete photo"
+                      title="Delete photo"
+                      className="p-1.5 rounded-md bg-card/95 text-text-secondary hover:text-[#9B3A3A] shadow-soft transition-colors">
+
+                          <Trash2Icon className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>);
 
             })}
               </div>
@@ -237,13 +291,17 @@ export function PhotoGallery({ animalId }: PhotoGalleryProps) {
         {lightboxIndex !== null && flatPhotos[lightboxIndex] &&
         <Lightbox
           photo={flatPhotos[lightboxIndex]}
+          isProfile={
+          !!profileUrl && flatPhotos[lightboxIndex].url === profileUrl
+          }
           hasPrev={lightboxIndex > 0}
           hasNext={lightboxIndex < flatPhotos.length - 1}
           onPrev={() => setLightboxIndex((i) => i === null ? null : i - 1)}
           onNext={() => setLightboxIndex((i) => i === null ? null : i + 1)}
           onClose={() => setLightboxIndex(null)}
+          onSetProfile={() => handleSetProfile(flatPhotos[lightboxIndex])}
           onDelete={() => {
-            deletePhoto(flatPhotos[lightboxIndex].id);
+            handleRemovePhoto(flatPhotos[lightboxIndex]);
             // close if last photo
             if (flatPhotos.length === 1) setLightboxIndex(null);else
             if (lightboxIndex >= flatPhotos.length - 1)
@@ -257,20 +315,24 @@ export function PhotoGallery({ animalId }: PhotoGalleryProps) {
 }
 interface LightboxProps {
   photo: AnimalPhoto;
+  isProfile: boolean;
   hasPrev: boolean;
   hasNext: boolean;
   onPrev: () => void;
   onNext: () => void;
   onClose: () => void;
+  onSetProfile: () => void;
   onDelete: () => void;
 }
 function Lightbox({
   photo,
+  isProfile,
   hasPrev,
   hasNext,
   onPrev,
   onNext,
   onClose,
+  onSetProfile,
   onDelete
 }: LightboxProps) {
   return (
@@ -302,17 +364,37 @@ function Lightbox({
         <XIcon className="w-6 h-6" />
       </button>
 
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete();
-        }}
-        className="absolute top-6 left-6 text-white/70 hover:text-white p-2 rounded-full hover:bg-white/10 text-sm flex items-center gap-2">
-        
-        <Trash2Icon className="w-4 h-4" />
-        Delete
-      </button>
+      <div className="absolute top-6 left-6 flex items-center gap-2">
+        {isProfile ?
+        <span className="text-white/80 text-sm flex items-center gap-2 px-2 py-1">
+            <StarIcon className="w-4 h-4 fill-current" />
+            Profile photo
+          </span> :
+
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onSetProfile();
+          }}
+          className="text-white/70 hover:text-white p-2 rounded-full hover:bg-white/10 text-sm flex items-center gap-2">
+
+            <StarIcon className="w-4 h-4" />
+            Set as profile
+          </button>
+        }
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          className="text-white/70 hover:text-white p-2 rounded-full hover:bg-white/10 text-sm flex items-center gap-2">
+
+          <Trash2Icon className="w-4 h-4" />
+          Delete
+        </button>
+      </div>
 
       {hasPrev &&
       <button

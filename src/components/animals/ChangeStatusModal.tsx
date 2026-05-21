@@ -1,9 +1,13 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Modal } from '../ui/Modal';
 import { Input, Select, Textarea, Label } from '../ui/Forms';
 import { Button } from '../ui/Button';
+import { AgeInformationFields } from './AgeInformationFields';
+import { BreedCombobox } from './BreedCombobox';
 import { useWhisker } from '../../context/WhiskerContext';
-import { AnimalStatus, Priority, Species, Sex } from '../../types';
+import { AnimalStatus, Priority, Species, Sex, AgeUnit } from '../../types';
+import { deriveAgeInfo } from '../../lib/age';
 
 // File name kept for now (the import path is stable); the modal has expanded
 // from "change status & priority" to a general "Edit animal" modal.
@@ -17,26 +21,49 @@ export function ChangeStatusModal({
   onClose,
   animalId
 }: ChangeStatusModalProps) {
-  const { animals, updateAnimal, addNote } = useWhisker();
+  const { animals, updateAnimal, deleteAnimal, addNote } = useWhisker();
+  const navigate = useNavigate();
   const animal = animals.find((a) => a.id === animalId);
 
   const [name, setName] = useState('');
   const [species, setSpecies] = useState<Species>('Dog');
   const [sex, setSex] = useState<Sex>('Unknown');
-  const [dob, setDob] = useState('');
+  const [breedId, setBreedId] = useState<string | undefined>();
+  const [breedText, setBreedText] = useState<string | undefined>();
+  const [birthdate, setBirthdate] = useState('');
+  const [ageValue, setAgeValue] = useState('');
+  const [ageUnit, setAgeUnit] = useState<AgeUnit>('months');
+  const [ageError, setAgeError] = useState<string | undefined>();
   const [status, setStatus] = useState<AnimalStatus>('intake');
   const [priority, setPriority] = useState<Priority>('normal');
   const [reason, setReason] = useState('');
   const [internalNotes, setInternalNotes] = useState('');
 
   // Hydrate from the animal each time the modal opens, so external updates
-  // are reflected and the user always starts from the current state.
+  // are reflected and the user always starts from the current state. We
+  // preserve the original input mode: animals entered via estimated age open
+  // with the age fields populated (not the derived birthdate).
   useEffect(() => {
     if (!isOpen || !animal) return;
     setName(animal.name);
     setSpecies(animal.species);
     setSex(animal.sex);
-    setDob(animal.estimated_birth_date);
+    setBreedId(animal.breed_id);
+    setBreedText(animal.breed_text);
+    if (animal.birthdate_source === 'estimated_age') {
+      setBirthdate('');
+      setAgeValue(
+        animal.estimated_age_value != null ?
+        String(animal.estimated_age_value) :
+        ''
+      );
+      setAgeUnit(animal.estimated_age_unit ?? 'months');
+    } else {
+      setBirthdate(animal.estimated_birth_date);
+      setAgeValue('');
+      setAgeUnit('months');
+    }
+    setAgeError(undefined);
     setStatus(animal.status);
     setPriority(animal.priority);
     setReason('');
@@ -45,8 +72,19 @@ export function ChangeStatusModal({
 
   if (!animal) return null;
 
+  // Anchor a re-estimated age to the original anchor, then intake, then today.
+  const ageAsOf =
+  animal.estimated_age_as_of ||
+  animal.intake_date ||
+  new Date().toISOString().split('T')[0];
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const ageInfo = deriveAgeInfo({ birthdate, ageValue, ageUnit, asOf: ageAsOf });
+    if (!ageInfo.valid) {
+      setAgeError('Enter a birthdate or an estimated age.');
+      return;
+    }
     const changes: string[] = [];
     if (status !== animal.status)
     changes.push(`status: ${animal.status} → ${status}`);
@@ -57,7 +95,13 @@ export function ChangeStatusModal({
       name: name.trim() || animal.name,
       species,
       sex,
-      estimated_birth_date: dob,
+      breed_id: breedId,
+      breed_text: breedText,
+      estimated_birth_date: ageInfo.estimated_birth_date,
+      birthdate_source: ageInfo.birthdate_source,
+      estimated_age_value: ageInfo.estimated_age_value,
+      estimated_age_unit: ageInfo.estimated_age_unit,
+      estimated_age_as_of: ageInfo.estimated_age_as_of,
       status,
       priority,
       internal_notes: internalNotes.trim() || undefined
@@ -72,6 +116,18 @@ export function ChangeStatusModal({
       });
     }
     onClose();
+  };
+
+  const handleDelete = () => {
+    if (
+    window.confirm(
+      `Delete ${animal.name}? This permanently removes the animal record and can't be undone.`
+    ))
+    {
+      deleteAnimal(animalId);
+      onClose();
+      navigate('/animals');
+    }
   };
 
   return (
@@ -123,12 +179,35 @@ export function ChangeStatusModal({
             </div>
           </div>
           <div>
-            <Label htmlFor="edit_dob">Date of Birth (estimated)</Label>
-            <Input
-              id="edit_dob"
-              type="date"
-              value={dob}
-              onChange={(e) => setDob(e.target.value)} />
+            <Label htmlFor="edit_breed">Breed</Label>
+            <BreedCombobox
+              id="edit_breed"
+              species={species}
+              breedId={breedId}
+              breedText={breedText}
+              onChange={(next) => {
+                setBreedId(next.breed_id);
+                setBreedText(next.breed_text);
+              }} />
+
+          </div>
+          <div>
+            <Label className="mb-2 block">Age</Label>
+            <AgeInformationFields
+              birthdate={birthdate}
+              ageValue={ageValue}
+              ageUnit={ageUnit}
+              asOfDate={ageAsOf}
+              onBirthdate={(v) => {
+                setBirthdate(v);
+                setAgeError(undefined);
+              }}
+              onAgeValue={(v) => {
+                setAgeValue(v);
+                setAgeError(undefined);
+              }}
+              onAgeUnit={setAgeUnit}
+              error={ageError} />
 
           </div>
         </section>
@@ -202,11 +281,21 @@ export function ChangeStatusModal({
           </div>
         </section>
 
-        <div className="pt-5 flex justify-end gap-3 border-t border-border">
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
+        <div className="pt-5 flex items-center justify-between gap-3 border-t border-border">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={handleDelete}
+            className="text-[#9B3A3A] hover:bg-[#F5D7D7]/60 hover:text-[#9B3A3A]">
+
+            Delete
           </Button>
-          <Button type="submit">Save Changes</Button>
+          <div className="flex gap-3">
+            <Button type="button" variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit">Save Changes</Button>
+          </div>
         </div>
       </form>
     </Modal>);
