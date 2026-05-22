@@ -7,6 +7,7 @@ import { SpeciesBadge } from '../ui/SpeciesBadge';
 import { HeartIcon, PlusIcon, XIcon } from 'lucide-react';
 import { BoneIcon } from '../ui/BoneIcon';
 import { Animal } from '../../types';
+import { calculateAge } from '../../lib/utils';
 import { AddRelationshipModal } from './AddRelationshipModal';
 interface RelationshipsCardProps {
   animalId: string;
@@ -187,8 +188,8 @@ function RelationshipRow({
                 <p className="font-medium text-text-primary hover:text-primary transition-colors truncate">
                   {entry.animal.name}
                 </p>
-                <p className="text-xs text-text-secondary font-mono">
-                  #{entry.animal.id}
+                <p className="text-xs text-text-secondary truncate">
+                  {entry.animal.sex} • {calculateAge(entry.animal.estimated_birth_date)}
                 </p>
               </div>
             </Link>

@@ -164,8 +164,21 @@ export interface MedicalRecord {
   performed_date?: string;
   due_date?: string;
   status: MedicalStatus;
+  /** Known person who performed/administered it (people row). */
+  provider_contact_id?: string;
+  /** Free-text performer fallback when not a known contact. */
   provider_name?: string;
+  /** Scheduled clinic event it was done at (clinic_events row). */
+  clinic_id?: string;
+  /** Free-text facility fallback (vet office, shelter, hospital, …). */
+  facility_name?: string;
   notes?: string;
+  /**
+   * When a recurring procedure (vaccine/exam/surgery/medication) becomes due
+   * again — e.g. a rabies shot renewed in a year. Optional; many procedures
+   * aren't recurring.
+   */
+  next_due_date?: string;
 }
 
 export type NoteType =

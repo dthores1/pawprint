@@ -45,6 +45,10 @@ export function DatePicker({
   if (minDate) disabledMatchers.push({ before: minDate });
   if (maxDate) disabledMatchers.push({ after: maxDate });
 
+  // Offer a one-click "Today" shortcut, unless today falls outside min/max.
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const todayAllowed = (!min || todayStr >= min) && (!max || todayStr <= max);
+
   const handleSelect = (d?: Date) => {
     if (d) {
       onChange(format(d, 'yyyy-MM-dd'));
@@ -88,6 +92,17 @@ export function DatePicker({
           onSelect={handleSelect}
           disabled={disabledMatchers.length ? disabledMatchers : undefined} />
 
+        {todayAllowed &&
+        <div className="border-t border-border mt-1 pt-2 px-1">
+            <button
+            type="button"
+            onClick={() => handleSelect(new Date())}
+            className="w-full rounded-lg py-1.5 text-sm font-medium text-primary hover:bg-background transition-colors">
+
+              Today
+            </button>
+          </div>
+        }
       </CalendarPopover>
     </>);
 

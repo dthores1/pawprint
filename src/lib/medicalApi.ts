@@ -9,8 +9,12 @@ export function rowToMedicalRecord(r: any): MedicalRecord {
     performed_date: r.performed_date ?? undefined,
     due_date: r.due_date ?? undefined,
     status: r.status,
+    provider_contact_id: r.provider_contact_id ?? undefined,
     provider_name: r.provider_name ?? undefined,
-    notes: r.notes ?? undefined
+    clinic_id: r.clinic_id ?? undefined,
+    facility_name: r.facility_name ?? undefined,
+    notes: r.notes ?? undefined,
+    next_due_date: r.next_due_date ?? undefined
   };
 }
 
@@ -21,8 +25,12 @@ const MEDICAL_COLUMNS = [
 'performed_date',
 'due_date',
 'status',
+'provider_contact_id',
 'provider_name',
-'notes'] as
+'clinic_id',
+'facility_name',
+'notes',
+'next_due_date'] as
 const;
 
 // Empty strings → null (date columns reject '').

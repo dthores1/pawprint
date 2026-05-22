@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { MedicalRecord } from '../types';
 import { useWhisker } from '../context/WhiskerContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -887,12 +888,28 @@ function MedicalGroup({
   count,
   records
 }: MedicalGroupProps) {
+  const { people, clinicEvents } = useWhisker();
   const toneColor = {
     urgent: 'text-status-urgent-text',
     info: 'text-primary',
     success: 'text-[#3E7B52]',
     neutral: 'text-text-secondary'
   }[tone];
+  // Resolve performer/facility: known contact/clinic, else free-text fallback.
+  const performerLabel = (r: MedicalRecord): string | null => {
+    if (r.provider_contact_id) {
+      const p = people.find((x) => x.id === r.provider_contact_id);
+      if (p) return `${p.first_name} ${p.last_name}`;
+    }
+    return r.provider_name || null;
+  };
+  const facilityLabel = (r: MedicalRecord): string | null => {
+    if (r.clinic_id) {
+      const c = clinicEvents.find((x) => x.id === r.clinic_id);
+      if (c) return `${formatDate(c.date_time)} clinic`;
+    }
+    return r.facility_name || null;
+  };
   return (
     <Card className="overflow-hidden">
       <div className="px-5 py-3 border-b border-border bg-background/60 flex items-center gap-2">
@@ -942,10 +959,24 @@ function MedicalGroup({
                     {dateLabel}
                   </span>
                 </span>
-                {r.provider_name &&
+                {performerLabel(r) &&
                 <span>
-                    <span className="text-text-secondary/70">Provider:</span>{' '}
-                    <span className="text-text-primary">{r.provider_name}</span>
+                    <span className="text-text-secondary/70">By:</span>{' '}
+                    <span className="text-text-primary">{performerLabel(r)}</span>
+                  </span>
+                }
+                {facilityLabel(r) &&
+                <span>
+                    <span className="text-text-secondary/70">At:</span>{' '}
+                    <span className="text-text-primary">{facilityLabel(r)}</span>
+                  </span>
+                }
+                {r.next_due_date &&
+                <span>
+                    <span className="text-text-secondary/70">Next due:</span>{' '}
+                    <span className="text-text-primary font-medium">
+                      {formatDate(r.next_due_date)}
+                    </span>
                   </span>
                 }
               </div>
