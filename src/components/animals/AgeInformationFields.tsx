@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Input, Select, Label } from '../ui/Forms';
+import { DatePicker } from '../ui/DatePicker';
 import { AgeUnit } from '../../types';
 import { deriveAgeInfo } from '../../lib/age';
 import { calculateAge } from '../../lib/utils';
@@ -87,11 +88,11 @@ export function AgeInformationFields({
           <Label htmlFor="estimated_birthdate" className="text-xs">
             Birthdate
           </Label>
-          <Input
+          <DatePicker
           id="estimated_birthdate"
-          type="date"
           value={birthdate}
-          onChange={(e) => onBirthdate(e.target.value)} />
+          max={asOfDate}
+          onChange={onBirthdate} />
 
         </div> :
 

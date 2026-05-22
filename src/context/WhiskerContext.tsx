@@ -24,7 +24,9 @@ import {
   SittingRequest,
   SittingRequestPlacement,
   ClinicEvent,
-  ClinicSlot } from
+  ClinicSlot,
+  ClinicSlotProcedure,
+  ClinicSlotProcedureType } from
 '../types';
 import { supabase } from '../lib/supabase';
 import { rowToBreed } from '../lib/breedsApi';
@@ -94,7 +96,10 @@ import {
   clinicEventUpdateToRow,
   rowToClinicSlot,
   clinicSlotToInsert,
-  clinicSlotUpdateToRow } from
+  clinicSlotUpdateToRow,
+  rowToClinicSlotProcedure,
+  clinicSlotProcedureToInsert,
+  clinicSlotProcedureUpdateToRow } from
 '../lib/clinicApi';
 export interface WhiskerContextType {
   animals: Animal[];
@@ -205,13 +210,27 @@ export interface WhiskerContextType {
   // Clinics
   clinicEvents: ClinicEvent[];
   clinicSlots: ClinicSlot[];
+  clinicSlotProcedures: ClinicSlotProcedure[];
   addClinicEvent: (
   event: Omit<ClinicEvent, 'id' | 'created_at' | 'updated_at'>)
   => Promise<string>;
   updateClinicEvent: (id: string, updates: Partial<ClinicEvent>) => void;
-  addClinicSlot: (slot: Omit<ClinicSlot, 'id'>) => void;
+  /** Create a slot plus its initial procedure rows. */
+  addClinicSlot: (
+  slot: Omit<ClinicSlot, 'id'>,
+  procedureTypes: ClinicSlotProcedureType[])
+  => void;
   updateClinicSlot: (id: string, updates: Partial<ClinicSlot>) => void;
   deleteClinicSlot: (id: string) => void;
+  addClinicSlotProcedure: (
+  clinic_slot_id: string,
+  procedure_type: ClinicSlotProcedureType)
+  => void;
+  updateClinicSlotProcedure: (
+  id: string,
+  updates: Partial<ClinicSlotProcedure>)
+  => void;
+  deleteClinicSlotProcedure: (id: string) => void;
 }
 export const WhiskerContext = createContext<WhiskerContextType | undefined>(
   undefined
@@ -433,6 +452,9 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     []);
   const [clinicEvents, setClinicEvents] = useState<ClinicEvent[]>([]);
   const [clinicSlots, setClinicSlots] = useState<ClinicSlot[]>([]);
+  const [clinicSlotProcedures, setClinicSlotProcedures] = useState<
+    ClinicSlotProcedure[]>(
+    []);
   const loadCoordination = useCallback(async () => {
     if (!orgId) {
       setProducts([]);
@@ -443,6 +465,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       setSittingRequestPlacements([]);
       setClinicEvents([]);
       setClinicSlots([]);
+      setClinicSlotProcedures([]);
       return;
     }
     const tables = [
@@ -474,7 +497,12 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
 
     [
     'clinic_slots',
-    (rows: any[]) => setClinicSlots(rows.map(rowToClinicSlot))]] as
+    (rows: any[]) => setClinicSlots(rows.map(rowToClinicSlot))],
+
+    [
+    'clinic_slot_procedures',
+    (rows: any[]) =>
+    setClinicSlotProcedures(rows.map(rowToClinicSlotProcedure))]] as
     const;
     await Promise.all(
       tables.map(async ([table, set]) => {
@@ -1222,18 +1250,44 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       }
     });
   };
-  const addClinicSlot = async (slot: Omit<ClinicSlot, 'id'>) => {
+  const addClinicSlot = async (
+  slot: Omit<ClinicSlot, 'id'>,
+  procedureTypes: ClinicSlotProcedureType[]) =>
+  {
     if (!orgId) return;
     const { data, error } = await supabase.
     from('clinic_slots').
     insert(clinicSlotToInsert(slot, orgId)).
     select('*').
     single();
-    if (error) {
-      console.error('[clinic slot] create failed:', error.message);
+    if (error || !data) {
+      console.error('[clinic slot] create failed:', error?.message);
       return;
     }
-    if (data) setClinicSlots((prev) => [rowToClinicSlot(data), ...prev]);
+    const newSlot = rowToClinicSlot(data);
+    setClinicSlots((prev) => [newSlot, ...prev]);
+    if (procedureTypes.length === 0) return;
+    const rows = procedureTypes.map((t) =>
+    clinicSlotProcedureToInsert(
+      { clinic_slot_id: newSlot.id, procedure_type: t, completed: false },
+      orgId
+    )
+    );
+    const { data: procs, error: procErr } = await supabase.
+    from('clinic_slot_procedures').
+    insert(rows).
+    select('*');
+    if (procErr) {
+      console.error('[clinic slot procedures] create failed:', procErr.message);
+      loadCoordination();
+      return;
+    }
+    if (procs) {
+      setClinicSlotProcedures((prev) => [
+      ...procs.map(rowToClinicSlotProcedure),
+      ...prev]
+      );
+    }
   };
   const updateClinicSlot = (id: string, updates: Partial<ClinicSlot>) => {
     setClinicSlots((prev) =>
@@ -1253,8 +1307,13 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     });
   };
   const deleteClinicSlot = (id: string) => {
-    const prev = clinicSlots;
+    const prevSlots = clinicSlots;
+    const prevProcs = clinicSlotProcedures;
     setClinicSlots((cur) => cur.filter((s) => s.id !== id));
+    // The DB cascades the child procedures; mirror that locally.
+    setClinicSlotProcedures((cur) =>
+    cur.filter((p) => p.clinic_slot_id !== id)
+    );
     supabase.
     from('clinic_slots').
     delete().
@@ -1262,7 +1321,63 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     then(({ error }) => {
       if (error) {
         console.error('[clinic slot] delete failed:', error.message);
-        setClinicSlots(prev);
+        setClinicSlots(prevSlots);
+        setClinicSlotProcedures(prevProcs);
+      }
+    });
+  };
+  const addClinicSlotProcedure = async (
+  clinic_slot_id: string,
+  procedure_type: ClinicSlotProcedureType) =>
+  {
+    if (!orgId) return;
+    const { data, error } = await supabase.
+    from('clinic_slot_procedures').
+    insert(
+      clinicSlotProcedureToInsert(
+        { clinic_slot_id, procedure_type, completed: false },
+        orgId
+      )
+    ).
+    select('*').
+    single();
+    if (error || !data) {
+      console.error('[clinic slot procedure] create failed:', error?.message);
+      return;
+    }
+    setClinicSlotProcedures((prev) => [rowToClinicSlotProcedure(data), ...prev]);
+  };
+  const updateClinicSlotProcedure = (
+  id: string,
+  updates: Partial<ClinicSlotProcedure>) =>
+  {
+    setClinicSlotProcedures((prev) =>
+    prev.map((p) => p.id === id ? { ...p, ...updates } : p)
+    );
+    const row = clinicSlotProcedureUpdateToRow(updates);
+    if (Object.keys(row).length === 0) return;
+    supabase.
+    from('clinic_slot_procedures').
+    update(row).
+    eq('id', id).
+    then(({ error }) => {
+      if (error) {
+        console.error('[clinic slot procedure] update failed:', error.message);
+        loadCoordination();
+      }
+    });
+  };
+  const deleteClinicSlotProcedure = (id: string) => {
+    const prev = clinicSlotProcedures;
+    setClinicSlotProcedures((cur) => cur.filter((p) => p.id !== id));
+    supabase.
+    from('clinic_slot_procedures').
+    delete().
+    eq('id', id).
+    then(({ error }) => {
+      if (error) {
+        console.error('[clinic slot procedure] delete failed:', error.message);
+        setClinicSlotProcedures(prev);
       }
     });
   };
@@ -1319,11 +1434,15 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         acceptSittingRequest,
         clinicEvents,
         clinicSlots,
+        clinicSlotProcedures,
         addClinicEvent,
         updateClinicEvent,
         addClinicSlot,
         updateClinicSlot,
-        deleteClinicSlot
+        deleteClinicSlot,
+        addClinicSlotProcedure,
+        updateClinicSlotProcedure,
+        deleteClinicSlotProcedure
       }}>
       
       {children}

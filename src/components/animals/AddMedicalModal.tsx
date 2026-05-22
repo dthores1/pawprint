@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { Input, Select, Textarea, Label } from '../ui/Forms';
+import { DatePicker } from '../ui/DatePicker';
 import { Button } from '../ui/Button';
 import { useWhisker } from '../../context/WhiskerContext';
 import { ProcedureType, MedicalStatus } from '../../types';
@@ -109,26 +110,24 @@ export function AddMedicalModal({
           {formData.status === 'completed' ?
           <div>
               <Label htmlFor="performed_date">Date Performed</Label>
-              <Input
+              <DatePicker
               id="performed_date"
-              name="performed_date"
-              type="date"
-              required
               value={formData.performed_date}
-              onChange={handleChange} />
-            
+              onChange={(v) =>
+              setFormData((prev) => ({ ...prev, performed_date: v }))
+              } />
+
             </div> :
 
           <div>
               <Label htmlFor="due_date">Due Date</Label>
-              <Input
+              <DatePicker
               id="due_date"
-              name="due_date"
-              type="date"
-              required
               value={formData.due_date}
-              onChange={handleChange} />
-            
+              onChange={(v) =>
+              setFormData((prev) => ({ ...prev, due_date: v }))
+              } />
+
             </div>
           }
           <div>

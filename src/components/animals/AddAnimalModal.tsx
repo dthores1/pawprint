@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { FieldError, Input, Select, Textarea, Label } from '../ui/Forms';
+import { DatePicker } from '../ui/DatePicker';
 import { Button } from '../ui/Button';
 import { FormSection } from '../ui/FormSection';
 import { AgeInformationFields } from './AgeInformationFields';
@@ -252,19 +253,16 @@ export function AddAnimalModal({ isOpen, onClose }: AddAnimalModalProps) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="intake_date">Intake Date</Label>
-              <Input
+              <DatePicker
                 id="intake_date"
-                name="intake_date"
-                type="date"
-                aria-invalid={Boolean(errors.intake_date)}
-                aria-describedby={
-                errors.intake_date ? 'intake_date_error' : undefined
-                }
-                className={
-                errors.intake_date && 'border-red-500 focus:ring-red-500'
-                }
+                error={Boolean(errors.intake_date)}
                 value={formData.intake_date}
-                onChange={handleChange} />
+                onChange={(v) => {
+                  setFormData((prev) => ({ ...prev, intake_date: v }));
+                  if (errors.intake_date) {
+                    setErrors((prev) => ({ ...prev, intake_date: undefined }));
+                  }
+                }} />
               <FieldError id="intake_date_error">
                 {errors.intake_date}
               </FieldError>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { Input, Select, Textarea, Label } from '../ui/Forms';
+import { DateTimePicker } from '../ui/DateTimePicker';
 import { Button } from '../ui/Button';
 import { AnimalSearchPicker } from '../ui/AnimalSearchPicker';
 import { useWhisker } from '../../context/WhiskerContext';
@@ -132,12 +133,10 @@ export function NewTransportRequestModal({ isOpen, onClose }: Props) {
 
         <div>
           <Label htmlFor="pickup_time">Pickup time</Label>
-          <Input
+          <DateTimePicker
             id="pickup_time"
-            type="datetime-local"
-            required
             value={pickupTime}
-            onChange={(e) => setPickupTime(e.target.value)} />
+            onChange={setPickupTime} />
 
         </div>
 

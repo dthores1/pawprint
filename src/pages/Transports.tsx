@@ -71,7 +71,8 @@ export function Transports() {
     transportRequests,
     people,
     animals,
-    claimTransportRequest
+    claimTransportRequest,
+    updateTransportRequest
   } = useWhisker();
   const { currentPersonId } = useAuth();
   const [isNewOpen, setIsNewOpen] = useState(false);
@@ -139,7 +140,7 @@ export function Transports() {
       <Card className="p-10 text-center text-text-secondary">
           <TruckIcon className="w-10 h-10 mx-auto mb-3 opacity-30" />
           <p className="font-medium text-text-primary mb-1">
-            Nothing in this bucket
+            Nothing to see here
           </p>
           <p className="text-sm">
             {activeTab === 'open' ?
@@ -171,9 +172,23 @@ export function Transports() {
             );
             return p ? `${p.first_name} ${p.last_name}` : undefined;
           })()}
+          canClaim={
+          !!currentPersonId &&
+          r.status === 'open' &&
+          r.requested_by_person_id !== currentPersonId
+          }
           onClaim={() =>
           currentPersonId &&
           claimTransportRequest(r.id, currentPersonId)
+          }
+          canCancel={
+          !!currentPersonId &&
+          r.requested_by_person_id === currentPersonId &&
+          r.status !== 'completed' &&
+          r.status !== 'canceled'
+          }
+          onCancel={() =>
+          updateTransportRequest(r.id, { status: 'canceled' })
           } />
 
         )}
@@ -193,20 +208,35 @@ interface TransportCardProps {
   animalName?: string;
   requesterName: string;
   assigneeName?: string;
+  canClaim: boolean;
   onClaim: () => void;
+  canCancel: boolean;
+  onCancel: () => void;
 }
 function TransportCard({
   request,
   animalName,
   requesterName,
   assigneeName,
-  onClaim
+  canClaim,
+  onClaim,
+  canCancel,
+  onCancel
 }: TransportCardProps) {
   const subject =
   animalName ||
   (request.type === 'supplies' ?
   'Supply drop' :
   TYPE_LABEL[request.type]);
+  const handleCancel = () => {
+    if (
+    window.confirm(
+      'Cancel this transport request? It will be marked as canceled for everyone.'
+    ))
+    {
+      onCancel();
+    }
+  };
   return (
     <Card className="p-5">
       <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-6">
@@ -254,9 +284,19 @@ function TransportCard({
 
             {STATUS_LABEL[request.status]}
           </span>
-          {request.status === 'open' &&
+          {canClaim &&
           <Button size="sm" onClick={onClaim}>
               Claim Request
+            </Button>
+          }
+          {canCancel &&
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleCancel}
+            className="text-status-urgent-text hover:bg-status-urgent-bg">
+
+              Cancel Request
             </Button>
           }
         </div>

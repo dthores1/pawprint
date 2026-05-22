@@ -8,21 +8,33 @@ interface AddFosterModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
-const INITIAL_FORM = {
+type FosterForm = {
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  address: string;
+  // `''` lets the user clear the field while typing; coerced to a number on submit.
+  max_capacity: number | '';
+  preferred_species: Species[];
+  notes: string;
+  active: boolean;
+};
+const INITIAL_FORM: FosterForm = {
   first_name: '',
   last_name: '',
   email: '',
   phone: '',
   address: '',
   max_capacity: 1,
-  preferred_species: ['Dog', 'Cat'] as Species[],
+  preferred_species: ['Dog', 'Cat'],
   notes: '',
   active: true
 };
-type FormField = keyof typeof INITIAL_FORM;
+type FormField = keyof FosterForm;
 type FormErrors = Partial<Record<FormField, string>>;
 
-function validateForm(formData: typeof INITIAL_FORM): FormErrors {
+function validateForm(formData: FosterForm): FormErrors {
   const nextErrors: FormErrors = {};
   if (!formData.first_name.trim()) nextErrors.first_name = 'First name is required.';
   if (!formData.last_name.trim()) nextErrors.last_name = 'Last name is required.';
@@ -33,7 +45,11 @@ function validateForm(formData: typeof INITIAL_FORM): FormErrors {
   }
   if (!formData.phone.trim()) nextErrors.phone = 'Phone is required.';
   if (!formData.address.trim()) nextErrors.address = 'Address is required.';
-  if (formData.max_capacity < 1 || formData.max_capacity > 10) {
+  if (
+    formData.max_capacity === '' ||
+    formData.max_capacity < 1 ||
+    formData.max_capacity > 10
+  ) {
     nextErrors.max_capacity = 'Capacity must be between 1 and 10.';
   }
   return nextErrors;
@@ -59,7 +75,8 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
       email: formData.email.trim(),
       phone: formData.phone.trim(),
       address: formData.address.trim(),
-      notes: formData.notes.trim()
+      notes: formData.notes.trim(),
+      max_capacity: Number(formData.max_capacity)
     });
     handleClose();
   };
@@ -68,10 +85,17 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
   {
     const { name, value } = e.target;
     const fieldName = name as FormField;
-    setFormData((prev) => ({
-      ...prev,
-      [fieldName]: name === 'max_capacity' ? parseInt(value) || 1 : value
-    }));
+    setFormData((prev) => {
+      if (name === 'max_capacity') {
+        if (value === '') return { ...prev, max_capacity: '' };
+        const parsed = parseInt(value, 10);
+        return {
+          ...prev,
+          max_capacity: Number.isNaN(parsed) ? '' : parsed
+        };
+      }
+      return { ...prev, [fieldName]: value };
+    });
     if (errors[fieldName]) {
       setErrors((prev) => ({ ...prev, [fieldName]: undefined }));
     }

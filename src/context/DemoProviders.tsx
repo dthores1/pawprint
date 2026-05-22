@@ -17,7 +17,8 @@ import {
   SittingRequest,
   SittingRequestPlacement,
   ClinicEvent,
-  ClinicSlot } from
+  ClinicSlot,
+  ClinicSlotProcedure } from
 '../types';
 import { NewPhotoInput } from '../lib/photosApi';
 import {
@@ -37,7 +38,8 @@ import {
   seedSittingRequests,
   seedSittingRequestPlacements,
   seedClinicEvents,
-  seedClinicSlots } from
+  seedClinicSlots,
+  seedClinicSlotProcedures } from
 '../data/seed';
 import { generateId } from '../lib/utils';
 
@@ -110,6 +112,9 @@ export function DemoWhiskerProvider({
   useState<ClinicEvent[]>(seedClinicEvents);
   const [clinicSlots, setClinicSlots] =
   useState<ClinicSlot[]>(seedClinicSlots);
+  const [clinicSlotProcedures, setClinicSlotProcedures] = useState<
+    ClinicSlotProcedure[]>(
+    seedClinicSlotProcedures);
 
   const now = () => new Date().toISOString();
 
@@ -412,17 +417,48 @@ export function DemoWhiskerProvider({
     c.id === id ? { ...c, ...updates, updated_at: now() } : c
     )
     ),
-    addClinicSlot: (slot) =>
-    setClinicSlots((prev) => [
-    { ...slot, id: `cs${generateId()}` },
-    ...prev]
-    ),
+    addClinicSlot: (slot, procedureTypes) => {
+      const slotId = `cs${generateId()}`;
+      setClinicSlots((prev) => [{ ...slot, id: slotId }, ...prev]);
+      if (procedureTypes.length) {
+        setClinicSlotProcedures((prev) => [
+        ...procedureTypes.map((t) => ({
+          id: `csp${generateId()}`,
+          clinic_slot_id: slotId,
+          procedure_type: t,
+          completed: false
+        })),
+        ...prev]
+        );
+      }
+    },
     updateClinicSlot: (id, updates) =>
     setClinicSlots((prev) =>
     prev.map((s) => s.id === id ? { ...s, ...updates } : s)
     ),
-    deleteClinicSlot: (id) =>
-    setClinicSlots((prev) => prev.filter((s) => s.id !== id))
+    deleteClinicSlot: (id) => {
+      setClinicSlots((prev) => prev.filter((s) => s.id !== id));
+      setClinicSlotProcedures((prev) =>
+      prev.filter((p) => p.clinic_slot_id !== id)
+      );
+    },
+    clinicSlotProcedures,
+    addClinicSlotProcedure: (clinic_slot_id, procedure_type) =>
+    setClinicSlotProcedures((prev) => [
+    {
+      id: `csp${generateId()}`,
+      clinic_slot_id,
+      procedure_type,
+      completed: false
+    },
+    ...prev]
+    ),
+    updateClinicSlotProcedure: (id, updates) =>
+    setClinicSlotProcedures((prev) =>
+    prev.map((p) => p.id === id ? { ...p, ...updates } : p)
+    ),
+    deleteClinicSlotProcedure: (id) =>
+    setClinicSlotProcedures((prev) => prev.filter((p) => p.id !== id))
   };
 
   return (

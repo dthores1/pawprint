@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../ui/Modal';
-import { Input, Textarea, Label } from '../ui/Forms';
+import { Textarea, Label } from '../ui/Forms';
+import { DatePicker } from '../ui/DatePicker';
 import { Button } from '../ui/Button';
 import { AnimalMultiPicker } from '../ui/AnimalMultiPicker';
 import { useWhisker } from '../../context/WhiskerContext';
@@ -165,22 +166,20 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label htmlFor="start">Start date</Label>
-            <Input
+            <DatePicker
               id="start"
-              type="date"
-              required
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)} />
+              onChange={setStartDate} />
 
           </div>
           <div>
             <Label htmlFor="end">End date</Label>
-            <Input
+            <DatePicker
               id="end"
-              type="date"
-              required
+              align="end"
+              min={startDate || undefined}
               value={endDate}
-              onChange={(e) => setEndDate(e.target.value)} />
+              onChange={setEndDate} />
 
           </div>
         </div>

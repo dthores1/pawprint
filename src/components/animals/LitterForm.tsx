@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { PlusIcon, XIcon } from 'lucide-react';
 import { FieldError, Input, Select, Textarea, Label } from '../ui/Forms';
+import { DatePicker } from '../ui/DatePicker';
 import { Button } from '../ui/Button';
 import { FormSection } from '../ui/FormSection';
 import { AgeInformationFields } from './AgeInformationFields';
@@ -171,16 +172,12 @@ export function LitterForm({ onClose }: LitterFormProps) {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label htmlFor="litter_intake_date">Intake Date</Label>
-            <Input
+            <DatePicker
               id="litter_intake_date"
-              type="date"
-              aria-invalid={Boolean(errors.intake_date)}
-              className={
-              errors.intake_date && 'border-red-500 focus:ring-red-500'
-              }
+              error={Boolean(errors.intake_date)}
               value={intakeDate}
-              onChange={(e) => {
-                setIntakeDate(e.target.value);
+              onChange={(v) => {
+                setIntakeDate(v);
                 setErrors((p) => ({ ...p, intake_date: undefined }));
               }} />
             <FieldError>{errors.intake_date}</FieldError>

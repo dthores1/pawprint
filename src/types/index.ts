@@ -413,6 +413,9 @@ export type ClinicSlotProcedureType =
 'dental' |
 'exam' |
 'recheck' |
+'flea_treatment' |
+'deworming' |
+'microchip' |
 'other';
 
 export type ClinicSlotStatus =
@@ -426,8 +429,17 @@ export interface ClinicSlot {
   id: string;
   clinic_event_id: string;
   animal_id: string;
-  procedure_type: ClinicSlotProcedureType;
   reserved_by_person_id?: string;
   status: ClinicSlotStatus;
   notes?: string;
+}
+
+// A slot's individual procedures (an animal usually gets several per visit).
+// Stored in clinic_slot_procedures; `completed` tracks per-procedure progress.
+export interface ClinicSlotProcedure {
+  id: string;
+  clinic_slot_id: string;
+  procedure_type: ClinicSlotProcedureType;
+  notes?: string;
+  completed: boolean;
 }

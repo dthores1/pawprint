@@ -68,7 +68,7 @@ Two more Animal fields worth calling out:
 - **`Product`**, **`SupplyRequest`**, **`SupplyRequestItem`** — supply ordering. See §10.
 - **`TransportRequest`** — request to move an animal or supplies between locations. See §11.
 - **`SittingRequest`** — temporary foster coverage when a placement's foster is unavailable. See §11.
-- **`ClinicEvent`**, **`ClinicSlot`** — TNR clinic planning: a vet date with a fixed capacity, and the animals assigned to it. See §11.
+- **`ClinicEvent`**, **`ClinicSlot`**, **`ClinicSlotProcedure`** — TNR clinic planning: a vet date with a fixed capacity, the animals assigned to it (slots), and each slot's procedures (an animal usually gets several per visit). See §11.
 
 ---
 
@@ -308,7 +308,9 @@ The most operationally complex of the three. TNR orgs run periodic clinics (typi
 - `slot_capacity` — hard cap that drives the capacity bar on cards.
 - `status` — `planning | scheduled | in_progress | completed | canceled`.
 
-**`ClinicSlot`** links an animal to a clinic for a specific `procedure_type` (`spay_neuter | vaccines | dental | exam | recheck | other`) with its own `status` (`reserved | confirmed | completed | no_show | canceled`). Slots are added inline in the **Clinic Detail modal** — pick an animal from a dropdown that excludes anyone already on this clinic's roster, pick a procedure, optionally add notes.
+**`ClinicSlot`** is one animal's appointment at a clinic, with its own `status` (`reserved | confirmed | completed | no_show | canceled`) and optional notes. Slots are added inline in the **Clinic Detail modal** — pick an animal from a search picker that excludes anyone already on this clinic's roster, then select one or more procedures.
+
+**`ClinicSlotProcedure`** is a child of `ClinicSlot`: an animal almost always gets several procedures in one visit (e.g. spay/neuter **+** vaccines **+** flea treatment), so procedures are rows, not a single field. Each has a `procedure_type` (`spay_neuter | vaccines | dental | exam | recheck | flea_treatment | deworming | microchip | other`) and a `completed` flag for per-procedure progress. In the Clinic Detail modal, procedures render as chips on each slot: click a chip to toggle done, `×` to remove it, `+ Add` to attach another. (Replaced the old single `clinic_slots.procedure_type` column.)
 
 **Cross-feature ties:**
 - A `TransportRequest` can carry a `clinic_event_id` so transport-to-clinic gets coordinated alongside everything else.

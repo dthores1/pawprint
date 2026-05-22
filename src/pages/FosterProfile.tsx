@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useWhisker } from '../context/WhiskerContext';
 import { Card } from '../components/ui/Card';
 import { Avatar } from '../components/ui/Avatar';
+import { Button } from '../components/ui/Button';
 import { StatusBadge } from '../components/ui/Badge';
+import { PlaceAnimalModal } from '../components/animals/PlaceAnimalModal';
 import {
   ArrowLeftIcon,
   MapPinIcon,
@@ -18,6 +20,7 @@ export function FosterProfile() {
     id: string;
   }>();
   const { fosters, placements, animals } = useWhisker();
+  const [isPlaceModalOpen, setIsPlaceModalOpen] = useState(false);
   const foster = fosters.find((f) => f.id === id);
   if (!foster) {
     return <div className="p-8 text-center">Foster not found.</div>;
@@ -165,10 +168,20 @@ export function FosterProfile() {
 
           {/* Current Placements */}
           <div>
-            <h3 className="text-lg font-heading font-bold mb-4 flex items-center gap-2">
-              <HomeIcon className="w-5 h-5 text-primary" />
-              Current Placements
-            </h3>
+            <Card className="p-4 mb-4 flex items-center justify-between gap-3">
+              <h3 className="text-lg font-heading font-bold flex items-center gap-2">
+                <HomeIcon className="w-5 h-5 text-primary" />
+                Current Placements
+              </h3>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setIsPlaceModalOpen(true)}>
+
+                <HomeIcon className="w-4 h-4 mr-2" />
+                Place Animal
+              </Button>
+            </Card>
             {activePlacements.length === 0 ?
             <Card className="p-8 text-center text-text-secondary">
                 No animals currently placed with this foster.
@@ -264,6 +277,12 @@ export function FosterProfile() {
           }
         </div>
       </div>
+
+      <PlaceAnimalModal
+        isOpen={isPlaceModalOpen}
+        onClose={() => setIsPlaceModalOpen(false)}
+        fosterId={foster.id} />
+
     </div>);
 
 }

@@ -16,7 +16,8 @@ import {
   SittingRequest,
   SittingRequestPlacement,
   ClinicEvent,
-  ClinicSlot } from
+  ClinicSlot,
+  ClinicSlotProcedure } from
 '../types';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -1302,7 +1303,6 @@ export const seedClinicSlots: ClinicSlot[] = [
   id: 'cs1',
   clinic_event_id: 'ce1',
   animal_id: 'a4', // Milkshake
-  procedure_type: 'spay_neuter',
   reserved_by_person_id: 'pe3',
   status: 'reserved',
   notes: 'Pending URI clearance; recheck day-before.'
@@ -1311,7 +1311,6 @@ export const seedClinicSlots: ClinicSlot[] = [
   id: 'cs2',
   clinic_event_id: 'ce1',
   animal_id: 'a7', // Pip
-  procedure_type: 'spay_neuter',
   reserved_by_person_id: 'pe3',
   status: 'confirmed'
 },
@@ -1319,7 +1318,6 @@ export const seedClinicSlots: ClinicSlot[] = [
   id: 'cs3',
   clinic_event_id: 'ce1',
   animal_id: 'a10', // Willow
-  procedure_type: 'spay_neuter',
   reserved_by_person_id: 'pe3',
   status: 'confirmed'
 },
@@ -1327,7 +1325,6 @@ export const seedClinicSlots: ClinicSlot[] = [
   id: 'cs4',
   clinic_event_id: 'ce1',
   animal_id: 'a9', // Otis
-  procedure_type: 'exam',
   reserved_by_person_id: 'pe4',
   status: 'reserved',
   notes: 'Right hind leg limp eval.'
@@ -1337,7 +1334,6 @@ export const seedClinicSlots: ClinicSlot[] = [
   id: 'cs5',
   clinic_event_id: 'ce2',
   animal_id: 'a6', // Hazel
-  procedure_type: 'spay_neuter',
   reserved_by_person_id: 'pe3',
   status: 'reserved'
 },
@@ -1346,7 +1342,27 @@ export const seedClinicSlots: ClinicSlot[] = [
   id: 'cs6',
   clinic_event_id: 'ce3',
   animal_id: 'a5', // Luna
-  procedure_type: 'spay_neuter',
   reserved_by_person_id: 'pe3',
   status: 'completed'
 }];
+
+// Each slot's procedures (cats commonly get several per visit).
+export const seedClinicSlotProcedures: ClinicSlotProcedure[] = [
+// cs1 — Milkshake: full intake combo
+{ id: 'csp1', clinic_slot_id: 'cs1', procedure_type: 'spay_neuter', completed: false },
+{ id: 'csp2', clinic_slot_id: 'cs1', procedure_type: 'vaccines', completed: false },
+{ id: 'csp3', clinic_slot_id: 'cs1', procedure_type: 'flea_treatment', completed: false },
+// cs2 — Pip
+{ id: 'csp4', clinic_slot_id: 'cs2', procedure_type: 'spay_neuter', completed: false },
+{ id: 'csp5', clinic_slot_id: 'cs2', procedure_type: 'vaccines', completed: false },
+// cs3 — Willow
+{ id: 'csp6', clinic_slot_id: 'cs3', procedure_type: 'spay_neuter', completed: false },
+{ id: 'csp7', clinic_slot_id: 'cs3', procedure_type: 'microchip', completed: false },
+// cs4 — Otis: exam only
+{ id: 'csp8', clinic_slot_id: 'cs4', procedure_type: 'exam', completed: false },
+// cs5 — Hazel
+{ id: 'csp9', clinic_slot_id: 'cs5', procedure_type: 'spay_neuter', completed: false },
+// cs6 — Luna: past clinic, all done
+{ id: 'csp10', clinic_slot_id: 'cs6', procedure_type: 'spay_neuter', completed: true },
+{ id: 'csp11', clinic_slot_id: 'cs6', procedure_type: 'vaccines', completed: true },
+{ id: 'csp12', clinic_slot_id: 'cs6', procedure_type: 'deworming', completed: true }];
