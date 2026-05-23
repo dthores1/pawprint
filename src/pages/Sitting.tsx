@@ -54,7 +54,8 @@ export function Sitting() {
     placements,
     animals,
     people,
-    acceptSittingRequest
+    acceptSittingRequest,
+    updateSittingRequest
   } = useWhisker();
   const { currentPersonId } = useAuth();
   const [isNewOpen, setIsNewOpen] = useState(false);
@@ -161,9 +162,23 @@ export function Sitting() {
               sitterName={
               sitter ? `${sitter.first_name} ${sitter.last_name}` : undefined
               }
+              canAccept={
+              !!currentPersonId &&
+              s.status === 'open' &&
+              s.requested_by_person_id !== currentPersonId
+              }
               onAccept={() =>
               currentPersonId &&
               acceptSittingRequest(s.id, currentPersonId)
+              }
+              canCancel={
+              !!currentPersonId &&
+              s.requested_by_person_id === currentPersonId &&
+              s.status !== 'completed' &&
+              s.status !== 'canceled'
+              }
+              onCancel={() =>
+              updateSittingRequest(s.id, { status: 'canceled' })
               } />);
 
 
@@ -184,15 +199,30 @@ interface SittingCardProps {
   coveredAnimals: Animal[];
   requesterName: string;
   sitterName?: string;
+  canAccept: boolean;
   onAccept: () => void;
+  canCancel: boolean;
+  onCancel: () => void;
 }
 function SittingCard({
   request,
   coveredAnimals,
   requesterName,
   sitterName,
-  onAccept
+  canAccept,
+  onAccept,
+  canCancel,
+  onCancel
 }: SittingCardProps) {
+  const handleCancel = () => {
+    if (
+    window.confirm(
+      'Cancel this sitting request? It will be marked as canceled for everyone.'
+    ))
+    {
+      onCancel();
+    }
+  };
   return (
     <Card className="p-5">
       <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-6">
@@ -272,11 +302,23 @@ function SittingCard({
           }
         </div>
 
-        {request.status === 'open' &&
-        <div className="shrink-0">
-            <Button size="sm" onClick={onAccept}>
-              Accept Sitting Request
-            </Button>
+        {(canAccept || canCancel) &&
+        <div className="shrink-0 flex sm:flex-col items-start sm:items-end gap-2">
+            {canAccept &&
+          <Button size="sm" onClick={onAccept}>
+                Accept Sitting Request
+              </Button>
+          }
+            {canCancel &&
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleCancel}
+            className="text-status-urgent-text hover:bg-status-urgent-bg">
+
+                Cancel Request
+              </Button>
+          }
           </div>
         }
       </div>

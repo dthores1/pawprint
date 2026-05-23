@@ -42,7 +42,7 @@ The central record. Every animal has both a **lifecycle status** and an orthogon
 | `intake_source` | string | e.g. "City Shelter Transfer". |
 | `status` | `AnimalStatus` | Lifecycle stage — see §2. |
 | `priority` | `Priority` | Severity / attention level — see §3. |
-| `action_needed` | string? | Short next-step sentence. Meaningful when `priority !== 'normal'`. See §4. |
+| `action_needed` | string? | **Retired** — next steps now live in `animal_action_items` (`AnimalActionItem`). See §4. |
 | `description` | string | Free-form personality / context. |
 | `microchip_number` | string? | |
 | `primary_photo_url` | string? | |
@@ -52,19 +52,20 @@ The central record. Every animal has both a **lifecycle status** and an orthogon
 
 Two more Animal fields worth calling out:
 
-- **`current_foster_id`** — denormalized cache of the active placement's `foster_parent_id`. The placements collection is still the source of truth for history; `placeAnimal` and `reassignFoster` keep this field in sync.
+- **`current_foster_id`** — denormalized cache of the active placement's foster (`person_id`, a `people` row). The placements collection is still the source of truth for history; `placeAnimal` and `reassignFoster` keep this field in sync.
 - **`internal_notes`** — staff-only free-form notes. Separate from `description`, which is the public-facing blurb.
 
 ### Other entities
 
-- **`FosterParent`** — has `max_capacity`, `preferred_species`, an `active` flag, and is paired to animals via `FosterPlacement`.
-- **`FosterPlacement`** — links one animal to one foster with a `start_date`, optional `end_date`, `placement_status` (`active` / `completed` / `interrupted`), `placement_type` (`foster` / `medical_foster` / `trial_adoption`), and optional `reason_ended`. An animal is considered "in foster" if any placement with `placement_status: 'active'` exists. The Placement Timeline on the Animal Profile renders this history as a date-range stack. (Type renamed from `AnimalPlacement` — the codebase consistently uses `FosterPlacement` now.)
+- **Fosters are `people`, not a separate table.** A foster is a `Person` whose `roles` include `'foster_parent'`, carrying foster-specific fields (`max_capacity`, `preferred_species`, `address`). The `fosters` collection is a derived view (`people.filter(roles.includes('foster_parent'))`); the Add/Edit Foster forms write a `people` row (legacy `role` set to `'volunteer'`). The old `foster_parents` table is retired — see migration `0012`.
+- **`FosterPlacement`** — links one animal to one foster (`person_id` → `people`) with a `start_date`, optional `end_date`, `placement_status` (`active` / `completed` / `interrupted`), `placement_type` (`foster` / `medical_foster` / `trial_adoption`), and optional `reason_ended`. An animal is considered "in foster" if any placement with `placement_status: 'active'` exists. The Placement Timeline on the Animal Profile renders this history as a date-range stack.
 - **`MedicalRecord`** — procedure log with `procedure_type`, `procedure_name`, `status` (`completed` / `due` / `scheduled` / `overdue` / `canceled`), `performed_date` and/or `due_date`, `notes`, and an optional `next_due_date` for recurring procedures (vaccine/exam/surgery/medication) — e.g. a rabies booster due in a year. The Add Medical modal only prompts for next-due on those types, via a relative interval (in N days/weeks/months/years) or an exact date. **Attribution** uses paired lookup-or-free-text fields: **Performed by** is either a known contact (`provider_contact_id` → `people`) or a free-text `provider_name`; **Facility / Event** is either a scheduled clinic (`clinic_id` → `clinic_events`) or a free-text `facility_name`. Each pair is mutually exclusive (picking a contact/clinic clears the free-text, and vice versa). FKs are `ON DELETE SET NULL` so removing a contact or clinic never deletes medical history.
 - **`AnimalNote`** — timestamped free-text note with a `note_type` (`behavior` / `medical` / `foster_update` / `adoption` / `general`).
+- **`AnimalActionItem`** — a tracked "next step" with `description`, elevated `priority`, and `status` (`open` / `completed` / `cancelled`). Replaces the old `action_needed` field so completions are kept in history. At most one `open` per animal. See §4.
 - **`AnimalRelationship`** — animal-to-animal link (mother, father, sibling, etc.). See §8.
 - **`Litter`** — groups animals that share intake/age/origin metadata (species, breed, estimated birth date, intake date/source). Members link via `animals.litter_id`; littermates are derived from that shared id, not from `AnimalRelationship`. Created by the Add Litter flow. See §8.
 - **`AnimalPhoto`** — gallery photo with a `category`. See §8.
-- **`Person`** — non-foster contacts: vets, rescue staff, volunteers, adopters. Used by the Contacts page and as the requester on supply / transport / sitting requests.
+- **`Person`** — every human in the org. A single flat `roles` array is the source of truth for what someone does — `foster_parent`, `admin`, `event_support`, `social_media`, `trapper`, `transport`, `vet`, `rescue_staff` (and system-managed `adopter`). This **replaced the old `role` + `volunteer_type` split** (`volunteer_type` is retired; the legacy single `role` column is still written via `legacyRoleFor()` for back-compat but reads come from `roles`). The Add/Edit Contact and Add/Edit Foster forms all edit `roles` via the grouped `RolesMultiSelect`. Used by the Contacts page, as the requester on supply / transport / sitting requests, and as the foster on placements.
 - **`Product`**, **`SupplyRequest`**, **`SupplyRequestItem`** — supply ordering. See §10.
 - **`TransportRequest`** — request to move an animal or supplies between locations. See §11.
 - **`SittingRequest`** — temporary foster coverage when a placement's foster is unavailable. See §11.
@@ -108,14 +109,14 @@ Priority ordering for sorts: `critical > urgent > needs_attention > normal`. See
 
 ## 4. Action Needed
 
-Priority answers "how worried should I be?" Status answers "where is this animal?" **Action Needed** answers "what should someone do today?"
+Priority answers "how worried should I be?" Status answers "where is this animal?" **Action items** answer "what should someone do today?"
 
-- `action_needed: string?` lives on `Animal`.
-- It is **only meaningful when `priority !== 'normal'`**.
-- The `ActionNeededCallout` component (rendered on the Animal Profile, below the hero) is the canonical surface for this field. It is hidden when priority is normal.
+- Action items live in their own table (`AnimalActionItem` → `animal_action_items`), **not** a single field on `Animal`. This keeps a tracked history (completions/cancellations show in the activity timeline) — see the `0011` migration. (The legacy `animals.action_needed` column is retired; do not write to it.)
+- Each item has a `description`, its own elevated `priority` (`needs_attention` / `urgent` / `critical`), and a lifecycle `status` (`open` / `completed` / `cancelled`). Completing or cancelling stamps `completed_at` + `completed_by`; **at most one `open` item per animal** (partial unique index).
+- The `ActionNeededCallout` component (Animal Profile, below the hero) is the canonical surface. It shows the single open item with **Complete** (✓) and **Edit** (✏) icon buttons. Complete opens an in-place confirmation: **Complete**, **Complete & Add Next Step** (completes + creates a fresh open item), or **Cancel item** (sets `cancelled`).
+- The banner is visible whenever there's an open item **or** the animal's `priority !== 'normal'`. If the priority is elevated but no open item exists, it shows: *"{name} is still marked {priority} but has no active action item."* with an **Add action item** button — a soft forcing function for data quality.
 - Text should be specific and operational. Good: *"Soft food only + finish 10-day antibiotic course (3 days remaining). Recheck on Nov 25."* Bad: *"Needs care."*
-- When priority is elevated but no action is set, the callout prompts: *"No action specified yet — what's the next step?"* with an Add button. This is a soft forcing function for data quality.
-- The same string is reused as the subtitle in the Dashboard's **Needs Action** list and the Global Search's **Needs Attention** section. If `action_needed` is unset, those views fall back to `"Needs placement"` (no active placement) or `"Needs review"` (otherwise).
+- The open item's `description` is reused as the subtitle in the Dashboard's **Needs Action** list and Global Search's **Needs Attention** section. With no open item, those views fall back to `"Needs placement"` (no active placement) or `"Needs review"` (otherwise).
 
 ---
 

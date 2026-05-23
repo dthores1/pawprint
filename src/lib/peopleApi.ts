@@ -1,4 +1,12 @@
-import { Person } from '../types';
+import { Person, PersonRole, Species } from '../types';
+
+// The legacy `people.role` column is NOT NULL and only allows these four — note
+// 'foster_parent' is NOT valid there (it lives only in `roles[]`). Derive a safe
+// legacy value from the multi-role array for back-compat writes.
+const LEGACY_ROLES: PersonRole[] = ['vet', 'rescue_staff', 'volunteer', 'adopter'];
+export function legacyRoleFor(roles: PersonRole[]): PersonRole {
+  return roles.find((r) => LEGACY_ROLES.includes(r)) ?? 'volunteer';
+}
 
 export function rowToPerson(r: any): Person {
   return {
@@ -7,6 +15,8 @@ export function rowToPerson(r: any): Person {
     last_name: r.last_name,
     email: r.email ?? '',
     phone: r.phone ?? undefined,
+    // Read from roles[]; fall back to wrapping the legacy single role.
+    roles: r.roles && r.roles.length ? r.roles : r.role ? [r.role] : [],
     role: r.role,
     volunteer_type: r.volunteer_type ?? undefined,
     organization_name: r.organization_name ?? undefined,
@@ -14,7 +24,11 @@ export function rowToPerson(r: any): Person {
     photo_url: r.photo_url ?? undefined,
     active: r.active ?? true,
     created_at: r.created_at,
-    user_id: r.user_id ?? undefined
+    user_id: r.user_id ?? undefined,
+    address: r.address ?? undefined,
+    max_capacity: r.max_capacity ?? undefined,
+    preferred_species:
+    (r.preferred_species ?? undefined) as Species[] | undefined
   };
 }
 
@@ -23,12 +37,16 @@ const PERSON_COLUMNS = [
 'last_name',
 'email',
 'phone',
+'roles',
 'role',
 'volunteer_type',
 'organization_name',
 'notes',
 'photo_url',
-'active'] as
+'active',
+'address',
+'max_capacity',
+'preferred_species'] as
 const;
 
 function normalize(v: any): any {

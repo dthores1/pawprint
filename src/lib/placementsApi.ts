@@ -4,7 +4,7 @@ export function rowToPlacement(r: any): FosterPlacement {
   return {
     id: r.id,
     animal_id: r.animal_id,
-    foster_parent_id: r.foster_parent_id,
+    person_id: r.person_id,
     start_date: r.start_date,
     end_date: r.end_date ?? undefined,
     placement_status: r.placement_status,
@@ -16,7 +16,7 @@ export function rowToPlacement(r: any): FosterPlacement {
 
 const PLACEMENT_COLUMNS = [
 'animal_id',
-'foster_parent_id',
+'person_id',
 'start_date',
 'end_date',
 'placement_status',

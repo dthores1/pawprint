@@ -64,7 +64,7 @@ export function AnimalsList() {
       (p) => p.animal_id === animalId && p.placement_status === 'active'
     );
     if (!activePlacement) return null;
-    return fosters.find((f) => f.id === activePlacement.foster_parent_id);
+    return fosters.find((f) => f.id === activePlacement.person_id);
   };
   const getNextMedical = (animalId: string) => {
     const upcoming = medicalRecords.

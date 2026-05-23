@@ -47,6 +47,7 @@ export function AnimalProfile() {
     fosters,
     medicalRecords,
     notes,
+    actionItems,
     photos,
     breeds,
     addPhoto
@@ -98,7 +99,7 @@ export function AnimalProfile() {
     (p) => p.placement_status === 'active'
   );
   const currentFoster = activePlacement ?
-  fosters.find((f) => f.id === activePlacement.foster_parent_id) :
+  fosters.find((f) => f.id === activePlacement.person_id) :
   null;
   const animalMedical = medicalRecords.filter((m) => m.animal_id === animal.id);
   const upcomingMedical = animalMedical.filter(
@@ -106,14 +107,20 @@ export function AnimalProfile() {
     m.status === 'due' || m.status === 'scheduled' || m.status === 'overdue'
   );
   const animalNotes = notes.filter((n) => n.animal_id === animal.id);
+  const animalActionItems = actionItems.filter(
+    (a) => a.animal_id === animal.id
+  );
   const animalPhotosCount = photos.filter(
     (p) => p.animal_id === animal.id
   ).length;
   // Build Timeline
   type TimelineEvent = {
     id: string;
+    /** Day used for display (yyyy-MM-dd or ISO). */
     date: string;
-    type: 'intake' | 'medical' | 'placement' | 'note';
+    /** Full timestamp for ordering — keeps same-day events in real order. */
+    ts: string;
+    type: 'intake' | 'medical' | 'placement' | 'note' | 'action';
     title: string;
     description: string;
     icon: React.ElementType;
@@ -123,7 +130,8 @@ export function AnimalProfile() {
   {
     id: 'intake',
     date: animal.intake_date,
-    type: 'intake',
+    ts: animal.intake_date,
+    type: 'intake' as const,
     title: 'Intake',
     description: `Source: ${animal.intake_source || 'Not specified'}`,
     icon: ActivityIcon,
@@ -134,6 +142,7 @@ export function AnimalProfile() {
   map((m) => ({
     id: m.id,
     date: m.performed_date!,
+    ts: m.performed_date!,
     type: 'medical' as const,
     title: `Medical: ${m.procedure_name}`,
     description: `Provider: ${m.provider_name || 'Unknown'}${m.notes ? ` - ${m.notes}` : ''}`,
@@ -141,10 +150,11 @@ export function AnimalProfile() {
     color: 'bg-[#F3E4D7] text-[#D98C5F]'
   })),
   ...animalPlacements.map((p) => {
-    const foster = fosters.find((f) => f.id === p.foster_parent_id);
+    const foster = fosters.find((f) => f.id === p.person_id);
     return {
       id: p.id,
       date: p.start_date.split('T')[0],
+      ts: p.start_date,
       type: 'placement' as const,
       title: `Placed in Foster`,
       description: `With ${foster?.first_name} ${foster?.last_name}`,
@@ -155,13 +165,50 @@ export function AnimalProfile() {
   ...animalNotes.map((n) => ({
     id: n.id,
     date: n.created_at.split('T')[0],
+    ts: n.created_at,
     type: 'note' as const,
     title: `Note: ${n.note_type}`,
     description: n.body,
     icon: MessageSquareIcon,
     color: 'bg-background text-text-secondary'
-  }))].
-  sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // Newest first
+  })),
+  // Action items: a "created" event, plus a resolution event when done.
+  ...animalActionItems.flatMap((a) => {
+    const events: TimelineEvent[] = [
+    {
+      id: `action-${a.id}-created`,
+      date: a.created_at.split('T')[0],
+      ts: a.created_at,
+      type: 'action' as const,
+      title: 'Action item added',
+      description: a.description,
+      icon: AlertCircleIcon,
+      color: 'bg-[#FBF1DC] text-[#A36B00]'
+    }];
+
+    if (
+    (a.status === 'completed' || a.status === 'cancelled') &&
+    a.completed_at)
+    {
+      const done = a.status === 'completed';
+      events.push({
+        id: `action-${a.id}-${a.status}`,
+        date: a.completed_at.split('T')[0],
+        ts: a.completed_at,
+        type: 'action' as const,
+        title: done ? 'Action completed' : 'Action cancelled',
+        description: a.completion_note ?
+        `${a.description} — ${a.completion_note}` :
+        a.description,
+        icon: done ? CheckCircle2Icon : CircleIcon,
+        color: done ?
+        'bg-[#DDEFE2] text-[#3E7B52]' :
+        'bg-background text-text-secondary'
+      });
+    }
+    return events;
+  })].
+  sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime()); // Newest first
   // Readiness Checklist logic
   const hasRabies = animalMedical.some(
     (m) =>
@@ -373,9 +420,9 @@ export function AnimalProfile() {
 
       <ActionNeededCallout
         animalId={animal.id}
-        priority={animal.priority}
-        actionNeeded={animal.action_needed} />
-      
+        animalName={animal.name}
+        priority={animal.priority} />
+
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Tabs (Timeline / Medical History) */}
@@ -416,18 +463,18 @@ export function AnimalProfile() {
             {activeTab !== 'photos' &&
             <div className="flex gap-2">
                 <Button
-                variant="outline"
+                variant="soft"
                 size="sm"
                 onClick={() => setIsNoteModalOpen(true)}>
-                
+
                   <FileTextIcon className="w-4 h-4 mr-2" /> Add Note
                 </Button>
                 <Button
-                variant="outline"
+                variant="soft"
                 size="sm"
                 onClick={() => setIsMedicalModalOpen(true)}>
-                
-                  <SyringeIcon className="w-4 h-4 mr-2" /> Add Medical
+
+                  <SyringeIcon className="w-4 h-4 mr-2" /> Add Medical Record
                 </Button>
               </div>
             }
@@ -700,7 +747,7 @@ function PlacementTimelineList({
     <div className="p-6">
       <div className="relative border-l-2 border-border ml-4 space-y-8 pb-4">
         {sorted.map((p) => {
-          const foster = fosters.find((f) => f.id === p.foster_parent_id);
+          const foster = fosters.find((f) => f.id === p.person_id);
           const isActive = p.placement_status === 'active';
           return (
             <div key={p.id} className="relative pl-8">

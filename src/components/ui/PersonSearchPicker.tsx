@@ -37,7 +37,7 @@ export function PersonSearchPicker({
     const excluded = new Set(excludeIds);
     return people.
     filter((p) => !excluded.has(p.id)).
-    filter((p) => (role ? p.role === role : true)).
+    filter((p) => (role ? p.roles.includes(role) : true)).
     filter((p) => p.active).
     filter((p) => {
       if (!q) return true;

@@ -10,6 +10,24 @@ export type AnimalStatus =
 
 export type Priority = 'normal' | 'needs_attention' | 'urgent' | 'critical';
 
+export type ActionItemStatus = 'open' | 'completed' | 'cancelled';
+// A tracked "next step" for an animal. Replaces the single animal.action_needed
+// field so completions/cancellations are kept in history (and shown in the
+// activity timeline). At most one 'open' item per animal.
+export interface AnimalActionItem {
+  id: string;
+  animal_id: string;
+  description: string;
+  /** Mirrors the elevated Priority levels (no 'normal'). */
+  priority: Exclude<Priority, 'normal'>;
+  status: ActionItemStatus;
+  created_at: string;
+  completed_at?: string;
+  /** Auth user id who completed/cancelled it. */
+  completed_by?: string;
+  completion_note?: string;
+}
+
 export type Species = 'Dog' | 'Cat' | 'Other';
 export type Sex = 'Male' | 'Female' | 'Unknown';
 
@@ -63,7 +81,7 @@ export interface Animal {
    */
   adoption_profile_url?: string;
   /**
-   * Denormalized cache: foster_parent_id of the active FosterPlacement, if any.
+   * Denormalized cache: person_id of the active FosterPlacement's foster, if any.
    * The placements collection remains the source of truth for history; kept
    * in sync by placeAnimal / reassignFoster. Components may prefer the
    * derived check (active placement) for consistency with seed data.
@@ -108,8 +126,9 @@ export interface AnimalPhoto {
   uploaded_at: string;
 }
 
-export interface FosterParent {
-  id: string;
+// The foster-specific fields captured by the Add/Edit Foster forms. A foster is
+// created/updated as a `people` row (role 'volunteer' + roles ['foster_parent']).
+export interface FosterInput {
   first_name: string;
   last_name: string;
   email: string;
@@ -120,6 +139,8 @@ export interface FosterParent {
   notes: string;
   active: boolean;
   photo_url?: string;
+  /** Always includes 'foster_parent'; may include other roles too. */
+  roles: PersonRole[];
 }
 
 export type PlacementType = 'foster' | 'medical_foster' | 'trial_adoption';
@@ -127,7 +148,8 @@ export type PlacementType = 'foster' | 'medical_foster' | 'trial_adoption';
 export interface FosterPlacement {
   id: string;
   animal_id: string;
-  foster_parent_id: string;
+  /** The foster — a `people` row (with the 'foster_parent' role). */
+  person_id: string;
   start_date: string;
   /** Nullable while the placement is active. */
   end_date?: string;
@@ -221,7 +243,23 @@ export interface Litter {
   notes?: string;
 }
 
-export type PersonRole = 'vet' | 'rescue_staff' | 'volunteer' | 'adopter';
+// A person's roles/capabilities — a single flat, non-hierarchical set (this
+// replaced the old role + volunteer_type split). Selectable roles are grouped in
+// RolesMultiSelect (Organization / Volunteer & Support / Foster). 'volunteer' is
+// retained only for the legacy NOT-NULL `people.role` column + role-less legacy
+// rows; 'adopter' is system-managed (set by a future adoption flow) — neither is
+// offered on creation.
+export type PersonRole =
+'vet' |
+'rescue_staff' |
+'volunteer' |
+'adopter' |
+'foster_parent' |
+'trapper' |
+'transport' |
+'admin' |
+'event_support' |
+'social_media';
 export type VolunteerType =
 'foster_parent' |
 'administrative' |
@@ -237,6 +275,16 @@ export interface Person {
   last_name: string;
   email: string;
   phone?: string;
+  /**
+   * Multi-role: a person can be e.g. ['vet', 'foster_parent']. This is the
+   * source of truth for what someone does. Fosters are people whose `roles`
+   * include 'foster_parent'.
+   */
+  roles: PersonRole[];
+  /**
+   * Legacy single role — still written for back-compat (DB column is NOT NULL),
+   * but read from `roles`. New foster-people use role 'volunteer'.
+   */
   role: PersonRole;
   volunteer_type?: VolunteerType;
   organization_name?: string;
@@ -250,6 +298,10 @@ export interface Person {
    * attribution but hidden from the Contacts directory.
    */
   user_id?: string;
+  // — Foster-specific (meaningful when roles includes 'foster_parent') —
+  address?: string;
+  max_capacity?: number;
+  preferred_species?: Species[];
 }
 
 export type SupplyRequestStatus =

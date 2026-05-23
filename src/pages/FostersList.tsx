@@ -28,7 +28,7 @@ export function FostersList() {
   });
   const getActivePlacementsCount = (fosterId: string) => {
     return placements.filter(
-      (p) => p.foster_parent_id === fosterId && p.placement_status === 'active'
+      (p) => p.person_id === fosterId && p.placement_status === 'active'
     ).length;
   };
   return (
@@ -87,8 +87,9 @@ export function FostersList() {
 
         filteredFosters.map((foster, index) => {
           const activeCount = getActivePlacementsCount(foster.id);
-          const isFull = activeCount >= foster.max_capacity;
-          const capacityPercent = activeCount / foster.max_capacity * 100;
+          const cap = foster.max_capacity ?? 0;
+          const isFull = activeCount >= cap;
+          const capacityPercent = cap > 0 ? activeCount / cap * 100 : 0;
           return (
             <motion.div
               key={foster.id}
@@ -121,7 +122,7 @@ export function FostersList() {
                           <div className="flex items-center gap-1 text-sm text-text-secondary mt-1">
                             <MapPinIcon className="w-3.5 h-3.5" />
                             <span className="truncate max-w-[180px]">
-                              {foster.address.split(',')[0]}
+                              {(foster.address ?? '').split(',')[0]}
                             </span>
                           </div>
                         </div>
@@ -141,7 +142,7 @@ export function FostersList() {
                         <div className="flex justify-between text-sm mb-2">
                           <span className="text-text-secondary">Capacity</span>
                           <span className="font-medium text-text-primary">
-                            {activeCount} / {foster.max_capacity}
+                            {activeCount} / {cap}
                           </span>
                         </div>
                         <div className="w-full bg-background rounded-full h-2 overflow-hidden">
@@ -153,7 +154,7 @@ export function FostersList() {
                       
                         </div>
                         <div className="mt-3 flex gap-1 flex-wrap">
-                          {foster.preferred_species.map((s) =>
+                          {(foster.preferred_species ?? []).map((s) =>
                       <span
                         key={s}
                         className="text-xs px-2 py-1 bg-accent text-secondary rounded-md font-medium">
@@ -196,9 +197,9 @@ export function FostersList() {
 
               filteredFosters.map((foster, index) => {
                 const activeCount = getActivePlacementsCount(foster.id);
-                const isFull = activeCount >= foster.max_capacity;
-                const capacityPercent =
-                activeCount / foster.max_capacity * 100;
+                const cap = foster.max_capacity ?? 0;
+                const isFull = activeCount >= cap;
+                const capacityPercent = cap > 0 ? activeCount / cap * 100 : 0;
                 return (
                   <motion.tr
                     key={foster.id}
@@ -248,13 +249,13 @@ export function FostersList() {
                         </td>
                         <td className="py-4 px-6">
                           <p className="text-sm text-text-primary">
-                            {foster.address.split(',')[0]}
+                            {(foster.address ?? '').split(',')[0]}
                           </p>
                         </td>
                         <td className="py-4 px-6">
                           <div className="flex items-center gap-3">
                             <span className="text-sm font-medium text-text-primary w-8">
-                              {activeCount}/{foster.max_capacity}
+                              {activeCount}/{cap}
                             </span>
                             <div className="w-16 bg-background rounded-full h-1.5 overflow-hidden">
                               <div
@@ -268,7 +269,7 @@ export function FostersList() {
                         </td>
                         <td className="py-4 px-6">
                           <div className="flex gap-1 flex-wrap">
-                            {foster.preferred_species.map((s) =>
+                            {(foster.preferred_species ?? []).map((s) =>
                         <span
                           key={s}
                           className="text-xs px-2 py-1 bg-accent text-secondary rounded-md font-medium">

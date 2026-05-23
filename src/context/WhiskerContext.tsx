@@ -1,6 +1,7 @@
 import React, {
   useState,
   useEffect,
+  useMemo,
   useCallback,
   createContext,
   useContext } from
@@ -10,10 +11,12 @@ import {
   Breed,
   Litter,
   Sex,
-  FosterParent,
+  PersonRole,
+  FosterInput,
   FosterPlacement,
   MedicalRecord,
   AnimalNote,
+  AnimalActionItem,
   AnimalRelationship,
   AnimalPhoto,
   Person,
@@ -39,10 +42,10 @@ import {
 '../lib/animalsApi';
 import { rowToNote, noteToInsert } from '../lib/notesApi';
 import {
-  rowToFoster,
-  fosterToInsert,
-  fosterUpdateToRow } from
-'../lib/fostersApi';
+  rowToActionItem,
+  actionItemToInsert,
+  actionItemUpdateToRow } from
+'../lib/actionItemsApi';
 import {
   rowToPlacement,
   placementToInsert,
@@ -60,7 +63,8 @@ import {
 import {
   rowToPerson,
   personToInsert,
-  personUpdateToRow } from
+  personUpdateToRow,
+  legacyRoleFor } from
 '../lib/peopleApi';
 import {
   rowToPhoto,
@@ -105,12 +109,14 @@ export interface WhiskerContextType {
   animals: Animal[];
   /** True while the Supabase-backed animals list is being fetched. */
   animalsLoading: boolean;
-  fosters: FosterParent[];
-  /** True while the Supabase-backed fosters list is being fetched. */
+  /** Fosters are `people` whose roles include 'foster_parent' (derived view). */
+  fosters: Person[];
+  /** True while the Supabase-backed people list is being fetched. */
   fostersLoading: boolean;
   placements: FosterPlacement[];
   medicalRecords: MedicalRecord[];
   notes: AnimalNote[];
+  actionItems: AnimalActionItem[];
   relationships: AnimalRelationship[];
   photos: AnimalPhoto[];
   people: Person[];
@@ -140,11 +146,20 @@ export interface WhiskerContextType {
   },
   members: { name: string; sex: Sex; description?: string }[])
   => Promise<void>;
-  addFoster: (foster: Omit<FosterParent, 'id'>) => void;
-  updateFoster: (id: string, updates: Partial<FosterParent>) => void;
+  addFoster: (foster: FosterInput) => void;
+  updateFoster: (id: string, updates: Partial<FosterInput>) => void;
   addMedicalRecord: (record: Omit<MedicalRecord, 'id'>) => void;
   updateMedicalRecord: (id: string, updates: Partial<MedicalRecord>) => void;
   addNote: (note: Omit<AnimalNote, 'id' | 'created_at'>) => void;
+  // — Action items (tracked next-steps) —
+  addActionItem: (
+  item: Pick<AnimalActionItem, 'animal_id' | 'description' | 'priority'>)
+  => void;
+  updateActionItem: (id: string, updates: Partial<AnimalActionItem>) => void;
+  /** Mark the item completed (stamps completed_at/by). */
+  completeActionItem: (id: string, completionNote?: string) => void;
+  /** Mark the item cancelled (stamps completed_at/by). */
+  cancelActionItem: (id: string, completionNote?: string) => void;
   addPlacement: (placement: Omit<FosterPlacement, 'id'>) => void;
   updatePlacement: (id: string, updates: Partial<FosterPlacement>) => void;
   addPerson: (person: Omit<Person, 'id' | 'created_at'>) => void;
@@ -155,7 +170,7 @@ export interface WhiskerContextType {
   deleteRelationship: (id: string) => void;
   placeAnimal: (
   animal_id: string,
-  foster_parent_id: string,
+  person_id: string,
   start_date: string,
   notes?: string)
   => void;
@@ -167,7 +182,7 @@ export interface WhiskerContextType {
    */
   reassignFoster: (
   animal_id: string,
-  new_foster_parent_id: string,
+  new_person_id: string,
   start_date: string,
   reason_ended?: string,
   notes?: string)
@@ -288,30 +303,29 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   useEffect(() => {
     loadNotes();
   }, [loadNotes]);
-  // Fosters & placements — Supabase-backed, org-scoped.
-  const [fosters, setFosters] = useState<FosterParent[]>([]);
-  const [fostersLoading, setFostersLoading] = useState(false);
-  const loadFosters = useCallback(async () => {
+  // Action items — Supabase-backed, org-scoped.
+  const [actionItems, setActionItems] = useState<AnimalActionItem[]>([]);
+  const loadActionItems = useCallback(async () => {
     if (!orgId) {
-      setFosters([]);
+      setActionItems([]);
       return;
     }
-    setFostersLoading(true);
     const { data, error } = await supabase.
-    from('foster_parents').
+    from('animal_action_items').
     select('*').
     eq('organization_id', orgId).
-    order('last_name', { ascending: true });
+    order('created_at', { ascending: false });
     if (error) {
-      console.error('[fosters] load failed:', error.message);
+      console.error('[action items] load failed:', error.message);
     } else {
-      setFosters((data ?? []).map(rowToFoster));
+      setActionItems((data ?? []).map(rowToActionItem));
     }
-    setFostersLoading(false);
   }, [orgId]);
   useEffect(() => {
-    loadFosters();
-  }, [loadFosters]);
+    loadActionItems();
+  }, [loadActionItems]);
+  // Placements — Supabase-backed, org-scoped. (Fosters are derived from
+  // `people` further down — see the `fosters` useMemo.)
   const [placements, setPlacements] = useState<FosterPlacement[]>([]);
   const loadPlacements = useCallback(async () => {
     if (!orgId) {
@@ -416,6 +430,12 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   useEffect(() => {
     loadPeople();
   }, [loadPeople]);
+  // Fosters are a derived view of people (those with the 'foster_parent' role).
+  const fosters = useMemo(
+    () => people.filter((p) => p.roles.includes('foster_parent')),
+    [people]
+  );
+  const fostersLoading = peopleLoading;
   // Breeds — global reference catalog (not org-scoped). Read-only here.
   const [breeds, setBreeds] = useState<Breed[]>([]);
   useEffect(() => {
@@ -631,36 +651,58 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       setAnimals((cur) => [...created.map(rowToAnimal), ...cur]);
     }
   };
-  const addFoster = async (foster: Omit<FosterParent, 'id'>) => {
+  // A foster is a `people` row that includes the 'foster_parent' role. The
+  // legacy single `role` is derived from roles[] (it can't be 'foster_parent').
+  const addFoster = async (foster: FosterInput) => {
     if (!orgId) {
       console.error('[fosters] cannot create — no current organization');
       return;
     }
+    const roles: PersonRole[] = foster.roles.includes('foster_parent') ?
+    foster.roles :
+    ['foster_parent', ...foster.roles];
+    const personPayload = {
+      first_name: foster.first_name,
+      last_name: foster.last_name,
+      email: foster.email,
+      phone: foster.phone,
+      role: legacyRoleFor(roles),
+      roles,
+      address: foster.address,
+      max_capacity: foster.max_capacity,
+      preferred_species: foster.preferred_species,
+      notes: foster.notes,
+      active: foster.active,
+      photo_url: foster.photo_url
+    } as Omit<Person, 'id' | 'created_at'>;
     const { data, error } = await supabase.
-    from('foster_parents').
-    insert(fosterToInsert(foster, orgId)).
+    from('people').
+    insert(personToInsert(personPayload, orgId)).
     select('*').
     single();
-    if (error) {
-      console.error('[fosters] create failed:', error.message);
+    if (error || !data) {
+      console.error('[fosters] create failed:', error?.message);
       return;
     }
-    if (data) setFosters((prev) => [rowToFoster(data), ...prev]);
+    setPeople((prev) => [rowToPerson(data), ...prev]);
   };
-  const updateFoster = (id: string, updates: Partial<FosterParent>) => {
-    setFosters((prev) =>
-    prev.map((f) => f.id === id ? { ...f, ...updates } : f)
+  const updateFoster = (id: string, updates: Partial<FosterInput>) => {
+    // Keep the legacy `role` in sync whenever roles change.
+    const patch: Partial<Person> = { ...updates };
+    if (updates.roles) patch.role = legacyRoleFor(updates.roles);
+    setPeople((prev) =>
+    prev.map((p) => p.id === id ? { ...p, ...patch } : p)
     );
-    const row = fosterUpdateToRow(updates);
+    const row = personUpdateToRow(patch);
     if (Object.keys(row).length === 0) return;
     supabase.
-    from('foster_parents').
+    from('people').
     update(row).
     eq('id', id).
     then(({ error }) => {
       if (error) {
         console.error('[fosters] update failed:', error.message);
-        loadFosters();
+        loadPeople();
       }
     });
   };
@@ -715,6 +757,58 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       setNotes((prev) => [rowToNote(data, currentUserLite), ...prev]);
     }
   };
+  const addActionItem = async (
+  item: Pick<AnimalActionItem, 'animal_id' | 'description' | 'priority'>) =>
+  {
+    if (!orgId) {
+      console.error('[action items] cannot create — no current organization');
+      return;
+    }
+    const { data, error } = await supabase.
+    from('animal_action_items').
+    insert(actionItemToInsert(item, orgId)).
+    select('*').
+    single();
+    if (error || !data) {
+      console.error('[action items] create failed:', error?.message);
+      return;
+    }
+    setActionItems((prev) => [rowToActionItem(data), ...prev]);
+  };
+  const updateActionItem = (
+  id: string,
+  updates: Partial<AnimalActionItem>) =>
+  {
+    setActionItems((prev) =>
+    prev.map((a) => a.id === id ? { ...a, ...updates } : a)
+    );
+    const row = actionItemUpdateToRow(updates);
+    if (Object.keys(row).length === 0) return;
+    supabase.
+    from('animal_action_items').
+    update(row).
+    eq('id', id).
+    then(({ error }) => {
+      if (error) {
+        console.error('[action items] update failed:', error.message);
+        loadActionItems();
+      }
+    });
+  };
+  const completeActionItem = (id: string, completionNote?: string) =>
+  updateActionItem(id, {
+    status: 'completed',
+    completed_at: new Date().toISOString(),
+    completed_by: user?.id ?? undefined,
+    completion_note: completionNote || undefined
+  });
+  const cancelActionItem = (id: string, completionNote?: string) =>
+  updateActionItem(id, {
+    status: 'cancelled',
+    completed_at: new Date().toISOString(),
+    completed_by: user?.id ?? undefined,
+    completion_note: completionNote || undefined
+  });
   const addPlacement = async (placement: Omit<FosterPlacement, 'id'>) => {
     if (!orgId) {
       console.error('[placements] cannot create — no current organization');
@@ -895,7 +989,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   };
   const placeAnimal = async (
   animal_id: string,
-  foster_parent_id: string,
+  person_id: string,
   start_date: string,
   notes?: string) =>
   {
@@ -909,7 +1003,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       placementToInsert(
         {
           animal_id,
-          foster_parent_id,
+          person_id,
           start_date,
           placement_status: 'active',
           placement_type: 'foster',
@@ -927,12 +1021,12 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     if (data) setPlacements((prev) => [rowToPlacement(data), ...prev]);
     updateAnimal(animal_id, {
       status: 'fostered',
-      current_foster_id: foster_parent_id
+      current_foster_id: person_id
     });
   };
   const reassignFoster = async (
   animal_id: string,
-  new_foster_parent_id: string,
+  new_person_id: string,
   start_date: string,
   reason_ended?: string,
   notes?: string) =>
@@ -967,7 +1061,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       placementToInsert(
         {
           animal_id,
-          foster_parent_id: new_foster_parent_id,
+          person_id: new_person_id,
           start_date,
           placement_status: 'active',
           placement_type: 'foster',
@@ -998,7 +1092,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     });
     updateAnimal(animal_id, {
       status: 'fostered',
-      current_foster_id: new_foster_parent_id
+      current_foster_id: new_person_id
     });
   };
   const addProduct = async (product: Omit<Product, 'id'>) => {
@@ -1391,6 +1485,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         placements,
         medicalRecords,
         notes,
+        actionItems,
         relationships,
         photos,
         people,
@@ -1410,6 +1505,10 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         addMedicalRecord,
         updateMedicalRecord,
         addNote,
+        addActionItem,
+        updateActionItem,
+        completeActionItem,
+        cancelActionItem,
         addPlacement,
         updatePlacement,
         addPerson,

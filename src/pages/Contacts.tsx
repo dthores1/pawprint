@@ -5,46 +5,36 @@ import { Avatar } from '../components/ui/Avatar';
 import { Input } from '../components/ui/Forms';
 import { Button } from '../components/ui/Button';
 import { AddContactModal } from '../components/contacts/AddContactModal';
+import { EditContactModal } from '../components/contacts/EditContactModal';
 import {
   SearchIcon,
   MapPinIcon,
   PhoneIcon,
   MailIcon,
   BuildingIcon,
+  Edit2Icon,
   PlusIcon } from
 'lucide-react';
 import { motion } from 'framer-motion';
-import { PersonRole } from '../types';
+import { Person, PersonRole } from '../types';
 export function Contacts() {
-  const { people, peopleLoading, fosters } = useWhisker();
+  const { people, peopleLoading } = useWhisker();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<PersonRole | 'all'>('all');
   const [isAddOpen, setIsAddOpen] = useState(false);
-  // Merge fosters into volunteers for display. Account/self records (those
-  // linked to an app user) are identity rows, not directory contacts — keep
-  // them out of the directory.
-  const mergedPeople = [
-  ...people.filter((p) => !p.user_id),
-  ...fosters.map((f) => ({
-    id: f.id,
-    first_name: f.first_name,
-    last_name: f.last_name,
-    email: f.email,
-    phone: f.phone,
-    role: 'volunteer' as PersonRole,
-    volunteer_type: 'foster_parent' as const,
-    active: f.active,
-    photo_url: f.photo_url,
-    created_at: ''
-  }))];
+  const [editingPerson, setEditingPerson] = useState<Person | null>(null);
+  // Fosters are people now (role 'foster_parent'). Account/self records (linked
+  // to an app user) are identity rows, not directory contacts — keep them out.
+  const directory = people.filter((p) => !p.user_id);
 
-  const filteredPeople = mergedPeople.filter((person) => {
+  const filteredPeople = directory.filter((person) => {
     const searchStr =
     `${person.first_name} ${person.last_name} ${person.email} ${person.organization_name || ''}`.toLowerCase();
     const matchesSearch = searchStr.includes(searchQuery.toLowerCase());
-    const matchesTab = activeTab === 'all' || person.role === activeTab;
+    const matchesTab = activeTab === 'all' || person.roles.includes(activeTab);
     return matchesSearch && matchesTab;
   });
+  const humanizeRole = (r: PersonRole) => r.replace('_', ' ');
   const tabs: {
     id: PersonRole | 'all';
     label: string;
@@ -58,16 +48,20 @@ export function Contacts() {
     label: 'Veterinarians'
   },
   {
-    id: 'rescue_staff',
-    label: 'Rescue Staff'
-  },
-  {
     id: 'volunteer',
     label: 'Volunteers'
   },
   {
-    id: 'adopter',
-    label: 'Adopters'
+    id: 'foster_parent',
+    label: 'Foster Parents'
+  },
+  {
+    id: 'trapper',
+    label: 'Trappers'
+  },
+  {
+    id: 'transport',
+    label: 'Transport'
   }];
 
   return (
@@ -136,29 +130,39 @@ export function Contacts() {
           }}>
           
               <Card className="h-full flex flex-col p-6">
-                <div className="flex items-start gap-4 mb-4">
-                  <Avatar
-                src={person.photo_url}
-                name={`${person.first_name} ${person.last_name}`}
-                colorKey={person.id}
-                type="person"
-                size="lg" />
-              
-                  <div>
-                    <h3 className="font-heading font-bold text-lg text-text-primary">
-                      {person.first_name} {person.last_name}
-                    </h3>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      <span className="text-xs px-2 py-0.5 bg-background border border-border text-text-secondary rounded-md font-medium capitalize">
-                        {person.role.replace('_', ' ')}
-                      </span>
-                      {person.volunteer_type &&
-                  <span className="text-xs px-2 py-0.5 bg-accent text-secondary rounded-md font-medium capitalize">
-                          {person.volunteer_type.replace('_', ' ')}
-                        </span>
-                  }
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div className="flex items-start gap-4 min-w-0">
+                    <Avatar
+                  src={person.photo_url}
+                  name={`${person.first_name} ${person.last_name}`}
+                  colorKey={person.id}
+                  type="person"
+                  size="lg" />
+
+                    <div className="min-w-0">
+                      <h3 className="font-heading font-bold text-lg text-text-primary">
+                        {person.first_name} {person.last_name}
+                      </h3>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {person.roles.map((r) =>
+                    <span
+                      key={r}
+                      className="text-xs px-2 py-0.5 bg-background border border-border text-text-secondary rounded-md font-medium capitalize">
+
+                            {humanizeRole(r)}
+                          </span>
+                    )}
+                      </div>
                     </div>
                   </div>
+                  <button
+                  type="button"
+                  onClick={() => setEditingPerson(person)}
+                  aria-label={`Edit ${person.first_name} ${person.last_name}`}
+                  className="shrink-0 p-1.5 -mr-1 -mt-1 rounded-md text-text-secondary hover:text-text-primary hover:bg-background transition-colors">
+
+                    <Edit2Icon className="w-4 h-4" />
+                  </button>
                 </div>
 
                 <div className="space-y-2 mb-4 flex-1">
@@ -204,6 +208,12 @@ export function Contacts() {
       </div>
 
       <AddContactModal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} />
+      {editingPerson &&
+      <EditContactModal
+        isOpen={!!editingPerson}
+        onClose={() => setEditingPerson(null)}
+        person={editingPerson} />
+      }
     </div>);
 
 }

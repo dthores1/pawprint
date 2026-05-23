@@ -3,13 +3,13 @@ import { AuthContext, AuthContextType, Org } from './AuthContext';
 import { WhiskerContext, WhiskerContextType } from './WhiskerContext';
 import {
   Animal,
-  FosterParent,
   FosterPlacement,
   MedicalRecord,
   AnimalNote,
   AnimalRelationship,
   AnimalPhoto,
   Person,
+  PersonRole,
   Product,
   SupplyRequest,
   SupplyRequestItem,
@@ -18,16 +18,18 @@ import {
   SittingRequestPlacement,
   ClinicEvent,
   ClinicSlot,
-  ClinicSlotProcedure } from
+  ClinicSlotProcedure,
+  AnimalActionItem } from
 '../types';
 import { NewPhotoInput } from '../lib/photosApi';
+import { legacyRoleFor } from '../lib/peopleApi';
 import {
   seedAnimals,
   seedBreeds,
-  seedFosters,
   seedPlacements,
   seedMedicalRecords,
   seedNotes,
+  seedActionItems,
   seedRelationships,
   seedPhotos,
   seedPeople,
@@ -87,16 +89,19 @@ export function DemoWhiskerProvider({
   children: React.ReactNode;
 }) {
   const [animals, setAnimals] = useState<Animal[]>(seedAnimals);
-  const [fosters, setFosters] = useState<FosterParent[]>(seedFosters);
   const [placements, setPlacements] =
   useState<FosterPlacement[]>(seedPlacements);
   const [medicalRecords, setMedicalRecords] =
   useState<MedicalRecord[]>(seedMedicalRecords);
   const [notes, setNotes] = useState<AnimalNote[]>(seedNotes);
+  const [actionItems, setActionItems] =
+  useState<AnimalActionItem[]>(seedActionItems);
   const [relationships, setRelationships] =
   useState<AnimalRelationship[]>(seedRelationships);
   const [photos, setPhotos] = useState<AnimalPhoto[]>(seedPhotos);
   const [people, setPeople] = useState<Person[]>(seedPeople);
+  // Fosters are a derived view of people (those with the 'foster_parent' role).
+  const fosters = people.filter((p) => p.roles.includes('foster_parent'));
   const [products, setProducts] = useState<Product[]>(seedProducts);
   const [supplyRequests, setSupplyRequests] =
   useState<SupplyRequest[]>(seedSupplyRequests);
@@ -133,6 +138,7 @@ export function DemoWhiskerProvider({
     placements,
     medicalRecords,
     notes,
+    actionItems,
     relationships,
     photos,
     people,
@@ -181,11 +187,33 @@ export function DemoWhiskerProvider({
       setAnimals((prev) => [...created, ...prev]);
     },
 
-    addFoster: (foster) =>
-    setFosters((prev) => [{ ...foster, id: `f${generateId()}` }, ...prev]),
+    // Fosters are people that include the 'foster_parent' role.
+    addFoster: (foster) => {
+      const roles: PersonRole[] = foster.roles.includes('foster_parent') ?
+      foster.roles :
+      ['foster_parent', ...foster.roles];
+      setPeople((prev) => [
+      {
+        ...foster,
+        id: `f${generateId()}`,
+        role: legacyRoleFor(roles),
+        roles,
+        created_at: now()
+      },
+      ...prev]
+      );
+    },
     updateFoster: (id, updates) =>
-    setFosters((prev) =>
-    prev.map((f) => f.id === id ? { ...f, ...updates } : f)
+    setPeople((prev) =>
+    prev.map((p) =>
+    p.id === id ?
+    {
+      ...p,
+      ...updates,
+      ...(updates.roles ? { role: legacyRoleFor(updates.roles) } : {})
+    } :
+    p
+    )
     ),
 
     addMedicalRecord: (record) =>
@@ -202,6 +230,49 @@ export function DemoWhiskerProvider({
     setNotes((prev) => [
     { ...note, id: `n${generateId()}`, created_at: now() },
     ...prev]
+    ),
+
+    addActionItem: (item) =>
+    setActionItems((prev) => [
+    {
+      ...item,
+      id: `ai${generateId()}`,
+      status: 'open',
+      created_at: now()
+    },
+    ...prev]
+    ),
+    updateActionItem: (id, updates) =>
+    setActionItems((prev) =>
+    prev.map((a) => a.id === id ? { ...a, ...updates } : a)
+    ),
+    completeActionItem: (id, completionNote) =>
+    setActionItems((prev) =>
+    prev.map((a) =>
+    a.id === id ?
+    {
+      ...a,
+      status: 'completed',
+      completed_at: now(),
+      completed_by: 'demo',
+      completion_note: completionNote || undefined
+    } :
+    a
+    )
+    ),
+    cancelActionItem: (id, completionNote) =>
+    setActionItems((prev) =>
+    prev.map((a) =>
+    a.id === id ?
+    {
+      ...a,
+      status: 'cancelled',
+      completed_at: now(),
+      completed_by: 'demo',
+      completion_note: completionNote || undefined
+    } :
+    a
+    )
     ),
 
     addPlacement: (placement) =>
@@ -254,12 +325,12 @@ export function DemoWhiskerProvider({
     deleteRelationship: (id) =>
     setRelationships((prev) => prev.filter((r) => r.id !== id)),
 
-    placeAnimal: (animal_id, foster_parent_id, start_date, notes) => {
+    placeAnimal: (animal_id, person_id, start_date, notes) => {
       setPlacements((prev) => [
       {
         id: `p${generateId()}`,
         animal_id,
-        foster_parent_id,
+        person_id,
         start_date,
         placement_status: 'active',
         placement_type: 'foster',
@@ -269,12 +340,12 @@ export function DemoWhiskerProvider({
       );
       updateAnimal(animal_id, {
         status: 'fostered',
-        current_foster_id: foster_parent_id
+        current_foster_id: person_id
       });
     },
     reassignFoster: (
     animal_id,
-    new_foster_parent_id,
+    new_person_id,
     start_date,
     reason_ended,
     notes) =>
@@ -294,7 +365,7 @@ export function DemoWhiskerProvider({
         {
           id: `p${generateId()}`,
           animal_id,
-          foster_parent_id: new_foster_parent_id,
+          person_id: new_person_id,
           start_date,
           placement_status: 'active' as const,
           placement_type: 'foster' as const,
@@ -305,7 +376,7 @@ export function DemoWhiskerProvider({
       });
       updateAnimal(animal_id, {
         status: 'fostered',
-        current_foster_id: new_foster_parent_id
+        current_foster_id: new_person_id
       });
     },
 

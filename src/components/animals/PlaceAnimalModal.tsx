@@ -61,19 +61,19 @@ export function PlaceAnimalModal({
   ) :
   undefined;
   const currentFoster = activePlacement ?
-  fosters.find((f) => f.id === activePlacement.foster_parent_id) :
+  fosters.find((f) => f.id === activePlacement.person_id) :
   undefined;
   const isReassign = mode === 'animal' && !!activePlacement;
 
   const getActivePlacementsCount = (fId: string) =>
   placements.filter(
-    (p) => p.foster_parent_id === fId && p.placement_status === 'active'
+    (p) => p.person_id === fId && p.placement_status === 'active'
   ).length;
   const anchorFosterActive = anchorFoster ?
   getActivePlacementsCount(anchorFoster.id) :
   0;
   const anchorFosterFull = anchorFoster ?
-  anchorFosterActive >= anchorFoster.max_capacity :
+  anchorFosterActive >= (anchorFoster.max_capacity ?? 0) :
   false;
 
   // Foster results (animal mode): active fosters, excluding the current one.
@@ -89,7 +89,7 @@ export function PlaceAnimalModal({
     }).
     map((f) => {
       const active = getActivePlacementsCount(f.id);
-      const isFull = active >= f.max_capacity;
+      const isFull = active >= (f.max_capacity ?? 0);
       return { foster: f, active, isFull };
     }).
     sort((a, b) => Number(a.isFull) - Number(b.isFull));
@@ -229,7 +229,7 @@ export function PlaceAnimalModal({
             anchorFosterFull ? 'text-status-medical-text' : 'text-text-primary'}`
             }>
 
-              {anchorFosterActive} / {anchorFoster.max_capacity}
+              {anchorFosterActive} / {anchorFoster.max_capacity ?? 0}
               {anchorFosterFull ? ' · at capacity' : ' spots filled'}
             </span>
           </div>
@@ -261,7 +261,7 @@ export function PlaceAnimalModal({
                   </p>
                   <p className="text-xs text-text-secondary truncate">
                     {getActivePlacementsCount(selectedFoster.id)} of{' '}
-                    {selectedFoster.max_capacity} spots filled
+                    {selectedFoster.max_capacity ?? 0} spots filled
                   </p>
                 </div>
               </div>
@@ -358,8 +358,8 @@ export function PlaceAnimalModal({
                                       {foster.first_name} {foster.last_name}
                                     </p>
                                     <p className="text-xs text-text-secondary truncate">
-                                      {foster.preferred_species.join(', ')} ·{' '}
-                                      {active}/{foster.max_capacity} in care
+                                      {(foster.preferred_species ?? []).join(', ')} ·{' '}
+                                      {active}/{foster.max_capacity ?? 0} in care
                                     </p>
                                   </div>
                                 </div>
@@ -368,7 +368,7 @@ export function PlaceAnimalModal({
 
                                   {isFull ?
                           'At capacity' :
-                          `${foster.max_capacity - active} open`}
+                          `${(foster.max_capacity ?? 0) - active} open`}
                                 </span>
                               </button>
                             </li>

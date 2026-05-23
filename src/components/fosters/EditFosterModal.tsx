@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { FieldError, Input, Textarea, Label } from '../ui/Forms';
 import { Button } from '../ui/Button';
 import { RolesMultiSelect } from '../ui/RolesMultiSelect';
 import { useWhisker } from '../../context/WhiskerContext';
-import { PersonRole, Species } from '../../types';
-interface AddFosterModalProps {
+import { Person, PersonRole, Species } from '../../types';
+interface EditFosterModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** The foster — a `people` row with the 'foster_parent' role. */
+  foster: Person;
 }
 type FosterForm = {
   first_name: string;
@@ -22,25 +24,31 @@ type FosterForm = {
   active: boolean;
   roles: PersonRole[];
 };
-const INITIAL_FORM: FosterForm = {
-  first_name: '',
-  last_name: '',
-  email: '',
-  phone: '',
-  address: '',
-  max_capacity: 1,
-  preferred_species: ['Dog', 'Cat'],
-  notes: '',
-  active: true,
-  roles: ['foster_parent']
-};
 type FormField = keyof FosterForm;
 type FormErrors = Partial<Record<FormField, string>>;
 
+function fromFoster(f: Person): FosterForm {
+  return {
+    first_name: f.first_name,
+    last_name: f.last_name,
+    email: f.email,
+    phone: f.phone ?? '',
+    address: f.address ?? '',
+    max_capacity: f.max_capacity ?? 1,
+    preferred_species: f.preferred_species ?? [],
+    notes: f.notes ?? '',
+    active: f.active,
+    roles: f.roles.includes('foster_parent') ?
+    f.roles :
+    ['foster_parent', ...f.roles]
+  };
+}
 function validateForm(formData: FosterForm): FormErrors {
   const nextErrors: FormErrors = {};
-  if (!formData.first_name.trim()) nextErrors.first_name = 'First name is required.';
-  if (!formData.last_name.trim()) nextErrors.last_name = 'Last name is required.';
+  if (!formData.first_name.trim())
+  nextErrors.first_name = 'First name is required.';
+  if (!formData.last_name.trim())
+  nextErrors.last_name = 'Last name is required.';
   if (!formData.email.trim()) {
     nextErrors.email = 'Email is required.';
   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
@@ -49,29 +57,37 @@ function validateForm(formData: FosterForm): FormErrors {
   if (!formData.phone.trim()) nextErrors.phone = 'Phone is required.';
   if (!formData.address.trim()) nextErrors.address = 'Address is required.';
   if (
-    formData.max_capacity === '' ||
-    formData.max_capacity < 1 ||
-    formData.max_capacity > 10
-  ) {
+  formData.max_capacity === '' ||
+  formData.max_capacity < 1 ||
+  formData.max_capacity > 10)
+  {
     nextErrors.max_capacity = 'Capacity must be between 1 and 10.';
   }
   return nextErrors;
 }
-export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
-  const { addFoster } = useWhisker();
-  const [formData, setFormData] = useState(INITIAL_FORM);
+export function EditFosterModal({
+  isOpen,
+  onClose,
+  foster
+}: EditFosterModalProps) {
+  const { updateFoster } = useWhisker();
+  const [formData, setFormData] = useState<FosterForm>(() => fromFoster(foster));
   const [errors, setErrors] = useState<FormErrors>({});
-  const handleClose = () => {
-    setFormData(INITIAL_FORM);
-    setErrors({});
-    onClose();
-  };
+  // Re-seed when the modal opens (or the foster changes) so edits start fresh.
+  useEffect(() => {
+    if (isOpen) {
+      setFormData(fromFoster(foster));
+      setErrors({});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, foster.id]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const nextErrors = validateForm(formData);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
-    addFoster({
+    updateFoster(foster.id, {
       ...formData,
       first_name: formData.first_name.trim(),
       last_name: formData.last_name.trim(),
@@ -81,7 +97,7 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
       notes: formData.notes.trim(),
       max_capacity: Number(formData.max_capacity)
     });
-    handleClose();
+    onClose();
   };
   const handleChange = (
   e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -92,10 +108,7 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
       if (name === 'max_capacity') {
         if (value === '') return { ...prev, max_capacity: '' };
         const parsed = parseInt(value, 10);
-        return {
-          ...prev,
-          max_capacity: Number.isNaN(parsed) ? '' : parsed
-        };
+        return { ...prev, max_capacity: Number.isNaN(parsed) ? '' : parsed };
       }
       return { ...prev, [fieldName]: value };
     });
@@ -106,21 +119,16 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
   const toggleSpecies = (species: Species) => {
     setFormData((prev) => {
       const current = prev.preferred_species;
-      if (current.includes(species)) {
-        return {
-          ...prev,
-          preferred_species: current.filter((s) => s !== species)
-        };
-      } else {
-        return {
-          ...prev,
-          preferred_species: [...current, species]
-        };
-      }
+      return {
+        ...prev,
+        preferred_species: current.includes(species) ?
+        current.filter((s) => s !== species) :
+        [...current, species]
+      };
     });
   };
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Add Foster Parent">
+    <Modal isOpen={isOpen} onClose={onClose} title="Edit Foster Parent">
       <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -130,12 +138,10 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
               name="first_name"
               autoComplete="off"
               aria-invalid={Boolean(errors.first_name)}
-              aria-describedby={errors.first_name ? 'first_name_error' : undefined}
               className={errors.first_name && 'border-red-500 focus:ring-red-500'}
               value={formData.first_name}
               onChange={handleChange} />
-            <FieldError id="first_name_error">{errors.first_name}</FieldError>
-            
+            <FieldError>{errors.first_name}</FieldError>
           </div>
           <div>
             <Label htmlFor="last_name">Last Name</Label>
@@ -144,12 +150,10 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
               name="last_name"
               autoComplete="off"
               aria-invalid={Boolean(errors.last_name)}
-              aria-describedby={errors.last_name ? 'last_name_error' : undefined}
               className={errors.last_name && 'border-red-500 focus:ring-red-500'}
               value={formData.last_name}
               onChange={handleChange} />
-            <FieldError id="last_name_error">{errors.last_name}</FieldError>
-            
+            <FieldError>{errors.last_name}</FieldError>
           </div>
         </div>
 
@@ -162,12 +166,10 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
               type="email"
               autoComplete="off"
               aria-invalid={Boolean(errors.email)}
-              aria-describedby={errors.email ? 'email_error' : undefined}
               className={errors.email && 'border-red-500 focus:ring-red-500'}
               value={formData.email}
               onChange={handleChange} />
-            <FieldError id="email_error">{errors.email}</FieldError>
-            
+            <FieldError>{errors.email}</FieldError>
           </div>
           <div>
             <Label htmlFor="phone">Phone</Label>
@@ -177,12 +179,10 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
               type="tel"
               autoComplete="off"
               aria-invalid={Boolean(errors.phone)}
-              aria-describedby={errors.phone ? 'phone_error' : undefined}
               className={errors.phone && 'border-red-500 focus:ring-red-500'}
               value={formData.phone}
               onChange={handleChange} />
-            <FieldError id="phone_error">{errors.phone}</FieldError>
-            
+            <FieldError>{errors.phone}</FieldError>
           </div>
         </div>
 
@@ -193,11 +193,10 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
             name="address"
             autoComplete="off"
             aria-invalid={Boolean(errors.address)}
-            aria-describedby={errors.address ? 'address_error' : undefined}
             className={errors.address && 'border-red-500 focus:ring-red-500'}
             value={formData.address}
             onChange={handleChange} />
-          <FieldError id="address_error">{errors.address}</FieldError>
+          <FieldError>{errors.address}</FieldError>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -210,18 +209,12 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
               min="1"
               max="10"
               aria-invalid={Boolean(errors.max_capacity)}
-              aria-describedby={
-                errors.max_capacity ? 'max_capacity_error' : undefined
-              }
               className={
-                errors.max_capacity && 'border-red-500 focus:ring-red-500'
+              errors.max_capacity && 'border-red-500 focus:ring-red-500'
               }
               value={formData.max_capacity}
               onChange={handleChange} />
-            <FieldError id="max_capacity_error">
-              {errors.max_capacity}
-            </FieldError>
-            
+            <FieldError>{errors.max_capacity}</FieldError>
           </div>
           <div>
             <Label>Preferred Species</Label>
@@ -232,7 +225,7 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
                 type="button"
                 onClick={() => toggleSpecies(species)}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${formData.preferred_species.includes(species) ? 'bg-primary text-white border-primary' : 'bg-background text-text-secondary border-border hover:border-primary/50'}`}>
-                
+
                   {species}
                 </button>
               )}
@@ -262,14 +255,32 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
             name="notes"
             value={formData.notes}
             onChange={handleChange} />
-
         </div>
 
+        {/* Active toggle — lets coordinators retire a foster without deleting. */}
+        <label className="flex items-center gap-3 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={formData.active}
+            onChange={(e) =>
+            setFormData((prev) => ({ ...prev, active: e.target.checked }))
+            }
+            className="w-4 h-4 rounded text-primary focus:ring-primary" />
+
+          <span className="text-sm text-text-primary">
+            Active foster parent
+            <span className="text-text-secondary">
+              {' '}
+              — available for new placements
+            </span>
+          </span>
+        </label>
+
         <div className="pt-4 flex justify-end gap-3 border-t border-border mt-6">
-          <Button type="button" variant="ghost" onClick={handleClose}>
+          <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit">Add Foster</Button>
+          <Button type="submit">Save Changes</Button>
         </div>
       </form>
     </Modal>);

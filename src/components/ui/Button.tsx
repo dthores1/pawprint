@@ -1,7 +1,7 @@
 import React from 'react';
 import { cn } from '../../lib/utils';
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'soft' | 'danger';
   size?: 'sm' | 'md' | 'lg';
 }
 export function Button({
@@ -12,7 +12,7 @@ export function Button({
   ...props
 }: ButtonProps) {
   const baseStyles =
-  'inline-flex items-center justify-center whitespace-nowrap rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:pointer-events-none';
+  'inline-flex items-center justify-center whitespace-nowrap rounded-lg font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:pointer-events-none';
   const variants = {
     primary: 'bg-primary text-white hover:bg-primary-hover',
     secondary: 'bg-accent text-secondary hover:bg-[#E8D5C4]',
@@ -20,6 +20,10 @@ export function Button({
     'border border-border bg-transparent hover:bg-background text-text-primary',
     ghost:
     'bg-transparent hover:bg-background text-text-secondary hover:text-text-primary',
+    // Soft secondary: a semi-opaque white "chip" that reads clearly on tinted
+    // backgrounds (where `outline` looks disabled), lifting on hover.
+    soft:
+    'bg-white/75 border border-border text-text-primary hover:bg-white hover:border-[#C9C3B6] hover:shadow-soft hover:-translate-y-0.5',
     danger: 'bg-status-urgent-bg text-status-urgent-text hover:bg-[#F0C5C5]'
   };
   const sizes = {

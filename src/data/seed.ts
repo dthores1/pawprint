@@ -2,13 +2,14 @@ import {
   Animal,
   Breed,
   BreedSpecies,
-  FosterParent,
+  FosterInput,
   FosterPlacement,
   MedicalRecord,
   AnimalNote,
   AnimalRelationship,
   AnimalPhoto,
   Person,
+  PersonRole,
   Product,
   SupplyRequest,
   SupplyRequestItem,
@@ -17,7 +18,8 @@ import {
   SittingRequestPlacement,
   ClinicEvent,
   ClinicSlot,
-  ClinicSlotProcedure } from
+  ClinicSlotProcedure,
+  AnimalActionItem } from
 '../types';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -297,7 +299,9 @@ export const seedAnimals: Animal[] = [
 }];
 
 
-export const seedFosters: FosterParent[] = [
+// Fosters are people with the 'foster_parent' role. These literals carry the
+// foster-specific fields; the .map below turns them into Person records.
+const rawFosters: (Omit<FosterInput, 'roles'> & { id: string })[] = [
 {
   id: 'f1',
   first_name: 'Sarah',
@@ -427,12 +431,20 @@ export const seedFosters: FosterParent[] = [
   'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200'
 }];
 
+// Foster literals → Person records (role 'volunteer' + 'foster_parent' in roles).
+const fosterPeople: Person[] = rawFosters.map((f) => ({
+  ...f,
+  role: 'volunteer' as PersonRole,
+  roles: ['foster_parent'] as PersonRole[],
+  created_at: '2024-01-01T10:00:00Z'
+}));
+
 
 export const seedPlacements: FosterPlacement[] = [
 {
   id: 'p1',
   animal_id: 'a3',
-  foster_parent_id: 'f1',
+  person_id:'f1',
   start_date: '2023-11-12T10:00:00Z',
   placement_status: 'active',
   placement_type: 'foster'
@@ -440,7 +452,7 @@ export const seedPlacements: FosterPlacement[] = [
 {
   id: 'p2',
   animal_id: 'a2',
-  foster_parent_id: 'f3',
+  person_id:'f3',
   start_date: '2023-11-06T14:00:00Z',
   placement_status: 'active',
   placement_type: 'medical_foster',
@@ -449,7 +461,7 @@ export const seedPlacements: FosterPlacement[] = [
 {
   id: 'p3',
   animal_id: 'a5',
-  foster_parent_id: 'f1',
+  person_id:'f1',
   start_date: '2023-09-16T09:00:00Z',
   end_date: '2023-10-30T14:00:00Z',
   placement_status: 'completed',
@@ -460,7 +472,7 @@ export const seedPlacements: FosterPlacement[] = [
 {
   id: 'p4',
   animal_id: 'a8',
-  foster_parent_id: 'f5',
+  person_id:'f5',
   start_date: '2023-11-18T10:00:00Z',
   placement_status: 'active',
   placement_type: 'foster'
@@ -469,7 +481,7 @@ export const seedPlacements: FosterPlacement[] = [
 {
   id: 'p5a',
   animal_id: 'a10',
-  foster_parent_id: 'f2',
+  person_id:'f2',
   start_date: '2024-01-08T10:00:00Z',
   end_date: '2024-06-15T10:00:00Z',
   placement_status: 'completed',
@@ -480,7 +492,7 @@ export const seedPlacements: FosterPlacement[] = [
 {
   id: 'p5b',
   animal_id: 'a10',
-  foster_parent_id: 'f9',
+  person_id:'f9',
   start_date: '2024-06-15T10:00:00Z',
   end_date: '2025-09-30T10:00:00Z',
   placement_status: 'completed',
@@ -490,7 +502,7 @@ export const seedPlacements: FosterPlacement[] = [
 {
   id: 'p5c',
   animal_id: 'a10',
-  foster_parent_id: 'f7',
+  person_id:'f7',
   start_date: '2025-09-30T10:00:00Z',
   placement_status: 'active',
   placement_type: 'foster'
@@ -498,7 +510,7 @@ export const seedPlacements: FosterPlacement[] = [
 {
   id: 'p6',
   animal_id: 'a12',
-  foster_parent_id: 'f7',
+  person_id:'f7',
   start_date: '2023-10-15T10:00:00Z',
   placement_status: 'active',
   placement_type: 'foster'
@@ -506,7 +518,7 @@ export const seedPlacements: FosterPlacement[] = [
 {
   id: 'p7',
   animal_id: 'a11',
-  foster_parent_id: 'f10',
+  person_id:'f10',
   start_date: '2023-11-05T10:00:00Z',
   end_date: '2023-11-15T10:00:00Z',
   placement_status: 'completed',
@@ -724,7 +736,9 @@ export const seedPhotos: AnimalPhoto[] = [
 }];
 
 
-export const seedPeople: Person[] = [
+// Directory contacts (vets, staff, volunteers, adopters). roles[] is injected
+// below; fosters are merged in from fosterPeople.
+const contactPeople: Omit<Person, 'roles'>[] = [
 {
   id: 'pe1',
   first_name: 'Dr. Emily',
@@ -877,6 +891,30 @@ export const seedPeople: Person[] = [
   active: true,
   created_at: '2025-10-05T10:00:00Z'
 }];
+
+// People = contacts + fosters. volunteer_type is retired — fold each legacy
+// value into a specific role and drop the column. Bare 'volunteer' (no specialty)
+// is kept only when there's no more-specific role.
+const VOLUNTEER_TYPE_TO_ROLE: Record<string, PersonRole | undefined> = {
+  administrative: 'admin',
+  event_support: 'event_support',
+  social_media: 'social_media',
+  trapper: 'trapper',
+  transport: 'transport',
+  foster_parent: undefined, // fosters come from fosterPeople; avoid duplicates
+  other: undefined
+};
+export const seedPeople: Person[] = [
+...contactPeople.map((p) => {
+  const roles: PersonRole[] = p.role === 'volunteer' ? [] : [p.role];
+  const mapped = p.volunteer_type ?
+  VOLUNTEER_TYPE_TO_ROLE[p.volunteer_type] :
+  undefined;
+  if (mapped && !roles.includes(mapped)) roles.push(mapped);
+  if (roles.length === 0) roles.push('volunteer');
+  return { ...p, roles, volunteer_type: undefined };
+}),
+...fosterPeople];
 
 
 export const seedProducts: Product[] = [
@@ -1366,3 +1404,55 @@ export const seedClinicSlotProcedures: ClinicSlotProcedure[] = [
 { id: 'csp10', clinic_slot_id: 'cs6', procedure_type: 'spay_neuter', completed: true },
 { id: 'csp11', clinic_slot_id: 'cs6', procedure_type: 'vaccines', completed: true },
 { id: 'csp12', clinic_slot_id: 'cs6', procedure_type: 'deworming', completed: true }];
+
+// Open action items for the elevated-priority animals (the "next step" shown in
+// the Action Needed banner), plus one completed item to show history/timeline.
+export const seedActionItems: AnimalActionItem[] = [
+{
+  id: 'ai1',
+  animal_id: 'a2', // Marmalade — needs_attention
+  description:
+  'Soft food only + finish 10-day antibiotic course (3 days remaining). Recheck on Nov 25.',
+  priority: 'needs_attention',
+  status: 'open',
+  created_at: '2025-11-15T09:00:00Z'
+},
+{
+  id: 'ai2',
+  animal_id: 'a4', // critical
+  description:
+  'Start URI antibiotics today and find an isolated foster — cannot be housed with other kittens.',
+  priority: 'critical',
+  status: 'open',
+  created_at: '2025-11-22T08:00:00Z'
+},
+{
+  id: 'ai3',
+  animal_id: 'a9', // urgent
+  description:
+  'Schedule vet eval for right hind leg limp this week and identify a medical foster home.',
+  priority: 'urgent',
+  status: 'open',
+  created_at: '2025-11-28T10:30:00Z'
+},
+{
+  id: 'ai4',
+  animal_id: 'a12', // needs_attention
+  description:
+  'Review senior bloodwork results with vet and confirm renal diet plan.',
+  priority: 'needs_attention',
+  status: 'open',
+  created_at: '2025-11-10T11:00:00Z'
+},
+// A completed earlier step on a2 — shows in the activity timeline as history.
+{
+  id: 'ai5',
+  animal_id: 'a2',
+  description: 'Complete intake exam and dental assessment.',
+  priority: 'needs_attention',
+  status: 'completed',
+  created_at: '2025-11-06T09:00:00Z',
+  completed_at: '2025-11-12T14:00:00Z',
+  completed_by: 'demo',
+  completion_note: 'Dental surgery completed; switched to soft-food recovery.'
+}];

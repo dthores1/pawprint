@@ -6,6 +6,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { Button } from '../components/ui/Button';
 import { StatusBadge } from '../components/ui/Badge';
 import { PlaceAnimalModal } from '../components/animals/PlaceAnimalModal';
+import { EditFosterModal } from '../components/fosters/EditFosterModal';
 import {
   ArrowLeftIcon,
   MapPinIcon,
@@ -13,6 +14,7 @@ import {
   MailIcon,
   HomeIcon,
   CheckCircle2Icon,
+  Edit2Icon,
   InfoIcon } from
 'lucide-react';
 export function FosterProfile() {
@@ -21,12 +23,13 @@ export function FosterProfile() {
   }>();
   const { fosters, placements, animals } = useWhisker();
   const [isPlaceModalOpen, setIsPlaceModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const foster = fosters.find((f) => f.id === id);
   if (!foster) {
     return <div className="p-8 text-center">Foster not found.</div>;
   }
   const fosterPlacements = placements.filter(
-    (p) => p.foster_parent_id === foster.id
+    (p) => p.person_id === foster.id
   );
   const activePlacements = fosterPlacements.filter(
     (p) => p.placement_status === 'active'
@@ -35,16 +38,26 @@ export function FosterProfile() {
     (p) => p.placement_status === 'completed'
   );
   const activeCount = activePlacements.length;
-  const isFull = activeCount >= foster.max_capacity;
-  const capacityPercent = activeCount / foster.max_capacity * 100;
+  const cap = foster.max_capacity ?? 0;
+  const isFull = activeCount >= cap;
+  const capacityPercent = cap > 0 ? activeCount / cap * 100 : 0;
   return (
     <div className="space-y-6 pb-12">
-      <Link
-        to="/fosters"
-        className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-text-primary transition-colors">
-        
-        <ArrowLeftIcon className="w-4 h-4" /> Back to Fosters
-      </Link>
+      <div className="flex items-center justify-between gap-3">
+        <Link
+          to="/fosters"
+          className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-text-primary transition-colors">
+
+          <ArrowLeftIcon className="w-4 h-4" /> Back to Fosters
+        </Link>
+        <Button
+          variant="soft"
+          size="sm"
+          onClick={() => setIsEditModalOpen(true)}>
+
+          <Edit2Icon className="w-4 h-4 mr-2" /> Edit
+        </Button>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Profile Info */}
@@ -78,7 +91,9 @@ export function FosterProfile() {
             <div className="space-y-4 pt-6 border-t border-border">
               <div className="flex items-start gap-3">
                 <MapPinIcon className="w-5 h-5 text-text-secondary shrink-0 mt-0.5" />
-                <span className="text-text-primary">{foster.address}</span>
+                <span className="text-text-primary">
+                  {foster.address || '—'}
+                </span>
               </div>
               <div className="flex items-center gap-3">
                 <PhoneIcon className="w-5 h-5 text-text-secondary shrink-0" />
@@ -111,7 +126,7 @@ export function FosterProfile() {
                 Preferred Species
               </p>
               <div className="flex gap-2">
-                {foster.preferred_species.map((s) =>
+                {(foster.preferred_species ?? []).map((s) =>
                 <span
                   key={s}
                   className="px-3 py-1 bg-accent text-secondary rounded-lg text-sm font-medium">
@@ -147,7 +162,7 @@ export function FosterProfile() {
                 </span>
                 <span className="text-text-secondary text-lg">
                   {' '}
-                  / {foster.max_capacity}
+                  / {cap}
                 </span>
               </div>
             </div>
@@ -282,6 +297,11 @@ export function FosterProfile() {
         isOpen={isPlaceModalOpen}
         onClose={() => setIsPlaceModalOpen(false)}
         fosterId={foster.id} />
+
+      <EditFosterModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        foster={foster} />
 
     </div>);
 

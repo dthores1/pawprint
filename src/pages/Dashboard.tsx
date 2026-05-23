@@ -35,6 +35,7 @@ export function Dashboard() {
     medicalRecords,
     fosters,
     placements,
+    actionItems,
     supplyRequests,
     sittingRequests,
     sittingRequestPlacements,
@@ -42,11 +43,17 @@ export function Dashboard() {
     clinicSlots,
     people
   } = useWhisker();
+  const openActionFor = (animalId: string) =>
+  actionItems.find((a) => a.animal_id === animalId && a.status === 'open')?.
+  description;
   const activePlacements = placements.filter(
     (p) => p.placement_status === 'active'
   );
   const activePlacementsCount = activePlacements.length;
-  const totalCapacity = fosters.reduce((sum, f) => sum + f.max_capacity, 0);
+  const totalCapacity = fosters.reduce(
+    (sum, f) => sum + (f.max_capacity ?? 0),
+    0
+  );
   const availableSpots = totalCapacity - activePlacementsCount;
   // High-priority animals (urgent + critical), sorted critical first
   const highPriorityAnimals = animals.
@@ -239,7 +246,7 @@ export function Dashboard() {
                               {animal.name}
                             </p>
                             <p className="text-sm text-text-secondary line-clamp-1">
-                              {animal.action_needed || (
+                              {openActionFor(animal.id) || (
                             !hasActivePlacement ?
                             'Needs placement' :
                             'Needs review')}

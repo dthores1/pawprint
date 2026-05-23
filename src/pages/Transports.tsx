@@ -102,7 +102,7 @@ export function Transports() {
         <div>
           <h1 className="text-3xl font-heading font-bold text-text-primary flex items-center gap-3">
             <TruckIcon className="w-8 h-8 text-primary" />
-            Transports
+            Transportation Requests
           </h1>
           <p className="text-text-secondary mt-1">
             Help move animals and supplies where they need to go.

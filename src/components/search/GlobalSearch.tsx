@@ -27,7 +27,8 @@ export function GlobalSearch({
   className
 }: GlobalSearchProps) {
   const navigate = useNavigate();
-  const { animals, fosters, people, medicalRecords, placements } = useWhisker();
+  const { animals, fosters, people, medicalRecords, placements, actionItems } =
+  useWhisker();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -129,12 +130,14 @@ export function GlobalSearch({
         id: `pri-${a.id}`,
         animal: a,
         label:
-        a.action_needed || (
+        actionItems.find(
+          (it) => it.animal_id === a.id && it.status === 'open'
+        )?.description || (
         !hasPlacement ? 'Needs placement' : 'Needs review')
       };
     });
     return [...overdue, ...highPriority].slice(0, 5);
-  }, [animals, medicalRecords, placements, q]);
+  }, [animals, medicalRecords, placements, actionItems, q]);
   const hasResults =
   animalResults.length > 0 ||
   fosterResults.length > 0 ||

@@ -16,9 +16,9 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
   const { addSittingRequest, placements, animals } = useWhisker();
   const { currentPersonId } = useAuth();
 
-  // TODO(auth): scope to the signed-in user's OWN placements once Person↔
-  // FosterParent linking exists. For now we cover all active placements in
-  // the org, so "in my care" reads as "currently in foster".
+  // TODO(auth): scope to the signed-in user's OWN placements (match
+  // currentPersonId to placement.person_id). For now we cover all active
+  // placements in the org, so "in my care" reads as "currently in foster".
   const myPlacements = useMemo(
     () => placements.filter((p) => p.placement_status === 'active'),
     [placements]
