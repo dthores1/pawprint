@@ -33,7 +33,11 @@ import {
 '../types';
 import { supabase } from '../lib/supabase';
 import { rowToBreed } from '../lib/breedsApi';
-import { litterToInsert } from '../lib/littersApi';
+import {
+  litterToInsert,
+  litterUpdateToRow,
+  rowToLitter } from
+'../lib/littersApi';
 import { useAuth } from './AuthContext';
 import {
   rowToAnimal,
@@ -120,6 +124,8 @@ export interface WhiskerContextType {
   relationships: AnimalRelationship[];
   photos: AnimalPhoto[];
   people: Person[];
+  litters: Litter[];
+  littersLoading: boolean;
   /** True while the Supabase-backed people list is being fetched. */
   peopleLoading: boolean;
   /** Global breed catalog (not org-scoped). */
@@ -146,6 +152,7 @@ export interface WhiskerContextType {
   },
   members: { name: string; sex: Sex; description?: string }[])
   => Promise<void>;
+  updateLitter: (id: string, updates: Partial<Litter>) => void;
   addFoster: (foster: FosterInput) => void;
   updateFoster: (id: string, updates: Partial<FosterInput>) => void;
   addMedicalRecord: (record: Omit<MedicalRecord, 'id'>) => void;
@@ -267,7 +274,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     from('animals').
     select('*').
     eq('organization_id', orgId).
-    order('created_at', { ascending: false });
+    order('updated_at', { ascending: false });
     if (error) {
       console.error('[animals] load failed:', error.message);
     } else {
@@ -385,6 +392,30 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   useEffect(() => {
     loadRelationships();
   }, [loadRelationships]);
+  // Litters — org-scoped grouping objects. Members link via animals.litter_id.
+  const [litters, setLitters] = useState<Litter[]>([]);
+  const [littersLoading, setLittersLoading] = useState(false);
+  const loadLitters = useCallback(async () => {
+    if (!orgId) {
+      setLitters([]);
+      return;
+    }
+    setLittersLoading(true);
+    const { data, error } = await supabase.
+    from('litters').
+    select('*').
+    eq('organization_id', orgId).
+    order('created_at', { ascending: false });
+    if (error) {
+      console.error('[litters] load failed:', error.message);
+    } else {
+      setLitters((data ?? []).map(rowToLitter));
+    }
+    setLittersLoading(false);
+  }, [orgId]);
+  useEffect(() => {
+    loadLitters();
+  }, [loadLitters]);
   // Photos — metadata in Supabase, image bytes in the `animal-photos` bucket.
   const [photos, setPhotos] = useState<AnimalPhoto[]>([]);
   const loadPhotos = useCallback(async () => {
@@ -608,12 +639,13 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     const { data: litter, error: litterErr } = await supabase.
     from('litters').
     insert(litterToInsert(shared, orgId)).
-    select('id').
+    select('*').
     single();
     if (litterErr || !litter) {
       console.error('[litters] create failed:', litterErr?.message);
       return;
     }
+    setLitters((cur) => [rowToLitter(litter), ...cur]);
     // 2) Create a member animal each, stamped with shared metadata + litter_id.
     const rows = members.map((m) =>
     animalToInsert(
@@ -649,6 +681,23 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     }
     if (created) {
       setAnimals((cur) => [...created.map(rowToAnimal), ...cur]);
+    }
+  };
+  const updateLitter: WhiskerContextType['updateLitter'] = async (
+  id,
+  updates) =>
+  {
+    const prev = litters;
+    setLitters((cur) =>
+    cur.map((l) => l.id === id ? { ...l, ...updates } : l)
+    );
+    const { error } = await supabase.
+    from('litters').
+    update(litterUpdateToRow(updates)).
+    eq('id', id);
+    if (error) {
+      console.error('[litters] update failed:', error.message);
+      setLitters(prev); // restore on failure
     }
   };
   // A foster is a `people` row that includes the 'foster_parent' role. The
@@ -1019,8 +1068,9 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       return;
     }
     if (data) setPlacements((prev) => [rowToPlacement(data), ...prev]);
+    // Fostered is derived from the active placement; only sync the cache here.
+    // Lifecycle status is left untouched (an animal can be in foster at any stage).
     updateAnimal(animal_id, {
-      status: 'fostered',
       current_foster_id: person_id
     });
   };
@@ -1090,8 +1140,8 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       );
       return data ? [rowToPlacement(data), ...closed] : closed;
     });
+    // Only the denormalized cache changes; lifecycle status is independent.
     updateAnimal(animal_id, {
-      status: 'fostered',
       current_foster_id: new_person_id
     });
   };
@@ -1490,6 +1540,8 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         photos,
         people,
         peopleLoading,
+        litters,
+        littersLoading,
         breeds,
         products,
         addProduct,
@@ -1500,6 +1552,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         updateAnimal,
         deleteAnimal,
         addLitter,
+        updateLitter,
         addFoster,
         updateFoster,
         addMedicalRecord,

@@ -27,6 +27,19 @@ export function Modal({
       document.body.style.overflow = 'unset';
     };
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
+
   // Portal to <body> so the fixed-position backdrop is anchored to the viewport,
   // not to an ancestor that may establish a containing block (transform/filter).
   return createPortal(

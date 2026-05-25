@@ -34,8 +34,7 @@ const STATUS_PILL: Record<TransportRequestStatus, string> = {
 };
 const TYPE_LABEL: Record<TransportRequestType, string> = {
   animal: 'Animal',
-  supplies: 'Supplies',
-  emergency: 'Emergency'
+  supplies: 'Supplies'
 };
 const URGENCY_PILL: Record<TransportRequestUrgency, string> = {
   normal: '',

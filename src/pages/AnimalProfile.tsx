@@ -4,7 +4,7 @@ import { MedicalRecord } from '../types';
 import { useWhisker } from '../context/WhiskerContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { StatusBadge, PriorityBadge } from '../components/ui/Badge';
+import { StatusBadge, PriorityBadge, AnimalFlags } from '../components/ui/Badge';
 import { SpeciesBadge } from '../components/ui/SpeciesBadge';
 import { Avatar } from '../components/ui/Avatar';
 import { AddMedicalModal } from '../components/animals/AddMedicalModal';
@@ -18,6 +18,7 @@ import { PhotoGallery } from '../components/animals/PhotoGallery';
 import { calculateAge, formatDate } from '../lib/utils';
 import {
   SyringeIcon,
+  DogIcon,
   FileTextIcon,
   HomeIcon,
   CheckCircle2Icon,
@@ -34,7 +35,6 @@ import {
 import { motion } from 'framer-motion';
 import { MedicalKitIcon } from '../components/ui/MedicalKitIcon';
 import { PawPrintIcon as PawPrintGlyph } from '../components/ui/PawPrintIcon';
-import { BoneIcon } from '../components/ui/BoneIcon';
 import { CatIcon } from '../components/icons/CatIcon';
 import { animalBreedLabel } from '../lib/breedsApi';
 export function AnimalProfile() {
@@ -45,6 +45,7 @@ export function AnimalProfile() {
     animals,
     placements,
     fosters,
+    people,
     medicalRecords,
     notes,
     actionItems,
@@ -100,6 +101,10 @@ export function AnimalProfile() {
   );
   const currentFoster = activePlacement ?
   fosters.find((f) => f.id === activePlacement.person_id) :
+  null;
+  const isAdopted = animal.status === 'adopted';
+  const adopter = animal.adopted_by_id ?
+  people.find((p) => p.id === animal.adopted_by_id) :
   null;
   const animalMedical = medicalRecords.filter((m) => m.animal_id === animal.id);
   const upcomingMedical = animalMedical.filter(
@@ -219,23 +224,29 @@ export function AnimalProfile() {
     (m) => m.procedure_type === 'spay_neuter' && m.status === 'completed'
   );
   const hasMicrochip = !!animal.microchip_number;
-  const hasBehaviorNote = animalNotes.some((n) => n.note_type === 'behavior');
+  // Behavior is "assessed" once there's no open behavior concern AND the animal
+  // is past initial intake/medical (either placed in foster, or moved to a later
+  // lifecycle stage where behavior would have been evaluated).
+  const behaviorAssessed =
+  !animal.has_behavior_concern && (
+  !!animal.current_foster_id ||
+  animal.status !== 'intake' && animal.status !== 'medical');
   const checklist = [
+  {
+    label: 'Behavior Assessed',
+    done: behaviorAssessed
+  },
   {
     label: 'Spay/Neuter Complete',
     done: isSpayed
-  },
-  {
-    label: 'Rabies Vaccine',
-    done: hasRabies
   },
   {
     label: 'Microchipped',
     done: hasMicrochip
   },
   {
-    label: 'Behavior Assessed',
-    done: hasBehaviorNote
+    label: 'Rabies Vaccine',
+    done: hasRabies
   }];
 
   const readinessPercent =
@@ -266,7 +277,7 @@ export function AnimalProfile() {
                    requester avatars elsewhere in the app. */}
                 <div className="w-32 h-32 rounded-full bg-[#EBD4C0] text-[#A85A2A] flex items-center justify-center">
                   {animal.species === 'Dog' ?
-                <BoneIcon className="w-14 h-14" /> :
+                <DogIcon className="w-14 h-14" /> :
                 animal.species === 'Cat' ?
                 <CatIcon className="w-14 h-14" /> :
 
@@ -336,14 +347,16 @@ export function AnimalProfile() {
                   }
                 </div>
                 <div className="flex flex-wrap gap-2 sm:shrink-0">
+                  {!isAdopted &&
                   <Button
                     variant="primary"
                     size="sm"
                     onClick={() => setIsPlaceModalOpen(true)}>
 
-                    <HomeIcon className="w-4 h-4 mr-2" />
-                    {currentFoster ? 'Reassign Foster' : 'Place in Foster'}
-                  </Button>
+                      <HomeIcon className="w-4 h-4 mr-2" />
+                      {currentFoster ? 'Reassign Foster' : 'Place in Foster'}
+                    </Button>
+                  }
                   <Button
                     variant="outline"
                     size="sm"
@@ -364,6 +377,11 @@ export function AnimalProfile() {
                   className="text-sm px-3 py-1" />
                 
                 <SpeciesBadge species={animal.species} showLabel size="md" />
+                <AnimalFlags
+                  animal={animal}
+                  isFostered={!!activePlacement}
+                  size="md" />
+
                 {animal.microchip_number &&
                 <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-background border border-border text-text-secondary">
                     Chip: {animal.microchip_number}
@@ -381,21 +399,37 @@ export function AnimalProfile() {
                 <div className="p-2 bg-[#DCEAF7] text-[#356A9A] rounded-lg">
                   <HomeIcon className="w-5 h-5" />
                 </div>
+                {isAdopted ?
                 <div>
-                  <p className="text-sm text-text-secondary">Current Foster</p>
-                  {currentFoster ?
+                    <p className="text-sm text-text-secondary">Adopted By</p>
+                    {adopter ?
+                  <Link
+                    to={`/contacts/${adopter.id}`}
+                    className="font-medium text-primary hover:underline">
+
+                        {adopter.first_name} {adopter.last_name}
+                      </Link> :
+
+                  <p className="font-medium text-text-primary">Not recorded</p>
+                  }
+                  </div> :
+
+                <div>
+                    <p className="text-sm text-text-secondary">Current Foster</p>
+                    {currentFoster ?
                   <Link
                     to={`/fosters/${currentFoster.id}`}
                     className="font-medium text-primary hover:underline">
-                    
-                      {currentFoster.first_name} {currentFoster.last_name}
-                    </Link> :
+
+                        {currentFoster.first_name} {currentFoster.last_name}
+                      </Link> :
 
                   <p className="font-medium text-text-primary">
-                      None (Needs Placement)
-                    </p>
+                        None (Needs Placement)
+                      </p>
                   }
-                </div>
+                  </div>
+                }
               </div>
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-[#F3E4D7] text-[#D98C5F] rounded-lg">
@@ -531,7 +565,7 @@ export function AnimalProfile() {
                       key={`${event.id}-${index}`}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.05 }}
+                      transition={{ duration: 0.2 }}
                       className="relative pl-8">
 
                             <div

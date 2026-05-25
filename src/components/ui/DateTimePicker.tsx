@@ -17,6 +17,8 @@ interface DateTimePickerProps {
   error?: boolean;
   align?: 'start' | 'end';
   className?: string;
+  /** Earliest selectable day. Past days are grayed out in the calendar. */
+  minDate?: Date;
 }
 const DEFAULT_TIME = '09:00';
 const TIME_SELECT_CLASS =
@@ -30,7 +32,8 @@ export function DateTimePicker({
   disabled,
   error,
   align,
-  className
+  className,
+  minDate
 }: DateTimePickerProps) {
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLButtonElement>(null);
@@ -103,7 +106,8 @@ export function DateTimePicker({
           mode="single"
           selected={valid ? parsed : undefined}
           defaultMonth={valid ? parsed : undefined}
-          onSelect={handleDate} />
+          onSelect={handleDate}
+          disabled={minDate ? { before: minDate } : undefined} />
 
         <div className="border-t border-border mt-1 pt-2.5 px-1">
           <div className="flex items-center gap-2 mb-2 text-sm font-medium text-text-primary">

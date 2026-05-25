@@ -43,7 +43,7 @@ export function AppShell() {
           },
           {
             to: '/fosters',
-            label: 'Fosters'
+            label: 'Foster Parents'
           },
           {
             to: '/clinics',

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useWhisker } from '../context/WhiskerContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -7,8 +7,16 @@ import { Input } from '../components/ui/Forms';
 import { StatusBadge, PriorityBadge } from '../components/ui/Badge';
 import { SpeciesBadge } from '../components/ui/SpeciesBadge';
 import { Avatar } from '../components/ui/Avatar';
-import { FilterDropdown, FilterOption } from '../components/ui/FilterDropdown';
+import { FilterOption } from '../components/ui/FilterDropdown';
+import { MultiFilterDropdown } from '../components/ui/MultiFilterDropdown';
+import {
+  SortableHeader,
+  SortState,
+  nextSort,
+  sortItems } from
+'../components/ui/SortableHeader';
 import { AddAnimalModal } from '../components/animals/AddAnimalModal';
+import { LittersView } from '../components/animals/LittersView';
 import {
   SearchIcon,
   PlusIcon,
@@ -20,8 +28,9 @@ import {
 import { calculateAge, formatDate } from '../lib/utils';
 import { animalBreedLabel } from '../lib/breedsApi';
 import { motion } from 'framer-motion';
+import { useWindowRowVirtualizer } from '../lib/useWindowRowVirtualizer';
 import { ENABLED_SPECIES } from '../lib/config';
-import { Species, AnimalStatus, Priority } from '../types';
+import { Animal, Person, Species, AnimalStatus, Priority } from '../types';
 import { PawPrintIcon as PawPrintGlyph } from '../components/ui/PawPrintIcon';
 const SPECIES_ICONS = {
   Dog: <DogIcon className="w-3.5 h-3.5 text-[#356A9A]" />,
@@ -31,19 +40,28 @@ const SPECIES_ICONS = {
 const STATUS_LABELS: Record<AnimalStatus, string> = {
   intake: 'Intake',
   medical: 'Medical',
-  hold: 'Hold',
-  fostered: 'Fostered',
+  not_ready: 'Not Ready',
   adoptable: 'Adoptable',
   adopted: 'Adopted',
   hospice: 'Hospice',
   deceased: 'Deceased'
 };
+// Boolean condition/placement filters (AND-combined with each other and the
+// dropdown filters). "Fostered" is derived from an active placement.
+const FLAG_FILTERS = [
+{ key: 'fostered', label: 'Fostered' },
+{ key: 'on_hold', label: 'On Hold' },
+{ key: 'behavior', label: 'Behavior Concern' },
+{ key: 'medical', label: 'Medical Concern' }];
 const PRIORITY_LABELS: Record<Priority, string> = {
   normal: 'Normal',
   needs_attention: 'Needs Attention',
   urgent: 'Urgent',
   critical: 'Critical'
 };
+// Lifecycle / severity orderings used when sorting those columns.
+const STATUS_ORDER = Object.keys(STATUS_LABELS) as AnimalStatus[];
+const PRIORITY_ORDER = Object.keys(PRIORITY_LABELS) as Priority[];
 export function AnimalsList() {
   const {
     animals,
@@ -55,119 +73,209 @@ export function AnimalsList() {
     breeds
   } = useWhisker();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [view, setView] = useState<'animals' | 'litters'>('animals');
+  const [searchParams] = useSearchParams();
+  // Initialize filters from the URL (e.g. /animals?priority=urgent,critical),
+  // keeping only values that match a known option.
+  const parseParam = (key: string, allowed: readonly string[]) =>
+  (searchParams.get(key) ?? '').
+  split(',').
+  map((s) => s.trim()).
+  filter((v) => allowed.includes(v));
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [speciesFilter, setSpeciesFilter] = useState('all');
-  const [priorityFilter, setPriorityFilter] = useState('all');
-  const getActiveFoster = (animalId: string) => {
-    const activePlacement = placements.find(
-      (p) => p.animal_id === animalId && p.placement_status === 'active'
-    );
-    if (!activePlacement) return null;
-    return fosters.find((f) => f.id === activePlacement.person_id);
-  };
-  const getNextMedical = (animalId: string) => {
-    const upcoming = medicalRecords.
-    filter(
-      (m) =>
-      m.animal_id === animalId && (
-      m.status === 'due' || m.status === 'scheduled') &&
-      m.due_date
-    ).
-    sort(
-      (a, b) =>
-      new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime()
-    );
-    return upcoming[0];
-  };
+  const [statusFilter, setStatusFilter] = useState<string[]>(() =>
+  parseParam('status', STATUS_ORDER)
+  );
+  const [speciesFilter, setSpeciesFilter] = useState<string[]>(() =>
+  parseParam('species', ENABLED_SPECIES)
+  );
+  const [priorityFilter, setPriorityFilter] = useState<string[]>(() =>
+  parseParam('priority', PRIORITY_ORDER)
+  );
+  const [flagFilters, setFlagFilters] = useState<string[]>(() =>
+  parseParam('flags', FLAG_FILTERS.map((f) => f.key))
+  );
+  const toggleFlag = (key: string) =>
+  setFlagFilters((cur) =>
+  cur.includes(key) ? cur.filter((v) => v !== key) : [...cur, key]
+  );
+  const [sort, setSort] = useState<SortState | null>(null);
+  const onSort = (key: string) => setSort((cur) => nextSort(cur, key));
+
+  // Precomputed lookups so per-row reads and sorting stay O(1) at scale.
+  const fosterByAnimal = useMemo(() => {
+    const activePersonByAnimal = new Map<string, string>();
+    for (const p of placements) {
+      if (p.placement_status === 'active') {
+        activePersonByAnimal.set(p.animal_id, p.person_id);
+      }
+    }
+    const fosterById = new Map(fosters.map((f) => [f.id, f]));
+    const m = new Map<string, Person | null>();
+    for (const a of animals) {
+      const pid = activePersonByAnimal.get(a.id);
+      m.set(a.id, pid ? fosterById.get(pid) ?? null : null);
+    }
+    return m;
+  }, [animals, placements, fosters]);
+  const nextMedicalByAnimal = useMemo(() => {
+    const byAnimal = new Map<string, typeof medicalRecords>();
+    for (const rec of medicalRecords) {
+      if ((rec.status === 'due' || rec.status === 'scheduled') && rec.due_date) {
+        const arr = byAnimal.get(rec.animal_id) ?? [];
+        arr.push(rec);
+        byAnimal.set(rec.animal_id, arr);
+      }
+    }
+    const m = new Map<string, (typeof medicalRecords)[number]>();
+    for (const [aid, arr] of byAnimal) {
+      arr.sort(
+        (a, b) =>
+        new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime()
+      );
+      m.set(aid, arr[0]);
+    }
+    return m;
+  }, [medicalRecords]);
+  const getActiveFoster = (animalId: string) =>
+  fosterByAnimal.get(animalId) ?? null;
+  const getNextMedical = (animalId: string) => nextMedicalByAnimal.get(animalId);
   const isBondedPair = (animalId: string) =>
   relationships.some(
     (r) =>
     r.relationship_type === 'bonded_pair' && (
     r.animal_id === animalId || r.related_animal_id === animalId)
   );
-  const filteredAnimals = animals.filter((animal) => {
-    const matchesSearch =
-    animal.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    animal.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    animal.microchip_number && animal.microchip_number.includes(searchQuery);
-    const matchesStatus =
-    statusFilter === 'all' || animal.status === statusFilter;
-    const matchesSpecies =
-    speciesFilter === 'all' || animal.species === speciesFilter;
-    const matchesPriority =
-    priorityFilter === 'all' || animal.priority === priorityFilter;
-    return matchesSearch && matchesStatus && matchesSpecies && matchesPriority;
-  });
+  const filteredAnimals = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return animals.filter((animal) => {
+      const matchesSearch =
+      animal.name.toLowerCase().includes(q) ||
+      animal.id.toLowerCase().includes(q) ||
+      !!animal.microchip_number && animal.microchip_number.includes(searchQuery);
+      const matchesStatus =
+      statusFilter.length === 0 || statusFilter.includes(animal.status);
+      const matchesSpecies =
+      speciesFilter.length === 0 || speciesFilter.includes(animal.species);
+      const matchesPriority =
+      priorityFilter.length === 0 || priorityFilter.includes(animal.priority);
+      const matchesFlags = flagFilters.every((f) => {
+        switch (f) {
+          case 'fostered':
+            return fosterByAnimal.get(animal.id) != null;
+          case 'on_hold':
+            return !!animal.is_on_hold;
+          case 'behavior':
+            return !!animal.has_behavior_concern;
+          case 'medical':
+            return !!animal.has_medical_concern;
+          default:
+            return true;
+        }
+      });
+      return (
+        matchesSearch &&
+        matchesStatus &&
+        matchesSpecies &&
+        matchesPriority &&
+        matchesFlags);
+
+    });
+  }, [
+  animals,
+  searchQuery,
+  statusFilter,
+  speciesFilter,
+  priorityFilter,
+  flagFilters,
+  fosterByAnimal]
+  );
+
+  const sortedAnimals = useMemo(() => {
+    if (!sort) return filteredAnimals;
+    const getValue = (a: Animal): string | number | null => {
+      switch (sort.key) {
+        case 'name':
+          return a.name?.toLowerCase() ?? '';
+        case 'status':
+          return STATUS_ORDER.indexOf(a.status);
+        case 'priority':
+          return PRIORITY_ORDER.indexOf(a.priority);
+        case 'age':
+          return a.estimated_birth_date ?
+          Date.now() - new Date(a.estimated_birth_date).getTime() :
+          null;
+        case 'foster': {
+          const f = fosterByAnimal.get(a.id);
+          return f ? `${f.first_name} ${f.last_name}`.toLowerCase() : null;
+        }
+        case 'medical': {
+          const m = nextMedicalByAnimal.get(a.id);
+          return m?.due_date ? new Date(m.due_date).getTime() : null;
+        }
+        default:
+          return null;
+      }
+    };
+    return sortItems(filteredAnimals, getValue, sort.dir);
+  }, [filteredAnimals, sort, fosterByAnimal, nextMedicalByAnimal]);
+
+  // Virtualized table rows in a self-scrolling container. ~73px per row.
+  const tableRows = useWindowRowVirtualizer(sortedAnimals.length, 73);
   // Filter option lists
   const statusOptions: FilterOption[] = useMemo(
-    () => [
-    {
-      value: 'all',
-      label: 'All'
-    },
-    ...(Object.keys(STATUS_LABELS) as AnimalStatus[]).map((s) => ({
+    () =>
+    (Object.keys(STATUS_LABELS) as AnimalStatus[]).map((s) => ({
       value: s,
       label: STATUS_LABELS[s]
-    }))],
-
+    })),
     []
   );
   const priorityOptions: FilterOption[] = useMemo(
-    () => [
-    {
-      value: 'all',
-      label: 'All'
-    },
-    ...(Object.keys(PRIORITY_LABELS) as Priority[]).map((p) => ({
+    () =>
+    (Object.keys(PRIORITY_LABELS) as Priority[]).map((p) => ({
       value: p,
       label: PRIORITY_LABELS[p]
-    }))],
-
+    })),
     []
   );
   const speciesOptions: FilterOption[] = useMemo(
-    () => [
-    {
-      value: 'all',
-      label: 'All'
-    },
-    ...ENABLED_SPECIES.map((s) => ({
+    () =>
+    ENABLED_SPECIES.map((s) => ({
       value: s,
       label: `${s}s`,
       icon: SPECIES_ICONS[s]
-    }))],
-
+    })),
     []
   );
-  // Active filter chips
+  // Active filter chips — one per selected value across all filters.
   const activeChips = [
-  statusFilter !== 'all' && {
-    key: 'status',
-    label: STATUS_LABELS[statusFilter as AnimalStatus],
-    clear: () => setStatusFilter('all')
-  },
-  priorityFilter !== 'all' && {
-    key: 'priority',
-    label: PRIORITY_LABELS[priorityFilter as Priority],
-    clear: () => setPriorityFilter('all')
-  },
-  speciesFilter !== 'all' && {
-    key: 'species',
-    label: `${speciesFilter}s`,
-    icon: SPECIES_ICONS[speciesFilter as Species],
-    clear: () => setSpeciesFilter('all')
-  }].
-  filter(Boolean) as Array<{
+  ...statusFilter.map((s) => ({
+    key: `status-${s}`,
+    label: STATUS_LABELS[s as AnimalStatus],
+    clear: () => setStatusFilter((cur) => cur.filter((v) => v !== s))
+  })),
+  ...priorityFilter.map((p) => ({
+    key: `priority-${p}`,
+    label: PRIORITY_LABELS[p as Priority],
+    clear: () => setPriorityFilter((cur) => cur.filter((v) => v !== p))
+  })),
+  ...speciesFilter.map((s) => ({
+    key: `species-${s}`,
+    label: `${s}s`,
+    icon: SPECIES_ICONS[s as Species],
+    clear: () => setSpeciesFilter((cur) => cur.filter((v) => v !== s))
+  }))] as Array<{
     key: string;
     label: string;
     icon?: React.ReactNode;
     clear: () => void;
   }>;
   const clearAll = () => {
-    setStatusFilter('all');
-    setPriorityFilter('all');
-    setSpeciesFilter('all');
+    setStatusFilter([]);
+    setPriorityFilter([]);
+    setSpeciesFilter([]);
+    setFlagFilters([]);
   };
   const showSpeciesFilter = ENABLED_SPECIES.length > 1;
   return (
@@ -183,10 +291,32 @@ export function AnimalsList() {
         </div>
         <Button onClick={() => setIsAddModalOpen(true)} className="gap-2">
           <PlusIcon className="w-4 h-4" />
-          Add Animal
+          {view === 'litters' ? 'Add Litter' : 'Add Animal'}
         </Button>
       </div>
 
+      {/* Animals | Litters tabs */}
+      <div className="flex items-center gap-1 border-b border-border">
+        {(['animals', 'litters'] as const).map((t) =>
+        <button
+          key={t}
+          type="button"
+          onClick={() => setView(t)}
+          className={`px-4 py-2.5 text-sm font-medium -mb-px border-b-2 transition-colors ${
+          view === t ?
+          'border-primary text-primary' :
+          'border-transparent text-text-secondary hover:text-text-primary'}`
+          }>
+
+            {t === 'animals' ? 'Animals' : 'Litters'}
+          </button>
+        )}
+      </div>
+
+      {view === 'litters' ?
+      <LittersView /> :
+
+      <>
       {/* Search — dominant, full width */}
       <div className="relative">
         <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-secondary pointer-events-none" />
@@ -210,26 +340,42 @@ export function AnimalsList() {
 
       {/* Compact filter row */}
       <div className="flex flex-wrap items-center gap-2">
-        <FilterDropdown
+        <MultiFilterDropdown
           label="Status"
-          value={statusFilter}
+          values={statusFilter}
           options={statusOptions}
           onChange={setStatusFilter} />
-        
-        <FilterDropdown
+
+        <MultiFilterDropdown
           label="Priority"
-          value={priorityFilter}
+          values={priorityFilter}
           options={priorityOptions}
           onChange={setPriorityFilter} />
-        
+
         {showSpeciesFilter &&
-        <FilterDropdown
+        <MultiFilterDropdown
           label="Species"
-          value={speciesFilter}
+          values={speciesFilter}
           options={speciesOptions}
           onChange={setSpeciesFilter} />
 
         }
+
+        <span className="w-px h-6 bg-border mx-1" aria-hidden="true" />
+        {FLAG_FILTERS.map((f) =>
+        <button
+          key={f.key}
+          type="button"
+          onClick={() => toggleFlag(f.key)}
+          className={`inline-flex items-center h-9 px-3 rounded-lg text-sm font-medium border transition-colors ${
+          flagFilters.includes(f.key) ?
+          'bg-primary/10 text-primary border-primary/30' :
+          'bg-card text-text-secondary border-border hover:bg-background'}`
+          }>
+
+            {f.label}
+          </button>
+        )}
       </div>
 
       {/* Active filter chips */}
@@ -276,19 +422,22 @@ export function AnimalsList() {
       }
 
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
+        <div
+          ref={tableRows.scrollRef}
+          className="overflow-auto"
+          style={{ maxHeight: '70vh' }}>
           <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-border bg-background/60 text-sm font-medium text-text-secondary">
-                <th className="py-4 px-6 font-medium">Animal</th>
-                <th className="py-4 px-6 font-medium">Status</th>
-                <th className="py-4 px-6 font-medium">Priority</th>
-                <th className="py-4 px-6 font-medium">Age & Sex</th>
-                <th className="py-4 px-6 font-medium">Current Foster</th>
-                <th className="py-4 px-6 font-medium">Next Medical</th>
+            <thead className="sticky top-0 z-10">
+              <tr className="border-b border-border bg-background text-sm font-medium text-text-secondary">
+                <SortableHeader label="Animal" sortKey="name" sort={sort} onSort={onSort} />
+                <SortableHeader label="Status" sortKey="status" sort={sort} onSort={onSort} />
+                <SortableHeader label="Priority" sortKey="priority" sort={sort} onSort={onSort} />
+                <SortableHeader label="Age & Sex" sortKey="age" sort={sort} onSort={onSort} />
+                <SortableHeader label="Current Foster" sortKey="foster" sort={sort} onSort={onSort} />
+                <SortableHeader label="Next Medical" sortKey="medical" sort={sort} onSort={onSort} />
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody>
               {animalsLoading && animals.length === 0 ?
               <tr>
                   <td
@@ -301,7 +450,7 @@ export function AnimalsList() {
                     </div>
                   </td>
                 </tr> :
-              filteredAnimals.length === 0 ?
+              sortedAnimals.length === 0 ?
               <tr>
                   <td
                   colSpan={6}
@@ -314,26 +463,25 @@ export function AnimalsList() {
                   </td>
                 </tr> :
 
-              filteredAnimals.map((animal, index) => {
-                const foster = getActiveFoster(animal.id);
-                const nextMedical = getNextMedical(animal.id);
-                const bonded = isBondedPair(animal.id);
-                return (
-                  <motion.tr
-                    key={animal.id}
-                    initial={{
-                      opacity: 0,
-                      y: 10
-                    }}
-                    animate={{
-                      opacity: 1,
-                      y: 0
-                    }}
-                    transition={{
-                      delay: index * 0.04
-                    }}
-                    className="hover:bg-background/60 transition-colors group">
-                    
+              <>
+                  {tableRows.paddingTop > 0 &&
+                <tr aria-hidden="true">
+                      <td
+                    colSpan={6}
+                    style={{ height: tableRows.paddingTop, padding: 0, border: 0 }} />
+
+                    </tr>
+                }
+                  {tableRows.virtualRows.map((vr) => {
+                  const animal = sortedAnimals[vr.index];
+                  const foster = getActiveFoster(animal.id);
+                  const nextMedical = getNextMedical(animal.id);
+                  const bonded = isBondedPair(animal.id);
+                  return (
+                    <tr
+                      key={animal.id}
+                      className="border-b border-border hover:bg-background/60 transition-colors group">
+
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-4">
                           <Link
@@ -421,19 +569,31 @@ export function AnimalsList() {
                           </span>
                       }
                       </td>
-                    </motion.tr>);
+                    </tr>);
 
-              })
+                })}
+                  {tableRows.paddingBottom > 0 &&
+                <tr aria-hidden="true">
+                      <td
+                    colSpan={6}
+                    style={{ height: tableRows.paddingBottom, padding: 0, border: 0 }} />
+
+                    </tr>
+                }
+                </>
               }
             </tbody>
           </table>
         </div>
       </Card>
+      </>
+      }
 
       <AddAnimalModal
         isOpen={isAddModalOpen}
+        initialMode={view === 'litters' ? 'litter' : 'single'}
         onClose={() => setIsAddModalOpen(false)} />
-      
+
     </div>);
 
 }

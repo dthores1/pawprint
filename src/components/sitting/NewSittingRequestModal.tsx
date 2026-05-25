@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { format } from 'date-fns';
 import { Modal } from '../ui/Modal';
 import { Textarea, Label } from '../ui/Forms';
 import { DatePicker } from '../ui/DatePicker';
@@ -33,10 +34,15 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
   const [selectedAnimalIds, setSelectedAnimalIds] = useState<string[]>([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [dateError, setDateError] = useState<string | null>(null);
   const [medicationRequired, setMedicationRequired] = useState(false);
   const [fosterProvidesSupplies, setFosterProvidesSupplies] = useState(true);
   const [transportNeeded, setTransportNeeded] = useState(false);
   const [notes, setNotes] = useState('');
+
+  // Today as a yyyy-MM-dd string (local). Used as the floor for both date
+  // pickers so past days are grayed out, and again as a submit-time backstop.
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
 
   // Reset on close.
   useEffect(() => {
@@ -45,6 +51,7 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
       setSelectedAnimalIds([]);
       setStartDate('');
       setEndDate('');
+      setDateError(null);
       setMedicationRequired(false);
       setFosterProvidesSupplies(true);
       setTransportNeeded(false);
@@ -52,9 +59,28 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
     }
   }, [isOpen]);
 
+  const handleStartChange = (v: string) => {
+    setStartDate(v);
+    if (dateError) setDateError(null);
+  };
+  const handleEndChange = (v: string) => {
+    setEndDate(v);
+    if (dateError) setDateError(null);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!startDate || !endDate) return;
+    // Backstop in case the modal was opened before midnight and submitted
+    // after — the picker's day-grayout is computed at render time.
+    if (startDate < todayStr) {
+      setDateError('Start date can\u2019t be in the past.');
+      return;
+    }
+    if (endDate < startDate) {
+      setDateError('End date must be on or after the start date.');
+      return;
+    }
     // Resolve covered placement IDs at submit time — even for "all", we
     // snapshot the current state so a later placement change doesn't
     // retroactively expand the request.
@@ -169,7 +195,9 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
             <DatePicker
               id="start"
               value={startDate}
-              onChange={setStartDate} />
+              onChange={handleStartChange}
+              min={todayStr}
+              error={!!dateError} />
 
           </div>
           <div>
@@ -177,12 +205,16 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
             <DatePicker
               id="end"
               align="end"
-              min={startDate || undefined}
+              min={startDate || todayStr}
               value={endDate}
-              onChange={setEndDate} />
+              onChange={handleEndChange}
+              error={!!dateError} />
 
           </div>
         </div>
+        {dateError &&
+        <p className="-mt-3 text-xs text-red-500">{dateError}</p>
+        }
 
         <fieldset className="space-y-2 p-4 rounded-xl bg-background/60 border border-border">
           <legend className="text-xs uppercase tracking-wider font-semibold text-text-secondary px-1">

@@ -241,7 +241,7 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
         </div>
 
         <div>
-          <Label>Roles / Capabilities</Label>
+          <Label>Roles</Label>
           <RolesMultiSelect
             value={formData.roles}
             locked={['foster_parent']}

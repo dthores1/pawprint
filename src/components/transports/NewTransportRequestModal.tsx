@@ -24,6 +24,7 @@ export function NewTransportRequestModal({ isOpen, onClose }: Props) {
   const [pickup, setPickup] = useState('');
   const [dropoff, setDropoff] = useState('');
   const [pickupTime, setPickupTime] = useState('');
+  const [pickupTimeError, setPickupTimeError] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
   const reset = () => {
     setType('animal');
@@ -32,17 +33,29 @@ export function NewTransportRequestModal({ isOpen, onClose }: Props) {
     setPickup('');
     setDropoff('');
     setPickupTime('');
+    setPickupTimeError(null);
     setNotes('');
   };
   const handleClose = () => {
     reset();
     onClose();
   };
+  const handlePickupTimeChange = (v: string) => {
+    setPickupTime(v);
+    if (pickupTimeError) setPickupTimeError(null);
+  };
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!pickup.trim() || !dropoff.trim() || !pickupTime) return;
     // Animal is required when the transport is for an animal.
     if (type === 'animal' && !animalId) return;
+    // Guard against past times. The calendar already blocks past days,
+    // but a same-day time can still slip into the past while the form is open.
+    const pickupDate = new Date(pickupTime);
+    if (pickupDate.getTime() < Date.now()) {
+      setPickupTimeError('Pickup time must be in the future.');
+      return;
+    }
     addTransportRequest({
       type,
       status: 'open',
@@ -77,7 +90,6 @@ export function NewTransportRequestModal({ isOpen, onClose }: Props) {
 
               <option value="animal">Animal</option>
               <option value="supplies">Supplies</option>
-              <option value="emergency">Emergency</option>
             </Select>
           </div>
           <div>
@@ -136,8 +148,12 @@ export function NewTransportRequestModal({ isOpen, onClose }: Props) {
           <DateTimePicker
             id="pickup_time"
             value={pickupTime}
-            onChange={setPickupTime} />
-
+            onChange={handlePickupTimeChange}
+            minDate={new Date()}
+            error={!!pickupTimeError} />
+          {pickupTimeError &&
+          <p className="mt-1.5 text-xs text-red-500">{pickupTimeError}</p>
+          }
         </div>
 
         <div>

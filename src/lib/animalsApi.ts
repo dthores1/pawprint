@@ -30,14 +30,23 @@ const WRITABLE_COLUMNS = [
 'primary_photo_url',
 'adoption_profile_url',
 'internal_notes',
-'current_foster_id'] as
+'current_foster_id',
+'is_on_hold',
+'has_behavior_concern',
+'has_medical_concern',
+'adopted_by_id',
+'adopted_at'] as
 const;
+
+// uuid columns referencing people; skip non-uuid values (e.g. seed ids).
+const UUID_COLUMNS = new Set(['current_foster_id', 'adopted_by_id']);
 
 // Date columns reject empty strings, so coalesce '' → null.
 const DATE_COLUMNS = new Set([
 'estimated_birth_date',
 'estimated_age_as_of',
-'intake_date']
+'intake_date',
+'adopted_at']
 );
 
 // Keep the age-estimate columns consistent with birthdate_source: they're only
@@ -71,6 +80,11 @@ export function rowToAnimal(r: any): Animal {
     primary_photo_url: r.primary_photo_url ?? undefined,
     adoption_profile_url: r.adoption_profile_url ?? undefined,
     current_foster_id: r.current_foster_id ?? undefined,
+    is_on_hold: r.is_on_hold ?? false,
+    has_behavior_concern: r.has_behavior_concern ?? false,
+    has_medical_concern: r.has_medical_concern ?? false,
+    adopted_by_id: r.adopted_by_id ?? undefined,
+    adopted_at: r.adopted_at ?? undefined,
     internal_notes: r.internal_notes ?? undefined,
     birthdate_source: r.birthdate_source ?? 'estimated_birthdate',
     estimated_age_value: r.estimated_age_value ?? undefined,
@@ -99,9 +113,8 @@ organizationId: string)
   for (const col of WRITABLE_COLUMNS) {
     const v = (a as any)[col];
     if (v === undefined) continue;
-    // current_foster_id is a uuid column; seed foster ids ('f1') aren't UUIDs.
-    // Skip them until fosters/placements are ported, so the write doesn't fail.
-    if (col === 'current_foster_id' && !isUuid(v)) continue;
+    // uuid columns: seed ids ('f1') aren't UUIDs — skip so the write doesn't fail.
+    if (UUID_COLUMNS.has(col) && !isUuid(v)) continue;
     row[col] = normalizeColumn(col, v);
   }
   clearAgeFieldsIfNeeded(row);
@@ -114,7 +127,7 @@ export function animalUpdateToRow(updates: Partial<Animal>) {
   for (const col of WRITABLE_COLUMNS) {
     if (!(col in updates)) continue;
     const v = (updates as any)[col];
-    if (col === 'current_foster_id' && v != null && !isUuid(v)) continue;
+    if (UUID_COLUMNS.has(col) && v != null && !isUuid(v)) continue;
     row[col] = normalizeColumn(col, v);
   }
   clearAgeFieldsIfNeeded(row);

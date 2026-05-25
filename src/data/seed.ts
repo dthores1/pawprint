@@ -19,7 +19,8 @@ import {
   ClinicEvent,
   ClinicSlot,
   ClinicSlotProcedure,
-  AnimalActionItem } from
+  AnimalActionItem,
+  Litter } from
 '../types';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -84,6 +85,7 @@ export const seedAnimals: Animal[] = [
   intake_source: 'City Shelter Transfer',
   status: 'adoptable',
   priority: 'normal',
+  is_on_hold: true,
   description:
   'A sweet, goofy Golden Retriever mix who loves everyone. Great with kids and other dogs. Needs a yard to run in.',
   microchip_number: '981020000000001',
@@ -122,7 +124,7 @@ export const seedAnimals: Animal[] = [
   estimated_birth_date: '2023-09-01',
   intake_date: '2023-11-10',
   intake_source: 'Stray',
-  status: 'fostered',
+  status: 'adoptable',
   priority: 'normal',
   description:
   'Energetic terrier mix puppy. Learning basic commands and doing well with crate training.',
@@ -214,8 +216,9 @@ export const seedAnimals: Animal[] = [
   estimated_birth_date: '2023-05-15',
   intake_date: '2023-11-15',
   intake_source: 'Hoarding Case',
-  status: 'fostered',
+  status: 'not_ready',
   priority: 'normal',
+  has_behavior_concern: true,
   description:
   'Timid young cat learning to trust humans. Making great progress in foster.',
   microchip_number: '981020000000008',
@@ -252,7 +255,7 @@ export const seedAnimals: Animal[] = [
   estimated_birth_date: '2023-11-01',
   intake_date: '2023-11-20',
   intake_source: 'Born in Care',
-  status: 'fostered',
+  status: 'not_ready',
   priority: 'normal',
   description: 'Playful kitten, part of a litter of 4.',
   primary_photo_url:
@@ -287,8 +290,9 @@ export const seedAnimals: Animal[] = [
   estimated_birth_date: '2017-09-20',
   intake_date: '2023-10-10',
   intake_source: 'City Shelter Transfer',
-  status: 'fostered',
+  status: 'not_ready',
   priority: 'needs_attention',
+  has_medical_concern: true,
   action_needed:
   'Review senior bloodwork results with vet and confirm renal diet plan.',
   description: 'Senior kitty who loves heated blankets and quiet afternoons.',
@@ -625,6 +629,21 @@ export const seedNotes: AnimalNote[] = [
   note_type: 'foster_update',
   body: 'Pepper came out from under the bed today and accepted some treats from my hand!',
   created_at: '2025-11-20T18:00:00Z'
+}];
+
+
+// Demo litter — members are linked via animals.litter_id (a4 Milkshake + a10
+// Willow). Mother is Marmalade (a2), who gave birth in care.
+export const seedLitters: Litter[] = [
+{
+  id: 'litter_demo',
+  name: undefined,
+  species: 'Cat',
+  estimated_birth_date: '2023-10-25',
+  intake_date: '2023-11-20',
+  intake_source: 'Born in Care',
+  mother_animal_id: 'a2',
+  notes: 'Litter born during a mother-cat intake stay.'
 }];
 
 

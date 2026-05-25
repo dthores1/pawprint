@@ -15,6 +15,9 @@ export function rowToSupplyRequest(r: any): SupplyRequest {
     fulfilled_date: r.fulfilled_date ?? undefined,
     delivery_method: r.delivery_method ?? undefined,
     notes: r.notes ?? undefined,
+    is_common_request: r.is_common_request ?? false,
+    common_request_name: r.common_request_name ?? undefined,
+    common_request_last_used_at: r.common_request_last_used_at ?? undefined,
     created_at: r.created_at,
     updated_at: r.updated_at
   };
@@ -31,7 +34,10 @@ const SUPPLY_COLUMNS = [
 'fulfilled_by_person_id',
 'fulfilled_date',
 'delivery_method',
-'notes'] as
+'notes',
+'is_common_request',
+'common_request_name',
+'common_request_last_used_at'] as
 const;
 
 function normalize(v: any): any {

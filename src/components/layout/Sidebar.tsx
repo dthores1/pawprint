@@ -31,7 +31,7 @@ export function Sidebar() {
   {
     to: '/fosters',
     icon: HomeIcon,
-    label: 'Fosters'
+    label: 'Foster Parents'
   },
   {
     to: '/clinics',

@@ -5,6 +5,7 @@ import { Card } from '../components/ui/Card';
 import { Avatar } from '../components/ui/Avatar';
 import { Button } from '../components/ui/Button';
 import { StatusBadge } from '../components/ui/Badge';
+import { SpeciesBadge } from '../components/ui/SpeciesBadge';
 import { PlaceAnimalModal } from '../components/animals/PlaceAnimalModal';
 import { EditFosterModal } from '../components/fosters/EditFosterModal';
 import {
@@ -182,59 +183,66 @@ export function FosterProfile() {
           </Card>
 
           {/* Current Placements */}
-          <div>
-            <Card className="p-4 mb-4 flex items-center justify-between gap-3">
-              <h3 className="text-lg font-heading font-bold flex items-center gap-2">
+          <Card className="p-6">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h2 className="text-xl font-heading font-bold flex items-center gap-2">
                 <HomeIcon className="w-5 h-5 text-primary" />
                 Current Placements
-              </h3>
+              </h2>
               <Button
                 variant="primary"
                 size="sm"
+                disabled={!foster.active}
                 onClick={() => setIsPlaceModalOpen(true)}>
 
                 <HomeIcon className="w-4 h-4 mr-2" />
                 Place Animal
               </Button>
-            </Card>
+            </div>
+            {!foster.active &&
+            <p className="text-sm text-text-secondary mb-4">
+                This foster is inactive and cannot receive new placements.
+              </p>
+            }
             {activePlacements.length === 0 ?
-            <Card className="p-8 text-center text-text-secondary">
+            <p className="text-sm text-text-secondary">
                 No animals currently placed with this foster.
-              </Card> :
+              </p> :
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {activePlacements.map((placement) => {
                 const animal = animals.find(
                   (a) => a.id === placement.animal_id
                 );
                 if (!animal) return null;
                 return (
-                  <Link key={placement.id} to={`/animals/${animal.id}`}>
-                      <Card hoverLift className="p-4 flex items-center gap-4">
+                  <Link
+                    key={placement.id}
+                    to={`/animals/${animal.id}`}
+                    className="flex items-center gap-3 p-3 rounded-xl border border-border hover:bg-background transition-colors group">
+
+                      <div className="relative shrink-0">
                         <Avatar
                         src={animal.primary_photo_url}
                         type="animal"
-                        size="lg" />
-                      
-                        <div>
-                          <h4 className="font-bold text-text-primary">
-                            {animal.name}
-                          </h4>
-                          <p className="text-sm text-text-secondary mb-1">
-                            {animal.species} • {animal.sex}
-                          </p>
-                          <StatusBadge
-                          status={animal.status}
-                          className="scale-90 origin-left" />
-                        
+                        species={animal.species} />
+
+                        <div className="absolute -bottom-1 -right-1 ring-2 ring-card rounded-full">
+                          <SpeciesBadge species={animal.species} />
                         </div>
-                      </Card>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-text-primary group-hover:text-primary transition-colors truncate">
+                          {animal.name}
+                        </p>
+                        <StatusBadge status={animal.status} className="mt-1" />
+                      </div>
                     </Link>);
 
               })}
               </div>
             }
-          </div>
+          </Card>
 
           {/* Past Placements */}
           {pastPlacements.length > 0 &&

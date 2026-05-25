@@ -137,7 +137,7 @@ export function EditContactModal({
         </div>
 
         <div>
-          <Label>Roles / Capabilities</Label>
+          <Label>Roles</Label>
           <RolesMultiSelect
             value={form.roles}
             onChange={(roles) => {

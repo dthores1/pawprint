@@ -8,9 +8,11 @@ import { AppShell } from './components/layout/AppShell';
 import { Dashboard } from './pages/Dashboard';
 import { AnimalsList } from './pages/AnimalsList';
 import { AnimalProfile } from './pages/AnimalProfile';
+import { LitterProfile } from './pages/LitterProfile';
 import { FostersList } from './pages/FostersList';
 import { FosterProfile } from './pages/FosterProfile';
 import { Contacts } from './pages/Contacts';
+import { ContactProfile } from './pages/ContactProfile';
 import { SupplyRequests } from './pages/SupplyRequests';
 import { ProductCatalog } from './pages/ProductCatalog';
 import { Transports } from './pages/Transports';
@@ -37,6 +39,7 @@ function AppRoutes() {
         <Route index element={<Dashboard />} />
         <Route path="animals" element={<AnimalsList />} />
         <Route path="animals/:id" element={<AnimalProfile />} />
+        <Route path="litters/:id" element={<LitterProfile />} />
         <Route path="fosters" element={<FostersList />} />
         <Route path="fosters/:id" element={<FosterProfile />} />
         <Route path="supplies" element={<SupplyRequests />} />
@@ -45,6 +48,7 @@ function AppRoutes() {
         <Route path="sitting" element={<Sitting />} />
         <Route path="clinics" element={<Clinics />} />
         <Route path="contacts" element={<Contacts />} />
+        <Route path="contacts/:id" element={<ContactProfile />} />
       </Route>
     </Routes>);
 

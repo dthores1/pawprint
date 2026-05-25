@@ -39,6 +39,9 @@ export function PlaceAnimalModal({
   );
   const [notes, setNotes] = useState('');
   const [reasonEnded, setReasonEnded] = useState('');
+  // Foster mode: by default the animal search is scoped to the foster's
+  // preferred species; this opts out of that scoping.
+  const [showAllSpecies, setShowAllSpecies] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   // Fixed anchor (from props) + the selected counterpart (from state).
@@ -52,6 +55,11 @@ export function PlaceAnimalModal({
   mode === 'animal' ? fosters.find((f) => f.id === selectedId) : undefined;
   const selectedAnimal =
   mode === 'foster' ? animals.find((a) => a.id === selectedId) : undefined;
+
+  // Species scoping for the animal search (foster mode only).
+  const fosterPrefs = anchorFoster?.preferred_species ?? [];
+  const hasPrefs = mode === 'foster' && fosterPrefs.length > 0;
+  const applySpeciesFilter = hasPrefs && !showAllSpecies;
 
   // Reassign only applies in animal mode, when the animal already has an active
   // placement. (See CLAUDE.md — animal.current_foster_id is a denormalized cache.)
@@ -104,15 +112,19 @@ export function PlaceAnimalModal({
       filter((p) => p.placement_status === 'active').
       map((p) => p.animal_id)
     );
+    const prefs = anchorFoster?.preferred_species ?? [];
+    const filterBySpecies =
+    mode === 'foster' && prefs.length > 0 && !showAllSpecies;
     return animals.
     filter((a) => !placedIds.has(a.id)).
     filter((a) => a.status !== 'adopted' && a.status !== 'deceased').
+    filter((a) => !filterBySpecies || prefs.includes(a.species)).
     filter((a) => {
       if (!q) return true;
       return `${a.name} ${a.id}`.toLowerCase().includes(q);
     }).
     slice(0, 30);
-  }, [animals, placements, query]);
+  }, [animals, placements, query, anchorFoster, showAllSpecies, mode]);
 
   // Close panel on outside click
   useEffect(() => {
@@ -135,6 +147,7 @@ export function PlaceAnimalModal({
       setOpen(false);
       setNotes('');
       setReasonEnded('');
+      setShowAllSpecies(false);
       setStartDate(new Date().toISOString().split('T')[0]);
     }
   }, [isOpen]);
@@ -377,11 +390,32 @@ export function PlaceAnimalModal({
                   }
 
                     {/* Animal results (foster mode) */}
-                    {mode === 'foster' && (
-                  animalResults.length === 0 ?
+                    {mode === 'foster' &&
+                <>
+                    {hasPrefs &&
+                  <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-border bg-background text-xs sticky top-0 z-10">
+                          <span className="text-text-secondary min-w-0 truncate">
+                            {applySpeciesFilter ?
+                      `Matching ${anchorFoster!.first_name}'s preferences (${fosterPrefs.join(', ')})` :
+                      'Showing all animals'}
+                          </span>
+                          <button
+                      type="button"
+                      onClick={() => setShowAllSpecies((v) => !v)}
+                      className="font-medium text-primary hover:underline shrink-0">
+
+                            {applySpeciesFilter ?
+                      'Show all animals' :
+                      'Match preferences'}
+                          </button>
+                        </div>
+                  }
+                    {animalResults.length === 0 ?
                   <div className="p-4 text-sm text-text-secondary text-center">
                           {query ?
                     `No available animals match "${query}".` :
+                    applySpeciesFilter ?
+                    `No available animals match ${anchorFoster!.first_name}'s preferences.` :
                     'No animals available to place.'}
                         </div> :
 
@@ -416,7 +450,8 @@ export function PlaceAnimalModal({
                               </button>
                             </li>
                     )}
-                        </ul>)
+                        </ul>}
+                  </>
                   }
                   </motion.div>
               }

@@ -1,8 +1,11 @@
+// Lifecycle stage only. "In foster" is NOT a status — it's derived from an
+// active FosterPlacement (current_foster_id). Holds/concerns are flags on the
+// Animal (is_on_hold / has_behavior_concern / has_medical_concern), orthogonal
+// to lifecycle. 'not_ready' = in care but not yet posted for adoption.
 export type AnimalStatus =
 'intake' |
 'medical' |
-'hold' |
-'fostered' |
+'not_ready' |
 'adoptable' |
 'adopted' |
 'hospice' |
@@ -87,6 +90,19 @@ export interface Animal {
    * derived check (active placement) for consistency with seed data.
    */
   current_foster_id?: string;
+  /**
+   * Condition flags — orthogonal to lifecycle `status` (an animal can be
+   * Adoptable AND On Hold, or Not Ready with a behavior concern). DB columns are
+   * NOT NULL DEFAULT false; optional here since optimistic local rows may omit
+   * them (treat undefined as false).
+   */
+  is_on_hold?: boolean;
+  has_behavior_concern?: boolean;
+  has_medical_concern?: boolean;
+  /** Adopter (people.id) once the animal is adopted; set with `adopted_at`. */
+  adopted_by_id?: string;
+  /** Timestamp the adoption was finalized. */
+  adopted_at?: string;
   /** Staff-only notes, separate from the public-facing `description` blurb. */
   internal_notes?: string;
   created_at: string;
@@ -240,20 +256,23 @@ export interface Litter {
   estimated_birth_date?: string;
   intake_date: string;
   intake_source?: string;
+  /** The mother (an existing Animal), if known. */
+  mother_animal_id?: string;
   notes?: string;
 }
 
 // A person's roles/capabilities — a single flat, non-hierarchical set (this
 // replaced the old role + volunteer_type split). Selectable roles are grouped in
-// RolesMultiSelect (Organization / Volunteer & Support / Foster). 'volunteer' is
-// retained only for the legacy NOT-NULL `people.role` column + role-less legacy
-// rows; 'adopter' is system-managed (set by a future adoption flow) — neither is
-// offered on creation.
+// RolesMultiSelect (Animal Care / Volunteer & Support / Organization). 'volunteer'
+// is NOT offered — it's retained only for the legacy NOT-NULL `people.role` column
+// + role-less legacy rows. `roles` is a free-form text[] in Postgres, so adding
+// values here needs no migration.
 export type PersonRole =
 'vet' |
 'rescue_staff' |
 'volunteer' |
 'adopter' |
+'donor' |
 'foster_parent' |
 'trapper' |
 'transport' |
@@ -348,6 +367,14 @@ export interface SupplyRequest {
   fulfilled_date?: string;
   delivery_method?: DeliveryMethod;
   notes?: string;
+  /**
+   * When true, this request doubles as a reusable "common request" template for
+   * its requester. Reusing it creates a brand-new request copied from this one
+   * (this row is never mutated except to bump `common_request_last_used_at`).
+   */
+  is_common_request?: boolean;
+  common_request_name?: string;
+  common_request_last_used_at?: string;
   created_at: string;
   updated_at: string;
 }

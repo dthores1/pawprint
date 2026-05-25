@@ -1,5 +1,6 @@
 import React from 'react';
 import { useWhisker } from '../context/WhiskerContext';
+import { useAuth } from '../context/AuthContext';
 import { Card } from '../components/ui/Card';
 import { PriorityBadge } from '../components/ui/Badge';
 import { SpeciesBadge } from '../components/ui/SpeciesBadge';
@@ -7,6 +8,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { GlobalSearch } from '../components/search/GlobalSearch';
 import {
   AlertCircleIcon,
+  BirdIcon,
   CalendarIcon,
   HomeIcon,
   ActivityIcon,
@@ -43,6 +45,9 @@ export function Dashboard() {
     clinicSlots,
     people
   } = useWhisker();
+  const { currentOrg } = useAuth();
+  const orgName = currentOrg?.name ?? 'your rescue';
+
   const openActionFor = (animalId: string) =>
   actionItems.find((a) => a.animal_id === animalId && a.status === 'open')?.
   description;
@@ -54,7 +59,13 @@ export function Dashboard() {
     (sum, f) => sum + (f.max_capacity ?? 0),
     0
   );
+
+  // Calculate the "Total Animals" metric for the animals in our care
+  const animalsInCare = animals.filter((a) => a.status !== 'adopted' && a.status !== 'deceased');
+  // "In foster" is derived from the current_foster_id cache, not the status.
+  const animalsInFoster = animals.filter((a) => !!a.current_foster_id);
   const availableSpots = totalCapacity - activePlacementsCount;
+
   // High-priority animals (urgent + critical), sorted critical first
   const highPriorityAnimals = animals.
   filter((a) => a.priority === 'urgent' || a.priority === 'critical').
@@ -64,6 +75,24 @@ export function Dashboard() {
     m.status === 'overdue' ||
     m.status === 'due' && m.due_date && getDaysUntil(m.due_date) < 0
   );
+  // Cap the Needs Action list; the rest are reachable via "Review All".
+  const NEEDS_ACTION_LIMIT = 5;
+  const shownHighPriority = highPriorityAnimals.slice(0, NEEDS_ACTION_LIMIT);
+  const shownOverdue = overdueMedical.slice(
+    0,
+    Math.max(0, NEEDS_ACTION_LIMIT - shownHighPriority.length)
+  );
+  const needsActionTotal = highPriorityAnimals.length + overdueMedical.length;
+  const hasMoreNeedsAction =
+  needsActionTotal > shownHighPriority.length + shownOverdue.length;
+  // "Review All" filters /animals by the priorities present in the list.
+  const needsActionPriorities = Array.from(
+    new Set(highPriorityAnimals.map((a) => a.priority))
+  );
+  const reviewAllTo =
+  needsActionPriorities.length > 0 ?
+  `/animals?priority=${needsActionPriorities.join(',')}` :
+  '/animals';
   const upcomingMedical = medicalRecords.
   filter(
     (m) =>
@@ -142,7 +171,7 @@ export function Dashboard() {
             {getGreeting()}, {CURRENT_USER_NAME}
           </h1>
           <p className="text-text-secondary">
-            Here's what's happening at Pawprint today.
+            Here's what's happening at {orgName} today.
           </p>
         </div>
         <GlobalSearch />
@@ -153,14 +182,14 @@ export function Dashboard() {
         {[
         {
           label: 'Total Animals',
-          value: animals.length,
+          value: animalsInCare.length,
           icon: ActivityIcon,
           color: 'text-primary',
           bg: 'bg-primary/10'
         },
         {
           label: 'In Foster',
-          value: statusCounts['fostered'] || 0,
+          value: animalsInFoster.length,
           icon: HomeIcon,
           color: 'text-[#356A9A]',
           bg: 'bg-[#DCEAF7]'
@@ -173,7 +202,7 @@ export function Dashboard() {
           bg: 'bg-[#F5D7D7]'
         },
         {
-          label: 'Available Spots',
+          label: 'Intake Capacity',
           value: availableSpots,
           icon: HomeIcon,
           color: 'text-[#3E7B52]',
@@ -220,8 +249,9 @@ export function Dashboard() {
                   </div>
                 </div> :
 
-              <div className="divide-y divide-border">
-                  {highPriorityAnimals.map((animal) => {
+              <>
+                  <div className="divide-y divide-border">
+                  {shownHighPriority.map((animal) => {
                   const hasActivePlacement = activePlacements.some(
                     (p) => p.animal_id === animal.id
                   );
@@ -260,7 +290,7 @@ export function Dashboard() {
                       </Link>);
 
                 })}
-                  {overdueMedical.map((record) => {
+                  {shownOverdue.map((record) => {
                   const animal = animals.find(
                     (a) => a.id === record.animal_id
                   );
@@ -294,7 +324,17 @@ export function Dashboard() {
                       </Link>);
 
                 })}
-                </div>
+                  </div>
+                  {hasMoreNeedsAction &&
+                <Link
+                  to={reviewAllTo}
+                  className="flex items-center justify-center gap-1.5 p-3 border-t border-border text-sm font-medium text-primary hover:bg-background transition-colors">
+
+                      Review All
+                      <ChevronRightIcon className="w-4 h-4" />
+                    </Link>
+                }
+                </>
               }
             </Card>
           </motion.div>
@@ -450,9 +490,21 @@ export function Dashboard() {
         <div className="space-y-8">
           {/* Status Breakdown */}
           <motion.div variants={item}>
-            <h2 className="text-xl font-heading font-bold mb-4">
-              Animals by Status
-            </h2>
+
+          <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-heading font-bold flex items-center gap-2">
+                <BirdIcon className="w-5 h-5 text-[#356A9A]" />
+                Animals by Status
+              </h2>
+
+              <Link
+                to="/animals"
+                className="text-sm font-medium text-primary hover:underline">
+
+                View all
+              </Link>              
+            </div>
+
             <Card className="p-4">
               <div className="space-y-3">
                 {[
@@ -467,14 +519,9 @@ export function Dashboard() {
                   color: 'bg-[#F8E7C8]'
                 },
                 {
-                  status: 'hold',
-                  label: 'Hold',
-                  color: 'bg-[#E8DEEC]'
-                },
-                {
-                  status: 'fostered',
-                  label: 'Fostered',
-                  color: 'bg-[#DCEAF7]'
+                  status: 'not_ready',
+                  label: 'Not Ready',
+                  color: 'bg-[#E2E5EA]'
                 },
                 {
                   status: 'adoptable',

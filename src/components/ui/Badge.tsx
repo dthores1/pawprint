@@ -1,6 +1,6 @@
 import React from 'react';
 import { cn } from '../../lib/utils';
-import { AnimalStatus, Priority } from '../../types';
+import { Animal, AnimalStatus, Priority } from '../../types';
 interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   status?: AnimalStatus | 'neutral';
   children: React.ReactNode;
@@ -8,8 +8,7 @@ interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
 const STATUS_STYLES: Record<string, string> = {
   intake: 'bg-[#E5E2DC] text-[#6B6B6B]',
   medical: 'bg-[#F8E7C8] text-[#A36B00]',
-  hold: 'bg-[#E8DEEC] text-[#6E4E80]',
-  fostered: 'bg-[#DCEAF7] text-[#356A9A]',
+  not_ready: 'bg-[#E2E5EA] text-[#5A6473]',
   adoptable: 'bg-[#DDEFE2] text-[#3E7B52]',
   adopted: 'bg-[#F3E4D7] text-[#B8632E]',
   hospice: 'bg-[#EDE0DA] text-[#7C4A3D]',
@@ -19,8 +18,7 @@ const STATUS_STYLES: Record<string, string> = {
 const STATUS_LABELS: Record<AnimalStatus, string> = {
   intake: 'Intake',
   medical: 'Medical',
-  hold: 'Hold',
-  fostered: 'Fostered',
+  not_ready: 'Not Ready',
   adoptable: 'Adoptable',
   adopted: 'Adopted',
   hospice: 'Hospice',
@@ -108,9 +106,71 @@ export function PriorityBadge({
         wrap,
         className
       )}>
-      
+
       <span className={cn('w-1.5 h-1.5 rounded-full', dot)} />
       {showLabel && label}
     </span>);
+
+}
+
+// Condition/placement badges shown alongside the lifecycle StatusBadge.
+// "Fostered" is derived (active placement / current_foster_id) and passed in;
+// the rest read the animal's flag fields. Renders nothing when all are off.
+export function AnimalFlags({
+  animal,
+  isFostered = false,
+  className,
+  size = 'sm'
+}: {
+  animal: Pick<
+    Animal,
+    'is_on_hold' | 'has_behavior_concern' | 'has_medical_concern'>;
+  isFostered?: boolean;
+  className?: string;
+  size?: 'sm' | 'md';
+}) {
+  const flags: {key: string;label: string;cls: string;}[] = [];
+  if (isFostered)
+  flags.push({
+    key: 'fostered',
+    label: 'Fostered',
+    cls: 'bg-[#DCEAF7] text-[#356A9A]'
+  });
+  if (animal.is_on_hold)
+  flags.push({
+    key: 'on_hold',
+    label: 'On Hold',
+    cls: 'bg-[#E8DEEC] text-[#6E4E80]'
+  });
+  if (animal.has_behavior_concern)
+  flags.push({
+    key: 'behavior',
+    label: 'Behavior Concern',
+    cls: 'bg-[#FBE7D2] text-[#B4641E]'
+  });
+  if (animal.has_medical_concern)
+  flags.push({
+    key: 'medical',
+    label: 'Medical Concern',
+    cls: 'bg-[#F8E7C8] text-[#A36B00]'
+  });
+  if (flags.length === 0) return null;
+  const sizeCls = size === 'md' ? 'text-sm px-3 py-1' : 'text-xs px-2.5 py-0.5';
+  return (
+    <>
+      {flags.map((f) =>
+      <span
+        key={f.key}
+        className={cn(
+          'inline-flex items-center rounded-full font-medium',
+          sizeCls,
+          f.cls,
+          className
+        )}>
+
+          {f.label}
+        </span>
+      )}
+    </>);
 
 }

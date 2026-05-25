@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { FieldError, Input, Select, Textarea, Label } from '../ui/Forms';
 import { DatePicker } from '../ui/DatePicker';
 import { Button } from '../ui/Button';
 import { FormSection } from '../ui/FormSection';
-import { AgeInformationFields } from './AgeInformationFields';
+import { AgeInformationFields, AgeInputMode } from './AgeInformationFields';
 import { BreedCombobox } from './BreedCombobox';
 import { LitterForm } from './LitterForm';
 import { useWhisker } from '../../context/WhiskerContext';
@@ -13,6 +13,8 @@ import { deriveAgeInfo } from '../../lib/age';
 interface AddAnimalModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Which sub-form to open on first render (e.g. 'litter' from the Litters tab). */
+  initialMode?: AddMode;
 }
 const INITIAL = {
   name: '',
@@ -47,14 +49,16 @@ function isValidUrl(value: string): boolean {
   }
 }
 
-function validateForm(formData: AnimalForm): FormErrors {
+function validateForm(formData: AnimalForm, ageMode: AgeInputMode): FormErrors {
   const nextErrors: FormErrors = {};
   if (!formData.name.trim()) nextErrors.name = 'Name is required.';
   // Require enough age info to derive a birthdate (one path or the other).
-  const asOf = formData.intake_date || new Date().toISOString().split('T')[0];
+  // Estimated age is anchored to today (it's the animal's *current* age),
+  // independent of when it was taken in.
+  const asOf = new Date().toISOString().split('T')[0];
   const ageInfo = deriveAgeInfo({
-    birthdate: formData.birthdate,
-    ageValue: formData.ageValue,
+    birthdate: ageMode === 'birthdate' ? formData.birthdate : '',
+    ageValue: ageMode === 'age' ? formData.ageValue : '',
     ageUnit: formData.ageUnit,
     asOf
   });
@@ -72,27 +76,37 @@ function validateForm(formData: AnimalForm): FormErrors {
 }
 type AddMode = 'single' | 'litter';
 
-export function AddAnimalModal({ isOpen, onClose }: AddAnimalModalProps) {
+export function AddAnimalModal({
+  isOpen,
+  onClose,
+  initialMode = 'single'
+}: AddAnimalModalProps) {
   const { addAnimal } = useWhisker();
-  const [mode, setMode] = useState<AddMode>('single');
+  const [mode, setMode] = useState<AddMode>(initialMode);
   const [formData, setFormData] = useState(INITIAL);
+  const [ageMode, setAgeMode] = useState<AgeInputMode>('birthdate');
   const [errors, setErrors] = useState<FormErrors>({});
+  // Open on the requested sub-form each time the modal is shown.
+  useEffect(() => {
+    if (isOpen) setMode(initialMode);
+  }, [isOpen, initialMode]);
   const handleClose = () => {
     setFormData(INITIAL);
+    setAgeMode('birthdate');
     setErrors({});
-    setMode('single');
+    setMode(initialMode);
     onClose();
   };
-  const asOf =
-  formData.intake_date || new Date().toISOString().split('T')[0];
+  // Estimated age means "current age", so anchor it to today — not intake.
+  const asOf = new Date().toISOString().split('T')[0];
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const nextErrors = validateForm(formData);
+    const nextErrors = validateForm(formData, ageMode);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
     const ageInfo = deriveAgeInfo({
-      birthdate: formData.birthdate,
-      ageValue: formData.ageValue,
+      birthdate: ageMode === 'birthdate' ? formData.birthdate : '',
+      ageValue: ageMode === 'age' ? formData.ageValue : '',
       ageUnit: formData.ageUnit,
       asOf
     });
@@ -236,6 +250,27 @@ export function AddAnimalModal({ isOpen, onClose }: AddAnimalModalProps) {
 
             </div>
           </div>
+          <div>
+            <Label htmlFor="primary_photo_url">Photo URL (optional)</Label>
+            <Input
+              id="primary_photo_url"
+              name="primary_photo_url"
+              type="url"
+              aria-invalid={Boolean(errors.primary_photo_url)}
+              aria-describedby={
+              errors.primary_photo_url ? 'primary_photo_url_error' : undefined
+              }
+              className={
+              errors.primary_photo_url && 'border-red-500 focus:ring-red-500'
+              }
+              value={formData.primary_photo_url}
+              onChange={handleChange}
+              placeholder="https://..." />
+
+            <FieldError id="primary_photo_url_error">
+              {errors.primary_photo_url}
+            </FieldError>
+          </div>
         </FormSection>
 
         {/* — Age & Intake — */}
@@ -245,6 +280,8 @@ export function AddAnimalModal({ isOpen, onClose }: AddAnimalModalProps) {
             ageValue={formData.ageValue}
             ageUnit={formData.ageUnit}
             asOfDate={asOf}
+            mode={ageMode}
+            onModeChange={setAgeMode}
             onBirthdate={(v) => setAgeField({ birthdate: v })}
             onAgeValue={(v) => setAgeField({ ageValue: v })}
             onAgeUnit={(v) => setAgeField({ ageUnit: v })}
@@ -289,36 +326,21 @@ export function AddAnimalModal({ isOpen, onClose }: AddAnimalModalProps) {
           </div>
         </FormSection>
 
-        {/* — Additional Information — */}
-        <FormSection title="Additional Information">
+        {/* — Intake Notes — */}
+        <FormSection title="Intake Notes">
           <div>
-            <Label htmlFor="primary_photo_url">Photo URL (optional)</Label>
-            <Input
-              id="primary_photo_url"
-              name="primary_photo_url"
-              type="url"
-              aria-invalid={Boolean(errors.primary_photo_url)}
-              aria-describedby={
-              errors.primary_photo_url ? 'primary_photo_url_error' : undefined
-              }
-              className={
-              errors.primary_photo_url && 'border-red-500 focus:ring-red-500'
-              }
-              value={formData.primary_photo_url}
-              onChange={handleChange}
-              placeholder="https://..." />
-            <FieldError id="primary_photo_url_error">
-              {errors.primary_photo_url}
-            </FieldError>
-          </div>
-          <div>
-            <Label htmlFor="description">Notes</Label>
             <Textarea
               id="description"
               name="description"
+              aria-label="Intake notes"
               value={formData.description}
               onChange={handleChange}
-              placeholder="Brief description of the animal…" />
+              placeholder="Initial observations or intake information…"
+              rows={3} />
+
+            <p className="text-xs text-text-secondary mt-1">
+              Initial observations or intake information.
+            </p>
           </div>
         </FormSection>
 

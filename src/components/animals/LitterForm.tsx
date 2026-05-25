@@ -4,7 +4,7 @@ import { FieldError, Input, Select, Textarea, Label } from '../ui/Forms';
 import { DatePicker } from '../ui/DatePicker';
 import { Button } from '../ui/Button';
 import { FormSection } from '../ui/FormSection';
-import { AgeInformationFields } from './AgeInformationFields';
+import { AgeInformationFields, AgeInputMode } from './AgeInformationFields';
 import { BreedCombobox } from './BreedCombobox';
 import { useWhisker } from '../../context/WhiskerContext';
 import { Species, Sex, AgeUnit } from '../../types';
@@ -46,6 +46,7 @@ export function LitterForm({ onClose }: LitterFormProps) {
   const [birthdate, setBirthdate] = useState('');
   const [ageValue, setAgeValue] = useState('');
   const [ageUnit, setAgeUnit] = useState<AgeUnit>('weeks');
+  const [ageMode, setAgeMode] = useState<AgeInputMode>('birthdate');
   const [intakeDate, setIntakeDate] = useState(today());
   const [intakeSource, setIntakeSource] = useState('');
   const [notes, setNotes] = useState('');
@@ -75,7 +76,12 @@ export function LitterForm({ onClose }: LitterFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const ageInfo = deriveAgeInfo({ birthdate, ageValue, ageUnit, asOf });
+    const ageInfo = deriveAgeInfo({
+      birthdate: ageMode === 'birthdate' ? birthdate : '',
+      ageValue: ageMode === 'age' ? ageValue : '',
+      ageUnit,
+      asOf
+    });
     const nextErrors: typeof errors = {};
     if (!ageInfo.valid) {
       nextErrors.birthdate = 'Enter a birthdate or an estimated age.';
@@ -158,6 +164,8 @@ export function LitterForm({ onClose }: LitterFormProps) {
           ageValue={ageValue}
           ageUnit={ageUnit}
           asOfDate={asOf}
+          mode={ageMode}
+          onModeChange={setAgeMode}
           onBirthdate={(v) => {
             setBirthdate(v);
             setErrors((p) => ({ ...p, birthdate: undefined }));

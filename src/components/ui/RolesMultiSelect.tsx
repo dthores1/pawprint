@@ -5,14 +5,17 @@ import { cn } from '../../lib/utils';
 // Multi-select chips for a person's roles/capabilities — one flat field (there
 // is no separate "volunteer type"). Grouped visually for clarity. `locked` roles
 // render selected and can't be toggled off (used to pin 'foster_parent' on the
-// foster form). 'volunteer' and 'adopter' are intentionally not offered here.
+// foster form). 'volunteer' is intentionally not offered here (legacy fallback).
 const ROLE_GROUPS: {
   label: string;
   roles: { value: PersonRole; label: string }[];
 }[] = [
 {
-  label: 'Foster',
-  roles: [{ value: 'foster_parent', label: 'Foster Parent' }]
+  label: 'Animal Care',
+  roles: [
+  { value: 'foster_parent', label: 'Foster Parent' },
+  { value: 'adopter', label: 'Adopter' }]
+
 },
 {
   label: 'Volunteer / Support',
@@ -21,7 +24,8 @@ const ROLE_GROUPS: {
   { value: 'event_support', label: 'Event Support' },
   { value: 'social_media', label: 'Social Media' },
   { value: 'trapper', label: 'Trapper' },
-  { value: 'transport', label: 'Transport' }]
+  { value: 'transport', label: 'Transport' },
+  { value: 'donor', label: 'Donor' }]
 
 },
 {

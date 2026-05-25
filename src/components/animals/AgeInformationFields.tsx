@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Input, Select, Label } from '../ui/Forms';
 import { DatePicker } from '../ui/DatePicker';
 import { AgeUnit } from '../../types';
@@ -7,6 +7,7 @@ import { calculateAge } from '../../lib/utils';
 
 // Estimated Birthdate OR Estimated Age, chosen via a radio so only one set of
 // inputs shows at a time (progressive disclosure — no competing fields).
+export type AgeInputMode = 'birthdate' | 'age';
 interface AgeInformationFieldsProps {
   birthdate: string;
   ageValue: string;
@@ -15,6 +16,9 @@ interface AgeInformationFieldsProps {
   onBirthdate: (v: string) => void;
   onAgeValue: (v: string) => void;
   onAgeUnit: (v: AgeUnit) => void;
+  mode?: AgeInputMode;
+  initialMode?: AgeInputMode;
+  onModeChange?: (v: AgeInputMode) => void;
   error?: string;
 }
 const UNIT_OPTIONS: AgeUnit[] = ['days', 'weeks', 'months', 'years'];
@@ -27,19 +31,38 @@ export function AgeInformationFields({
   onBirthdate,
   onAgeValue,
   onAgeUnit,
+  mode: controlledMode,
+  initialMode,
+  onModeChange,
   error
 }: AgeInformationFieldsProps) {
-  // Start on whichever the data already reflects (age path if an age is set
-  // and no birthdate). Remounts on modal open, so it re-syncs per animal.
-  const [mode, setMode] = useState<'birthdate' | 'age'>(() =>
-  ageValue && !birthdate ? 'age' : 'birthdate'
+  // Start on whichever the data already reflects, or let a parent control the
+  // mode when it needs submit-time awareness of the visible path.
+  const [internalMode, setInternalMode] = useState<AgeInputMode>(() =>
+  initialMode ?? (ageValue && !birthdate ? 'age' : 'birthdate')
   );
+  const mode = controlledMode ?? internalMode;
 
-  const selectMode = (next: 'birthdate' | 'age') => {
-    setMode(next);
-    // Clear the inactive path so the derived birthdate is unambiguous.
-    if (next === 'birthdate') onAgeValue('');else
-    onBirthdate('');
+  useEffect(() => {
+    if (controlledMode || !initialMode) return;
+    setInternalMode(initialMode);
+  }, [controlledMode, initialMode]);
+
+  const selectMode = (next: AgeInputMode) => {
+    if (!controlledMode) setInternalMode(next);
+    onModeChange?.(next);
+  };
+  const handleBirthdate = (v: string) => {
+    onBirthdate(v);
+    if (v) onAgeValue('');
+  };
+  const handleAgeValue = (v: string) => {
+    onAgeValue(v);
+    if (v) onBirthdate('');
+  };
+  const handleAgeUnit = (v: AgeUnit) => {
+    onAgeUnit(v);
+    if (ageValue) onBirthdate('');
   };
 
   const derived = deriveAgeInfo({ birthdate, ageValue, ageUnit, asOf: asOfDate });
@@ -92,7 +115,7 @@ export function AgeInformationFields({
           id="estimated_birthdate"
           value={birthdate}
           max={asOfDate}
-          onChange={onBirthdate} />
+          onChange={handleBirthdate} />
 
         </div> :
 
@@ -108,7 +131,7 @@ export function AgeInformationFields({
             inputMode="numeric"
             placeholder="e.g. 3"
             value={ageValue}
-            onChange={(e) => onAgeValue(e.target.value)} />
+            onChange={(e) => handleAgeValue(e.target.value)} />
 
           </div>
           <div>
@@ -118,7 +141,7 @@ export function AgeInformationFields({
             <Select
             id="estimated_age_unit"
             value={ageUnit}
-            onChange={(e) => onAgeUnit(e.target.value as AgeUnit)}>
+            onChange={(e) => handleAgeUnit(e.target.value as AgeUnit)}>
 
               {UNIT_OPTIONS.map((u) =>
             <option key={u} value={u}>

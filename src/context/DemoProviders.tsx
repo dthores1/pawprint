@@ -19,7 +19,8 @@ import {
   ClinicEvent,
   ClinicSlot,
   ClinicSlotProcedure,
-  AnimalActionItem } from
+  AnimalActionItem,
+  Litter } from
 '../types';
 import { NewPhotoInput } from '../lib/photosApi';
 import { legacyRoleFor } from '../lib/peopleApi';
@@ -41,7 +42,8 @@ import {
   seedSittingRequestPlacements,
   seedClinicEvents,
   seedClinicSlots,
-  seedClinicSlotProcedures } from
+  seedClinicSlotProcedures,
+  seedLitters } from
 '../data/seed';
 import { generateId } from '../lib/utils';
 
@@ -99,6 +101,7 @@ export function DemoWhiskerProvider({
   const [relationships, setRelationships] =
   useState<AnimalRelationship[]>(seedRelationships);
   const [photos, setPhotos] = useState<AnimalPhoto[]>(seedPhotos);
+  const [litters, setLitters] = useState<Litter[]>(seedLitters);
   const [people, setPeople] = useState<Person[]>(seedPeople);
   // Fosters are a derived view of people (those with the 'foster_parent' role).
   const fosters = people.filter((p) => p.roles.includes('foster_parent'));
@@ -143,6 +146,8 @@ export function DemoWhiskerProvider({
     photos,
     people,
     peopleLoading: false,
+    litters,
+    littersLoading: false,
     breeds: seedBreeds,
     products,
     supplyRequests,
@@ -163,6 +168,21 @@ export function DemoWhiskerProvider({
     setAnimals((prev) => prev.filter((a) => a.id !== id)),
     addLitter: async (shared, members) => {
       const litterId = `litter${generateId()}`;
+      setLitters((prev) => [
+      {
+        id: litterId,
+        name: shared.name,
+        species: shared.species,
+        breed_id: shared.breed_id,
+        breed_text: shared.breed_text,
+        estimated_birth_date: shared.estimated_birth_date,
+        intake_date: shared.intake_date,
+        intake_source: shared.intake_source,
+        mother_animal_id: shared.mother_animal_id,
+        notes: shared.notes
+      },
+      ...prev]
+      );
       const created: Animal[] = members.map((m) => ({
         id: `a${generateId()}`,
         name: m.name,
@@ -186,6 +206,10 @@ export function DemoWhiskerProvider({
       }));
       setAnimals((prev) => [...created, ...prev]);
     },
+    updateLitter: (id, updates) =>
+    setLitters((prev) =>
+    prev.map((l) => l.id === id ? { ...l, ...updates } : l)
+    ),
 
     // Fosters are people that include the 'foster_parent' role.
     addFoster: (foster) => {
@@ -338,8 +362,8 @@ export function DemoWhiskerProvider({
       },
       ...prev]
       );
+      // Fostered is derived from the active placement; lifecycle status is left alone.
       updateAnimal(animal_id, {
-        status: 'fostered',
         current_foster_id: person_id
       });
     },
@@ -375,7 +399,6 @@ export function DemoWhiskerProvider({
 
       });
       updateAnimal(animal_id, {
-        status: 'fostered',
         current_foster_id: new_person_id
       });
     },

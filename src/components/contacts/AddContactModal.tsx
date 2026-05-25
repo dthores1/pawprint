@@ -127,7 +127,7 @@ export function AddContactModal({ isOpen, onClose }: AddContactModalProps) {
         </div>
 
         <div>
-          <Label>Roles / Capabilities</Label>
+          <Label>Roles</Label>
           <RolesMultiSelect
             value={form.roles}
             onChange={(roles) => {
