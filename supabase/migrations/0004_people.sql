@@ -1,5 +1,5 @@
 -- ============================================================
--- Pawprint: people (contacts) — vets, rescue staff, volunteers, adopters.
+-- Whiskerville: people (contacts) — vets, rescue staff, volunteers, adopters.
 -- Depends on 0001_init.sql (organizations, helpers, set_updated_at).
 -- Note: distinct from foster_parents. The coordination tables (supply,
 -- transport, sitting, clinics) will FK to this table when they're ported.

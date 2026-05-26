@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
 
-const PENDING_TOKEN_KEY = 'pawprint.pendingInviteToken';
+const PENDING_TOKEN_KEY = 'whiskerville.pendingInviteToken';
 
 interface InviteInfo {
   invite_id: string;
@@ -85,7 +85,7 @@ export function AcceptInvitePage() {
         <div className="flex items-center justify-center gap-2 text-primary mb-6">
           <PawPrintIcon className="w-9 h-9" />
           <span className="font-heading font-bold text-3xl tracking-tight">
-            Pawprint
+            Whiskerville
           </span>
         </div>
 
@@ -104,7 +104,7 @@ export function AcceptInvitePage() {
               to="/"
               className="text-sm font-medium text-primary hover:underline">
 
-                Go to Pawprint →
+                Go to Whiskerville →
               </Link>
             </div> :
           accepted ?
@@ -120,7 +120,7 @@ export function AcceptInvitePage() {
                 </span>
                 .
               </p>
-              <Button onClick={() => navigate('/')}>Open Pawprint</Button>
+              <Button onClick={() => navigate('/')}>Open Whiskerville</Button>
             </div> :
 
           <>

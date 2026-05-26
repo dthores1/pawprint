@@ -90,7 +90,7 @@ export const seedAnimals: Animal[] = [
   description:
   'A sweet, goofy Golden Retriever mix who loves everyone. Great with kids and other dogs. Needs a yard to run in.',
   microchip_number: '981020000000001',
-  adoption_profile_url: 'https://www.petfinder.com/dog/biscuit-pawprint-a1',
+  adoption_profile_url: 'https://www.petfinder.com/dog/biscuit-whiskerville-a1',
   primary_photo_url:
   'https://images.unsplash.com/photo-1552053831-71594a27632d?auto=format&fit=crop&q=80&w=800',
   created_at: '2025-10-01T10:00:00Z',
@@ -204,7 +204,7 @@ export const seedAnimals: Animal[] = [
   description:
   'Trapped in Columbia City, Seattle with four of his littermates and his mother.',
   microchip_number: '981020000000007',
-  adoption_profile_url: 'https://www.petfinder.com/cat/pip-pawprint-a7',
+  adoption_profile_url: 'https://www.petfinder.com/cat/pip-whiskerville-a7',
   primary_photo_url: '/images/animals/pip-1.jpg',
   created_at: '2025-10-20T10:00:00Z',
   updated_at: '2025-11-01T10:00:00Z'
@@ -638,13 +638,13 @@ export const seedNotes: AnimalNote[] = [
 export const seedLitters: Litter[] = [
 {
   id: 'litter_demo',
-  name: undefined,
+  name: 'Columbia City - July 2025',
   species: 'Cat',
-  estimated_birth_date: '2023-10-25',
-  intake_date: '2023-11-20',
-  intake_source: 'Born in Care',
+  estimated_birth_date: '2025-06-01',
+  intake_date: '2025-07-13',
+  intake_source: 'Trapped with mother',
   mother_animal_id: 'a2',
-  notes: 'Litter born during a mother-cat intake stay.'
+  notes: 'Litter trapped with mother near apartment complex in Columbia City.'
 }];
 
 
@@ -791,7 +791,7 @@ const contactPeople: Omit<Person, 'roles'>[] = [
   id: 'pe3',
   first_name: 'Jessica',
   last_name: 'Wong',
-  email: 'jwong@pawprintrescue.org',
+  email: 'jwong@whiskervillerescue.org',
   phone: '(555) 303-4040',
   role: 'rescue_staff',
   notes: 'Executive Director',
@@ -804,7 +804,7 @@ const contactPeople: Omit<Person, 'roles'>[] = [
   id: 'pe4',
   first_name: 'Brian',
   last_name: "O'Connor",
-  email: 'boconnor@pawprintrescue.org',
+  email: 'boconnor@whiskervillerescue.org',
   phone: '(555) 404-5050',
   role: 'rescue_staff',
   notes: 'Intake Coordinator',
@@ -1204,7 +1204,7 @@ export const seedTransportRequests: TransportRequest[] = [
   requested_by_person_id: 'pe3',
   assigned_volunteer_person_id: 'pe7', // Rachel Green
   supply_request_id: 'sr4',
-  pickup_location: 'Pawprint office storage',
+  pickup_location: 'Whiskerville office storage',
   dropoff_location: '505 Walnut Dr, Portland, OR (Tom Baker)',
   requested_pickup_time: seedDateTime(2, 16, 0),
   notes: 'Drop on porch; foster will text back when they have it.',
@@ -1218,7 +1218,7 @@ export const seedTransportRequests: TransportRequest[] = [
   status: 'open',
   requested_by_person_id: 'pe4',
   animal_id: 'a9', // Otis
-  pickup_location: "Pawprint intake (Brian O'Connor)",
+  pickup_location: "Whiskerville intake (Brian O'Connor)",
   dropoff_location: 'Bridge City Veterinary',
   requested_pickup_time: seedDateTime(1, 11, 30),
   notes: 'Right hind leg eval; please use the larger carrier.',

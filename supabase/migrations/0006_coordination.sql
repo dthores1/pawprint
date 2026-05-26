@@ -1,5 +1,5 @@
 -- ============================================================
--- Pawprint: coordination tables — products, supply requests, transports,
+-- Whiskerville: coordination tables — products, supply requests, transports,
 -- sitting requests, clinics. Plus people.user_id to link an auth user to
 -- their own person record (so "requested by" can be the signed-in user).
 -- Depends on 0001 (orgs/animals/helpers), 0002 (foster_placements),

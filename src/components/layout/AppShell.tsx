@@ -18,7 +18,7 @@ export function AppShell() {
           <div className="flex items-center gap-2 text-primary">
             <PawPrintIcon className="w-7 h-7" />
             <span className="font-heading font-bold text-xl tracking-tight">
-              Pawprint
+              Whiskerville
             </span>
           </div>
           <button

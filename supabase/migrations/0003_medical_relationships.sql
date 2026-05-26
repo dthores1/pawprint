@@ -1,5 +1,5 @@
 -- ============================================================
--- Pawprint: medical records + animal relationships
+-- Whiskerville: medical records + animal relationships
 -- Depends on 0001_init.sql (organizations, animals, helpers, set_updated_at).
 -- ============================================================
 

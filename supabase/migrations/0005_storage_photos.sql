@@ -1,5 +1,5 @@
 -- ============================================================
--- Pawprint: photo storage policies for the `animal-photos` bucket.
+-- Whiskerville: photo storage policies for the `animal-photos` bucket.
 -- Depends on 0001_init.sql (animal_photos table, is_org_member helper).
 -- Prereq: create a PUBLIC bucket named `animal-photos` in the dashboard.
 -- ============================================================

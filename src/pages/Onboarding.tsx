@@ -43,7 +43,7 @@ export function Onboarding() {
         <div className="flex items-center justify-center gap-2 text-primary mb-6">
           <PawPrintIcon className="w-9 h-9" />
           <span className="font-heading font-bold text-3xl tracking-tight">
-            Pawprint
+            Whiskerville
           </span>
         </div>
 
