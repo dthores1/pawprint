@@ -28,8 +28,6 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Priority } from '../types';
 import { BoneIcon } from '../components/ui/BoneIcon';
-// TODO: source from the authenticated user once auth lands — e.g. useUser().name
-const CURRENT_USER_NAME = 'Dan';
 const PRIORITY_RANK: Record<Priority, number> = {
   critical: 4,
   urgent: 3,
@@ -50,7 +48,21 @@ export function Dashboard() {
     clinicSlots,
     people
   } = useWhisker();
-  const { currentOrg } = useAuth();
+  const { currentOrg, user, currentPersonId } = useAuth();
+  // Greet the user by name. Prefer the self-record's first_name (which captures
+  // anything the user later edits on their profile); fall back to sign-up
+  // metadata, then to the email prefix.
+  const selfPerson = currentPersonId ?
+  people.find((p) => p.id === currentPersonId) :
+  null;
+  const metaFullName =
+  (user?.user_metadata as Record<string, unknown> | undefined)?.full_name ??
+  (user?.user_metadata as Record<string, unknown> | undefined)?.name;
+  const greetingName =
+  selfPerson?.first_name?.trim() ||
+  (typeof metaFullName === 'string' ? metaFullName.trim().split(/\s+/)[0] : '') ||
+  user?.email?.split('@')[0] ||
+  'there';
   const orgName = currentOrg?.name ?? 'your rescue';
 
   const openActionFor = (animalId: string) =>
@@ -173,7 +185,7 @@ export function Dashboard() {
       <motion.div variants={item} className="space-y-5">
         <div>
           <h1 className="text-3xl font-heading font-bold text-text-primary mb-2">
-            {getGreeting()}, {CURRENT_USER_NAME}
+            {getGreeting()}, {greetingName}
           </h1>
           <p className="text-text-secondary">
             Here's what's happening at {orgName} today.
