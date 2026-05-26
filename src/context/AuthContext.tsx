@@ -47,7 +47,7 @@ export const AuthContext = createContext<AuthContextType | undefined>(
   undefined
 );
 
-const CURRENT_ORG_KEY = 'pawprint.currentOrgId';
+const CURRENT_ORG_KEY = 'whiskerville.currentOrgId';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
@@ -116,14 +116,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // AcceptInvitePage: accept the invite → refresh memberships → land in the org.
   useEffect(() => {
     if (!userId) return;
-    const token = localStorage.getItem('pawprint.pendingInviteToken');
+    const token = localStorage.getItem('whiskerville.pendingInviteToken');
     if (!token) return;
     (async () => {
       const { data, error } = await supabase.rpc('accept_org_invite', {
         p_token: token
       });
       // Clear regardless — we don't want to retry a bad/expired token forever.
-      localStorage.removeItem('pawprint.pendingInviteToken');
+      localStorage.removeItem('whiskerville.pendingInviteToken');
       if (error) {
         console.error('[invites] auto-accept failed:', error.message);
         return;

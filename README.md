@@ -1,10 +1,10 @@
-# Pawprint
+# Whiskerville (fka Pawprint)
 
-An operationally-focused animal rescue management app. Pawprint helps small-to-medium rescues track animals, foster parents, medical care, supply logistics, and adoption pipelines without the bloat of legacy shelter software.
+An operationally-focused animal rescue management app. Whiskerville helps small-to-medium rescues track animals, foster parents, medical care, supply logistics, and adoption pipelines without the bloat of legacy shelter software.
 
 This document is the canonical reference for **product logic, data model, and design conventions**. Update it whenever a meaningful behavior changes.
 
-> **Stack note:** Pawprint is a React + TypeScript + Vite + Tailwind front end backed by **Supabase** (Postgres + Row-Level Security + Storage + Auth). It is **multi-tenant** — every record belongs to an `organization`, and access is gated by org membership via RLS. See §0 for the backend model; the entity sections below describe the app-facing shapes.
+> **Stack note:** Whiskerville is a React + TypeScript + Vite + Tailwind front end backed by **Supabase** (Postgres + Row-Level Security + Storage + Auth). It is **multi-tenant** — every record belongs to an `organization`, and access is gated by org membership via RLS. See §0 for the backend model; the entity sections below describe the app-facing shapes.
 
 
 ![Application Dashboard / Landing page](docs/images/Landing_Page.png "Dashboard of the application where users can determine organization status at a glance and review items that need attention.")
@@ -13,7 +13,7 @@ This document is the canonical reference for **product logic, data model, and de
 
 ## 0. Backend, persistence & auth
 
-Pawprint persists everything to **Supabase**. The schema lives in `supabase/migrations/*.sql` (run in order in the Supabase SQL editor); the front end talks to it through `src/lib/supabase.ts` and a thin mapping layer in `src/lib/*Api.ts`.
+Whiskerville persists everything to **Supabase**. The schema lives in `supabase/migrations/*.sql` (run in order in the Supabase SQL editor); the front end talks to it through `src/lib/supabase.ts` and a thin mapping layer in `src/lib/*Api.ts`.
 
 - **Multi-tenant.** Every table carries an `organization_id`. **Row-Level Security** policies restrict every read/write to members of that org (`is_org_member(organization_id)`), so one rescue can never see another's data. `organization_members` links Supabase auth users to orgs with a role (`owner` / `admin` / `member`).
 - **Auth.** Google OAuth + email/password (Supabase Auth). On first sign-in a user with no org is sent to an **Onboarding** screen to create one (a DB trigger makes them the owner). The app is gated: loading → login → onboarding → app.
@@ -420,4 +420,4 @@ supabase/migrations/                 Ordered SQL: schema, RLS, storage policies
 
 ## Naming
 
-The app is **Pawprint** (lowercase second syllable). The earlier working name was **Whisker**, which is still referenced in the internal context (`WhiskerProvider`, `useWhisker`) — that's intentionally untouched since it doesn't surface in the UI.
+The app is **Whiskerville**. Earlier working names were **Whisker** and then **Pawprint**; the original "Whisker" is still referenced in the internal context (`WhiskerProvider`, `useWhisker`) — that's intentionally untouched since it doesn't surface in the UI.

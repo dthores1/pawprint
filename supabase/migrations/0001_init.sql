@@ -1,5 +1,5 @@
 -- ============================================================
--- Pawprint schema: organizations, members, animals, notes, photos
+-- Whiskerville schema: organizations, members, animals, notes, photos
 -- Multi-tenant with Supabase RLS.
 -- ============================================================
 

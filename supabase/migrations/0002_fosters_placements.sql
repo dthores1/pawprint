@@ -1,5 +1,5 @@
 -- ============================================================
--- Pawprint: foster parents + placements
+-- Whiskerville: foster parents + placements
 -- Depends on 0001_init.sql (organizations, animals, helpers, set_updated_at).
 -- ============================================================
 
