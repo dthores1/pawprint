@@ -59,36 +59,46 @@ export function AddPhotoModal({
   const { addPhoto } = useWhisker();
   const [uploadMode, setUploadMode] = useState<'file' | 'url'>('file');
   const [url, setUrl] = useState('');
+  const [file, setFile] = useState<File | null>(null);
   const [category, setCategory] = useState<PhotoCategory>('profile');
   const [caption, setCaption] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const reset = () => {
     setUrl('');
+    setFile(null);
     setCategory('profile');
     setCaption('');
     setUploadMode('file');
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const selected = e.target.files?.[0];
+    if (!selected) return;
+    setFile(selected);
+    // Data URL just for the preview; the actual File is uploaded on submit.
     const reader = new FileReader();
     reader.onload = (event) => {
       if (typeof event.target?.result === 'string') {
         setUrl(event.target.result);
       }
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(selected);
   };
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!url.trim()) return;
-    addPhoto({
+    if (uploadMode === 'file' && !file) return;
+    if (uploadMode === 'url' && !url.trim()) return;
+    setSubmitting(true);
+    await addPhoto({
       animal_id: animalId,
-      url: url.trim(),
       category,
-      caption: caption.trim() || undefined
+      caption: caption.trim() || undefined,
+      ...(uploadMode === 'file' ?
+      { file: file! } :
+      { url: url.trim() })
     });
+    setSubmitting(false);
     reset();
     onClose();
   };
@@ -205,7 +215,9 @@ export function AddPhotoModal({
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit">Add Photo</Button>
+          <Button type="submit" disabled={submitting}>
+            {submitting ? 'Uploading…' : 'Add Photo'}
+          </Button>
         </div>
       </form>
     </Modal>);

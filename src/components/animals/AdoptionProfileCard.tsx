@@ -18,6 +18,10 @@ interface AdoptionProfileCardProps {
   status: AnimalStatus;
   adoptionProfileUrl?: string;
 }
+// Require http(s):// followed by a domain that contains at least one dot.
+// Permissive enough for real listings (Petfinder, Adopt-a-Pet, org sites,
+// query strings, fragments) while rejecting plain text and protocol-less input.
+const URL_RE = /^https?:\/\/[^\s.]+\.[^\s]+$/i;
 export function AdoptionProfileCard({
   animalId,
   status,
@@ -26,11 +30,17 @@ export function AdoptionProfileCard({
   const { updateAnimal } = useWhisker();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(adoptionProfileUrl || '');
+  const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   // Only render when status is adoptable. Other statuses don't need this card.
   if (status !== 'adoptable') return null;
   const save = () => {
     const trimmed = draft.trim();
+    if (trimmed && !URL_RE.test(trimmed)) {
+      setError('Please enter a full link starting with http:// or https://');
+      return;
+    }
+    setError(null);
     updateAnimal(animalId, {
       adoption_profile_url: trimmed || undefined
     });
@@ -38,6 +48,7 @@ export function AdoptionProfileCard({
   };
   const cancel = () => {
     setDraft(adoptionProfileUrl || '');
+    setError(null);
     setEditing(false);
   };
   const copy = async () => {
@@ -79,11 +90,32 @@ export function AdoptionProfileCard({
             <input
             type="url"
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              if (error) setError(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                save();
+              }
+            }}
             autoFocus
             placeholder="https://www.petfinder.com/..."
-            className="w-full h-10 px-3 rounded-lg border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" />
+            aria-invalid={!!error}
+            aria-describedby={error ? 'adoption-url-error' : undefined}
+            className={cn(
+              'w-full h-10 px-3 rounded-lg border bg-white text-sm focus:outline-none focus:ring-2 focus:border-transparent',
+              error ?
+              'border-red-500 focus:ring-red-500' :
+              'border-border focus:ring-primary'
+            )} />
           
+            {error &&
+          <p id="adoption-url-error" className="text-xs text-red-500">
+              {error}
+            </p>
+          }
             <div className="flex items-center gap-2">
               <button
               type="button"

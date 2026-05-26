@@ -10,15 +10,13 @@ import {
   AlertCircleIcon } from
 'lucide-react';
 import { cn } from '../lib/utils';
+import { useAuth } from '../context/AuthContext';
 import {
   TransportRequest,
   TransportRequestStatus,
   TransportRequestType,
   TransportRequestUrgency } from
 '../types';
-
-// Demo current user — see other modals for the same TODO(auth).
-const CURRENT_USER = { person_id: 'p_dan' };
 
 const STATUS_LABEL: Record<TransportRequestStatus, string> = {
   open: 'Open',
@@ -36,8 +34,7 @@ const STATUS_PILL: Record<TransportRequestStatus, string> = {
 };
 const TYPE_LABEL: Record<TransportRequestType, string> = {
   animal: 'Animal',
-  supplies: 'Supplies',
-  emergency: 'Emergency'
+  supplies: 'Supplies'
 };
 const URGENCY_PILL: Record<TransportRequestUrgency, string> = {
   normal: '',
@@ -73,8 +70,10 @@ export function Transports() {
     transportRequests,
     people,
     animals,
-    claimTransportRequest
+    claimTransportRequest,
+    updateTransportRequest
   } = useWhisker();
+  const { currentPersonId } = useAuth();
   const [isNewOpen, setIsNewOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<
     'open' | 'claimed' | 'completed'>(
@@ -102,7 +101,7 @@ export function Transports() {
         <div>
           <h1 className="text-3xl font-heading font-bold text-text-primary flex items-center gap-3">
             <TruckIcon className="w-8 h-8 text-primary" />
-            Transports
+            Transportation Requests
           </h1>
           <p className="text-text-secondary mt-1">
             Help move animals and supplies where they need to go.
@@ -140,7 +139,7 @@ export function Transports() {
       <Card className="p-10 text-center text-text-secondary">
           <TruckIcon className="w-10 h-10 mx-auto mb-3 opacity-30" />
           <p className="font-medium text-text-primary mb-1">
-            Nothing in this bucket
+            Nothing to see here
           </p>
           <p className="text-sm">
             {activeTab === 'open' ?
@@ -172,8 +171,23 @@ export function Transports() {
             );
             return p ? `${p.first_name} ${p.last_name}` : undefined;
           })()}
+          canClaim={
+          !!currentPersonId &&
+          r.status === 'open' &&
+          r.requested_by_person_id !== currentPersonId
+          }
           onClaim={() =>
-          claimTransportRequest(r.id, CURRENT_USER.person_id)
+          currentPersonId &&
+          claimTransportRequest(r.id, currentPersonId)
+          }
+          canCancel={
+          !!currentPersonId &&
+          r.requested_by_person_id === currentPersonId &&
+          r.status !== 'completed' &&
+          r.status !== 'canceled'
+          }
+          onCancel={() =>
+          updateTransportRequest(r.id, { status: 'canceled' })
           } />
 
         )}
@@ -193,20 +207,35 @@ interface TransportCardProps {
   animalName?: string;
   requesterName: string;
   assigneeName?: string;
+  canClaim: boolean;
   onClaim: () => void;
+  canCancel: boolean;
+  onCancel: () => void;
 }
 function TransportCard({
   request,
   animalName,
   requesterName,
   assigneeName,
-  onClaim
+  canClaim,
+  onClaim,
+  canCancel,
+  onCancel
 }: TransportCardProps) {
   const subject =
   animalName ||
   (request.type === 'supplies' ?
   'Supply drop' :
   TYPE_LABEL[request.type]);
+  const handleCancel = () => {
+    if (
+    window.confirm(
+      'Cancel this transport request? It will be marked as canceled for everyone.'
+    ))
+    {
+      onCancel();
+    }
+  };
   return (
     <Card className="p-5">
       <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-6">
@@ -254,9 +283,19 @@ function TransportCard({
 
             {STATUS_LABEL[request.status]}
           </span>
-          {request.status === 'open' &&
+          {canClaim &&
           <Button size="sm" onClick={onClaim}>
               Claim Request
+            </Button>
+          }
+          {canCancel &&
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleCancel}
+            className="text-status-urgent-text hover:bg-status-urgent-bg">
+
+              Cancel Request
             </Button>
           }
         </div>

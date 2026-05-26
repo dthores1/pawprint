@@ -7,6 +7,7 @@ import { SpeciesBadge } from '../ui/SpeciesBadge';
 import { HeartIcon, PlusIcon, XIcon } from 'lucide-react';
 import { BoneIcon } from '../ui/BoneIcon';
 import { Animal } from '../../types';
+import { calculateAge, animalDisplayName } from '../../lib/utils';
 import { AddRelationshipModal } from './AddRelationshipModal';
 interface RelationshipsCardProps {
   animalId: string;
@@ -16,6 +17,8 @@ interface RelationshipsCardProps {
 interface RelEntry {
   relationshipId: string;
   animal: Animal;
+  /** Derived links (e.g. littermates from a shared litter_id) aren't removable. */
+  derived?: boolean;
 }
 interface GroupedRelationships {
   mother: RelEntry | null;
@@ -41,7 +44,7 @@ export function RelationshipsCard({ animalId }: RelationshipsCardProps) {
   const handleDelete = (entry: RelEntry, label: string) => {
     if (
     window.confirm(
-      `Remove the ${label.toLowerCase()} link to ${entry.animal.name}? This only removes the relationship, not the animal.`
+      `Remove the ${label.toLowerCase()} link to ${animalDisplayName(entry.animal)}? This only removes the relationship, not the animal.`
     ))
     {
       deleteRelationship(entry.relationshipId);
@@ -183,21 +186,23 @@ function RelationshipRow({
               </div>
               <div className="min-w-0">
                 <p className="font-medium text-text-primary hover:text-primary transition-colors truncate">
-                  {entry.animal.name}
+                  {animalDisplayName(entry.animal)}
                 </p>
-                <p className="text-xs text-text-secondary font-mono">
-                  #{entry.animal.id}
+                <p className="text-xs text-text-secondary truncate">
+                  {entry.animal.sex} • {calculateAge(entry.animal.estimated_birth_date)}
                 </p>
               </div>
             </Link>
-            <button
+            {!entry.derived &&
+          <button
             type="button"
             onClick={() => onDelete(entry, label)}
-            aria-label={`Remove ${label.toLowerCase()} link to ${entry.animal.name}`}
+            aria-label={`Remove ${label.toLowerCase()} link to ${animalDisplayName(entry.animal)}`}
             className="shrink-0 p-1.5 rounded-md text-text-secondary opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-[#9B3A3A] hover:bg-[#F5D7D7]/60 transition-opacity transition-colors">
 
               <XIcon className="w-3.5 h-3.5" />
             </button>
+          }
           </div>
         )}
       </div>
@@ -239,9 +244,6 @@ animals: Animal[])
         case 'sibling':
           result.siblings.push(entry);
           break;
-        case 'littermate':
-          result.littermates.push(entry);
-          break;
         case 'bonded_pair':
           result.bondedWith.push(entry);
           break;
@@ -265,13 +267,23 @@ animals: Animal[])
         case 'sibling':
           result.siblings.push(entry);
           break;
-        case 'littermate':
-          result.littermates.push(entry);
-          break;
         case 'bonded_pair':
           result.bondedWith.push(entry);
           break;
       }
+    }
+  }
+  // Littermates are derived from a shared litter_id, not stored as relationship
+  // rows. These links are read-only (no delete button).
+  const self = find(animalId);
+  if (self?.litter_id) {
+    for (const other of animals) {
+      if (other.id === animalId || other.litter_id !== self.litter_id) continue;
+      result.littermates.push({
+        relationshipId: `litter-${other.id}`,
+        animal: other,
+        derived: true
+      });
     }
   }
   return result;

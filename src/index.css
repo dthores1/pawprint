@@ -6,6 +6,10 @@
 @import 'tailwindcss/components';
 @import 'tailwindcss/utilities';
 
+/* react-day-picker base styles (must stay in the @import group — CSS requires
+   @import rules before any other statements). Themed via .pp-calendar below. */
+@import 'react-day-picker/style.css';
+
 /* END TAILWIND IMPORTS — ALL OTHER CSS MUST GO BELOW THIS LINE */
 
 @layer base {
@@ -24,4 +28,52 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+}
+
+/* — Calendar theming (react-day-picker) — matches the calm/operational palette.
+   Scoped to .pp-calendar so it never leaks into other UI. */
+.pp-calendar {
+  --rdp-accent-color: #2E6F68;
+  --rdp-accent-background-color: #DDEFE2;
+  --rdp-today-color: #D98C5F;
+  --rdp-day-width: 2.5rem;
+  --rdp-day-height: 2.5rem;
+  margin: 0;
+  font-size: 0.875rem;
+}
+.pp-calendar .rdp-month_caption {
+  font-family: 'Nunito Sans', sans-serif;
+  font-weight: 700;
+  color: #2B2B2B;
+}
+.pp-calendar .rdp-weekday {
+  color: #6B6B6B;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+}
+.pp-calendar .rdp-day_button {
+  border-radius: 0.5rem;
+}
+.pp-calendar .rdp-day_button:hover:not(:disabled) {
+  background-color: #DDEFE2;
+}
+/* Filled selected day rather than the default outline. */
+.pp-calendar .rdp-selected .rdp-day_button {
+  background-color: #2E6F68;
+  color: #FFFFFF;
+  border: none;
+  font-weight: 700;
+}
+.pp-calendar .rdp-button_previous,
+.pp-calendar .rdp-button_next {
+  border-radius: 0.5rem;
+  color: #2B2B2B;
+}
+.pp-calendar .rdp-button_previous:hover:not(:disabled),
+.pp-calendar .rdp-button_next:hover:not(:disabled) {
+  background-color: #F1EEE8;
+}
+.pp-calendar .rdp-chevron {
+  fill: #2E6F68;
 }

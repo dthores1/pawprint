@@ -1,12 +1,15 @@
 import {
   Animal,
-  FosterParent,
+  Breed,
+  BreedSpecies,
+  FosterInput,
   FosterPlacement,
   MedicalRecord,
   AnimalNote,
   AnimalRelationship,
   AnimalPhoto,
   Person,
+  PersonRole,
   Product,
   SupplyRequest,
   SupplyRequestItem,
@@ -14,7 +17,11 @@ import {
   SittingRequest,
   SittingRequestPlacement,
   ClinicEvent,
-  ClinicSlot } from
+  ClinicSlot,
+  ClinicSlotProcedure,
+  AnimalActionItem,
+  Litter,
+  Adoption } from
 '../types';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -34,6 +41,40 @@ function seedDateTime(daysFromNow: number, hour: number, minute = 0): string {
   return d.toISOString();
 }
 
+// Global breed catalog (mirrors the `breeds` table seed). Demo mode reads this;
+// production reads the Supabase table.
+const BREED_DATA: [BreedSpecies, string[]][] = [
+['dog', [
+'Mixed Breed', 'Unknown', 'Labrador Retriever', 'Labrador Mix',
+'German Shepherd', 'German Shepherd Mix', 'Golden Retriever',
+'Golden Retriever Mix', 'Pit Bull', 'Pit Bull Mix',
+'American Staffordshire Terrier', 'Staffordshire Bull Terrier',
+'Chihuahua', 'Chihuahua Mix', 'Husky', 'Husky Mix', 'Australian Shepherd',
+'Border Collie', 'Boxer', 'Poodle', 'Standard Poodle', 'Miniature Poodle',
+'Shih Tzu', 'Yorkshire Terrier', 'Dachshund', 'Beagle', 'Corgi',
+'Great Pyrenees', 'Mastiff', 'Doberman Pinscher', 'Rottweiler',
+'Pomeranian', 'French Bulldog', 'Bulldog', 'Cocker Spaniel',
+'Jack Russell Terrier', 'Boston Terrier']],
+['cat', [
+'Domestic Shorthair', 'Domestic Medium Hair', 'Domestic Longhair',
+'Mixed Breed', 'Unknown', 'Siamese', 'Maine Coon', 'Persian', 'Ragdoll',
+'Bengal', 'Russian Blue', 'British Shorthair', 'Sphynx', 'Scottish Fold',
+'Norwegian Forest Cat']],
+['rabbit', [
+'Mixed Breed', 'Unknown', 'Lionhead', 'Mini Rex', 'Holland Lop',
+'Netherland Dwarf']],
+['bird', [
+'Parakeet', 'Cockatiel', 'Lovebird', 'Canary', 'Conure', 'Unknown']]];
+
+export const seedBreeds: Breed[] = BREED_DATA.flatMap(([species, names]) =>
+names.map((name, i) => ({
+  id: `br_${species}_${i}`,
+  species,
+  name,
+  active: true
+}))
+);
+
 export const seedAnimals: Animal[] = [
 {
   id: 'a1',
@@ -45,6 +86,7 @@ export const seedAnimals: Animal[] = [
   intake_source: 'City Shelter Transfer',
   status: 'adoptable',
   priority: 'normal',
+  is_on_hold: true,
   description:
   'A sweet, goofy Golden Retriever mix who loves everyone. Great with kids and other dogs. Needs a yard to run in.',
   microchip_number: '981020000000001',
@@ -83,7 +125,7 @@ export const seedAnimals: Animal[] = [
   estimated_birth_date: '2023-09-01',
   intake_date: '2023-11-10',
   intake_source: 'Stray',
-  status: 'fostered',
+  status: 'adoptable',
   priority: 'normal',
   description:
   'Energetic terrier mix puppy. Learning basic commands and doing well with crate training.',
@@ -109,6 +151,7 @@ export const seedAnimals: Animal[] = [
   'Tiny black kitten found alone. Currently battling an upper respiratory infection. Needs immediate foster placement.',
   primary_photo_url:
   'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&q=80&w=800',
+  litter_id: 'litter_demo',
   created_at: '2025-11-22T08:00:00Z',
   updated_at: '2025-11-22T08:00:00Z'
 },
@@ -174,8 +217,9 @@ export const seedAnimals: Animal[] = [
   estimated_birth_date: '2023-05-15',
   intake_date: '2023-11-15',
   intake_source: 'Hoarding Case',
-  status: 'fostered',
+  status: 'not_ready',
   priority: 'normal',
+  has_behavior_concern: true,
   description:
   'Timid young cat learning to trust humans. Making great progress in foster.',
   microchip_number: '981020000000008',
@@ -212,12 +256,13 @@ export const seedAnimals: Animal[] = [
   estimated_birth_date: '2023-11-01',
   intake_date: '2023-11-20',
   intake_source: 'Born in Care',
-  status: 'fostered',
+  status: 'not_ready',
   priority: 'normal',
   description: 'Playful kitten, part of a litter of 4.',
   primary_photo_url:
   'https://images.unsplash.com/photo-1596854407944-bf87f6fdd49e?auto=format&fit=crop&q=80&w=800',
   current_foster_id: 'f7',
+  litter_id: 'litter_demo',
   created_at: '2025-11-20T10:00:00Z',
   updated_at: '2025-11-20T10:00:00Z'
 },
@@ -246,8 +291,9 @@ export const seedAnimals: Animal[] = [
   estimated_birth_date: '2017-09-20',
   intake_date: '2023-10-10',
   intake_source: 'City Shelter Transfer',
-  status: 'fostered',
+  status: 'not_ready',
   priority: 'needs_attention',
+  has_medical_concern: true,
   action_needed:
   'Review senior bloodwork results with vet and confirm renal diet plan.',
   description: 'Senior kitty who loves heated blankets and quiet afternoons.',
@@ -258,7 +304,9 @@ export const seedAnimals: Animal[] = [
 }];
 
 
-export const seedFosters: FosterParent[] = [
+// Fosters are people with the 'foster_parent' role. These literals carry the
+// foster-specific fields; the .map below turns them into Person records.
+const rawFosters: (Omit<FosterInput, 'roles'> & { id: string })[] = [
 {
   id: 'f1',
   first_name: 'Sarah',
@@ -388,12 +436,20 @@ export const seedFosters: FosterParent[] = [
   'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200'
 }];
 
+// Foster literals → Person records (role 'volunteer' + 'foster_parent' in roles).
+const fosterPeople: Person[] = rawFosters.map((f) => ({
+  ...f,
+  role: 'volunteer' as PersonRole,
+  roles: ['foster_parent'] as PersonRole[],
+  created_at: '2024-01-01T10:00:00Z'
+}));
+
 
 export const seedPlacements: FosterPlacement[] = [
 {
   id: 'p1',
   animal_id: 'a3',
-  foster_parent_id: 'f1',
+  person_id:'f1',
   start_date: '2023-11-12T10:00:00Z',
   placement_status: 'active',
   placement_type: 'foster'
@@ -401,7 +457,7 @@ export const seedPlacements: FosterPlacement[] = [
 {
   id: 'p2',
   animal_id: 'a2',
-  foster_parent_id: 'f3',
+  person_id:'f3',
   start_date: '2023-11-06T14:00:00Z',
   placement_status: 'active',
   placement_type: 'medical_foster',
@@ -410,7 +466,7 @@ export const seedPlacements: FosterPlacement[] = [
 {
   id: 'p3',
   animal_id: 'a5',
-  foster_parent_id: 'f1',
+  person_id:'f1',
   start_date: '2023-09-16T09:00:00Z',
   end_date: '2023-10-30T14:00:00Z',
   placement_status: 'completed',
@@ -421,7 +477,7 @@ export const seedPlacements: FosterPlacement[] = [
 {
   id: 'p4',
   animal_id: 'a8',
-  foster_parent_id: 'f5',
+  person_id:'f5',
   start_date: '2023-11-18T10:00:00Z',
   placement_status: 'active',
   placement_type: 'foster'
@@ -430,7 +486,7 @@ export const seedPlacements: FosterPlacement[] = [
 {
   id: 'p5a',
   animal_id: 'a10',
-  foster_parent_id: 'f2',
+  person_id:'f2',
   start_date: '2024-01-08T10:00:00Z',
   end_date: '2024-06-15T10:00:00Z',
   placement_status: 'completed',
@@ -441,7 +497,7 @@ export const seedPlacements: FosterPlacement[] = [
 {
   id: 'p5b',
   animal_id: 'a10',
-  foster_parent_id: 'f9',
+  person_id:'f9',
   start_date: '2024-06-15T10:00:00Z',
   end_date: '2025-09-30T10:00:00Z',
   placement_status: 'completed',
@@ -451,7 +507,7 @@ export const seedPlacements: FosterPlacement[] = [
 {
   id: 'p5c',
   animal_id: 'a10',
-  foster_parent_id: 'f7',
+  person_id:'f7',
   start_date: '2025-09-30T10:00:00Z',
   placement_status: 'active',
   placement_type: 'foster'
@@ -459,7 +515,7 @@ export const seedPlacements: FosterPlacement[] = [
 {
   id: 'p6',
   animal_id: 'a12',
-  foster_parent_id: 'f7',
+  person_id:'f7',
   start_date: '2023-10-15T10:00:00Z',
   placement_status: 'active',
   placement_type: 'foster'
@@ -467,7 +523,7 @@ export const seedPlacements: FosterPlacement[] = [
 {
   id: 'p7',
   animal_id: 'a11',
-  foster_parent_id: 'f10',
+  person_id:'f10',
   start_date: '2023-11-05T10:00:00Z',
   end_date: '2023-11-15T10:00:00Z',
   placement_status: 'completed',
@@ -577,6 +633,25 @@ export const seedNotes: AnimalNote[] = [
 }];
 
 
+// Demo litter — members are linked via animals.litter_id (a4 Milkshake + a10
+// Willow). Mother is Marmalade (a2), who gave birth in care.
+export const seedLitters: Litter[] = [
+{
+  id: 'litter_demo',
+  name: undefined,
+  species: 'Cat',
+  estimated_birth_date: '2023-10-25',
+  intake_date: '2023-11-20',
+  intake_source: 'Born in Care',
+  mother_animal_id: 'a2',
+  notes: 'Litter born during a mother-cat intake stay.'
+}];
+
+
+// Adoptions start empty in the demo — use "Start Adoption" on an adoptable
+// animal to exercise the workflow (resets on refresh, like all demo mutations).
+export const seedAdoptions: Adoption[] = [];
+
 export const seedRelationships: AnimalRelationship[] = [
 // Marmalade gave birth in care — Willow is her kitten.
 {
@@ -586,13 +661,8 @@ export const seedRelationships: AnimalRelationship[] = [
   relationship_type: 'mother',
   notes: 'Litter born during intake stay.'
 },
-// Willow and Milkshake are littermates (cross-listed for demo richness).
-{
-  id: 'r2',
-  animal_id: 'a10',
-  related_animal_id: 'a4',
-  relationship_type: 'littermate'
-},
+// (Willow & Milkshake littermate link is now expressed via a shared
+//  litter_id on those seed animals — see seedAnimals — not a relationship row.)
 // Biscuit and Duffy are a bonded pair — must be adopted together.
 {
   id: 'r3',
@@ -690,7 +760,9 @@ export const seedPhotos: AnimalPhoto[] = [
 }];
 
 
-export const seedPeople: Person[] = [
+// Directory contacts (vets, staff, volunteers, adopters). roles[] is injected
+// below; fosters are merged in from fosterPeople.
+const contactPeople: Omit<Person, 'roles'>[] = [
 {
   id: 'pe1',
   first_name: 'Dr. Emily',
@@ -843,6 +915,30 @@ export const seedPeople: Person[] = [
   active: true,
   created_at: '2025-10-05T10:00:00Z'
 }];
+
+// People = contacts + fosters. volunteer_type is retired — fold each legacy
+// value into a specific role and drop the column. Bare 'volunteer' (no specialty)
+// is kept only when there's no more-specific role.
+const VOLUNTEER_TYPE_TO_ROLE: Record<string, PersonRole | undefined> = {
+  administrative: 'admin',
+  event_support: 'event_support',
+  social_media: 'social_media',
+  trapper: 'trapper',
+  transport: 'transport',
+  foster_parent: undefined, // fosters come from fosterPeople; avoid duplicates
+  other: undefined
+};
+export const seedPeople: Person[] = [
+...contactPeople.map((p) => {
+  const roles: PersonRole[] = p.role === 'volunteer' ? [] : [p.role];
+  const mapped = p.volunteer_type ?
+  VOLUNTEER_TYPE_TO_ROLE[p.volunteer_type] :
+  undefined;
+  if (mapped && !roles.includes(mapped)) roles.push(mapped);
+  if (roles.length === 0) roles.push('volunteer');
+  return { ...p, roles, volunteer_type: undefined };
+}),
+...fosterPeople];
 
 
 export const seedProducts: Product[] = [
@@ -1269,7 +1365,6 @@ export const seedClinicSlots: ClinicSlot[] = [
   id: 'cs1',
   clinic_event_id: 'ce1',
   animal_id: 'a4', // Milkshake
-  procedure_type: 'spay_neuter',
   reserved_by_person_id: 'pe3',
   status: 'reserved',
   notes: 'Pending URI clearance; recheck day-before.'
@@ -1278,7 +1373,6 @@ export const seedClinicSlots: ClinicSlot[] = [
   id: 'cs2',
   clinic_event_id: 'ce1',
   animal_id: 'a7', // Pip
-  procedure_type: 'spay_neuter',
   reserved_by_person_id: 'pe3',
   status: 'confirmed'
 },
@@ -1286,7 +1380,6 @@ export const seedClinicSlots: ClinicSlot[] = [
   id: 'cs3',
   clinic_event_id: 'ce1',
   animal_id: 'a10', // Willow
-  procedure_type: 'spay_neuter',
   reserved_by_person_id: 'pe3',
   status: 'confirmed'
 },
@@ -1294,7 +1387,6 @@ export const seedClinicSlots: ClinicSlot[] = [
   id: 'cs4',
   clinic_event_id: 'ce1',
   animal_id: 'a9', // Otis
-  procedure_type: 'exam',
   reserved_by_person_id: 'pe4',
   status: 'reserved',
   notes: 'Right hind leg limp eval.'
@@ -1304,7 +1396,6 @@ export const seedClinicSlots: ClinicSlot[] = [
   id: 'cs5',
   clinic_event_id: 'ce2',
   animal_id: 'a6', // Hazel
-  procedure_type: 'spay_neuter',
   reserved_by_person_id: 'pe3',
   status: 'reserved'
 },
@@ -1313,7 +1404,79 @@ export const seedClinicSlots: ClinicSlot[] = [
   id: 'cs6',
   clinic_event_id: 'ce3',
   animal_id: 'a5', // Luna
-  procedure_type: 'spay_neuter',
   reserved_by_person_id: 'pe3',
   status: 'completed'
+}];
+
+// Each slot's procedures (cats commonly get several per visit).
+export const seedClinicSlotProcedures: ClinicSlotProcedure[] = [
+// cs1 — Milkshake: full intake combo
+{ id: 'csp1', clinic_slot_id: 'cs1', procedure_type: 'spay_neuter', completed: false },
+{ id: 'csp2', clinic_slot_id: 'cs1', procedure_type: 'vaccines', completed: false },
+{ id: 'csp3', clinic_slot_id: 'cs1', procedure_type: 'flea_treatment', completed: false },
+// cs2 — Pip
+{ id: 'csp4', clinic_slot_id: 'cs2', procedure_type: 'spay_neuter', completed: false },
+{ id: 'csp5', clinic_slot_id: 'cs2', procedure_type: 'vaccines', completed: false },
+// cs3 — Willow
+{ id: 'csp6', clinic_slot_id: 'cs3', procedure_type: 'spay_neuter', completed: false },
+{ id: 'csp7', clinic_slot_id: 'cs3', procedure_type: 'microchip', completed: false },
+// cs4 — Otis: exam only
+{ id: 'csp8', clinic_slot_id: 'cs4', procedure_type: 'exam', completed: false },
+// cs5 — Hazel
+{ id: 'csp9', clinic_slot_id: 'cs5', procedure_type: 'spay_neuter', completed: false },
+// cs6 — Luna: past clinic, all done
+{ id: 'csp10', clinic_slot_id: 'cs6', procedure_type: 'spay_neuter', completed: true },
+{ id: 'csp11', clinic_slot_id: 'cs6', procedure_type: 'vaccines', completed: true },
+{ id: 'csp12', clinic_slot_id: 'cs6', procedure_type: 'deworming', completed: true }];
+
+// Open action items for the elevated-priority animals (the "next step" shown in
+// the Action Needed banner), plus one completed item to show history/timeline.
+export const seedActionItems: AnimalActionItem[] = [
+{
+  id: 'ai1',
+  animal_id: 'a2', // Marmalade — needs_attention
+  description:
+  'Soft food only + finish 10-day antibiotic course (3 days remaining). Recheck on Nov 25.',
+  priority: 'needs_attention',
+  status: 'open',
+  created_at: '2025-11-15T09:00:00Z'
+},
+{
+  id: 'ai2',
+  animal_id: 'a4', // critical
+  description:
+  'Start URI antibiotics today and find an isolated foster — cannot be housed with other kittens.',
+  priority: 'critical',
+  status: 'open',
+  created_at: '2025-11-22T08:00:00Z'
+},
+{
+  id: 'ai3',
+  animal_id: 'a9', // urgent
+  description:
+  'Schedule vet eval for right hind leg limp this week and identify a medical foster home.',
+  priority: 'urgent',
+  status: 'open',
+  created_at: '2025-11-28T10:30:00Z'
+},
+{
+  id: 'ai4',
+  animal_id: 'a12', // needs_attention
+  description:
+  'Review senior bloodwork results with vet and confirm renal diet plan.',
+  priority: 'needs_attention',
+  status: 'open',
+  created_at: '2025-11-10T11:00:00Z'
+},
+// A completed earlier step on a2 — shows in the activity timeline as history.
+{
+  id: 'ai5',
+  animal_id: 'a2',
+  description: 'Complete intake exam and dental assessment.',
+  priority: 'needs_attention',
+  status: 'completed',
+  created_at: '2025-11-06T09:00:00Z',
+  completed_at: '2025-11-12T14:00:00Z',
+  completed_by: 'demo',
+  completion_note: 'Dental surgery completed; switched to soft-food recovery.'
 }];

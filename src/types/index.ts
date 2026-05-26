@@ -1,24 +1,85 @@
+// Lifecycle stage only. "In foster" is NOT a status — it's derived from an
+// active FosterPlacement (current_foster_id). Holds/concerns are flags on the
+// Animal (is_on_hold / has_behavior_concern / has_medical_concern), orthogonal
+// to lifecycle. 'not_ready' = in care but not yet posted for adoption.
+// 'adoption_pending' is set automatically while an adoption is past the inquiry
+// stage (an active Adoption drives it); completing the adoption moves it to
+// 'adopted'. It signals the animal is effectively on hold for that adopter.
 export type AnimalStatus =
 'intake' |
 'medical' |
-'hold' |
-'fostered' |
+'not_ready' |
 'adoptable' |
+'adoption_pending' |
 'adopted' |
 'hospice' |
 'deceased';
 
 export type Priority = 'normal' | 'needs_attention' | 'urgent' | 'critical';
 
+export type ActionItemStatus = 'open' | 'completed' | 'cancelled';
+// A tracked "next step" for an animal. Replaces the single animal.action_needed
+// field so completions/cancellations are kept in history (and shown in the
+// activity timeline). At most one 'open' item per animal.
+export interface AnimalActionItem {
+  id: string;
+  animal_id: string;
+  description: string;
+  /** Mirrors the elevated Priority levels (no 'normal'). */
+  priority: Exclude<Priority, 'normal'>;
+  status: ActionItemStatus;
+  created_at: string;
+  completed_at?: string;
+  /** Auth user id who completed/cancelled it. */
+  completed_by?: string;
+  completion_note?: string;
+}
+
 export type Species = 'Dog' | 'Cat' | 'Other';
 export type Sex = 'Male' | 'Female' | 'Unknown';
 
+/** How `estimated_birth_date` was derived. */
+export type BirthdateSource =
+'exact_birthdate' |
+'estimated_birthdate' |
+'estimated_age';
+export type AgeUnit = 'days' | 'weeks' | 'months' | 'years';
+
 export interface Animal {
   id: string;
-  name: string;
+  /**
+   * Display name. Either `name` or `rescue_id` must be present (DB CHECK).
+   * Animals can exist with just a Rescue ID (e.g. unnamed cats in a TNR
+   * colony) — use `animalDisplayName()` in UI to pick the right label.
+   */
+  name?: string;
+  /**
+   * Operational identifier assigned by the rescue (e.g. `DanBH-1`, `ACP-1044`).
+   * Unique within an organization (partial unique index, NULL allowed).
+   */
+  rescue_id?: string;
   species: Species;
   sex: Sex;
+  /**
+   * Canonical date used to compute current age everywhere. Always set — when
+   * the user gives an estimated age instead, it's computed from that.
+   */
   estimated_birth_date: string;
+  /** Known breed from the `breeds` catalog (mutually exclusive with breed_text). */
+  breed_id?: string;
+  /** Free-text breed for custom / messy real-world values ("Pit mix", etc.). */
+  breed_text?: string;
+  is_mixed_breed?: boolean;
+  /** Set when this animal belongs to a litter (see Litter). Littermates are
+   *  derived from shared litter_id, not from AnimalRelationship rows. */
+  litter_id?: string;
+  /** Metadata: how `estimated_birth_date` was arrived at. Defaults to estimated_birthdate. */
+  birthdate_source?: BirthdateSource;
+  /** Original age estimate (audit/context), set when birthdate_source === 'estimated_age'. */
+  estimated_age_value?: number;
+  estimated_age_unit?: AgeUnit;
+  /** The date the age estimate was anchored to (usually intake or today). */
+  estimated_age_as_of?: string;
   intake_date: string;
   intake_source: string;
   status: AnimalStatus;
@@ -37,16 +98,39 @@ export interface Animal {
    */
   adoption_profile_url?: string;
   /**
-   * Denormalized cache: foster_parent_id of the active FosterPlacement, if any.
+   * Denormalized cache: person_id of the active FosterPlacement's foster, if any.
    * The placements collection remains the source of truth for history; kept
    * in sync by placeAnimal / reassignFoster. Components may prefer the
    * derived check (active placement) for consistency with seed data.
    */
   current_foster_id?: string;
+  /**
+   * Condition flags — orthogonal to lifecycle `status` (an animal can be
+   * Adoptable AND On Hold, or Not Ready with a behavior concern). DB columns are
+   * NOT NULL DEFAULT false; optional here since optimistic local rows may omit
+   * them (treat undefined as false).
+   */
+  is_on_hold?: boolean;
+  has_behavior_concern?: boolean;
+  has_medical_concern?: boolean;
+  /** Adopter (people.id) once the animal is adopted; set with `adopted_at`. */
+  adopted_by_id?: string;
+  /** Timestamp the adoption was finalized. */
+  adopted_at?: string;
   /** Staff-only notes, separate from the public-facing `description` blurb. */
   internal_notes?: string;
   created_at: string;
   updated_at: string;
+}
+
+// Breed reference catalog (global, shared across orgs). `species` is lowercase
+// and includes rabbit/bird/other, unlike the app's TitleCase `Species`.
+export type BreedSpecies = 'dog' | 'cat' | 'rabbit' | 'bird' | 'other';
+export interface Breed {
+  id: string;
+  species: BreedSpecies;
+  name: string;
+  active: boolean;
 }
 
 export type PhotoCategory =
@@ -62,13 +146,19 @@ export interface AnimalPhoto {
   id: string;
   animal_id: string;
   url: string;
+  /**
+   * Path within the Supabase Storage `animal-photos` bucket. Present for
+   * uploaded files (used to delete the object); absent for external URLs.
+   */
+  storage_path?: string;
   category: PhotoCategory;
   caption?: string;
   uploaded_at: string;
 }
 
-export interface FosterParent {
-  id: string;
+// The foster-specific fields captured by the Add/Edit Foster forms. A foster is
+// created/updated as a `people` row (role 'volunteer' + roles ['foster_parent']).
+export interface FosterInput {
   first_name: string;
   last_name: string;
   email: string;
@@ -79,6 +169,8 @@ export interface FosterParent {
   notes: string;
   active: boolean;
   photo_url?: string;
+  /** Always includes 'foster_parent'; may include other roles too. */
+  roles: PersonRole[];
 }
 
 export type PlacementType = 'foster' | 'medical_foster' | 'trial_adoption';
@@ -86,7 +178,8 @@ export type PlacementType = 'foster' | 'medical_foster' | 'trial_adoption';
 export interface FosterPlacement {
   id: string;
   animal_id: string;
-  foster_parent_id: string;
+  /** The foster — a `people` row (with the 'foster_parent' role). */
+  person_id: string;
   start_date: string;
   /** Nullable while the placement is active. */
   end_date?: string;
@@ -123,8 +216,21 @@ export interface MedicalRecord {
   performed_date?: string;
   due_date?: string;
   status: MedicalStatus;
+  /** Known person who performed/administered it (people row). */
+  provider_contact_id?: string;
+  /** Free-text performer fallback when not a known contact. */
   provider_name?: string;
+  /** Scheduled clinic event it was done at (clinic_events row). */
+  clinic_id?: string;
+  /** Free-text facility fallback (vet office, shelter, hospital, …). */
+  facility_name?: string;
   notes?: string;
+  /**
+   * When a recurring procedure (vaccine/exam/surgery/medication) becomes due
+   * again — e.g. a rabies shot renewed in a year. Optional; many procedures
+   * aren't recurring.
+   */
+  next_due_date?: string;
 }
 
 export type NoteType =
@@ -147,17 +253,74 @@ export interface AnimalRelationship {
   id: string;
   animal_id: string;
   related_animal_id: string;
-  relationship_type:
-  'mother' |
-  'father' |
-  'sibling' |
-  'child' |
-  'bonded_pair' |
-  'littermate';
+  // 'littermate' intentionally removed — littermates are derived from a shared
+  // litter_id (avoids the N² relationship rows). See Litter + RelationshipsCard.
+  relationship_type: 'mother' | 'father' | 'sibling' | 'child' | 'bonded_pair';
   notes?: string;
 }
 
-export type PersonRole = 'vet' | 'rescue_staff' | 'volunteer' | 'adopter';
+// Operational adoption workflow. One row per adoption attempt for an animal;
+// an animal can have at most one *active* (non-terminal) adoption at a time.
+// Completing it sets the animal to 'adopted' + stamps adopted_by_id/adopted_at.
+export type AdoptionStatus =
+'inquiry' |
+'application_submitted' |
+'meet_and_greet' |
+'pending_paperwork' |
+'ready_for_placement' |
+'completed' |
+'cancelled';
+export interface Adoption {
+  id: string;
+  animal_id: string;
+  adopter_id: string;
+  status: AdoptionStatus;
+  submitted_at?: string;
+  approved_at?: string;
+  completed_at?: string;
+  cancelled_at?: string;
+  paperwork_sent_at?: string;
+  paperwork_completed_at?: string;
+  donation_amount?: number;
+  notes?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+// A litter groups animals that share intake/age/origin metadata. Members link
+// via animals.litter_id; littermates are derived from that, not relationships.
+export interface Litter {
+  id: string;
+  name?: string;
+  species: Species;
+  breed_id?: string;
+  breed_text?: string;
+  estimated_birth_date?: string;
+  intake_date: string;
+  intake_source?: string;
+  /** The mother (an existing Animal), if known. */
+  mother_animal_id?: string;
+  notes?: string;
+}
+
+// A person's roles/capabilities — a single flat, non-hierarchical set (this
+// replaced the old role + volunteer_type split). Selectable roles are grouped in
+// RolesMultiSelect (Animal Care / Volunteer & Support / Organization). 'volunteer'
+// is NOT offered — it's retained only for the legacy NOT-NULL `people.role` column
+// + role-less legacy rows. `roles` is a free-form text[] in Postgres, so adding
+// values here needs no migration.
+export type PersonRole =
+'vet' |
+'rescue_staff' |
+'volunteer' |
+'adopter' |
+'donor' |
+'foster_parent' |
+'trapper' |
+'transport' |
+'admin' |
+'event_support' |
+'social_media';
 export type VolunteerType =
 'foster_parent' |
 'administrative' |
@@ -173,6 +336,16 @@ export interface Person {
   last_name: string;
   email: string;
   phone?: string;
+  /**
+   * Multi-role: a person can be e.g. ['vet', 'foster_parent']. This is the
+   * source of truth for what someone does. Fosters are people whose `roles`
+   * include 'foster_parent'.
+   */
+  roles: PersonRole[];
+  /**
+   * Legacy single role — still written for back-compat (DB column is NOT NULL),
+   * but read from `roles`. New foster-people use role 'volunteer'.
+   */
   role: PersonRole;
   volunteer_type?: VolunteerType;
   organization_name?: string;
@@ -180,6 +353,16 @@ export interface Person {
   photo_url?: string;
   active: boolean;
   created_at: string;
+  /**
+   * Set when this record is an app-user account (the signed-in user's "self"
+   * record), as opposed to a directory contact. Account records are used for
+   * attribution but hidden from the Contacts directory.
+   */
+  user_id?: string;
+  // — Foster-specific (meaningful when roles includes 'foster_parent') —
+  address?: string;
+  max_capacity?: number;
+  preferred_species?: Species[];
 }
 
 export type SupplyRequestStatus =
@@ -226,6 +409,14 @@ export interface SupplyRequest {
   fulfilled_date?: string;
   delivery_method?: DeliveryMethod;
   notes?: string;
+  /**
+   * When true, this request doubles as a reusable "common request" template for
+   * its requester. Reusing it creates a brand-new request copied from this one
+   * (this row is never mutated except to bump `common_request_last_used_at`).
+   */
+  is_common_request?: boolean;
+  common_request_name?: string;
+  common_request_last_used_at?: string;
   created_at: string;
   updated_at: string;
 }
@@ -356,6 +547,9 @@ export type ClinicSlotProcedureType =
 'dental' |
 'exam' |
 'recheck' |
+'flea_treatment' |
+'deworming' |
+'microchip' |
 'other';
 
 export type ClinicSlotStatus =
@@ -369,8 +563,17 @@ export interface ClinicSlot {
   id: string;
   clinic_event_id: string;
   animal_id: string;
-  procedure_type: ClinicSlotProcedureType;
   reserved_by_person_id?: string;
   status: ClinicSlotStatus;
   notes?: string;
+}
+
+// A slot's individual procedures (an animal usually gets several per visit).
+// Stored in clinic_slot_procedures; `completed` tracks per-procedure progress.
+export interface ClinicSlotProcedure {
+  id: string;
+  clinic_slot_id: string;
+  procedure_type: ClinicSlotProcedureType;
+  notes?: string;
+  completed: boolean;
 }

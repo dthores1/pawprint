@@ -1,9 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useWhisker } from '../context/WhiskerContext';
 import { Card } from '../components/ui/Card';
 import { Avatar } from '../components/ui/Avatar';
+import { Button } from '../components/ui/Button';
 import { StatusBadge } from '../components/ui/Badge';
+import { SpeciesBadge } from '../components/ui/SpeciesBadge';
+import { PlaceAnimalModal } from '../components/animals/PlaceAnimalModal';
+import { EditFosterModal } from '../components/fosters/EditFosterModal';
+import { animalDisplayName } from '../lib/utils';
 import {
   ArrowLeftIcon,
   MapPinIcon,
@@ -11,6 +16,7 @@ import {
   MailIcon,
   HomeIcon,
   CheckCircle2Icon,
+  Edit2Icon,
   InfoIcon } from
 'lucide-react';
 export function FosterProfile() {
@@ -18,12 +24,14 @@ export function FosterProfile() {
     id: string;
   }>();
   const { fosters, placements, animals } = useWhisker();
+  const [isPlaceModalOpen, setIsPlaceModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const foster = fosters.find((f) => f.id === id);
   if (!foster) {
     return <div className="p-8 text-center">Foster not found.</div>;
   }
   const fosterPlacements = placements.filter(
-    (p) => p.foster_parent_id === foster.id
+    (p) => p.person_id === foster.id
   );
   const activePlacements = fosterPlacements.filter(
     (p) => p.placement_status === 'active'
@@ -32,16 +40,26 @@ export function FosterProfile() {
     (p) => p.placement_status === 'completed'
   );
   const activeCount = activePlacements.length;
-  const isFull = activeCount >= foster.max_capacity;
-  const capacityPercent = activeCount / foster.max_capacity * 100;
+  const cap = foster.max_capacity ?? 0;
+  const isFull = activeCount >= cap;
+  const capacityPercent = cap > 0 ? activeCount / cap * 100 : 0;
   return (
     <div className="space-y-6 pb-12">
-      <Link
-        to="/fosters"
-        className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-text-primary transition-colors">
-        
-        <ArrowLeftIcon className="w-4 h-4" /> Back to Fosters
-      </Link>
+      <div className="flex items-center justify-between gap-3">
+        <Link
+          to="/fosters"
+          className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-text-primary transition-colors">
+
+          <ArrowLeftIcon className="w-4 h-4" /> Back to Fosters
+        </Link>
+        <Button
+          variant="soft"
+          size="sm"
+          onClick={() => setIsEditModalOpen(true)}>
+
+          <Edit2Icon className="w-4 h-4 mr-2" /> Edit
+        </Button>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Profile Info */}
@@ -75,7 +93,9 @@ export function FosterProfile() {
             <div className="space-y-4 pt-6 border-t border-border">
               <div className="flex items-start gap-3">
                 <MapPinIcon className="w-5 h-5 text-text-secondary shrink-0 mt-0.5" />
-                <span className="text-text-primary">{foster.address}</span>
+                <span className="text-text-primary">
+                  {foster.address || '—'}
+                </span>
               </div>
               <div className="flex items-center gap-3">
                 <PhoneIcon className="w-5 h-5 text-text-secondary shrink-0" />
@@ -108,7 +128,7 @@ export function FosterProfile() {
                 Preferred Species
               </p>
               <div className="flex gap-2">
-                {foster.preferred_species.map((s) =>
+                {(foster.preferred_species ?? []).map((s) =>
                 <span
                   key={s}
                   className="px-3 py-1 bg-accent text-secondary rounded-lg text-sm font-medium">
@@ -144,7 +164,7 @@ export function FosterProfile() {
                 </span>
                 <span className="text-text-secondary text-lg">
                   {' '}
-                  / {foster.max_capacity}
+                  / {cap}
                 </span>
               </div>
             </div>
@@ -164,49 +184,66 @@ export function FosterProfile() {
           </Card>
 
           {/* Current Placements */}
-          <div>
-            <h3 className="text-lg font-heading font-bold mb-4 flex items-center gap-2">
-              <HomeIcon className="w-5 h-5 text-primary" />
-              Current Placements
-            </h3>
-            {activePlacements.length === 0 ?
-            <Card className="p-8 text-center text-text-secondary">
-                No animals currently placed with this foster.
-              </Card> :
+          <Card className="p-6">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h2 className="text-xl font-heading font-bold flex items-center gap-2">
+                <HomeIcon className="w-5 h-5 text-primary" />
+                Current Placements
+              </h2>
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={!foster.active}
+                onClick={() => setIsPlaceModalOpen(true)}>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <HomeIcon className="w-4 h-4 mr-2" />
+                Place Animal
+              </Button>
+            </div>
+            {!foster.active &&
+            <p className="text-sm text-text-secondary mb-4">
+                This foster is inactive and cannot receive new placements.
+              </p>
+            }
+            {activePlacements.length === 0 ?
+            <p className="text-sm text-text-secondary">
+                No animals currently placed with this foster.
+              </p> :
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {activePlacements.map((placement) => {
                 const animal = animals.find(
                   (a) => a.id === placement.animal_id
                 );
                 if (!animal) return null;
                 return (
-                  <Link key={placement.id} to={`/animals/${animal.id}`}>
-                      <Card hoverLift className="p-4 flex items-center gap-4">
+                  <Link
+                    key={placement.id}
+                    to={`/animals/${animal.id}`}
+                    className="flex items-center gap-3 p-3 rounded-xl border border-border hover:bg-background transition-colors group">
+
+                      <div className="relative shrink-0">
                         <Avatar
                         src={animal.primary_photo_url}
                         type="animal"
-                        size="lg" />
-                      
-                        <div>
-                          <h4 className="font-bold text-text-primary">
-                            {animal.name}
-                          </h4>
-                          <p className="text-sm text-text-secondary mb-1">
-                            {animal.species} • {animal.sex}
-                          </p>
-                          <StatusBadge
-                          status={animal.status}
-                          className="scale-90 origin-left" />
-                        
+                        species={animal.species} />
+
+                        <div className="absolute -bottom-1 -right-1 ring-2 ring-card rounded-full">
+                          <SpeciesBadge species={animal.species} />
                         </div>
-                      </Card>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-text-primary group-hover:text-primary transition-colors truncate">
+                          {animalDisplayName(animal)}
+                        </p>
+                        <StatusBadge status={animal.status} className="mt-1" />
+                      </div>
                     </Link>);
 
               })}
               </div>
             }
-          </div>
+          </Card>
 
           {/* Past Placements */}
           {pastPlacements.length > 0 &&
@@ -237,7 +274,7 @@ export function FosterProfile() {
                             to={`/animals/${animal.id}`}
                             className="font-medium text-text-primary hover:text-primary">
                             
-                              {animal.name}
+                              {animalDisplayName(animal)}
                             </Link>
                             <p className="text-sm text-text-secondary">
                               {new Date(
@@ -264,6 +301,17 @@ export function FosterProfile() {
           }
         </div>
       </div>
+
+      <PlaceAnimalModal
+        isOpen={isPlaceModalOpen}
+        onClose={() => setIsPlaceModalOpen(false)}
+        fosterId={foster.id} />
+
+      <EditFosterModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        foster={foster} />
+
     </div>);
 
 }

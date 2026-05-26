@@ -11,10 +11,9 @@ import {
   TruckIcon,
   PackageIcon } from
 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, animalDisplayName } from '../lib/utils';
+import { useAuth } from '../context/AuthContext';
 import { SittingRequest, SittingRequestStatus, Animal } from '../types';
-
-const CURRENT_USER = { person_id: 'p_dan' };
 
 const STATUS_LABEL: Record<SittingRequestStatus, string> = {
   open: 'Unclaimed',
@@ -55,8 +54,10 @@ export function Sitting() {
     placements,
     animals,
     people,
-    acceptSittingRequest
+    acceptSittingRequest,
+    updateSittingRequest
   } = useWhisker();
+  const { currentPersonId } = useAuth();
   const [isNewOpen, setIsNewOpen] = useState(false);
   const [tab, setTab] = useState<'unclaimed' | 'mine'>('unclaimed');
 
@@ -68,8 +69,9 @@ export function Sitting() {
   // "Mine" = requests I submitted OR placements I'm sitting.
   const mine = sorted.filter(
     (s) =>
-    s.requested_by_person_id === CURRENT_USER.person_id ||
-    s.sitter_person_id === CURRENT_USER.person_id
+    !!currentPersonId && (
+    s.requested_by_person_id === currentPersonId ||
+    s.sitter_person_id === currentPersonId)
   );
 
   const display = tab === 'unclaimed' ? unclaimed : mine;
@@ -160,8 +162,23 @@ export function Sitting() {
               sitterName={
               sitter ? `${sitter.first_name} ${sitter.last_name}` : undefined
               }
+              canAccept={
+              !!currentPersonId &&
+              s.status === 'open' &&
+              s.requested_by_person_id !== currentPersonId
+              }
               onAccept={() =>
-              acceptSittingRequest(s.id, CURRENT_USER.person_id)
+              currentPersonId &&
+              acceptSittingRequest(s.id, currentPersonId)
+              }
+              canCancel={
+              !!currentPersonId &&
+              s.requested_by_person_id === currentPersonId &&
+              s.status !== 'completed' &&
+              s.status !== 'canceled'
+              }
+              onCancel={() =>
+              updateSittingRequest(s.id, { status: 'canceled' })
               } />);
 
 
@@ -182,15 +199,30 @@ interface SittingCardProps {
   coveredAnimals: Animal[];
   requesterName: string;
   sitterName?: string;
+  canAccept: boolean;
   onAccept: () => void;
+  canCancel: boolean;
+  onCancel: () => void;
 }
 function SittingCard({
   request,
   coveredAnimals,
   requesterName,
   sitterName,
-  onAccept
+  canAccept,
+  onAccept,
+  canCancel,
+  onCancel
 }: SittingCardProps) {
+  const handleCancel = () => {
+    if (
+    window.confirm(
+      'Cancel this sitting request? It will be marked as canceled for everyone.'
+    ))
+    {
+      onCancel();
+    }
+  };
   return (
     <Card className="p-5">
       <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-6">
@@ -218,7 +250,7 @@ function SittingCard({
             <h3 className="text-lg font-heading font-bold text-text-primary">
               {coveredAnimals.length === 0 ?
               'No animals attached' :
-              coveredAnimals.map((a) => a.name).join(', ')}
+              coveredAnimals.map((a) => animalDisplayName(a)).join(', ')}
             </h3>
             <span
               className={cn(
@@ -270,11 +302,23 @@ function SittingCard({
           }
         </div>
 
-        {request.status === 'open' &&
-        <div className="shrink-0">
-            <Button size="sm" onClick={onAccept}>
-              Accept Sitting Request
-            </Button>
+        {(canAccept || canCancel) &&
+        <div className="shrink-0 flex sm:flex-col items-start sm:items-end gap-2">
+            {canAccept &&
+          <Button size="sm" onClick={onAccept}>
+                Accept Sitting Request
+              </Button>
+          }
+            {canCancel &&
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleCancel}
+            className="text-status-urgent-text hover:bg-status-urgent-bg">
+
+                Cancel Request
+              </Button>
+          }
           </div>
         }
       </div>

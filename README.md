@@ -4,8 +4,24 @@ An operationally-focused animal rescue management app. Pawprint helps small-to-m
 
 This document is the canonical reference for **product logic, data model, and design conventions**. Update it whenever a meaningful behavior changes.
 
+> **Stack note:** Pawprint is a React + TypeScript + Vite + Tailwind front end backed by **Supabase** (Postgres + Row-Level Security + Storage + Auth). It is **multi-tenant** — every record belongs to an `organization`, and access is gated by org membership via RLS. See §0 for the backend model; the entity sections below describe the app-facing shapes.
+
 
 ![Application Dashboard / Landing page](docs/images/Landing_Page.png "Dashboard of the application where users can determine organization status at a glance and review items that need attention.")
+
+---
+
+## 0. Backend, persistence & auth
+
+Pawprint persists everything to **Supabase**. The schema lives in `supabase/migrations/*.sql` (run in order in the Supabase SQL editor); the front end talks to it through `src/lib/supabase.ts` and a thin mapping layer in `src/lib/*Api.ts`.
+
+- **Multi-tenant.** Every table carries an `organization_id`. **Row-Level Security** policies restrict every read/write to members of that org (`is_org_member(organization_id)`), so one rescue can never see another's data. `organization_members` links Supabase auth users to orgs with a role (`owner` / `admin` / `member`).
+- **Auth.** Google OAuth + email/password (Supabase Auth). On first sign-in a user with no org is sent to an **Onboarding** screen to create one (a DB trigger makes them the owner). The app is gated: loading → login → onboarding → app.
+- **Accounts vs. contacts.** The signed-in user gets a "self" row in `people` (linked by `user_id`) so their actions can be attributed ("Requested by …"). These self records are **hidden from the Contacts directory** — `people` doubles as both the org's contact directory *and* the set of user accounts, distinguished by `user_id`. (No separate `profiles` table, by design.)
+- **Storage.** Animal photos live in a public `animal-photos` bucket; `animal_photos` rows hold the `storage_path` + `public_url` metadata.
+- **State.** `src/context/WhiskerContext.tsx` exposes every collection + CRUD action via `useWhisker()` (now Supabase-backed, optimistic writes), and `src/context/AuthContext.tsx` owns session, `currentOrg`, and `currentPersonId`. `src/data/seed.ts` is no longer loaded at runtime, but is **intentionally kept** for a planned no-auth demo/portfolio mode (see below).
+
+The sections below describe the **app-facing TypeScript shapes** (`src/types/index.ts`). DB columns are snake_case and largely 1:1; a few differences are called out (e.g. photos' `url` ↔ `public_url`).
 
 ---
 
@@ -26,7 +42,7 @@ The central record. Every animal has both a **lifecycle status** and an orthogon
 | `intake_source` | string | e.g. "City Shelter Transfer". |
 | `status` | `AnimalStatus` | Lifecycle stage — see §2. |
 | `priority` | `Priority` | Severity / attention level — see §3. |
-| `action_needed` | string? | Short next-step sentence. Meaningful when `priority !== 'normal'`. See §4. |
+| `action_needed` | string? | **Retired** — next steps now live in `animal_action_items` (`AnimalActionItem`). See §4. |
 | `description` | string | Free-form personality / context. |
 | `microchip_number` | string? | |
 | `primary_photo_url` | string? | |
@@ -36,22 +52,24 @@ The central record. Every animal has both a **lifecycle status** and an orthogon
 
 Two more Animal fields worth calling out:
 
-- **`current_foster_id`** — denormalized cache of the active placement's `foster_parent_id`. The placements collection is still the source of truth for history; `placeAnimal` and `reassignFoster` keep this field in sync.
+- **`current_foster_id`** — denormalized cache of the active placement's foster (`person_id`, a `people` row). The placements collection is still the source of truth for history; `placeAnimal` and `reassignFoster` keep this field in sync.
 - **`internal_notes`** — staff-only free-form notes. Separate from `description`, which is the public-facing blurb.
 
 ### Other entities
 
-- **`FosterParent`** — has `max_capacity`, `preferred_species`, an `active` flag, and is paired to animals via `FosterPlacement`.
-- **`FosterPlacement`** — links one animal to one foster with a `start_date`, optional `end_date`, `placement_status` (`active` / `completed` / `interrupted`), `placement_type` (`foster` / `medical_foster` / `trial_adoption`), and optional `reason_ended`. An animal is considered "in foster" if any placement with `placement_status: 'active'` exists. The Placement Timeline on the Animal Profile renders this history as a date-range stack. (Type renamed from `AnimalPlacement` — the codebase consistently uses `FosterPlacement` now.)
-- **`MedicalRecord`** — procedure log with `procedure_type`, `procedure_name`, `status` (`completed` / `due` / `scheduled` / `overdue` / `canceled`), `performed_date` and/or `due_date`, `provider_name`, `notes`.
+- **Fosters are `people`, not a separate table.** A foster is a `Person` whose `roles` include `'foster_parent'`, carrying foster-specific fields (`max_capacity`, `preferred_species`, `address`). The `fosters` collection is a derived view (`people.filter(roles.includes('foster_parent'))`); the Add/Edit Foster forms write a `people` row (legacy `role` set to `'volunteer'`). The old `foster_parents` table is retired — see migration `0012`.
+- **`FosterPlacement`** — links one animal to one foster (`person_id` → `people`) with a `start_date`, optional `end_date`, `placement_status` (`active` / `completed` / `interrupted`), `placement_type` (`foster` / `medical_foster` / `trial_adoption`), and optional `reason_ended`. An animal is considered "in foster" if any placement with `placement_status: 'active'` exists. The Placement Timeline on the Animal Profile renders this history as a date-range stack.
+- **`MedicalRecord`** — procedure log with `procedure_type`, `procedure_name`, `status` (`completed` / `due` / `scheduled` / `overdue` / `canceled`), `performed_date` and/or `due_date`, `notes`, and an optional `next_due_date` for recurring procedures (vaccine/exam/surgery/medication) — e.g. a rabies booster due in a year. The Add Medical modal only prompts for next-due on those types, via a relative interval (in N days/weeks/months/years) or an exact date. **Attribution** uses paired lookup-or-free-text fields: **Performed by** is either a known contact (`provider_contact_id` → `people`) or a free-text `provider_name`; **Facility / Event** is either a scheduled clinic (`clinic_id` → `clinic_events`) or a free-text `facility_name`. Each pair is mutually exclusive (picking a contact/clinic clears the free-text, and vice versa). FKs are `ON DELETE SET NULL` so removing a contact or clinic never deletes medical history.
 - **`AnimalNote`** — timestamped free-text note with a `note_type` (`behavior` / `medical` / `foster_update` / `adoption` / `general`).
+- **`AnimalActionItem`** — a tracked "next step" with `description`, elevated `priority`, and `status` (`open` / `completed` / `cancelled`). Replaces the old `action_needed` field so completions are kept in history. At most one `open` per animal. See §4.
 - **`AnimalRelationship`** — animal-to-animal link (mother, father, sibling, etc.). See §8.
+- **`Litter`** — groups animals that share intake/age/origin metadata (species, breed, estimated birth date, intake date/source). Members link via `animals.litter_id`; littermates are derived from that shared id, not from `AnimalRelationship`. Created by the Add Litter flow. See §8.
 - **`AnimalPhoto`** — gallery photo with a `category`. See §8.
-- **`Person`** — non-foster contacts: vets, rescue staff, volunteers, adopters. Used by the Contacts page and as the requester on supply / transport / sitting requests.
+- **`Person`** — every human in the org. A single flat `roles` array is the source of truth for what someone does — `foster_parent`, `admin`, `event_support`, `social_media`, `trapper`, `transport`, `vet`, `rescue_staff` (and system-managed `adopter`). This **replaced the old `role` + `volunteer_type` split** (`volunteer_type` is retired; the legacy single `role` column is still written via `legacyRoleFor()` for back-compat but reads come from `roles`). The Add/Edit Contact and Add/Edit Foster forms all edit `roles` via the grouped `RolesMultiSelect`. Used by the Contacts page, as the requester on supply / transport / sitting requests, and as the foster on placements.
 - **`Product`**, **`SupplyRequest`**, **`SupplyRequestItem`** — supply ordering. See §10.
 - **`TransportRequest`** — request to move an animal or supplies between locations. See §11.
 - **`SittingRequest`** — temporary foster coverage when a placement's foster is unavailable. See §11.
-- **`ClinicEvent`**, **`ClinicSlot`** — TNR clinic planning: a vet date with a fixed capacity, and the animals assigned to it. See §11.
+- **`ClinicEvent`**, **`ClinicSlot`**, **`ClinicSlotProcedure`** — TNR clinic planning: a vet date with a fixed capacity, the animals assigned to it (slots), and each slot's procedures (an animal usually gets several per visit). See §11.
 
 ---
 
@@ -91,14 +109,14 @@ Priority ordering for sorts: `critical > urgent > needs_attention > normal`. See
 
 ## 4. Action Needed
 
-Priority answers "how worried should I be?" Status answers "where is this animal?" **Action Needed** answers "what should someone do today?"
+Priority answers "how worried should I be?" Status answers "where is this animal?" **Action items** answer "what should someone do today?"
 
-- `action_needed: string?` lives on `Animal`.
-- It is **only meaningful when `priority !== 'normal'`**.
-- The `ActionNeededCallout` component (rendered on the Animal Profile, below the hero) is the canonical surface for this field. It is hidden when priority is normal.
+- Action items live in their own table (`AnimalActionItem` → `animal_action_items`), **not** a single field on `Animal`. This keeps a tracked history (completions/cancellations show in the activity timeline) — see the `0011` migration. (The legacy `animals.action_needed` column is retired; do not write to it.)
+- Each item has a `description`, its own elevated `priority` (`needs_attention` / `urgent` / `critical`), and a lifecycle `status` (`open` / `completed` / `cancelled`). Completing or cancelling stamps `completed_at` + `completed_by`; **at most one `open` item per animal** (partial unique index).
+- The `ActionNeededCallout` component (Animal Profile, below the hero) is the canonical surface. It shows the single open item with **Complete** (✓) and **Edit** (✏) icon buttons. Complete opens an in-place confirmation: **Complete**, **Complete & Add Next Step** (completes + creates a fresh open item), or **Cancel item** (sets `cancelled`).
+- The banner is visible whenever there's an open item **or** the animal's `priority !== 'normal'`. If the priority is elevated but no open item exists, it shows: *"{name} is still marked {priority} but has no active action item."* with an **Add action item** button — a soft forcing function for data quality.
 - Text should be specific and operational. Good: *"Soft food only + finish 10-day antibiotic course (3 days remaining). Recheck on Nov 25."* Bad: *"Needs care."*
-- When priority is elevated but no action is set, the callout prompts: *"No action specified yet — what's the next step?"* with an Add button. This is a soft forcing function for data quality.
-- The same string is reused as the subtitle in the Dashboard's **Needs Action** list and the Global Search's **Needs Attention** section. If `action_needed` is unset, those views fall back to `"Needs placement"` (no active placement) or `"Needs review"` (otherwise).
+- The open item's `description` is reused as the subtitle in the Dashboard's **Needs Action** list and Global Search's **Needs Attention** section. With no open item, those views fall back to `"Needs placement"` (no active placement) or `"Needs review"` (otherwise).
 
 ---
 
@@ -159,14 +177,23 @@ Hierarchy is intentional:
 The Animal Profile carries three additional surfaces that round out the record.
 
 ### Relationships
-Animals can be linked via `AnimalRelationship` records with type `mother | father | child | sibling | littermate | bonded_pair`.
+Animals can be linked via `AnimalRelationship` records with type `mother | father | child | sibling | bonded_pair`.
 
 - **Storage is one-directional.** A record like `{ animal_id: 'a2', related_animal_id: 'a10', relationship_type: 'mother' }` means "a2 is the mother of a10."
 - **Display is bidirectional.** The `RelationshipsCard` walks the relationships list and derives the inverse automatically, so a10's page shows "Mother: a2" without needing a duplicate row.
-- Symmetric types (`sibling`, `littermate`, `bonded_pair`) appear identically on both ends.
+- Symmetric types (`sibling`, `bonded_pair`) appear identically on both ends.
+- **Littermates are not a relationship type.** They are derived from a shared `Litter` (animals with the same `litter_id`) rather than stored as rows — this avoids the N² explosion of pairwise littermate links. The `RelationshipsCard` reads both `AnimalRelationship` rows and `litter_id`, and renders littermate links as read-only (no delete button), since the link lives on the litter, not a relationship. See the Litters note below.
 - **The card always renders.** When empty, it shows a soft empty state with a "Link to another animal" CTA. The "Add" button in the header opens `AddRelationshipModal`, which has a searchable animal picker that excludes the current animal and any already-linked animals.
 - "Bonded With" is highlighted with a heart icon — adoption coordinators need to see at a glance that an animal cannot be separated.
 - The card header uses the custom `BoneIcon` since the relationships are animal-to-animal, not people.
+
+### Litters
+Rescues frequently intake whole litters at once. The **Add Litter** flow lives inside the **Add Animal** modal: a `What are you adding?` radio toggles between **Single Animal** and **Litter** (single is the default; the primary CTA stays "Add Animal").
+
+- **Shared once, per-member differs.** Litter-wide fields (species, breed, age / estimated birth date, intake date, intake source, optional litter name + notes) are entered once. Each member row only captures what differs: name, sex, and markings/notes.
+- **Members table.** Starts with two rows; "Add another puppy/kitten" (the noun follows species) adds more. Blank names are auto-filled at submit with a temporary placeholder (`Puppy 1`, `Kitten 2`, …).
+- **What gets created.** `addLitter` inserts one `Litter` row, then one `Animal` per member stamped with the shared metadata and the new `litter_id`. Members start as `intake` / `normal` priority.
+- **Littermates are derived, not stored.** Animals sharing a `litter_id` are littermates; the `RelationshipsCard` surfaces them automatically (read-only). There is intentionally no `littermate` `AnimalRelationship` type.
 
 ### Photo gallery
 Animals can carry many photos (`AnimalPhoto` records) categorized by `PhotoCategory`: `intake | profile | medical | foster | adoption | post_adoption | other`. The Animal Profile has a dedicated **Photos** tab that:
@@ -235,6 +262,7 @@ A request can have many items. Each item is for the same request — multi-anima
 - **Request detail modal** — opened by clicking any row. Shows requester + animal, a **current-status pill** with a colored dot, a **History** list derived from `created_at`, `approved_by_person_id`, `fulfilled_date`, `fulfilled_by_person_id`, and `updated_at`, the line items as a table, and quick-advance / cancel buttons. The presentation is deliberately soft — no horizontal lifecycle stepper, no progress bar. Status feels like a current moment + a short paper trail, not a corporate workflow.
 - **New request modal** — "Requesting as" (read-only current user) + priority + per-item cards. Each item card has a product dropdown (with an "Other" custom-item option), quantity + unit (unit is a dropdown of common units; auto-fills from the product's `default_unit` when a catalog product is selected), and optional notes. A dashed "+ Add another item" CTA appends a card. A clickable bookmark icon at the bottom toggles "Save as common request" for a future templates feature (carries a `TODO(persistence)`). The "For Animal" picker was intentionally removed — supplies rarely map 1:1 to a single animal — and the staff-only "Create request on behalf of…" lookup is stubbed in code comments.
 - **Dashboard widget** — three soft counts on the dashboard: Urgent requests, Pending review (submitted + reviewing), Awaiting delivery (approved + ordered + ready_for_pickup). Each row links to `/supplies`.
+- **Product Catalog (`/supplies/catalog`)** — reached via the "Manage Catalog" button on the Supplies page. Lists the org's `Product` catalog with add/edit (name, category, default unit) and an active/inactive toggle. Inactive products stay on past requests but drop out of the new-request item picker. The catalog is org-scoped and starts empty for a new org — until products are added, the new-request form only offers the "Other (custom item)" path.
 
 ### UX north star
 
@@ -281,7 +309,9 @@ The most operationally complex of the three. TNR orgs run periodic clinics (typi
 - `slot_capacity` — hard cap that drives the capacity bar on cards.
 - `status` — `planning | scheduled | in_progress | completed | canceled`.
 
-**`ClinicSlot`** links an animal to a clinic for a specific `procedure_type` (`spay_neuter | vaccines | dental | exam | recheck | other`) with its own `status` (`reserved | confirmed | completed | no_show | canceled`). Slots are added inline in the **Clinic Detail modal** — pick an animal from a dropdown that excludes anyone already on this clinic's roster, pick a procedure, optionally add notes.
+**`ClinicSlot`** is one animal's appointment at a clinic, with its own `status` (`reserved | confirmed | completed | no_show | canceled`) and optional notes. Slots are added inline in the **Clinic Detail modal** — pick an animal from a search picker that excludes anyone already on this clinic's roster, then select one or more procedures.
+
+**`ClinicSlotProcedure`** is a child of `ClinicSlot`: an animal almost always gets several procedures in one visit (e.g. spay/neuter **+** vaccines **+** flea treatment), so procedures are rows, not a single field. Each has a `procedure_type` (`spay_neuter | vaccines | dental | exam | recheck | flea_treatment | deworming | microchip | other`) and a `completed` flag for per-procedure progress. In the Clinic Detail modal, procedures render as chips on each slot: click a chip to toggle done, `×` to remove it, `+ Add` to attach another. (Replaced the old single `clinic_slots.procedure_type` column.)
 
 **Cross-feature ties:**
 - A `TransportRequest` can carry a `clinic_event_id` so transport-to-clinic gets coordinated alongside everything else.
@@ -334,35 +364,43 @@ The Avatar primitive also supports a fixed `tone` prop (currently `'peach'`) for
 ## 14. File structure
 
 ```
+supabase/migrations/                 Ordered SQL: schema, RLS, storage policies
 /
-├── App.tsx                          Router + WhiskerProvider
+├── App.tsx                          Providers (Auth + Whisker) + auth Gate + routes
 ├── index.tsx, index.css             Entry
 ├── tailwind.config.js               Theme tokens
+├── .env.local                       VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY (gitignored)
 ├── types/index.ts                   All TypeScript types
-├── data/seed.ts                     Seed records for in-memory state
+├── data/seed.ts                     Unused at runtime; kept for a planned demo mode
 ├── lib/
+│   ├── supabase.ts                  Supabase client
 │   ├── utils.ts                     cn, calculateAge, formatDate, getDaysUntil, getGreeting
 │   ├── config.ts                    ENABLED_SPECIES (org-level config)
-│   └── colors.ts                    Avatar color hashing
-├── context/WhiskerContext.tsx       Global state + CRUD actions
+│   ├── colors.ts                    Avatar color hashing
+│   └── *Api.ts                      DB row ↔ type mappers + insert/update builders
+├── context/
+│   ├── AuthContext.tsx              Session, orgs, currentOrg, currentPersonId, auth
+│   └── WhiskerContext.tsx           Supabase-backed collections + CRUD actions
 ├── components/
 │   ├── ui/                          Primitives: Button, Card, Modal, Forms, Badge,
-│   │                                Avatar, FilterDropdown, SpeciesBadge, SpeciesFilter,
+│   │                                Avatar, FilterDropdown, SpeciesBadge, search pickers,
 │   │                                MedicalKitIcon, BoneIcon, PawPrintIcon
 │   ├── layout/                      AppShell, Sidebar
 │   ├── animals/                     Animal modals, ActionNeededCallout, RelationshipsCard,
 │   │                                AdoptionProfileCard, PhotoGallery, AddPhotoModal,
 │   │                                AddRelationshipModal
+│   ├── contacts/                    AddContactModal
 │   ├── fosters/                     Foster-specific modals
-│   ├── supplies/                    NewSupplyRequestModal, SupplyRequestDetailModal
+│   ├── supplies/                    NewSupplyRequestModal, SupplyRequestDetailModal,
+│   │                                AddProductModal
 │   ├── transports/                  NewTransportRequestModal
 │   ├── sitting/                     NewSittingRequestModal
 │   ├── clinics/                     NewClinicEventModal, ClinicDetailModal
 │   ├── icons/                       CatIcon (and future custom SVG icons)
 │   └── search/GlobalSearch.tsx      Global search component
-└── pages/                           Dashboard, AnimalsList, AnimalProfile,
-                                     FostersList, FosterProfile, Contacts,
-                                     SupplyRequests, Transports, Sitting, Clinics
+└── pages/                           Dashboard, AnimalsList, AnimalProfile, FostersList,
+                                     FosterProfile, Contacts, SupplyRequests, ProductCatalog,
+                                     Transports, Sitting, Clinics, Login, Onboarding
 ```
 
 ---
@@ -371,12 +409,12 @@ The Avatar primitive also supports a fixed `tone` prop (currently `'peach'`) for
 
 - **Components**: one per file, named exports only, PascalCase.
 - **Types**: shared types live in `types/index.ts`. Local component prop types stay inline.
-- **State**: all entity state lives in `WhiskerContext` and is mutated via context actions (`addAnimal`, `updateAnimal`, `placeAnimal`, `reassignFoster`, `addNote`, `addRelationship`, `addPhoto`, `addSupplyRequest`, `updateSupplyRequest`, `addSupplyRequestItem`, `addTransportRequest` / `claimTransportRequest`, `addSittingRequest` / `acceptSittingRequest`, `addClinicEvent` / `addClinicSlot` / `updateClinicSlot`, etc.). Components never mutate data directly.
-- **Status / Priority / animal edits** flow through the `ChangeStatusModal` — now an "Edit" modal that also covers Name, Species, Sex, DOB, and Internal Notes. Status/priority changes are still logged as a `general` note when the reason field is filled. Supply / transport / sitting status advances go through quick-action buttons on their respective surfaces.
-- **Date inputs** use the shared `Input` component, which auto-normalizes Safari's native date picker rendering. Never apply per-instance date styling.
-- **Avatars in lists** prefer photos when available, fall back to initials when a `name` is passed, and only fall back to icons when neither is available. Pass `species` for animal avatars so the dog/cat fallback glyph is correct.
-- **Relational pickers** (Animals, Fosters, Contacts) use search-driven typeahead — not dropdowns. Even small datasets grow, and forcing search keeps the interaction consistent at scale.
-- **Demo current user**. There's no auth yet. Forms that need a "requested by" / "claimed by" identity reference a `CURRENT_USER` constant (`person_id: 'p_dan'`) which resolves to a real `Person` row in the seed. Multiple TODOs across modals call this out — replace with the real session user when auth lands.
+- **State**: all entity state lives in `WhiskerContext` (Supabase-backed, org-scoped) and is mutated via context actions (`addAnimal`, `updateAnimal`, `placeAnimal`, `reassignFoster`, `addNote`, `addRelationship`, `addPhoto`, `addProduct`, `addSupplyRequest`, `addSupplyRequestItem`, `addTransportRequest` / `claimTransportRequest`, `addSittingRequest` / `acceptSittingRequest`, `addClinicEvent` / `addClinicSlot` / `updateClinicSlot`, etc.). Components never read/write Supabase directly. Each action is optimistic: it updates local state, persists, and reconciles (refetch) on error. DB↔type mapping lives in `lib/*Api.ts`.
+- **Status / Priority / animal edits** flow through the `ChangeStatusModal` — an "Edit" modal that also covers Name, Species, Sex, DOB, Internal Notes, and Delete. Status/priority changes are logged as a `general` note when the reason field is filled. Supply / transport / sitting status advances go through quick-action buttons on their respective surfaces.
+- **Date inputs** use the shared `Input` component, which normalizes the native date picker. Never apply per-instance date styling (and never add `appearance-none` to a date input — it collapses the WebKit picker layout).
+- **Avatars in lists** prefer photos when available, fall back to initials when a `name` is passed, and only fall back to icons when neither is available. Pass `species` for animal avatars so the dog/cat/other fallback glyph is correct.
+- **Relational pickers** (Animals, Fosters, Contacts/People) use search-driven typeahead — not dropdowns. Even small datasets grow, and forcing search keeps the interaction consistent at scale.
+- **Current-user attribution**. Forms that need a "requested by" / "claimed by" identity use `currentPersonId` from `AuthContext` — the signed-in user's self `people` row (created on first login from auth metadata, hidden from the Contacts directory). Don't reintroduce hardcoded person ids.
 
 ---
 

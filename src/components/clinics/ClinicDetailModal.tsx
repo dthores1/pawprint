@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Modal } from '../ui/Modal';
-import { Select, Label, Input } from '../ui/Forms';
+import { Label, Input } from '../ui/Forms';
 import { Button } from '../ui/Button';
 import { Avatar } from '../ui/Avatar';
 import { AnimalSearchPicker } from '../ui/AnimalSearchPicker';
 import { useWhisker } from '../../context/WhiskerContext';
 import {
+  ClinicSlotProcedure,
   ClinicSlotProcedureType,
   ClinicSlotStatus,
   ClinicEventStatus } from
@@ -18,10 +19,11 @@ import {
   TruckIcon,
   ClipboardListIcon,
   PlusIcon,
+  CheckIcon,
+  XIcon,
   Trash2Icon } from
 'lucide-react';
-
-const CURRENT_USER = { person_id: 'p_dan' };
+import { useAuth } from '../../context/AuthContext';
 
 interface Props {
   isOpen: boolean;
@@ -34,8 +36,22 @@ const PROCEDURE_LABEL: Record<ClinicSlotProcedureType, string> = {
   dental: 'Dental',
   exam: 'Exam',
   recheck: 'Recheck',
+  flea_treatment: 'Flea Treatment',
+  deworming: 'Deworming',
+  microchip: 'Microchip',
   other: 'Other'
 };
+// Stable display order for the procedure chips / picker.
+const PROCEDURE_ORDER: ClinicSlotProcedureType[] = [
+'spay_neuter',
+'vaccines',
+'flea_treatment',
+'deworming',
+'microchip',
+'dental',
+'exam',
+'recheck',
+'other'];
 const SLOT_STATUS_LABEL: Record<ClinicSlotStatus, string> = {
   reserved: 'Reserved',
   confirmed: 'Confirmed',
@@ -69,17 +85,23 @@ export function ClinicDetailModal({ isOpen, onClose, clinicEventId }: Props) {
   const {
     clinicEvents,
     clinicSlots,
+    clinicSlotProcedures,
     animals,
     people,
     addClinicSlot,
     updateClinicSlot,
-    deleteClinicSlot
+    deleteClinicSlot,
+    addClinicSlotProcedure,
+    updateClinicSlotProcedure,
+    deleteClinicSlotProcedure
   } = useWhisker();
+  const { currentPersonId } = useAuth();
 
   const [adding, setAdding] = useState(false);
   const [newAnimalId, setNewAnimalId] = useState('');
-  const [newProcedure, setNewProcedure] =
-  useState<ClinicSlotProcedureType>('spay_neuter');
+  const [newProcedures, setNewProcedures] = useState<ClinicSlotProcedureType[]>([
+  'spay_neuter']
+  );
   const [newNotes, setNewNotes] = useState('');
 
   if (!clinicEventId) return null;
@@ -110,20 +132,26 @@ export function ClinicDetailModal({ isOpen, onClose, clinicEventId }: Props) {
 
   const handleAddSlot = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newAnimalId) return;
-    addClinicSlot({
-      clinic_event_id: clinicEventId,
-      animal_id: newAnimalId,
-      procedure_type: newProcedure,
-      reserved_by_person_id: CURRENT_USER.person_id,
-      status: 'reserved',
-      notes: newNotes.trim() || undefined
-    });
+    if (!newAnimalId || newProcedures.length === 0) return;
+    addClinicSlot(
+      {
+        clinic_event_id: clinicEventId,
+        animal_id: newAnimalId,
+        reserved_by_person_id: currentPersonId ?? undefined,
+        status: 'reserved',
+        notes: newNotes.trim() || undefined
+      },
+      newProcedures
+    );
     setNewAnimalId('');
-    setNewProcedure('spay_neuter');
+    setNewProcedures(['spay_neuter']);
     setNewNotes('');
     setAdding(false);
   };
+  const toggleNewProcedure = (p: ClinicSlotProcedureType) =>
+  setNewProcedures((prev) =>
+  prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]
+  );
 
   return (
     <Modal
@@ -236,23 +264,33 @@ export function ClinicDetailModal({ isOpen, onClose, clinicEventId }: Props) {
 
               </div>
               <div>
-                <Label htmlFor="add_procedure">Procedure</Label>
-                <Select
-                  id="add_procedure"
-                  value={newProcedure}
-                  onChange={(e) =>
-                  setNewProcedure(
-                    e.target.value as ClinicSlotProcedureType
-                  )
-                  }>
+                <Label>Procedures</Label>
+                <div className="flex flex-wrap gap-2">
+                  {PROCEDURE_ORDER.map((p) => {
+                    const active = newProcedures.includes(p);
+                    return (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => toggleNewProcedure(p)}
+                        aria-pressed={active}
+                        className={cn(
+                          'px-3 py-1.5 rounded-full text-sm font-medium border transition-colors',
+                          active ?
+                          'bg-primary text-white border-primary' :
+                          'bg-white text-text-secondary border-border hover:border-primary/50'
+                        )}>
 
-                  {(Object.keys(PROCEDURE_LABEL) as ClinicSlotProcedureType[]).
-                  map((k) =>
-                  <option key={k} value={k}>
-                        {PROCEDURE_LABEL[k]}
-                      </option>
-                  )}
-                </Select>
+                        {PROCEDURE_LABEL[p]}
+                      </button>);
+
+                  })}
+                </div>
+                {newProcedures.length === 0 &&
+                <p className="mt-1.5 text-xs text-[#9B3A3A]">
+                    Pick at least one procedure.
+                  </p>
+                }
               </div>
               <div>
                 <Label htmlFor="add_notes">Notes (optional)</Label>
@@ -270,7 +308,10 @@ export function ClinicDetailModal({ isOpen, onClose, clinicEventId }: Props) {
                 onClick={() => setAdding(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" size="sm">
+                <Button
+                type="submit"
+                size="sm"
+                disabled={!newAnimalId || newProcedures.length === 0}>
                   Reserve Slot
                 </Button>
               </div>
@@ -288,9 +329,9 @@ export function ClinicDetailModal({ isOpen, onClose, clinicEventId }: Props) {
               return (
                 <div
                   key={s.id}
-                  className="flex items-center gap-3 px-4 py-3 hover:bg-background/40 transition-colors">
+                  className="flex items-start gap-3 px-4 py-3 hover:bg-background/40 transition-colors">
 
-                    <div className="shrink-0">
+                    <div className="shrink-0 mt-0.5">
                       <Avatar
                       src={animal?.primary_photo_url}
                       type="animal"
@@ -302,10 +343,23 @@ export function ClinicDetailModal({ isOpen, onClose, clinicEventId }: Props) {
                       <p className="font-medium text-text-primary truncate">
                         {animal?.name || 'Unknown'}
                       </p>
-                      <p className="text-xs text-text-secondary truncate">
-                        {PROCEDURE_LABEL[s.procedure_type]}
-                        {s.notes && <span className="italic"> · {s.notes}</span>}
-                      </p>
+                      <SlotProcedureChips
+                      procedures={clinicSlotProcedures.filter(
+                        (p) => p.clinic_slot_id === s.id
+                      )}
+                      onToggle={(proc) =>
+                      updateClinicSlotProcedure(proc.id, {
+                        completed: !proc.completed
+                      })
+                      }
+                      onRemove={(proc) => deleteClinicSlotProcedure(proc.id)}
+                      onAdd={(type) => addClinicSlotProcedure(s.id, type)} />
+
+                      {s.notes &&
+                    <p className="text-xs text-text-secondary italic mt-1.5 truncate">
+                          {s.notes}
+                        </p>
+                    }
                     </div>
                     {/*
                       Native <select> here (not the Forms Select primitive) so
@@ -356,6 +410,80 @@ export function ClinicDetailModal({ isOpen, onClose, clinicEventId }: Props) {
         </div>
       </div>
     </Modal>);
+
+}
+
+// Per-slot procedure chips: click a chip to toggle done, × to remove, "+ Add"
+// to attach another procedure type not already on the slot.
+function SlotProcedureChips({
+  procedures,
+  onToggle,
+  onRemove,
+  onAdd
+}: {
+  procedures: ClinicSlotProcedure[];
+  onToggle: (proc: ClinicSlotProcedure) => void;
+  onRemove: (proc: ClinicSlotProcedure) => void;
+  onAdd: (type: ClinicSlotProcedureType) => void;
+}) {
+  const present = new Set(procedures.map((p) => p.procedure_type));
+  const addable = PROCEDURE_ORDER.filter((t) => !present.has(t));
+  const ordered = [...procedures].sort(
+    (a, b) =>
+    PROCEDURE_ORDER.indexOf(a.procedure_type) -
+    PROCEDURE_ORDER.indexOf(b.procedure_type)
+  );
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+      {ordered.map((proc) =>
+      <span
+        key={proc.id}
+        className={cn(
+          'inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full text-xs font-medium border transition-colors',
+          proc.completed ?
+          'bg-status-adoptable-bg text-status-adoptable-text border-transparent' :
+          'bg-white text-text-secondary border-border'
+        )}>
+
+          <button
+          type="button"
+          onClick={() => onToggle(proc)}
+          title={proc.completed ? 'Mark as not done' : 'Mark as done'}
+          className="inline-flex items-center gap-1">
+
+            {proc.completed && <CheckIcon className="w-3 h-3" />}
+            {PROCEDURE_LABEL[proc.procedure_type]}
+          </button>
+          <button
+          type="button"
+          onClick={() => onRemove(proc)}
+          aria-label={`Remove ${PROCEDURE_LABEL[proc.procedure_type]}`}
+          className="rounded-full p-0.5 text-text-secondary/70 hover:text-[#9B3A3A] hover:bg-[#F5D7D7]/60 transition-colors">
+
+            <XIcon className="w-3 h-3" />
+          </button>
+        </span>
+      )}
+      {addable.length > 0 &&
+      <select
+        value=""
+        onChange={(e) => {
+          if (e.target.value) {
+            onAdd(e.target.value as ClinicSlotProcedureType);
+          }
+        }}
+        aria-label="Add procedure"
+        className="h-6 text-xs rounded-full border border-dashed border-border bg-white px-2 text-text-secondary cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary">
+
+          <option value="">+ Add</option>
+          {addable.map((t) =>
+        <option key={t} value={t}>
+              {PROCEDURE_LABEL[t]}
+            </option>
+        )}
+        </select>
+      }
+    </div>);
 
 }
 

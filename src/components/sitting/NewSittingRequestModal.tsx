@@ -1,38 +1,28 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { format } from 'date-fns';
 import { Modal } from '../ui/Modal';
-import { Input, Textarea, Label } from '../ui/Forms';
+import { Textarea, Label } from '../ui/Forms';
+import { DatePicker } from '../ui/DatePicker';
 import { Button } from '../ui/Button';
 import { AnimalMultiPicker } from '../ui/AnimalMultiPicker';
 import { useWhisker } from '../../context/WhiskerContext';
+import { useAuth } from '../../context/AuthContext';
 import { SittingCoverageScope } from '../../types';
+import { animalDisplayName } from '../../lib/utils';
 
-// Demo current user — see other modals.
-const CURRENT_USER = { person_id: 'p_dan' };
-
-// TODO(auth): once auth + roles exist, link a Person row to their
-// FosterParent row (e.g. a `foster_parent_id` foreign key on Person) so the
-// modal can derive this. For staff/admin creating on behalf of a foster,
-// also surface a person lookup labeled "Animals currently with …".
-const CURRENT_FOSTER_ID = 'f3';
 interface Props {
   isOpen: boolean;
   onClose: () => void;
 }
 export function NewSittingRequestModal({ isOpen, onClose }: Props) {
-  const { addSittingRequest, placements, animals, fosters } = useWhisker();
-  const foster = fosters.find((f) => f.id === CURRENT_FOSTER_ID);
-  const fosterName = foster ?
-  `${foster.first_name} ${foster.last_name}` :
-  'this foster';
+  const { addSittingRequest, placements, animals } = useWhisker();
+  const { currentPersonId } = useAuth();
 
-  // Active placements that belong to the current user.
+  // TODO(auth): scope to the signed-in user's OWN placements (match
+  // currentPersonId to placement.person_id). For now we cover all active
+  // placements in the org, so "in my care" reads as "currently in foster".
   const myPlacements = useMemo(
-    () =>
-    placements.filter(
-      (p) =>
-      p.placement_status === 'active' &&
-      p.foster_parent_id === CURRENT_FOSTER_ID
-    ),
+    () => placements.filter((p) => p.placement_status === 'active'),
     [placements]
   );
   const myAnimals = myPlacements.
@@ -45,10 +35,15 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
   const [selectedAnimalIds, setSelectedAnimalIds] = useState<string[]>([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [dateError, setDateError] = useState<string | null>(null);
   const [medicationRequired, setMedicationRequired] = useState(false);
   const [fosterProvidesSupplies, setFosterProvidesSupplies] = useState(true);
   const [transportNeeded, setTransportNeeded] = useState(false);
   const [notes, setNotes] = useState('');
+
+  // Today as a yyyy-MM-dd string (local). Used as the floor for both date
+  // pickers so past days are grayed out, and again as a submit-time backstop.
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
 
   // Reset on close.
   useEffect(() => {
@@ -57,6 +52,7 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
       setSelectedAnimalIds([]);
       setStartDate('');
       setEndDate('');
+      setDateError(null);
       setMedicationRequired(false);
       setFosterProvidesSupplies(true);
       setTransportNeeded(false);
@@ -64,9 +60,28 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
     }
   }, [isOpen]);
 
+  const handleStartChange = (v: string) => {
+    setStartDate(v);
+    if (dateError) setDateError(null);
+  };
+  const handleEndChange = (v: string) => {
+    setEndDate(v);
+    if (dateError) setDateError(null);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!startDate || !endDate) return;
+    // Backstop in case the modal was opened before midnight and submitted
+    // after — the picker's day-grayout is computed at render time.
+    if (startDate < todayStr) {
+      setDateError('Start date can\u2019t be in the past.');
+      return;
+    }
+    if (endDate < startDate) {
+      setDateError('End date must be on or after the start date.');
+      return;
+    }
     // Resolve covered placement IDs at submit time — even for "all", we
     // snapshot the current state so a later placement change doesn't
     // retroactively expand the request.
@@ -82,7 +97,7 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
 
     addSittingRequest(
       {
-        requested_by_person_id: CURRENT_USER.person_id,
+        requested_by_person_id: currentPersonId ?? '',
         coverage_scope: scope,
         start_date: startDate,
         end_date: endDate,
@@ -99,7 +114,7 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
 
   // Friendly list of names for the "all" copy ("Juniper, Marmalade, and Pepper").
   const namesList = (() => {
-    const names = myAnimals.map((a) => a.name);
+    const names = myAnimals.map((a) => animalDisplayName(a));
     if (names.length === 0) return '';
     if (names.length === 1) return names[0];
     if (names.length === 2) return `${names[0]} and ${names[1]}`;
@@ -136,7 +151,7 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
                   </p>
                   <p className="text-sm text-text-secondary mt-0.5">
                     {myAnimals.length === 0 ?
-                    `No active placements for ${fosterName} right now.` :
+                    'No animals are currently in foster.' :
                     <>Includes {namesList}</>}
                   </p>
                 </div>
@@ -178,25 +193,29 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label htmlFor="start">Start date</Label>
-            <Input
+            <DatePicker
               id="start"
-              type="date"
-              required
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)} />
+              onChange={handleStartChange}
+              min={todayStr}
+              error={!!dateError} />
 
           </div>
           <div>
             <Label htmlFor="end">End date</Label>
-            <Input
+            <DatePicker
               id="end"
-              type="date"
-              required
+              align="end"
+              min={startDate || todayStr}
               value={endDate}
-              onChange={(e) => setEndDate(e.target.value)} />
+              onChange={handleEndChange}
+              error={!!dateError} />
 
           </div>
         </div>
+        {dateError &&
+        <p className="-mt-3 text-xs text-red-500">{dateError}</p>
+        }
 
         <fieldset className="space-y-2 p-4 rounded-xl bg-background/60 border border-border">
           <legend className="text-xs uppercase tracking-wider font-semibold text-text-secondary px-1">

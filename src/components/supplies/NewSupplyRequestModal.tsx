@@ -3,18 +3,18 @@ import { Modal } from '../ui/Modal';
 import { Input, Select, Textarea, Label } from '../ui/Forms';
 import { Button } from '../ui/Button';
 import { useWhisker } from '../../context/WhiskerContext';
-import { SupplyRequestPriority, SupplyRequestItem } from '../../types';
-import { PlusIcon, Trash2Icon, BookmarkIcon, BookmarkCheckIcon } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import {
+  SupplyRequest,
+  SupplyRequestPriority,
+  SupplyRequestItem } from
+'../../types';
+import { PlusIcon, Trash2Icon, BookmarkIcon, BookmarkCheckIcon, RepeatIcon } from 'lucide-react';
 
-// TODO(auth): replace with the signed-in user once an auth/session layer exists.
-// Today the app has no current-user concept (see WhiskerContext); we hardcode
-// the demo user so "Requesting as" reads correctly. The Person row exists in
-// seed.ts as a foster parent (f3), but Person and FosterParent are separate
-// tables — wire requester_person_id properly when auth lands.
-const CURRENT_USER = {
-  person_id: 'p_dan',
-  display_name: 'Dan Thoreson'
-};
+// Cap how many common requests one person keeps; saving a new one beyond this
+// demotes their least-recently-used template.
+const MAX_COMMON_REQUESTS = 5;
+
 interface NewSupplyRequestModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -44,23 +44,137 @@ const emptyItem = (): DraftItem => ({
   unit: 'each',
   notes: ''
 });
+
+// Order-insensitive content fingerprint (items + priority + notes) used to avoid
+// saving a duplicate common request when the content matches an existing one.
+type SigItem = {
+  product_id?: string;
+  custom_item_name?: string;
+  quantity?: number | string;
+  unit?: string;
+  notes?: string;
+};
+function requestSignature(
+items: SigItem[],
+priority: string,
+notes?: string)
+: string {
+  const itemSigs = items.
+  map((it) => {
+    const isCustom = !it.product_id || it.product_id === 'custom';
+    return [
+    isCustom ?
+    `c:${(it.custom_item_name || '').trim().toLowerCase()}` :
+    `p:${it.product_id}`,
+    `q:${Number(it.quantity) || 1}`,
+    `u:${it.unit || 'each'}`,
+    `n:${(it.notes || '').trim().toLowerCase()}`].
+    join('|');
+  }).
+  sort();
+  return JSON.stringify({
+    items: itemSigs,
+    priority,
+    notes: (notes || '').trim().toLowerCase()
+  });
+}
 export function NewSupplyRequestModal({
   isOpen,
   onClose
 }: NewSupplyRequestModalProps) {
-  const { addSupplyRequest, addSupplyRequestItem, products } = useWhisker();
-  // Admin-on-behalf-of flow is stubbed until we have roles. When enabled,
-  // an admin would pick a contact/foster from `people` here.
-  // const { people, animals } = useWhisker();
+  const {
+    addSupplyRequest,
+    addSupplyRequestItem,
+    updateSupplyRequest,
+    supplyRequests,
+    supplyRequestItems,
+    products,
+    people
+  } = useWhisker();
+  const { currentPersonId } = useAuth();
+  const currentPerson = people.find((p) => p.id === currentPersonId);
+  const currentDisplayName = currentPerson ?
+  `${currentPerson.first_name} ${currentPerson.last_name}` :
+  'You';
   const [priority, setPriority] = useState<SupplyRequestPriority>('normal');
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<DraftItem[]>([emptyItem()]);
   const [saveAsCommon, setSaveAsCommon] = useState(false);
+  const [commonName, setCommonName] = useState('');
+  // Set when the form was prefilled from a common request — bumps that
+  // template's last-used time on submit (the template itself is never reused).
+  const [usedTemplateId, setUsedTemplateId] = useState<string | null>(null);
   const reset = () => {
     setPriority('normal');
     setNotes('');
     setItems([emptyItem()]);
     setSaveAsCommon(false);
+    setCommonName('');
+    setUsedTemplateId(null);
+  };
+
+  const itemsForRequest = (requestId: string) =>
+  supplyRequestItems.filter((i) => i.supply_request_id === requestId);
+  const itemLabel = (it: { product_id?: string; custom_item_name?: string }) =>
+  it.product_id && it.product_id !== 'custom' ?
+  products.find((p) => p.id === it.product_id)?.name ?? 'Item' :
+  it.custom_item_name || 'Custom item';
+  const deriveName = (
+  its: { product_id?: string; custom_item_name?: string }[]) =>
+  {
+    const names = its.map(itemLabel).filter(Boolean);
+    if (names.length === 0) return '';
+    if (names.length <= 2) return names.join(' + ');
+    return `${names.slice(0, 2).join(' + ')} +${names.length - 2} more`;
+  };
+
+  // The current user's common-request templates, most-recently-used first.
+  const myCommonRequests = supplyRequests.
+  filter(
+    (r) => r.is_common_request && r.requester_person_id === currentPersonId
+  ).
+  sort((a, b) => {
+    const at = a.common_request_last_used_at ?
+    new Date(a.common_request_last_used_at).getTime() :
+    0;
+    const bt = b.common_request_last_used_at ?
+    new Date(b.common_request_last_used_at).getTime() :
+    0;
+    if (bt !== at) return bt - at;
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+  const commonLabel = (req: SupplyRequest) =>
+  req.common_request_name?.trim() ||
+  deriveName(itemsForRequest(req.id)) ||
+  'Common request';
+
+  const applyCommonRequest = (req: SupplyRequest) => {
+    const tplItems = itemsForRequest(req.id);
+    setItems(
+      tplItems.length ?
+      tplItems.map((it) =>
+      it.product_id ?
+      {
+        product_id: it.product_id,
+        quantity: it.quantity,
+        unit: it.unit,
+        notes: it.notes ?? ''
+      } :
+      {
+        product_id: 'custom',
+        custom_item_name: it.custom_item_name,
+        quantity: it.quantity,
+        unit: it.unit,
+        notes: it.notes ?? ''
+      }
+      ) :
+      [emptyItem()]
+    );
+    setPriority(req.priority);
+    setNotes(req.notes ?? '');
+    setSaveAsCommon(false);
+    setCommonName('');
+    setUsedTemplateId(req.id);
   };
   const handleClose = () => {
     reset();
@@ -91,7 +205,7 @@ export function NewSupplyRequestModal({
     }
     setItems(newItems);
   };
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (items.length === 0) return;
     // Filter out empty items
@@ -99,16 +213,32 @@ export function NewSupplyRequestModal({
       (i) => i.product_id && i.product_id !== 'custom' || i.custom_item_name
     );
     if (validItems.length === 0) return;
-    const requestId = addSupplyRequest({
-      requester_person_id: CURRENT_USER.person_id,
+    // Don't create a duplicate template: if "save as common" is on but the
+    // content already matches one of the user's common requests, treat it as a
+    // reuse of that one (bump its last-used) instead of saving a new copy.
+    const draftSig = requestSignature(validItems, priority, notes);
+    const duplicateCommon = myCommonRequests.find(
+      (r) =>
+      requestSignature(itemsForRequest(r.id), r.priority, r.notes) === draftSig
+    );
+    const createCommon = saveAsCommon && !duplicateCommon;
+    // Create the request first; its id keys the line items.
+    const requestId = await addSupplyRequest({
+      requester_person_id: currentPersonId ?? '',
       // requested_for_animal_id intentionally omitted — supplies don't map
       // 1:1 to a single animal. See commented-out "For Animal" field below.
       status: 'submitted',
       priority,
       requested_date: new Date().toISOString(),
-      notes: notes.trim() || undefined
+      notes: notes.trim() || undefined,
+      is_common_request: createCommon,
+      common_request_name: createCommon ?
+      commonName.trim() || deriveName(validItems) || undefined :
+      undefined
     });
-    validItems.forEach((item) => {
+    if (!requestId) return;
+    await Promise.all(
+      validItems.map((item) =>
       addSupplyRequestItem({
         supply_request_id: requestId,
         product_id: item.product_id === 'custom' ? undefined : item.product_id,
@@ -117,12 +247,26 @@ export function NewSupplyRequestModal({
         quantity: Number(item.quantity) || 1,
         unit: item.unit || 'each',
         notes: item.notes?.trim() || undefined
+      })
+      )
+    );
+    // Bump the source template's last-used time (don't otherwise touch it):
+    // either the one explicitly reused, or the matching duplicate we collapsed
+    // into when "save as common" had no real changes.
+    const templateToBump =
+    usedTemplateId ?? (saveAsCommon ? duplicateCommon?.id ?? null : null);
+    if (templateToBump) {
+      updateSupplyRequest(templateToBump, {
+        common_request_last_used_at: new Date().toISOString()
       });
-    });
-    // TODO(persistence): "Save as common request" is captured but does not
-    // persist — there is no template/abstraction for reusable request
-    // bundles yet. Add a `requestTemplates` collection (or similar) in
-    // WhiskerContext when persistence lands, then write here.
+    }
+    // Cap common requests per person: demote the least-recently-used templates
+    // beyond the limit (keeping the new one + the most-recent existing).
+    if (createCommon) {
+      myCommonRequests.
+      slice(MAX_COMMON_REQUESTS - 1).
+      forEach((r) => updateSupplyRequest(r.id, { is_common_request: false }));
+    }
     handleClose();
   };
   return (
@@ -133,11 +277,38 @@ export function NewSupplyRequestModal({
       className="max-w-2xl">
       
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Reuse one of the requester's saved common requests. */}
+        {myCommonRequests.length > 0 &&
+        <div className="p-3 rounded-xl bg-primary/5 border border-primary/15">
+            <div className="flex items-center gap-2 mb-2">
+              <RepeatIcon className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium text-text-primary">
+                Use a common request?
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {myCommonRequests.slice(0, MAX_COMMON_REQUESTS).map((req) => {
+              const active = usedTemplateId === req.id;
+              return (
+                <button
+                  key={req.id}
+                  type="button"
+                  onClick={() => applyCommonRequest(req)}
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${active ? 'bg-primary text-white border-primary' : 'bg-white text-text-secondary border-border hover:border-primary/50 hover:text-text-primary'}`}>
+
+                    {commonLabel(req)}
+                  </button>);
+
+            })}
+            </div>
+          </div>
+        }
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label>Requesting as</Label>
             <div className="h-11 px-3.5 flex items-center rounded-lg border border-border bg-background/60 text-sm font-medium text-text-primary">
-              {CURRENT_USER.display_name}
+              {currentDisplayName}
             </div>
           </div>
           <div>
@@ -375,6 +546,22 @@ export function NewSupplyRequestModal({
               Reuse these items next time you need to restock for the same
               situation.
             </p>
+            {saveAsCommon &&
+            <Input
+              value={commonName}
+              onChange={(e) => setCommonName(e.target.value)}
+              placeholder={
+              deriveName(
+                items.filter(
+                  (i) =>
+                  i.product_id && i.product_id !== 'custom' ||
+                  i.custom_item_name
+                )
+              ) || 'e.g. Monthly litter refill'
+              }
+              className="mt-2"
+              maxLength={60} />
+            }
           </div>
         </div>
 

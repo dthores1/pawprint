@@ -86,3 +86,18 @@ export function Label({
     </label>);
 
 }
+
+export function FieldError({
+  id,
+  children
+}: {
+  id?: string;
+  children?: React.ReactNode;
+}) {
+  if (!children) return null;
+  return (
+    <p id={id} className="mt-1.5 text-xs font-medium text-red-700">
+      {children}
+    </p>);
+
+}

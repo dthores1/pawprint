@@ -3,3 +3,8 @@ public/.DS_Store
 
 .DS_Store
 CLAUDE.md
+
+# Local env files — never commit secrets / API keys
+.env
+.env.local
+.env.*.local

@@ -2,7 +2,38 @@ export function cn(...classes: (string | undefined | null | false)[]) {
   return classes.filter(Boolean).join(' ');
 }
 
+// Animal label resolution. Animals must have a name OR a rescue_id (DB CHECK);
+// many will have both. UI surfaces show the name when present and surface the
+// rescue_id as a smaller supporting badge when both exist. Rescue-id-only
+// animals show the id in the primary slot.
+export function animalDisplayName(a: {
+  name?: string;
+  rescue_id?: string;
+}): string {
+  const name = a.name?.trim();
+  if (name) return name;
+  const rid = a.rescue_id?.trim();
+  if (rid) return rid;
+  return 'Unnamed';
+}
+
+/**
+ * Whether to render the Rescue ID as a supporting badge next to the primary
+ * heading. True only when both a name and a rescue_id are present (rescue-id-
+ * only animals show the id in the primary slot, not as a separate badge).
+ */
+export function animalShowsRescueIdBadge(a: {
+  name?: string;
+  rescue_id?: string;
+}): boolean {
+  return Boolean(a.name?.trim() && a.rescue_id?.trim());
+}
+
 export function calculateAge(birthDate: string): string {
+  if (!birthDate) {
+    return 'Unknown';
+  }
+  
   const birth = new Date(birthDate);
   const now = new Date();
 
@@ -19,6 +50,7 @@ export function calculateAge(birthDate: string): string {
   } else {
     const years = Math.floor(months / 12);
     const remainingMonths = months % 12;
+
     // For senior animals (10+ years), months are noise — show years only.
     if (years >= 10) return `${years} years`;
     if (remainingMonths === 0) return `${years} year${years > 1 ? 's' : ''}`;

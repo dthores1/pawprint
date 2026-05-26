@@ -1,24 +1,34 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { MedicalRecord } from '../types';
 import { useWhisker } from '../context/WhiskerContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { StatusBadge, PriorityBadge } from '../components/ui/Badge';
+import { StatusBadge, PriorityBadge, AnimalFlags } from '../components/ui/Badge';
 import { SpeciesBadge } from '../components/ui/SpeciesBadge';
 import { Avatar } from '../components/ui/Avatar';
 import { AddMedicalModal } from '../components/animals/AddMedicalModal';
 import { AddNoteModal } from '../components/animals/AddNoteModal';
 import { ChangeStatusModal } from '../components/animals/ChangeStatusModal';
 import { PlaceAnimalModal } from '../components/animals/PlaceAnimalModal';
+import { StartAdoptionModal } from '../components/animals/StartAdoptionModal';
+import { AdoptionPanel } from '../components/animals/AdoptionPanel';
 import { ActionNeededCallout } from '../components/animals/ActionNeededCallout';
 import { RelationshipsCard } from '../components/animals/RelationshipsCard';
 import { AdoptionProfileCard } from '../components/animals/AdoptionProfileCard';
 import { PhotoGallery } from '../components/animals/PhotoGallery';
-import { calculateAge, formatDate } from '../lib/utils';
+import {
+  calculateAge,
+  formatDate,
+  animalDisplayName,
+  animalShowsRescueIdBadge } from
+'../lib/utils';
 import {
   SyringeIcon,
+  DogIcon,
   FileTextIcon,
   HomeIcon,
+  HeartIcon,
   CheckCircle2Icon,
   CircleIcon,
   ArrowLeftIcon,
@@ -27,23 +37,36 @@ import {
   MessageSquareIcon,
   ClockIcon,
   AlertCircleIcon,
-  ImageIcon } from
+  ImageIcon,
+  CameraIcon } from
 'lucide-react';
 import { motion } from 'framer-motion';
 import { MedicalKitIcon } from '../components/ui/MedicalKitIcon';
 import { PawPrintIcon as PawPrintGlyph } from '../components/ui/PawPrintIcon';
-import { BoneIcon } from '../components/ui/BoneIcon';
 import { CatIcon } from '../components/icons/CatIcon';
+import { animalBreedLabel } from '../lib/breedsApi';
 export function AnimalProfile() {
   const { id } = useParams<{
     id: string;
   }>();
-  const { animals, placements, fosters, medicalRecords, notes, photos } =
-  useWhisker();
+  const {
+    animals,
+    placements,
+    fosters,
+    people,
+    adoptions,
+    medicalRecords,
+    notes,
+    actionItems,
+    photos,
+    breeds,
+    addPhoto
+  } = useWhisker();
   const [isMedicalModalOpen, setIsMedicalModalOpen] = useState(false);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isPlaceModalOpen, setIsPlaceModalOpen] = useState(false);
+  const [isStartAdoptionOpen, setIsStartAdoptionOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'timeline' | 'medical' | 'photos'>(
     'timeline'
   );
@@ -51,6 +74,8 @@ export function AnimalProfile() {
     'all' | 'placements' | 'medical' | 'notes'>(
     'all');
   const [heroImageError, setHeroImageError] = useState(false);
+  const [heroUploading, setHeroUploading] = useState(false);
+  const heroFileInputRef = useRef<HTMLInputElement>(null);
   // Reset the image-error state when navigating between animals so the
   // placeholder doesn't persist after the photo URL changes.
   useEffect(() => {
@@ -60,28 +85,62 @@ export function AnimalProfile() {
   if (!animal) {
     return <div className="p-8 text-center">Animal not found.</div>;
   }
+  // Profile-image upload from the hero (LinkedIn/Twitter-style). Uploads the
+  // file, files it under the Photos gallery as a profile photo, and sets it
+  // as the animal's profile picture.
+  const handleHeroUpload = async (
+  e: React.ChangeEvent<HTMLInputElement>) =>
+  {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setHeroUploading(true);
+    setHeroImageError(false);
+    await addPhoto({
+      animal_id: animal.id,
+      category: 'profile',
+      file,
+      setAsProfile: true
+    });
+    setHeroUploading(false);
+    if (heroFileInputRef.current) heroFileInputRef.current.value = '';
+  };
   // Derived data
   const animalPlacements = placements.filter((p) => p.animal_id === animal.id);
   const activePlacement = animalPlacements.find(
     (p) => p.placement_status === 'active'
   );
   const currentFoster = activePlacement ?
-  fosters.find((f) => f.id === activePlacement.foster_parent_id) :
+  fosters.find((f) => f.id === activePlacement.person_id) :
   null;
+  const isAdopted = animal.status === 'adopted';
+  const adopter = animal.adopted_by_id ?
+  people.find((p) => p.id === animal.adopted_by_id) :
+  null;
+  const animalAdoptions = adoptions.filter((a) => a.animal_id === animal.id);
+  // At most one in-progress adoption per animal (terminal ones are history).
+  const activeAdoption = animalAdoptions.find(
+    (a) => a.status !== 'completed' && a.status !== 'cancelled'
+  );
   const animalMedical = medicalRecords.filter((m) => m.animal_id === animal.id);
   const upcomingMedical = animalMedical.filter(
     (m) =>
     m.status === 'due' || m.status === 'scheduled' || m.status === 'overdue'
   );
   const animalNotes = notes.filter((n) => n.animal_id === animal.id);
+  const animalActionItems = actionItems.filter(
+    (a) => a.animal_id === animal.id
+  );
   const animalPhotosCount = photos.filter(
     (p) => p.animal_id === animal.id
   ).length;
   // Build Timeline
   type TimelineEvent = {
     id: string;
+    /** Day used for display (yyyy-MM-dd or ISO). */
     date: string;
-    type: 'intake' | 'medical' | 'placement' | 'note';
+    /** Full timestamp for ordering — keeps same-day events in real order. */
+    ts: string;
+    type: 'intake' | 'medical' | 'placement' | 'note' | 'action' | 'adoption';
     title: string;
     description: string;
     icon: React.ElementType;
@@ -91,9 +150,10 @@ export function AnimalProfile() {
   {
     id: 'intake',
     date: animal.intake_date,
-    type: 'intake',
+    ts: animal.intake_date,
+    type: 'intake' as const,
     title: 'Intake',
-    description: `Source: ${animal.intake_source}`,
+    description: `Source: ${animal.intake_source || 'Not specified'}`,
     icon: ActivityIcon,
     color: 'bg-[#E5E2DC] text-[#6B6B6B]'
   },
@@ -102,6 +162,7 @@ export function AnimalProfile() {
   map((m) => ({
     id: m.id,
     date: m.performed_date!,
+    ts: m.performed_date!,
     type: 'medical' as const,
     title: `Medical: ${m.procedure_name}`,
     description: `Provider: ${m.provider_name || 'Unknown'}${m.notes ? ` - ${m.notes}` : ''}`,
@@ -109,10 +170,11 @@ export function AnimalProfile() {
     color: 'bg-[#F3E4D7] text-[#D98C5F]'
   })),
   ...animalPlacements.map((p) => {
-    const foster = fosters.find((f) => f.id === p.foster_parent_id);
+    const foster = fosters.find((f) => f.id === p.person_id);
     return {
       id: p.id,
       date: p.start_date.split('T')[0],
+      ts: p.start_date,
       type: 'placement' as const,
       title: `Placed in Foster`,
       description: `With ${foster?.first_name} ${foster?.last_name}`,
@@ -123,13 +185,127 @@ export function AnimalProfile() {
   ...animalNotes.map((n) => ({
     id: n.id,
     date: n.created_at.split('T')[0],
+    ts: n.created_at,
     type: 'note' as const,
     title: `Note: ${n.note_type}`,
     description: n.body,
     icon: MessageSquareIcon,
     color: 'bg-background text-text-secondary'
-  }))].
-  sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // Newest first
+  })),
+  // Action items: a "created" event, plus a resolution event when done.
+  ...animalActionItems.flatMap((a) => {
+    const events: TimelineEvent[] = [
+    {
+      id: `action-${a.id}-created`,
+      date: a.created_at.split('T')[0],
+      ts: a.created_at,
+      type: 'action' as const,
+      title: 'Action item added',
+      description: a.description,
+      icon: AlertCircleIcon,
+      color: 'bg-[#FBF1DC] text-[#A36B00]'
+    }];
+
+    if (
+    (a.status === 'completed' || a.status === 'cancelled') &&
+    a.completed_at)
+    {
+      const done = a.status === 'completed';
+      events.push({
+        id: `action-${a.id}-${a.status}`,
+        date: a.completed_at.split('T')[0],
+        ts: a.completed_at,
+        type: 'action' as const,
+        title: done ? 'Action completed' : 'Action cancelled',
+        description: a.completion_note ?
+        `${a.description} — ${a.completion_note}` :
+        a.description,
+        icon: done ? CheckCircle2Icon : CircleIcon,
+        color: done ?
+        'bg-[#DDEFE2] text-[#3E7B52]' :
+        'bg-background text-text-secondary'
+      });
+    }
+    return events;
+  }),
+  // Adoption milestones — surfaces past adoptions (completed/cancelled) as
+  // history, plus the in-progress one.
+  ...animalAdoptions.flatMap((ad) => {
+    const adopterPerson = people.find((p) => p.id === ad.adopter_id);
+    const adopterName = adopterPerson ?
+    `${adopterPerson.first_name} ${adopterPerson.last_name}` :
+    'an adopter';
+    const adoptionColor = 'bg-[#F3E4D7] text-[#B8632E]';
+    const evs: TimelineEvent[] = [
+    {
+      id: `adoption-${ad.id}-created`,
+      date: ad.created_at.split('T')[0],
+      ts: ad.created_at,
+      type: 'adoption' as const,
+      title: 'Adoption started',
+      description: `Inquiry opened with ${adopterName}.`,
+      icon: HeartIcon,
+      color: adoptionColor
+    }];
+
+    if (ad.submitted_at)
+    evs.push({
+      id: `adoption-${ad.id}-submitted`,
+      date: ad.submitted_at.split('T')[0],
+      ts: ad.submitted_at,
+      type: 'adoption' as const,
+      title: 'Application submitted',
+      description: '',
+      icon: HeartIcon,
+      color: adoptionColor
+    });
+    if (ad.paperwork_sent_at)
+    evs.push({
+      id: `adoption-${ad.id}-paperwork-sent`,
+      date: ad.paperwork_sent_at.split('T')[0],
+      ts: ad.paperwork_sent_at,
+      type: 'adoption' as const,
+      title: 'Paperwork sent',
+      description: '',
+      icon: HeartIcon,
+      color: adoptionColor
+    });
+    if (ad.paperwork_completed_at)
+    evs.push({
+      id: `adoption-${ad.id}-paperwork-done`,
+      date: ad.paperwork_completed_at.split('T')[0],
+      ts: ad.paperwork_completed_at,
+      type: 'adoption' as const,
+      title: 'Paperwork completed',
+      description: '',
+      icon: HeartIcon,
+      color: adoptionColor
+    });
+    if (ad.completed_at)
+    evs.push({
+      id: `adoption-${ad.id}-completed`,
+      date: ad.completed_at.split('T')[0],
+      ts: ad.completed_at,
+      type: 'adoption' as const,
+      title: 'Adoption completed',
+      description: `Adopted by ${adopterName}.`,
+      icon: CheckCircle2Icon,
+      color: 'bg-[#DDEFE2] text-[#3E7B52]'
+    });
+    if (ad.cancelled_at)
+    evs.push({
+      id: `adoption-${ad.id}-cancelled`,
+      date: ad.cancelled_at.split('T')[0],
+      ts: ad.cancelled_at,
+      type: 'adoption' as const,
+      title: 'Adoption cancelled',
+      description: ad.notes ?? '',
+      icon: CircleIcon,
+      color: 'bg-background text-text-secondary'
+    });
+    return evs;
+  })].
+  sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime()); // Newest first
   // Readiness Checklist logic
   const hasRabies = animalMedical.some(
     (m) =>
@@ -140,23 +316,29 @@ export function AnimalProfile() {
     (m) => m.procedure_type === 'spay_neuter' && m.status === 'completed'
   );
   const hasMicrochip = !!animal.microchip_number;
-  const hasBehaviorNote = animalNotes.some((n) => n.note_type === 'behavior');
+  // Behavior is "assessed" once there's no open behavior concern AND the animal
+  // is past initial intake/medical (either placed in foster, or moved to a later
+  // lifecycle stage where behavior would have been evaluated).
+  const behaviorAssessed =
+  !animal.has_behavior_concern && (
+  !!animal.current_foster_id ||
+  animal.status !== 'intake' && animal.status !== 'medical');
   const checklist = [
+  {
+    label: 'Behavior Assessed',
+    done: behaviorAssessed
+  },
   {
     label: 'Spay/Neuter Complete',
     done: isSpayed
-  },
-  {
-    label: 'Rabies Vaccine',
-    done: hasRabies
   },
   {
     label: 'Microchipped',
     done: hasMicrochip
   },
   {
-    label: 'Behavior Assessed',
-    done: hasBehaviorNote
+    label: 'Rabies Vaccine',
+    done: hasRabies
   }];
 
   const readinessPercent =
@@ -173,11 +355,11 @@ export function AnimalProfile() {
       {/* Hero Section */}
       <Card className="overflow-hidden">
         <div className="flex flex-col md:flex-row">
-          <div className="w-full md:w-1/3 h-64 md:h-auto bg-accent relative">
+          <div className="w-full md:w-1/3 h-64 md:h-auto bg-accent relative group">
             {animal.primary_photo_url && !heroImageError ?
             <img
               src={animal.primary_photo_url}
-              alt={animal.name}
+              alt={animalDisplayName(animal)}
               className="w-full h-full object-cover"
               onError={() => setHeroImageError(true)} /> :
 
@@ -187,7 +369,7 @@ export function AnimalProfile() {
                    requester avatars elsewhere in the app. */}
                 <div className="w-32 h-32 rounded-full bg-[#EBD4C0] text-[#A85A2A] flex items-center justify-center">
                   {animal.species === 'Dog' ?
-                <BoneIcon className="w-14 h-14" /> :
+                <DogIcon className="w-14 h-14" /> :
                 animal.species === 'Cat' ?
                 <CatIcon className="w-14 h-14" /> :
 
@@ -196,35 +378,103 @@ export function AnimalProfile() {
                 </div>
               </div>
             }
+
+            {/* Hover-to-change profile photo (LinkedIn/Twitter-style). */}
+            <button
+              type="button"
+              onClick={() => heroFileInputRef.current?.click()}
+              disabled={heroUploading}
+              aria-label={
+              animal.primary_photo_url ?
+              'Change profile photo' :
+              'Upload profile photo'
+              }
+              className={`absolute inset-0 flex flex-col items-center justify-center gap-2 text-white transition-all focus:outline-none ${heroUploading ? 'bg-black/50 opacity-100' : 'bg-black/0 opacity-0 hover:bg-black/40 hover:opacity-100 focus-visible:bg-black/40 focus-visible:opacity-100'}`}>
+
+              <CameraIcon className="w-7 h-7" />
+              <span className="text-sm font-medium">
+                {heroUploading ?
+                'Uploading…' :
+                animal.primary_photo_url ?
+                'Change photo' :
+                'Upload photo'}
+              </span>
+            </button>
+            <input
+              ref={heroFileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleHeroUpload} />
+
           </div>
           <div className="flex-1 p-6 md:p-8 flex flex-col justify-between min-w-0">
             <div>
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-4">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-2">
+                    {animal.name ?
                     <h1 className="text-4xl font-heading font-bold text-text-primary break-words">
-                      {animal.name}
-                    </h1>
-                    <span className="font-mono text-xs font-medium bg-background border border-border text-text-secondary px-2 py-1 rounded-md">
-                      #{animal.id}
-                    </span>
+                        {animal.name}
+                      </h1> :
+
+                    <h1
+                      className="text-3xl font-mono font-semibold text-text-primary break-words"
+                      title="This animal has not been given a name yet.">
+
+                        {animal.rescue_id}
+                      </h1>
+                    }
+                    {animalShowsRescueIdBadge(animal) &&
+                    <span
+                      className="font-mono text-xs font-medium bg-background border border-border text-text-secondary px-2 py-1 rounded-md"
+                      title="Rescue ID">
+
+                        {animal.rescue_id}
+                      </span>
+                    }
                   </div>
                   <p className="text-lg text-text-secondary">
-                    {animal.species} • {animal.sex} •{' '}
+                    {animalBreedLabel(animal, breeds) || animal.species} •{' '}
+                    {animal.sex} •{' '}
                     <span className="whitespace-nowrap">
                       {calculateAge(animal.estimated_birth_date)}
                     </span>
                   </p>
+                  {animal.birthdate_source === 'estimated_age' &&
+                  animal.estimated_age_value != null &&
+                  <p className="text-xs text-text-secondary mt-0.5">
+                      Estimated {animal.estimated_age_value}{' '}
+                      {animal.estimated_age_unit}
+                      {animal.estimated_age_as_of ?
+                    ` as of ${formatDate(animal.estimated_age_as_of)}` :
+                    ''}
+                    </p>
+                  }
                 </div>
                 <div className="flex flex-wrap gap-2 sm:shrink-0">
+                  {animal.status === 'adoptable' && !activeAdoption &&
                   <Button
                     variant="primary"
                     size="sm"
+                    onClick={() => setIsStartAdoptionOpen(true)}>
+
+                      <HeartIcon className="w-4 h-4 mr-2" />
+                      Start Adoption
+                    </Button>
+                  }
+                  {!isAdopted &&
+                  <Button
+                    variant={
+                    animal.status === 'adoptable' ? 'outline' : 'primary'
+                    }
+                    size="sm"
                     onClick={() => setIsPlaceModalOpen(true)}>
 
-                    <HomeIcon className="w-4 h-4 mr-2" />
-                    {currentFoster ? 'Reassign Foster' : 'Place in Foster'}
-                  </Button>
+                      <HomeIcon className="w-4 h-4 mr-2" />
+                      {currentFoster ? 'Reassign Foster' : 'Place in Foster'}
+                    </Button>
+                  }
                   <Button
                     variant="outline"
                     size="sm"
@@ -245,6 +495,11 @@ export function AnimalProfile() {
                   className="text-sm px-3 py-1" />
                 
                 <SpeciesBadge species={animal.species} showLabel size="md" />
+                <AnimalFlags
+                  animal={animal}
+                  isFostered={!!activePlacement}
+                  size="md" />
+
                 {animal.microchip_number &&
                 <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-background border border-border text-text-secondary">
                     Chip: {animal.microchip_number}
@@ -262,21 +517,37 @@ export function AnimalProfile() {
                 <div className="p-2 bg-[#DCEAF7] text-[#356A9A] rounded-lg">
                   <HomeIcon className="w-5 h-5" />
                 </div>
+                {isAdopted ?
                 <div>
-                  <p className="text-sm text-text-secondary">Current Foster</p>
-                  {currentFoster ?
+                    <p className="text-sm text-text-secondary">Adopted By</p>
+                    {adopter ?
+                  <Link
+                    to={`/contacts/${adopter.id}`}
+                    className="font-medium text-primary hover:underline">
+
+                        {adopter.first_name} {adopter.last_name}
+                      </Link> :
+
+                  <p className="font-medium text-text-primary">Not recorded</p>
+                  }
+                  </div> :
+
+                <div>
+                    <p className="text-sm text-text-secondary">Current Foster</p>
+                    {currentFoster ?
                   <Link
                     to={`/fosters/${currentFoster.id}`}
                     className="font-medium text-primary hover:underline">
-                    
-                      {currentFoster.first_name} {currentFoster.last_name}
-                    </Link> :
+
+                        {currentFoster.first_name} {currentFoster.last_name}
+                      </Link> :
 
                   <p className="font-medium text-text-primary">
-                      None (Needs Placement)
-                    </p>
+                        None (Needs Placement)
+                      </p>
                   }
-                </div>
+                  </div>
+                }
               </div>
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-[#F3E4D7] text-[#D98C5F] rounded-lg">
@@ -301,9 +572,10 @@ export function AnimalProfile() {
 
       <ActionNeededCallout
         animalId={animal.id}
-        priority={animal.priority}
-        actionNeeded={animal.action_needed} />
-      
+        animalName={animalDisplayName(animal)}
+        priority={animal.priority} />
+
+      {activeAdoption && <AdoptionPanel adoptionId={activeAdoption.id} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Tabs (Timeline / Medical History) */}
@@ -344,18 +616,18 @@ export function AnimalProfile() {
             {activeTab !== 'photos' &&
             <div className="flex gap-2">
                 <Button
-                variant="outline"
+                variant="soft"
                 size="sm"
                 onClick={() => setIsNoteModalOpen(true)}>
-                
+
                   <FileTextIcon className="w-4 h-4 mr-2" /> Add Note
                 </Button>
                 <Button
-                variant="outline"
+                variant="soft"
                 size="sm"
                 onClick={() => setIsMedicalModalOpen(true)}>
-                
-                  <SyringeIcon className="w-4 h-4 mr-2" /> Add Medical
+
+                  <SyringeIcon className="w-4 h-4 mr-2" /> Add Medical Record
                 </Button>
               </div>
             }
@@ -412,7 +684,7 @@ export function AnimalProfile() {
                       key={`${event.id}-${index}`}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.05 }}
+                      transition={{ duration: 0.2 }}
                       className="relative pl-8">
 
                             <div
@@ -559,6 +831,11 @@ export function AnimalProfile() {
         onClose={() => setIsPlaceModalOpen(false)}
         animalId={animal.id} />
 
+      <StartAdoptionModal
+        isOpen={isStartAdoptionOpen}
+        onClose={() => setIsStartAdoptionOpen(false)}
+        animalId={animal.id} />
+
     </div>);
 
 }
@@ -628,7 +905,7 @@ function PlacementTimelineList({
     <div className="p-6">
       <div className="relative border-l-2 border-border ml-4 space-y-8 pb-4">
         {sorted.map((p) => {
-          const foster = fosters.find((f) => f.id === p.foster_parent_id);
+          const foster = fosters.find((f) => f.id === p.person_id);
           const isActive = p.placement_status === 'active';
           return (
             <div key={p.id} className="relative pl-8">
@@ -816,12 +1093,28 @@ function MedicalGroup({
   count,
   records
 }: MedicalGroupProps) {
+  const { people, clinicEvents } = useWhisker();
   const toneColor = {
     urgent: 'text-status-urgent-text',
     info: 'text-primary',
     success: 'text-[#3E7B52]',
     neutral: 'text-text-secondary'
   }[tone];
+  // Resolve performer/facility: known contact/clinic, else free-text fallback.
+  const performerLabel = (r: MedicalRecord): string | null => {
+    if (r.provider_contact_id) {
+      const p = people.find((x) => x.id === r.provider_contact_id);
+      if (p) return `${p.first_name} ${p.last_name}`;
+    }
+    return r.provider_name || null;
+  };
+  const facilityLabel = (r: MedicalRecord): string | null => {
+    if (r.clinic_id) {
+      const c = clinicEvents.find((x) => x.id === r.clinic_id);
+      if (c) return `${formatDate(c.date_time)} clinic`;
+    }
+    return r.facility_name || null;
+  };
   return (
     <Card className="overflow-hidden">
       <div className="px-5 py-3 border-b border-border bg-background/60 flex items-center gap-2">
@@ -871,10 +1164,24 @@ function MedicalGroup({
                     {dateLabel}
                   </span>
                 </span>
-                {r.provider_name &&
+                {performerLabel(r) &&
                 <span>
-                    <span className="text-text-secondary/70">Provider:</span>{' '}
-                    <span className="text-text-primary">{r.provider_name}</span>
+                    <span className="text-text-secondary/70">By:</span>{' '}
+                    <span className="text-text-primary">{performerLabel(r)}</span>
+                  </span>
+                }
+                {facilityLabel(r) &&
+                <span>
+                    <span className="text-text-secondary/70">At:</span>{' '}
+                    <span className="text-text-primary">{facilityLabel(r)}</span>
+                  </span>
+                }
+                {r.next_due_date &&
+                <span>
+                    <span className="text-text-secondary/70">Next due:</span>{' '}
+                    <span className="text-text-primary font-medium">
+                      {formatDate(r.next_due_date)}
+                    </span>
                   </span>
                 }
               </div>

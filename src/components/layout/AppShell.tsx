@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
+import { DemoBanner } from './DemoBanner';
+import { isDemoMode } from '../../lib/appMode';
 import { PawPrintIcon, MenuIcon } from 'lucide-react';
 export function AppShell() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   return (
-    <div className="flex h-screen w-full bg-background overflow-hidden">
-      <Sidebar />
+    <div className="flex flex-col h-screen w-full bg-background overflow-hidden">
+      {isDemoMode && <DemoBanner />}
+      <div className="flex flex-1 min-h-0 w-full">
+        <Sidebar />
 
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         {/* Mobile Header */}
@@ -39,7 +43,7 @@ export function AppShell() {
           },
           {
             to: '/fosters',
-            label: 'Fosters'
+            label: 'Foster Parents'
           },
           {
             to: '/clinics',
@@ -82,6 +86,7 @@ export function AppShell() {
             <Outlet />
           </div>
         </main>
+        </div>
       </div>
     </div>);
 

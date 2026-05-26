@@ -11,6 +11,7 @@ import {
   ChevronRightIcon } from
 'lucide-react';
 import { useWhisker } from '../../context/WhiskerContext';
+import { animalDisplayName } from '../../lib/utils';
 import { Avatar } from '../ui/Avatar';
 import { StatusBadge, PriorityBadge } from '../ui/Badge';
 import { SpeciesBadge } from '../ui/SpeciesBadge';
@@ -27,7 +28,8 @@ export function GlobalSearch({
   className
 }: GlobalSearchProps) {
   const navigate = useNavigate();
-  const { animals, fosters, people, medicalRecords, placements } = useWhisker();
+  const { animals, fosters, people, medicalRecords, placements, actionItems } =
+  useWhisker();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -69,7 +71,7 @@ export function GlobalSearch({
     return animals.
     filter((a) => {
       const hay =
-      `${a.name} ${a.id} ${a.microchip_number || ''}`.toLowerCase();
+      `${a.name ?? ''} ${a.rescue_id ?? ''} ${a.id} ${a.microchip_number || ''}`.toLowerCase();
       return hay.includes(q);
     }).
     slice(0, 5);
@@ -129,12 +131,14 @@ export function GlobalSearch({
         id: `pri-${a.id}`,
         animal: a,
         label:
-        a.action_needed || (
+        actionItems.find(
+          (it) => it.animal_id === a.id && it.status === 'open'
+        )?.description || (
         !hasPlacement ? 'Needs placement' : 'Needs review')
       };
     });
     return [...overdue, ...highPriority].slice(0, 5);
-  }, [animals, medicalRecords, placements, q]);
+  }, [animals, medicalRecords, placements, actionItems, q]);
   const hasResults =
   animalResults.length > 0 ||
   fosterResults.length > 0 ||
@@ -242,7 +246,7 @@ export function GlobalSearch({
                 
                       <div className="min-w-0">
                         <p className="font-medium text-text-primary text-sm truncate">
-                          {r.animal.name}
+                          {animalDisplayName(r.animal)}
                         </p>
                         <p className="text-xs text-status-urgent-text font-medium truncate">
                           {r.label}
@@ -281,11 +285,17 @@ export function GlobalSearch({
                       </div>
                       <div className="min-w-0">
                         <p className="font-medium text-text-primary text-sm truncate">
-                          {a.name}
+                          {animalDisplayName(a)}
                         </p>
-                        <p className="text-xs text-text-secondary font-mono">
-                          #{a.id}
-                        </p>
+                        {a.rescue_id ?
+                    <p className="text-xs text-text-secondary font-mono">
+                            {a.rescue_id}
+                          </p> :
+
+                    <p className="text-xs text-text-secondary font-mono">
+                            #{a.id}
+                          </p>
+                    }
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">

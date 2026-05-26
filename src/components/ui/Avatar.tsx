@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { cn } from '../../lib/utils';
-import { UserIcon } from 'lucide-react';
+import { UserIcon, BoneIcon } from 'lucide-react';
 import { getInitialsColor, getInitials } from '../../lib/colors';
 import { PawPrintIcon } from './PawPrintIcon';
-import { BoneIcon } from './BoneIcon';
 import { CatIcon } from '../icons/CatIcon';
 import { Species } from '../../types';
 interface AvatarProps {
@@ -87,7 +86,7 @@ export function Avatar({
           fallback :
           type === 'animal' ?
           species === 'Dog' ?
-          <BoneIcon className="w-1/2 h-1/2 opacity-50" /> :
+          <BoneIcon className="w-3/4 h-3/4 opacity-75" /> :
           species === 'Cat' ?
           <CatIcon className="w-1/2 h-1/2 opacity-50" /> :
 
