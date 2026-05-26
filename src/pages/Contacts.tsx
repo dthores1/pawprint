@@ -100,6 +100,8 @@ export function Contacts() {
   { id: 'all', label: 'All Contacts' },
   { id: 'vet', label: 'Veterinarians' },
   { id: 'foster_parent', label: 'Foster Parents' },
+  { id: 'adopter', label: 'Adopters' },
+  { id: 'donor', label: 'Donors' },
   { id: 'trapper', label: 'Trappers' },
   { id: 'transport', label: 'Transport' }];
 

@@ -19,18 +19,20 @@ export function Onboarding() {
     if (!name.trim()) return;
     setBusy(true);
     setError(null);
-    const { data, error } = await supabase.
-    from('organizations').
-    insert({ name: name.trim() }).
-    select('id, name').
-    single();
+    // Use the SECURITY DEFINER RPC: it inserts the org + the creator's
+    // membership in one atomic step and avoids the "new row violates RLS policy"
+    // error you can hit doing a direct INSERT here.
+    const { data, error } = await supabase.rpc(
+      'create_organization_for_current_user',
+      { p_name: name.trim() }
+    );
     if (error) {
       setError(error.message);
       setBusy(false);
       return;
     }
     await refreshOrganizations();
-    if (data?.id) setCurrentOrgId(data.id);
+    if (data) setCurrentOrgId(data as string);
     // Gate will advance to the app once organizations include this one.
     setBusy(false);
   };

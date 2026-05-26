@@ -2,11 +2,15 @@
 // active FosterPlacement (current_foster_id). Holds/concerns are flags on the
 // Animal (is_on_hold / has_behavior_concern / has_medical_concern), orthogonal
 // to lifecycle. 'not_ready' = in care but not yet posted for adoption.
+// 'adoption_pending' is set automatically while an adoption is past the inquiry
+// stage (an active Adoption drives it); completing the adoption moves it to
+// 'adopted'. It signals the animal is effectively on hold for that adopter.
 export type AnimalStatus =
 'intake' |
 'medical' |
 'not_ready' |
 'adoptable' |
+'adoption_pending' |
 'adopted' |
 'hospice' |
 'deceased';
@@ -43,7 +47,17 @@ export type AgeUnit = 'days' | 'weeks' | 'months' | 'years';
 
 export interface Animal {
   id: string;
-  name: string;
+  /**
+   * Display name. Either `name` or `rescue_id` must be present (DB CHECK).
+   * Animals can exist with just a Rescue ID (e.g. unnamed cats in a TNR
+   * colony) — use `animalDisplayName()` in UI to pick the right label.
+   */
+  name?: string;
+  /**
+   * Operational identifier assigned by the rescue (e.g. `DanBH-1`, `ACP-1044`).
+   * Unique within an organization (partial unique index, NULL allowed).
+   */
+  rescue_id?: string;
   species: Species;
   sex: Sex;
   /**
@@ -243,6 +257,34 @@ export interface AnimalRelationship {
   // litter_id (avoids the N² relationship rows). See Litter + RelationshipsCard.
   relationship_type: 'mother' | 'father' | 'sibling' | 'child' | 'bonded_pair';
   notes?: string;
+}
+
+// Operational adoption workflow. One row per adoption attempt for an animal;
+// an animal can have at most one *active* (non-terminal) adoption at a time.
+// Completing it sets the animal to 'adopted' + stamps adopted_by_id/adopted_at.
+export type AdoptionStatus =
+'inquiry' |
+'application_submitted' |
+'meet_and_greet' |
+'pending_paperwork' |
+'ready_for_placement' |
+'completed' |
+'cancelled';
+export interface Adoption {
+  id: string;
+  animal_id: string;
+  adopter_id: string;
+  status: AdoptionStatus;
+  submitted_at?: string;
+  approved_at?: string;
+  completed_at?: string;
+  cancelled_at?: string;
+  paperwork_sent_at?: string;
+  paperwork_completed_at?: string;
+  donation_amount?: number;
+  notes?: string;
+  created_at: string;
+  updated_at?: string;
 }
 
 // A litter groups animals that share intake/age/origin metadata. Members link

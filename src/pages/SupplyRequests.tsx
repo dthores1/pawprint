@@ -15,7 +15,7 @@ import {
   BookmarkIcon,
   PackageIcon } from
 'lucide-react';
-import { formatDate, cn } from '../lib/utils';
+import { formatDate, cn, animalDisplayName } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { SupplyRequest, SupplyRequestStatus } from '../types';
 import { motion } from 'framer-motion';
@@ -357,12 +357,12 @@ export function SupplyRequests() {
                             <Avatar
                           src={animal.primary_photo_url}
                           type="animal"
-                          name={animal.name}
+                          name={animal.name ?? undefined}
                           species={animal.species}
                           className="w-12 h-12 text-[15px]" />
                         
                             <p className="font-medium text-text-primary">
-                              {animal.name}
+                              {animalDisplayName(animal)}
                             </p>
                           </> :
 

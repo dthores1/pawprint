@@ -9,6 +9,7 @@ import {
   TruckIcon,
   HeartHandshakeIcon,
   StethoscopeIcon,
+  BuildingIcon,
   LogOutIcon } from
 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -57,6 +58,11 @@ export function Sidebar() {
     to: '/contacts',
     icon: UsersIcon,
     label: 'Contacts'
+  },
+  {
+    to: '/organization',
+    icon: BuildingIcon,
+    label: 'Organization'
   }];
 
   return (

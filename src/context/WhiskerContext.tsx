@@ -8,6 +8,7 @@ import React, {
 'react';
 import {
   Animal,
+  Adoption,
   Breed,
   Litter,
   Sex,
@@ -38,6 +39,12 @@ import {
   litterUpdateToRow,
   rowToLitter } from
 '../lib/littersApi';
+import {
+  adoptionToInsert,
+  adoptionUpdateToRow,
+  rowToAdoption } from
+'../lib/adoptionsApi';
+import { adoptionStatusPatch, ADOPTION_FLOW } from '../lib/adoptions';
 import { useAuth } from './AuthContext';
 import {
   rowToAnimal,
@@ -126,6 +133,8 @@ export interface WhiskerContextType {
   people: Person[];
   litters: Litter[];
   littersLoading: boolean;
+  adoptions: Adoption[];
+  adoptionsLoading: boolean;
   /** True while the Supabase-backed people list is being fetched. */
   peopleLoading: boolean;
   /** Global breed catalog (not org-scoped). */
@@ -169,8 +178,20 @@ export interface WhiskerContextType {
   cancelActionItem: (id: string, completionNote?: string) => void;
   addPlacement: (placement: Omit<FosterPlacement, 'id'>) => void;
   updatePlacement: (id: string, updates: Partial<FosterPlacement>) => void;
-  addPerson: (person: Omit<Person, 'id' | 'created_at'>) => void;
+  addPerson: (
+  person: Omit<Person, 'id' | 'created_at'>)
+  => Promise<Person | undefined>;
   updatePerson: (id: string, updates: Partial<Person>) => void;
+  // — Adoptions (operational workflow) —
+  addAdoption: (
+  input: { animal_id: string; adopter_id: string; notes?: string })
+  => Promise<void>;
+  updateAdoption: (id: string, updates: Partial<Adoption>) => void;
+  /** Advance an adoption to a workflow status, stamping milestone timestamps. */
+  setAdoptionStatus: (id: string, status: Adoption['status']) => void;
+  /** Finalize: animal -> adopted, set adopted_by/at, close active placement. */
+  completeAdoption: (id: string, donationAmount?: number) => void;
+  cancelAdoption: (id: string, reason?: string) => void;
   addPhoto: (input: NewPhotoInput) => Promise<void>;
   deletePhoto: (id: string) => void;
   addRelationship: (rel: Omit<AnimalRelationship, 'id'>) => void;
@@ -416,6 +437,30 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   useEffect(() => {
     loadLitters();
   }, [loadLitters]);
+  // Adoptions — org-scoped operational workflow records.
+  const [adoptions, setAdoptions] = useState<Adoption[]>([]);
+  const [adoptionsLoading, setAdoptionsLoading] = useState(false);
+  const loadAdoptions = useCallback(async () => {
+    if (!orgId) {
+      setAdoptions([]);
+      return;
+    }
+    setAdoptionsLoading(true);
+    const { data, error } = await supabase.
+    from('adoptions').
+    select('*').
+    eq('organization_id', orgId).
+    order('created_at', { ascending: false });
+    if (error) {
+      console.error('[adoptions] load failed:', error.message);
+    } else {
+      setAdoptions((data ?? []).map(rowToAdoption));
+    }
+    setAdoptionsLoading(false);
+  }, [orgId]);
+  useEffect(() => {
+    loadAdoptions();
+  }, [loadAdoptions]);
   // Photos — metadata in Supabase, image bytes in the `animal-photos` bucket.
   const [photos, setPhotos] = useState<AnimalPhoto[]>([]);
   const loadPhotos = useCallback(async () => {
@@ -891,10 +936,12 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       }
     });
   };
-  const addPerson = async (person: Omit<Person, 'id' | 'created_at'>) => {
+  const addPerson = async (
+  person: Omit<Person, 'id' | 'created_at'>)
+  : Promise<Person | undefined> => {
     if (!orgId) {
       console.error('[people] cannot create — no current organization');
-      return;
+      return undefined;
     }
     const { data, error } = await supabase.
     from('people').
@@ -903,9 +950,11 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     single();
     if (error) {
       console.error('[people] create failed:', error.message);
-      return;
+      return undefined;
     }
-    if (data) setPeople((prev) => [rowToPerson(data), ...prev]);
+    const created = rowToPerson(data);
+    setPeople((prev) => [created, ...prev]);
+    return created;
   };
   const updatePerson = (id: string, updates: Partial<Person>) => {
     setPeople((prev) =>
@@ -923,6 +972,147 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         loadPeople();
       }
     });
+  };
+  // — Adoptions —————————————————————————————————————————————————————
+  const ensureAdopterRole = (personId: string) => {
+    const person = people.find((p) => p.id === personId);
+    if (!person || person.roles.includes('adopter')) return;
+    const nextRoles: PersonRole[] = [...person.roles, 'adopter'];
+    updatePerson(personId, { roles: nextRoles, role: legacyRoleFor(nextRoles) });
+  };
+  const addAdoption: WhiskerContextType['addAdoption'] = async (input) => {
+    if (!orgId) {
+      console.error('[adoptions] cannot create — no current organization');
+      return;
+    }
+    const { data, error } = await supabase.
+    from('adoptions').
+    insert(adoptionToInsert(input, orgId)).
+    select('*').
+    single();
+    if (error || !data) {
+      console.error('[adoptions] create failed:', error?.message);
+      return;
+    }
+    setAdoptions((prev) => [rowToAdoption(data), ...prev]);
+    ensureAdopterRole(input.adopter_id);
+  };
+  const updateAdoption: WhiskerContextType['updateAdoption'] = (id, updates) => {
+    const prev = adoptions;
+    setAdoptions((cur) =>
+    cur.map((a) => a.id === id ? { ...a, ...updates } : a)
+    );
+    // In-flow status changes drive the animal's lifecycle status: beyond the
+    // inquiry stage the animal is "Adoption Pending" (effectively on hold);
+    // back to inquiry returns it to Adoptable. Terminal statuses are handled by
+    // completeAdoption / cancelAdoption.
+    if (updates.status && ADOPTION_FLOW.includes(updates.status)) {
+      const adoption = adoptions.find((a) => a.id === id);
+      const animal = adoption ?
+      animals.find((an) => an.id === adoption.animal_id) :
+      undefined;
+      if (
+      animal && (
+      animal.status === 'adoptable' || animal.status === 'adoption_pending'))
+      {
+        const next =
+        updates.status === 'inquiry' ? 'adoptable' : 'adoption_pending';
+        if (animal.status !== next) updateAnimal(animal.id, { status: next });
+      }
+    }
+    const row = adoptionUpdateToRow(updates);
+    if (Object.keys(row).length === 0) return;
+    supabase.
+    from('adoptions').
+    update(row).
+    eq('id', id).
+    then(({ error }) => {
+      if (error) {
+        console.error('[adoptions] update failed:', error.message);
+        setAdoptions(prev);
+      }
+    });
+  };
+  const setAdoptionStatus: WhiskerContextType['setAdoptionStatus'] = (
+  id,
+  status) =>
+  {
+    const adoption = adoptions.find((a) => a.id === id);
+    if (!adoption) return;
+    updateAdoption(id, adoptionStatusPatch(adoption, status));
+  };
+  const completeAdoption: WhiskerContextType['completeAdoption'] = (
+  id,
+  donationAmount) =>
+  {
+    const adoption = adoptions.find((a) => a.id === id);
+    if (!adoption) return;
+    const ts = new Date().toISOString();
+    // 1. The adoption record becomes completed.
+    updateAdoption(id, {
+      status: 'completed',
+      completed_at: ts,
+      ...(donationAmount != null ? { donation_amount: donationAmount } : {})
+    });
+    // 2. The animal becomes adopted; stamp the adopter + clear the foster cache.
+    const animalUpdates: Partial<Animal> = {
+      status: 'adopted',
+      adopted_by_id: adoption.adopter_id,
+      adopted_at: ts
+    };
+    (animalUpdates as Record<string, unknown>).current_foster_id = null;
+    updateAnimal(adoption.animal_id, animalUpdates);
+    // 3. Close any active foster placement.
+    const active = placements.find(
+      (p) =>
+      p.animal_id === adoption.animal_id && p.placement_status === 'active'
+    );
+    if (active) {
+      const endDate = ts.split('T')[0];
+      setPlacements((cur) =>
+      cur.map((p) =>
+      p.id === active.id ?
+      {
+        ...p,
+        placement_status: 'completed' as const,
+        end_date: endDate,
+        reason_ended: 'Adopted'
+      } :
+      p
+      )
+      );
+      supabase.
+      from('foster_placements').
+      update({
+        placement_status: 'completed',
+        end_date: endDate,
+        reason_ended: 'Adopted'
+      }).
+      eq('id', active.id).
+      then(({ error }) => {
+        if (error) {
+          console.error('[placements] close-on-adopt failed:', error.message);
+          loadPlacements();
+        }
+      });
+    }
+    // 4. Make sure the adopter carries the adopter role.
+    ensureAdopterRole(adoption.adopter_id);
+  };
+  const cancelAdoption: WhiskerContextType['cancelAdoption'] = (id, reason) => {
+    const adoption = adoptions.find((a) => a.id === id);
+    updateAdoption(id, {
+      status: 'cancelled',
+      cancelled_at: new Date().toISOString(),
+      ...(reason && reason.trim() ? { notes: reason.trim() } : {})
+    });
+    // Free the animal back up if the cancelled adoption had it pending.
+    if (adoption) {
+      const animal = animals.find((an) => an.id === adoption.animal_id);
+      if (animal && animal.status === 'adoption_pending') {
+        updateAnimal(animal.id, { status: 'adoptable' });
+      }
+    }
   };
   const addPhoto = async (input: NewPhotoInput) => {
     if (!orgId) {
@@ -1542,6 +1732,8 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         peopleLoading,
         litters,
         littersLoading,
+        adoptions,
+        adoptionsLoading,
         breeds,
         products,
         addProduct,
@@ -1566,6 +1758,11 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         updatePlacement,
         addPerson,
         updatePerson,
+        addAdoption,
+        updateAdoption,
+        setAdoptionStatus,
+        completeAdoption,
+        cancelAdoption,
         addPhoto,
         deletePhoto,
         addRelationship,

@@ -112,6 +112,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [userId, refreshOrganizations]);
 
+  // If the user just signed in via an invite link, consume the token stashed by
+  // AcceptInvitePage: accept the invite → refresh memberships → land in the org.
+  useEffect(() => {
+    if (!userId) return;
+    const token = localStorage.getItem('pawprint.pendingInviteToken');
+    if (!token) return;
+    (async () => {
+      const { data, error } = await supabase.rpc('accept_org_invite', {
+        p_token: token
+      });
+      // Clear regardless — we don't want to retry a bad/expired token forever.
+      localStorage.removeItem('pawprint.pendingInviteToken');
+      if (error) {
+        console.error('[invites] auto-accept failed:', error.message);
+        return;
+      }
+      await refreshOrganizations();
+      if (data) {
+        setCurrentOrgIdState(data as string);
+        localStorage.setItem(CURRENT_ORG_KEY, data as string);
+      }
+    })();
+  }, [userId, refreshOrganizations]);
+
   const setCurrentOrgId = useCallback((id: string) => {
     setCurrentOrgIdState(id);
     localStorage.setItem(CURRENT_ORG_KEY, id);

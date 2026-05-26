@@ -8,6 +8,7 @@ import { StatusBadge } from '../components/ui/Badge';
 import { SpeciesBadge } from '../components/ui/SpeciesBadge';
 import { PlaceAnimalModal } from '../components/animals/PlaceAnimalModal';
 import { EditFosterModal } from '../components/fosters/EditFosterModal';
+import { animalDisplayName } from '../lib/utils';
 import {
   ArrowLeftIcon,
   MapPinIcon,
@@ -233,7 +234,7 @@ export function FosterProfile() {
                       </div>
                       <div className="min-w-0">
                         <p className="font-medium text-text-primary group-hover:text-primary transition-colors truncate">
-                          {animal.name}
+                          {animalDisplayName(animal)}
                         </p>
                         <StatusBadge status={animal.status} className="mt-1" />
                       </div>
@@ -273,7 +274,7 @@ export function FosterProfile() {
                             to={`/animals/${animal.id}`}
                             className="font-medium text-text-primary hover:text-primary">
                             
-                              {animal.name}
+                              {animalDisplayName(animal)}
                             </Link>
                             <p className="text-sm text-text-secondary">
                               {new Date(

@@ -9,6 +9,7 @@ typeof v === 'string' && UUID_RE.test(v);
 // TS Animal field names (the schema uses snake_case to match).
 const WRITABLE_COLUMNS = [
 'name',
+'rescue_id',
 'species',
 'sex',
 'breed_id',
@@ -62,11 +63,17 @@ function clearAgeFieldsIfNeeded(row: Record<string, any>) {
   }
 }
 
+// Optional text columns where '' from a form input should become NULL in the
+// DB. Rescue ID has a partial unique index that treats NULL as "no value", but
+// empty strings would all collide as the same value.
+const NULLABLE_TEXT_COLUMNS = new Set(['name', 'rescue_id']);
+
 /** Supabase row → app Animal. Coalesces nulls for the TS-required strings. */
 export function rowToAnimal(r: any): Animal {
   return {
     id: r.id,
-    name: r.name,
+    name: r.name ?? undefined,
+    rescue_id: r.rescue_id ?? undefined,
     species: r.species,
     sex: r.sex,
     estimated_birth_date: r.estimated_birth_date ?? '',
@@ -101,6 +108,11 @@ export function rowToAnimal(r: any): Animal {
 
 function normalizeColumn(col: string, value: any): any {
   if (DATE_COLUMNS.has(col) && value === '') return null;
+  if (NULLABLE_TEXT_COLUMNS.has(col)) {
+    if (value == null) return null;
+    const trimmed = typeof value === 'string' ? value.trim() : value;
+    return trimmed === '' ? null : trimmed;
+  }
   return value;
 }
 

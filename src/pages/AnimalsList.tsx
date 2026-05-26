@@ -25,7 +25,12 @@ import {
   DogIcon,
   PawPrintIcon } from
 'lucide-react';
-import { calculateAge, formatDate } from '../lib/utils';
+import {
+  calculateAge,
+  formatDate,
+  animalDisplayName,
+  animalShowsRescueIdBadge } from
+'../lib/utils';
 import { animalBreedLabel } from '../lib/breedsApi';
 import { motion } from 'framer-motion';
 import { useWindowRowVirtualizer } from '../lib/useWindowRowVirtualizer';
@@ -42,6 +47,7 @@ const STATUS_LABELS: Record<AnimalStatus, string> = {
   medical: 'Medical',
   not_ready: 'Not Ready',
   adoptable: 'Adoptable',
+  adoption_pending: 'Adoption Pending',
   adopted: 'Adopted',
   hospice: 'Hospice',
   deceased: 'Deceased'
@@ -150,7 +156,8 @@ export function AnimalsList() {
     const q = searchQuery.toLowerCase();
     return animals.filter((animal) => {
       const matchesSearch =
-      animal.name.toLowerCase().includes(q) ||
+      (animal.name ?? '').toLowerCase().includes(q) ||
+      (animal.rescue_id ?? '').toLowerCase().includes(q) ||
       animal.id.toLowerCase().includes(q) ||
       !!animal.microchip_number && animal.microchip_number.includes(searchQuery);
       const matchesStatus =
@@ -196,7 +203,7 @@ export function AnimalsList() {
     const getValue = (a: Animal): string | number | null => {
       switch (sort.key) {
         case 'name':
-          return a.name?.toLowerCase() ?? '';
+          return animalDisplayName(a).toLowerCase();
         case 'status':
           return STATUS_ORDER.indexOf(a.status);
         case 'priority':
@@ -500,10 +507,15 @@ export function AnimalsList() {
                           <div>
                             <Link
                             to={`/animals/${animal.id}`}
-                            className="font-medium text-text-primary group-hover:text-primary transition-colors block">
-                            
-                              {animal.name}
+                            className={`group-hover:text-primary transition-colors block ${animal.name ? 'font-medium text-text-primary' : 'font-mono text-sm font-semibold text-text-primary'}`}>
+
+                              {animalDisplayName(animal)}
                             </Link>
+                            {animalShowsRescueIdBadge(animal) &&
+                          <span className="block mt-0.5 font-mono text-[11px] text-text-secondary">
+                                {animal.rescue_id}
+                              </span>
+                          }
                             {bonded &&
                           <span
                             className="inline-flex items-center gap-1.5 mt-0.5 text-[12.5px] font-medium text-[#6B5B8C]"

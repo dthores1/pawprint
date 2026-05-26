@@ -7,6 +7,7 @@ import { Button } from '../components/ui/Button';
 import { SpeciesBadge } from '../components/ui/SpeciesBadge';
 import { StatusBadge } from '../components/ui/Badge';
 import { EditContactModal } from '../components/contacts/EditContactModal';
+import { animalDisplayName } from '../lib/utils';
 import {
   ArrowLeftIcon,
   MapPinIcon,
@@ -216,7 +217,7 @@ export function ContactProfile() {
                     </div>
                     <div className="min-w-0">
                       <p className="font-medium text-text-primary group-hover:text-primary transition-colors truncate">
-                        {animal.name}
+                        {animalDisplayName(animal)}
                       </p>
                       <StatusBadge status={animal.status} className="mt-1" />
                     </div>

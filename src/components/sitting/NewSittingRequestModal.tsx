@@ -8,6 +8,7 @@ import { AnimalMultiPicker } from '../ui/AnimalMultiPicker';
 import { useWhisker } from '../../context/WhiskerContext';
 import { useAuth } from '../../context/AuthContext';
 import { SittingCoverageScope } from '../../types';
+import { animalDisplayName } from '../../lib/utils';
 
 interface Props {
   isOpen: boolean;
@@ -113,7 +114,7 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
 
   // Friendly list of names for the "all" copy ("Juniper, Marmalade, and Pepper").
   const namesList = (() => {
-    const names = myAnimals.map((a) => a.name);
+    const names = myAnimals.map((a) => animalDisplayName(a));
     if (names.length === 0) return '';
     if (names.length === 1) return names[0];
     if (names.length === 2) return `${names[0]} and ${names[1]}`;

@@ -18,7 +18,12 @@ import {
   HeartHandshakeIcon,
   MapPinIcon } from
 'lucide-react';
-import { getDaysUntil, formatDate, getGreeting } from '../lib/utils';
+import {
+  getDaysUntil,
+  formatDate,
+  getGreeting,
+  animalDisplayName } from
+'../lib/utils';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Priority } from '../types';
@@ -273,7 +278,7 @@ export function Dashboard() {
                           </div>
                           <div className="min-w-0">
                             <p className="font-medium text-text-primary truncate">
-                              {animal.name}
+                              {animalDisplayName(animal)}
                             </p>
                             <p className="text-sm text-text-secondary line-clamp-1">
                               {openActionFor(animal.id) || (
@@ -313,7 +318,7 @@ export function Dashboard() {
                           </div>
                           <div>
                             <p className="font-medium text-text-primary">
-                              {animal.name}
+                              {animalDisplayName(animal)}
                             </p>
                             <p className="text-sm text-status-urgent-text font-medium">
                               Overdue: {record.procedure_name}
@@ -464,7 +469,7 @@ export function Dashboard() {
 
                           <div>
                             <p className="font-medium text-text-primary">
-                              {animal.name}{' '}
+                              {animalDisplayName(animal)}{' '}
                               <span className="text-text-secondary font-normal">
                                 — {record.procedure_name}
                               </span>

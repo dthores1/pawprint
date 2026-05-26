@@ -20,6 +20,8 @@ import { Sitting } from './pages/Sitting';
 import { Clinics } from './pages/Clinics';
 import { Login } from './pages/Login';
 import { Onboarding } from './pages/Onboarding';
+import { AcceptInvitePage } from './pages/AcceptInvitePage';
+import { OrganizationPage } from './pages/OrganizationPage';
 import { PawPrintIcon } from 'lucide-react';
 
 function Splash() {
@@ -49,6 +51,7 @@ function AppRoutes() {
         <Route path="clinics" element={<Clinics />} />
         <Route path="contacts" element={<Contacts />} />
         <Route path="contacts/:id" element={<ContactProfile />} />
+        <Route path="organization" element={<OrganizationPage />} />
       </Route>
     </Routes>);
 
@@ -84,7 +87,12 @@ function ProductionApp() {
     <AuthProvider>
       <WhiskerProvider>
         <BrowserRouter>
-          <Gate />
+          <Routes>
+            {/* Invite acceptance is reachable without a session — signed-out
+             visitors stash the token and sign in; AuthContext consumes it. */}
+            <Route path="/invite/:token" element={<AcceptInvitePage />} />
+            <Route path="*" element={<Gate />} />
+          </Routes>
         </BrowserRouter>
       </WhiskerProvider>
     </AuthProvider>);

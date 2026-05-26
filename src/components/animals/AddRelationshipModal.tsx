@@ -7,6 +7,7 @@ import { SpeciesBadge } from '../ui/SpeciesBadge';
 import { useWhisker } from '../../context/WhiskerContext';
 import { AnimalRelationship, Animal } from '../../types';
 import { SearchIcon, XIcon, CheckIcon } from 'lucide-react';
+import { animalDisplayName, animalShowsRescueIdBadge } from '../../lib/utils';
 interface AddRelationshipModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -59,13 +60,13 @@ export function AddRelationshipModal({
       r.animal_id === animalId ? r.related_animal_id : r.animal_id
       )
     );
-    return animals.filter(
-      (a) =>
-      a.id !== animalId &&
-      !relatedIds.has(a.id) && (
-      a.name.toLowerCase().includes(search.toLowerCase()) ||
-      a.id.toLowerCase().includes(search.toLowerCase()))
-    );
+    const q = search.toLowerCase();
+    return animals.filter((a) => {
+      if (a.id === animalId || relatedIds.has(a.id)) return false;
+      const hay =
+      `${a.name ?? ''} ${a.rescue_id ?? ''} ${a.id}`.toLowerCase();
+      return hay.includes(q);
+    });
   }, [animals, relationships, animalId, search]);
   const reset = () => {
     setSearch('');
@@ -155,11 +156,19 @@ export function AddRelationshipModal({
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-text-primary truncate">
-                          {animal.name}
+                          {animalDisplayName(animal)}
                         </p>
-                        <p className="text-xs text-text-secondary font-mono">
-                          #{animal.id}
-                        </p>
+                        {animalShowsRescueIdBadge(animal) ?
+                    <p className="text-xs text-text-secondary font-mono">
+                            {animal.rescue_id}
+                          </p> :
+                    animal.rescue_id ?
+                    null :
+
+                    <p className="text-xs text-text-secondary font-mono">
+                            #{animal.id}
+                          </p>
+                    }
                       </div>
                     </button>
               )

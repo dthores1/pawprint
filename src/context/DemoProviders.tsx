@@ -20,7 +20,8 @@ import {
   ClinicSlot,
   ClinicSlotProcedure,
   AnimalActionItem,
-  Litter } from
+  Litter,
+  Adoption } from
 '../types';
 import { NewPhotoInput } from '../lib/photosApi';
 import { legacyRoleFor } from '../lib/peopleApi';
@@ -43,9 +44,11 @@ import {
   seedClinicEvents,
   seedClinicSlots,
   seedClinicSlotProcedures,
-  seedLitters } from
+  seedLitters,
+  seedAdoptions } from
 '../data/seed';
 import { generateId } from '../lib/utils';
+import { adoptionStatusPatch, ADOPTION_FLOW } from '../lib/adoptions';
 
 // ============================================================
 // Demo mode providers — public portfolio. No auth, no Supabase.
@@ -102,6 +105,7 @@ export function DemoWhiskerProvider({
   useState<AnimalRelationship[]>(seedRelationships);
   const [photos, setPhotos] = useState<AnimalPhoto[]>(seedPhotos);
   const [litters, setLitters] = useState<Litter[]>(seedLitters);
+  const [adoptions, setAdoptions] = useState<Adoption[]>(seedAdoptions);
   const [people, setPeople] = useState<Person[]>(seedPeople);
   // Fosters are a derived view of people (those with the 'foster_parent' role).
   const fosters = people.filter((p) => p.roles.includes('foster_parent'));
@@ -148,6 +152,8 @@ export function DemoWhiskerProvider({
     peopleLoading: false,
     litters,
     littersLoading: false,
+    adoptions,
+    adoptionsLoading: false,
     breeds: seedBreeds,
     products,
     supplyRequests,
@@ -309,15 +315,131 @@ export function DemoWhiskerProvider({
     prev.map((p) => p.id === id ? { ...p, ...updates } : p)
     ),
 
-    addPerson: (person) =>
-    setPeople((prev) => [
-    { ...person, id: `pe${generateId()}`, created_at: now() },
-    ...prev]
-    ),
+    addPerson: async (person) => {
+      const created: Person = {
+        ...person,
+        id: `pe${generateId()}`,
+        created_at: now()
+      };
+      setPeople((prev) => [created, ...prev]);
+      return created;
+    },
     updatePerson: (id, updates) =>
     setPeople((prev) =>
     prev.map((p) => p.id === id ? { ...p, ...updates } : p)
     ),
+
+    // — Adoptions —
+    addAdoption: async ({ animal_id, adopter_id, notes }) => {
+      setAdoptions((prev) => [
+      {
+        id: `ad${generateId()}`,
+        animal_id,
+        adopter_id,
+        status: 'inquiry',
+        notes,
+        created_at: now()
+      },
+      ...prev]
+      );
+      setPeople((prev) =>
+      prev.map((p) =>
+      p.id === adopter_id && !p.roles.includes('adopter') ?
+      {
+        ...p,
+        roles: [...p.roles, 'adopter'],
+        role: legacyRoleFor([...p.roles, 'adopter'])
+      } :
+      p
+      )
+      );
+    },
+    updateAdoption: (id, updates) => {
+      setAdoptions((prev) =>
+      prev.map((a) => a.id === id ? { ...a, ...updates } : a)
+      );
+      if (updates.status && ADOPTION_FLOW.includes(updates.status)) {
+        const adoption = adoptions.find((a) => a.id === id);
+        if (adoption) {
+          const next =
+          updates.status === 'inquiry' ? 'adoptable' : 'adoption_pending';
+          updateAnimal(adoption.animal_id, { status: next });
+        }
+      }
+    },
+    setAdoptionStatus: (id, status) =>
+    setAdoptions((prev) =>
+    prev.map((a) =>
+    a.id === id ? { ...a, ...adoptionStatusPatch(a, status) } : a
+    )
+    ),
+    completeAdoption: (id, donationAmount) => {
+      const adoption = adoptions.find((a) => a.id === id);
+      if (!adoption) return;
+      const ts = now();
+      setAdoptions((prev) =>
+      prev.map((a) =>
+      a.id === id ?
+      {
+        ...a,
+        status: 'completed',
+        completed_at: ts,
+        ...(donationAmount != null ? { donation_amount: donationAmount } : {})
+      } :
+      a
+      )
+      );
+      updateAnimal(adoption.animal_id, {
+        status: 'adopted',
+        adopted_by_id: adoption.adopter_id,
+        adopted_at: ts,
+        current_foster_id: undefined
+      });
+      setPlacements((prev) =>
+      prev.map((p) =>
+      p.animal_id === adoption.animal_id && p.placement_status === 'active' ?
+      {
+        ...p,
+        placement_status: 'completed' as const,
+        end_date: ts.split('T')[0],
+        reason_ended: 'Adopted'
+      } :
+      p
+      )
+      );
+      setPeople((prev) =>
+      prev.map((p) =>
+      p.id === adoption.adopter_id && !p.roles.includes('adopter') ?
+      {
+        ...p,
+        roles: [...p.roles, 'adopter'],
+        role: legacyRoleFor([...p.roles, 'adopter'])
+      } :
+      p
+      )
+      );
+    },
+    cancelAdoption: (id, reason) => {
+      const adoption = adoptions.find((a) => a.id === id);
+      setAdoptions((prev) =>
+      prev.map((a) =>
+      a.id === id ?
+      {
+        ...a,
+        status: 'cancelled',
+        cancelled_at: now(),
+        ...(reason && reason.trim() ? { notes: reason.trim() } : {})
+      } :
+      a
+      )
+      );
+      if (adoption) {
+        const animal = animals.find((an) => an.id === adoption.animal_id);
+        if (animal && animal.status === 'adoption_pending') {
+          updateAnimal(adoption.animal_id, { status: 'adoptable' });
+        }
+      }
+    },
 
     addPhoto: async (input: NewPhotoInput) => {
       const url = input.file ?

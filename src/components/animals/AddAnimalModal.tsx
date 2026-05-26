@@ -18,6 +18,9 @@ interface AddAnimalModalProps {
 }
 const INITIAL = {
   name: '',
+  // Operational identifier (e.g. `DanBH-1`). Either name or rescue_id (or both)
+  // is required — the DB CHECK enforces it, and so does the submit validator.
+  rescue_id: '',
   species: 'Dog' as Species,
   sex: 'Unknown' as Sex,
   breed_id: undefined as string | undefined,
@@ -38,6 +41,8 @@ const INITIAL = {
 type AnimalForm = typeof INITIAL;
 type FormField = keyof AnimalForm;
 type FormErrors = Partial<Record<FormField, string>>;
+const NAME_OR_RESCUE_ID_MESSAGE =
+'Animals must have either a Name or Rescue ID.';
 
 function isValidUrl(value: string): boolean {
   if (!value.trim()) return true;
@@ -51,7 +56,12 @@ function isValidUrl(value: string): boolean {
 
 function validateForm(formData: AnimalForm, ageMode: AgeInputMode): FormErrors {
   const nextErrors: FormErrors = {};
-  if (!formData.name.trim()) nextErrors.name = 'Name is required.';
+  if (!formData.name.trim() && !formData.rescue_id.trim()) {
+    // Surface the same message on both fields so it's visible regardless of
+    // which one the user is looking at.
+    nextErrors.name = NAME_OR_RESCUE_ID_MESSAGE;
+    nextErrors.rescue_id = NAME_OR_RESCUE_ID_MESSAGE;
+  }
   // Require enough age info to derive a birthdate (one path or the other).
   // Estimated age is anchored to today (it's the animal's *current* age),
   // independent of when it was taken in.
@@ -111,7 +121,8 @@ export function AddAnimalModal({
       asOf
     });
     addAnimal({
-      name: formData.name.trim(),
+      name: formData.name.trim() || undefined,
+      rescue_id: formData.rescue_id.trim() || undefined,
       species: formData.species,
       sex: formData.sex,
       breed_id: formData.breed_id,
@@ -210,6 +221,32 @@ export function AddAnimalModal({
               <FieldError id="name_error">{errors.name}</FieldError>
             </div>
             <div>
+              <Label htmlFor="rescue_id">Rescue ID</Label>
+              <Input
+                id="rescue_id"
+                name="rescue_id"
+                aria-invalid={Boolean(errors.rescue_id)}
+                aria-describedby={
+                errors.rescue_id ? 'rescue_id_error' : undefined
+                }
+                className={
+                errors.rescue_id ?
+                'border-red-500 focus:ring-red-500 font-mono' :
+                'font-mono'
+                }
+                value={formData.rescue_id}
+                onChange={handleChange}
+                placeholder="Rescue-assigned ID" />
+
+              <FieldError id="rescue_id_error">{errors.rescue_id}</FieldError>
+            </div>
+          </div>
+          <p className="text-xs text-text-secondary -mt-2">
+            Either a Name or a Rescue ID is required. Most animals will have
+            both.
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
               <Label htmlFor="species">Species</Label>
               <Select
                 id="species"
@@ -222,8 +259,6 @@ export function AddAnimalModal({
                 <option value="Other">Other</option>
               </Select>
             </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="sex">Sex</Label>
               <Select
@@ -237,18 +272,18 @@ export function AddAnimalModal({
                 <option value="Unknown">Unknown</option>
               </Select>
             </div>
-            <div>
-              <Label htmlFor="breed">Breed</Label>
-              <BreedCombobox
-                id="breed"
-                species={formData.species}
-                breedId={formData.breed_id}
-                breedText={formData.breed_text}
-                onChange={(next) =>
-                setFormData((prev) => ({ ...prev, ...next }))
-                } />
+          </div>
+          <div>
+            <Label htmlFor="breed">Breed</Label>
+            <BreedCombobox
+              id="breed"
+              species={formData.species}
+              breedId={formData.breed_id}
+              breedText={formData.breed_text}
+              onChange={(next) =>
+              setFormData((prev) => ({ ...prev, ...next }))
+              } />
 
-            </div>
           </div>
           <div>
             <Label htmlFor="primary_photo_url">Photo URL (optional)</Label>

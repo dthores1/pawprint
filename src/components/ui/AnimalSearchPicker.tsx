@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { SearchIcon, XIcon } from 'lucide-react';
 import { Input } from './Forms';
 import { Avatar } from './Avatar';
 import { SpeciesBadge } from './SpeciesBadge';
+import { CalendarPopover } from './CalendarPopover';
 import { Animal } from '../../types';
+import { animalDisplayName, animalShowsRescueIdBadge } from '../../lib/utils';
 
 // Single-select typeahead for picking one animal. Same UX shape as the
 // foster picker in PlaceAnimalModal — we use it across the new coordination
@@ -30,6 +31,7 @@ export function AnimalSearchPicker({
 }: Props) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
+  const [menuWidth, setMenuWidth] = useState<number>();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const selected = animals.find((a) => a.id === value) || null;
 
@@ -40,25 +42,16 @@ export function AnimalSearchPicker({
     filter((a) => !excluded.has(a.id)).
     filter((a) => {
       if (!q) return true;
-      return (
-        a.name.toLowerCase().includes(q) || a.id.toLowerCase().includes(q));
-
+      const hay = `${a.name ?? ''} ${a.rescue_id ?? ''} ${a.id}`.toLowerCase();
+      return hay.includes(q);
     }).
     slice(0, 12);
   }, [animals, query, excludeIds]);
 
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (
-      wrapperRef.current &&
-      !wrapperRef.current.contains(e.target as Node))
-      {
-        setOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
+  // Match the dropdown width to the input each time it opens.
+  useLayoutEffect(() => {
+    if (open) setMenuWidth(wrapperRef.current?.offsetWidth);
+  }, [open]);
 
   if (selected) {
     return (
@@ -116,27 +109,27 @@ export function AnimalSearchPicker({
         className="pl-9" />
 
 
-      <AnimatePresence>
-        {open &&
-        <motion.div
-          initial={{ opacity: 0, y: -4 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -4 }}
-          transition={{ duration: 0.15 }}
-          className="absolute z-10 mt-1.5 w-full bg-card border border-border rounded-xl shadow-soft-lg overflow-hidden max-h-72 overflow-y-auto">
+      <CalendarPopover
+        anchorRef={wrapperRef}
+        open={open}
+        onClose={() => setOpen(false)}
+        padded={false}>
 
-            {results.length === 0 ?
+        <div
+          style={{ width: menuWidth }}
+          className="max-h-72 overflow-y-auto">
+
+          {results.length === 0 ?
           <div className="p-4 text-sm text-text-secondary text-center">
-                {query ?
+              {query ?
             <>No animals match "{query}".</> :
-
             'No animals available.'}
-              </div> :
+            </div> :
 
           <ul className="py-1">
-                {results.map((a) =>
+              {results.map((a) =>
             <li key={a.id}>
-                    <button
+                  <button
                 type="button"
                 onClick={() => {
                   onChange(a.id);
@@ -145,33 +138,40 @@ export function AnimalSearchPicker({
                 }}
                 className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-background cursor-pointer transition-colors">
 
-                      <div className="relative shrink-0">
-                        <Avatar
+                    <div className="relative shrink-0">
+                      <Avatar
                   src={a.primary_photo_url}
                   type="animal"
                   species={a.species}
                   size="sm" />
 
-                        <div className="absolute -bottom-1 -right-1 ring-2 ring-card rounded-full">
-                          <SpeciesBadge species={a.species} />
-                        </div>
+                      <div className="absolute -bottom-1 -right-1 ring-2 ring-card rounded-full">
+                        <SpeciesBadge species={a.species} />
                       </div>
-                      <div className="min-w-0">
-                        <p className="font-medium text-text-primary truncate text-sm">
-                          {a.name}
-                        </p>
-                        <p className="text-xs text-text-secondary font-mono">
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-medium text-text-primary truncate text-sm">
+                        {animalDisplayName(a)}
+                      </p>
+                      {animalShowsRescueIdBadge(a) ?
+                  <p className="text-xs text-text-secondary font-mono">
+                          {a.rescue_id}
+                        </p> :
+                  a.rescue_id ?
+                  null :
+
+                  <p className="text-xs text-text-secondary font-mono">
                           #{a.id}
                         </p>
-                      </div>
-                    </button>
-                  </li>
+                  }
+                    </div>
+                  </button>
+                </li>
             )}
-              </ul>
+            </ul>
           }
-          </motion.div>
-        }
-      </AnimatePresence>
+        </div>
+      </CalendarPopover>
     </div>);
 
 }

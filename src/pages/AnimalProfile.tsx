@@ -11,16 +11,24 @@ import { AddMedicalModal } from '../components/animals/AddMedicalModal';
 import { AddNoteModal } from '../components/animals/AddNoteModal';
 import { ChangeStatusModal } from '../components/animals/ChangeStatusModal';
 import { PlaceAnimalModal } from '../components/animals/PlaceAnimalModal';
+import { StartAdoptionModal } from '../components/animals/StartAdoptionModal';
+import { AdoptionPanel } from '../components/animals/AdoptionPanel';
 import { ActionNeededCallout } from '../components/animals/ActionNeededCallout';
 import { RelationshipsCard } from '../components/animals/RelationshipsCard';
 import { AdoptionProfileCard } from '../components/animals/AdoptionProfileCard';
 import { PhotoGallery } from '../components/animals/PhotoGallery';
-import { calculateAge, formatDate } from '../lib/utils';
+import {
+  calculateAge,
+  formatDate,
+  animalDisplayName,
+  animalShowsRescueIdBadge } from
+'../lib/utils';
 import {
   SyringeIcon,
   DogIcon,
   FileTextIcon,
   HomeIcon,
+  HeartIcon,
   CheckCircle2Icon,
   CircleIcon,
   ArrowLeftIcon,
@@ -46,6 +54,7 @@ export function AnimalProfile() {
     placements,
     fosters,
     people,
+    adoptions,
     medicalRecords,
     notes,
     actionItems,
@@ -57,6 +66,7 @@ export function AnimalProfile() {
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isPlaceModalOpen, setIsPlaceModalOpen] = useState(false);
+  const [isStartAdoptionOpen, setIsStartAdoptionOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'timeline' | 'medical' | 'photos'>(
     'timeline'
   );
@@ -106,6 +116,11 @@ export function AnimalProfile() {
   const adopter = animal.adopted_by_id ?
   people.find((p) => p.id === animal.adopted_by_id) :
   null;
+  const animalAdoptions = adoptions.filter((a) => a.animal_id === animal.id);
+  // At most one in-progress adoption per animal (terminal ones are history).
+  const activeAdoption = animalAdoptions.find(
+    (a) => a.status !== 'completed' && a.status !== 'cancelled'
+  );
   const animalMedical = medicalRecords.filter((m) => m.animal_id === animal.id);
   const upcomingMedical = animalMedical.filter(
     (m) =>
@@ -125,7 +140,7 @@ export function AnimalProfile() {
     date: string;
     /** Full timestamp for ordering — keeps same-day events in real order. */
     ts: string;
-    type: 'intake' | 'medical' | 'placement' | 'note' | 'action';
+    type: 'intake' | 'medical' | 'placement' | 'note' | 'action' | 'adoption';
     title: string;
     description: string;
     icon: React.ElementType;
@@ -212,6 +227,83 @@ export function AnimalProfile() {
       });
     }
     return events;
+  }),
+  // Adoption milestones — surfaces past adoptions (completed/cancelled) as
+  // history, plus the in-progress one.
+  ...animalAdoptions.flatMap((ad) => {
+    const adopterPerson = people.find((p) => p.id === ad.adopter_id);
+    const adopterName = adopterPerson ?
+    `${adopterPerson.first_name} ${adopterPerson.last_name}` :
+    'an adopter';
+    const adoptionColor = 'bg-[#F3E4D7] text-[#B8632E]';
+    const evs: TimelineEvent[] = [
+    {
+      id: `adoption-${ad.id}-created`,
+      date: ad.created_at.split('T')[0],
+      ts: ad.created_at,
+      type: 'adoption' as const,
+      title: 'Adoption started',
+      description: `Inquiry opened with ${adopterName}.`,
+      icon: HeartIcon,
+      color: adoptionColor
+    }];
+
+    if (ad.submitted_at)
+    evs.push({
+      id: `adoption-${ad.id}-submitted`,
+      date: ad.submitted_at.split('T')[0],
+      ts: ad.submitted_at,
+      type: 'adoption' as const,
+      title: 'Application submitted',
+      description: '',
+      icon: HeartIcon,
+      color: adoptionColor
+    });
+    if (ad.paperwork_sent_at)
+    evs.push({
+      id: `adoption-${ad.id}-paperwork-sent`,
+      date: ad.paperwork_sent_at.split('T')[0],
+      ts: ad.paperwork_sent_at,
+      type: 'adoption' as const,
+      title: 'Paperwork sent',
+      description: '',
+      icon: HeartIcon,
+      color: adoptionColor
+    });
+    if (ad.paperwork_completed_at)
+    evs.push({
+      id: `adoption-${ad.id}-paperwork-done`,
+      date: ad.paperwork_completed_at.split('T')[0],
+      ts: ad.paperwork_completed_at,
+      type: 'adoption' as const,
+      title: 'Paperwork completed',
+      description: '',
+      icon: HeartIcon,
+      color: adoptionColor
+    });
+    if (ad.completed_at)
+    evs.push({
+      id: `adoption-${ad.id}-completed`,
+      date: ad.completed_at.split('T')[0],
+      ts: ad.completed_at,
+      type: 'adoption' as const,
+      title: 'Adoption completed',
+      description: `Adopted by ${adopterName}.`,
+      icon: CheckCircle2Icon,
+      color: 'bg-[#DDEFE2] text-[#3E7B52]'
+    });
+    if (ad.cancelled_at)
+    evs.push({
+      id: `adoption-${ad.id}-cancelled`,
+      date: ad.cancelled_at.split('T')[0],
+      ts: ad.cancelled_at,
+      type: 'adoption' as const,
+      title: 'Adoption cancelled',
+      description: ad.notes ?? '',
+      icon: CircleIcon,
+      color: 'bg-background text-text-secondary'
+    });
+    return evs;
   })].
   sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime()); // Newest first
   // Readiness Checklist logic
@@ -267,7 +359,7 @@ export function AnimalProfile() {
             {animal.primary_photo_url && !heroImageError ?
             <img
               src={animal.primary_photo_url}
-              alt={animal.name}
+              alt={animalDisplayName(animal)}
               className="w-full h-full object-cover"
               onError={() => setHeroImageError(true)} /> :
 
@@ -321,12 +413,26 @@ export function AnimalProfile() {
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-4">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-2">
+                    {animal.name ?
                     <h1 className="text-4xl font-heading font-bold text-text-primary break-words">
-                      {animal.name}
-                    </h1>
-                    <span className="font-mono text-xs font-medium bg-background border border-border text-text-secondary px-2 py-1 rounded-md">
-                      #{animal.id}
-                    </span>
+                        {animal.name}
+                      </h1> :
+
+                    <h1
+                      className="text-3xl font-mono font-semibold text-text-primary break-words"
+                      title="This animal has not been given a name yet.">
+
+                        {animal.rescue_id}
+                      </h1>
+                    }
+                    {animalShowsRescueIdBadge(animal) &&
+                    <span
+                      className="font-mono text-xs font-medium bg-background border border-border text-text-secondary px-2 py-1 rounded-md"
+                      title="Rescue ID">
+
+                        {animal.rescue_id}
+                      </span>
+                    }
                   </div>
                   <p className="text-lg text-text-secondary">
                     {animalBreedLabel(animal, breeds) || animal.species} •{' '}
@@ -347,9 +453,21 @@ export function AnimalProfile() {
                   }
                 </div>
                 <div className="flex flex-wrap gap-2 sm:shrink-0">
-                  {!isAdopted &&
+                  {animal.status === 'adoptable' && !activeAdoption &&
                   <Button
                     variant="primary"
+                    size="sm"
+                    onClick={() => setIsStartAdoptionOpen(true)}>
+
+                      <HeartIcon className="w-4 h-4 mr-2" />
+                      Start Adoption
+                    </Button>
+                  }
+                  {!isAdopted &&
+                  <Button
+                    variant={
+                    animal.status === 'adoptable' ? 'outline' : 'primary'
+                    }
                     size="sm"
                     onClick={() => setIsPlaceModalOpen(true)}>
 
@@ -454,9 +572,10 @@ export function AnimalProfile() {
 
       <ActionNeededCallout
         animalId={animal.id}
-        animalName={animal.name}
+        animalName={animalDisplayName(animal)}
         priority={animal.priority} />
 
+      {activeAdoption && <AdoptionPanel adoptionId={activeAdoption.id} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Tabs (Timeline / Medical History) */}
@@ -710,6 +829,11 @@ export function AnimalProfile() {
       <PlaceAnimalModal
         isOpen={isPlaceModalOpen}
         onClose={() => setIsPlaceModalOpen(false)}
+        animalId={animal.id} />
+
+      <StartAdoptionModal
+        isOpen={isStartAdoptionOpen}
+        onClose={() => setIsStartAdoptionOpen(false)}
         animalId={animal.id} />
 
     </div>);

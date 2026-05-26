@@ -10,6 +10,7 @@ import { BreedCombobox } from './BreedCombobox';
 import { useWhisker } from '../../context/WhiskerContext';
 import { AnimalStatus, Priority, Species, Sex, AgeUnit } from '../../types';
 import { deriveAgeInfo } from '../../lib/age';
+import { animalDisplayName } from '../../lib/utils';
 
 function isValidUrl(value: string): boolean {
   if (!value.trim()) return true;
@@ -38,6 +39,8 @@ export function ChangeStatusModal({
   const animal = animals.find((a) => a.id === animalId);
 
   const [name, setName] = useState('');
+  const [rescueId, setRescueId] = useState('');
+  const [nameError, setNameError] = useState<string | undefined>();
   const [species, setSpecies] = useState<Species>('Dog');
   const [sex, setSex] = useState<Sex>('Unknown');
   const [breedId, setBreedId] = useState<string | undefined>();
@@ -67,7 +70,9 @@ export function ChangeStatusModal({
   // with the age fields populated (not the derived birthdate).
   useEffect(() => {
     if (!isOpen || !animal) return;
-    setName(animal.name);
+    setName(animal.name ?? '');
+    setRescueId(animal.rescue_id ?? '');
+    setNameError(undefined);
     setSpecies(animal.species);
     setSex(animal.sex);
     setBreedId(animal.breed_id);
@@ -123,6 +128,10 @@ export function ChangeStatusModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!name.trim() && !rescueId.trim()) {
+      setNameError('Animals must have either a Name or Rescue ID.');
+      return;
+    }
     const ageInfo = deriveAgeInfo({
       birthdate: ageMode === 'birthdate' ? birthdate : '',
       ageValue: ageMode === 'age' ? ageValue : '',
@@ -158,7 +167,8 @@ export function ChangeStatusModal({
     flagChange('medical concern', medicalConcern, animal.has_medical_concern);
 
     updateAnimal(animalId, {
-      name: name.trim() || animal.name,
+      name: name.trim() || undefined,
+      rescue_id: rescueId.trim() || undefined,
       species,
       sex,
       breed_id: breedId,
@@ -199,7 +209,7 @@ export function ChangeStatusModal({
   const handleDelete = () => {
     if (
     window.confirm(
-      `Delete ${animal.name}? This permanently removes the animal record and can't be undone.`
+      `Delete ${animalDisplayName(animal)}? This permanently removes the animal record and can't be undone.`
     ))
     {
       deleteAnimal(animalId);
@@ -212,21 +222,51 @@ export function ChangeStatusModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={`Edit ${animal.name}`}
+      title={`Edit ${animalDisplayName(animal)}`}
       className="max-w-2xl">
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Basic Information */}
         <FormSection title="Basic Information">
-          <div>
-            <Label htmlFor="edit_name">Name</Label>
-            <Input
-              id="edit_name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="edit_name">Name</Label>
+              <Input
+                id="edit_name"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  if (nameError) setNameError(undefined);
+                }}
+                aria-invalid={Boolean(nameError)}
+                aria-describedby={nameError ? 'edit_name_error' : undefined}
+                className={nameError && 'border-red-500 focus:ring-red-500'}
+                placeholder="e.g. Biscuit" />
 
+              <FieldError id="edit_name_error">{nameError}</FieldError>
+            </div>
+            <div>
+              <Label htmlFor="edit_rescue_id">Rescue ID</Label>
+              <Input
+                id="edit_rescue_id"
+                value={rescueId}
+                onChange={(e) => {
+                  setRescueId(e.target.value);
+                  if (nameError) setNameError(undefined);
+                }}
+                aria-invalid={Boolean(nameError)}
+                className={
+                nameError ?
+                'border-red-500 focus:ring-red-500 font-mono' :
+                'font-mono'
+                }
+                placeholder="e.g. DanBH-1" />
+
+            </div>
           </div>
+          <p className="text-xs text-text-secondary -mt-2">
+            Either a Name or a Rescue ID is required.
+          </p>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="edit_species">Species</Label>
@@ -343,6 +383,7 @@ export function ChangeStatusModal({
                 <option value="medical">Medical</option>
                 <option value="not_ready">Not Ready</option>
                 <option value="adoptable">Adoptable</option>
+                <option value="adoption_pending">Adoption Pending</option>
                 <option value="adopted">Adopted</option>
                 <option value="hospice">Hospice</option>
                 <option value="deceased">Deceased</option>

@@ -5,6 +5,7 @@ import { Input } from './Forms';
 import { Avatar } from './Avatar';
 import { SpeciesBadge } from './SpeciesBadge';
 import { Animal } from '../../types';
+import { animalDisplayName, animalShowsRescueIdBadge } from '../../lib/utils';
 
 // Multi-select typeahead — used by the Sitting Request form when the
 // foster wants to scope coverage to specific animals.
@@ -41,9 +42,8 @@ export function AnimalMultiPicker({
     filter((a) => !picked.has(a.id)).
     filter((a) => {
       if (!q) return true;
-      return (
-        a.name.toLowerCase().includes(q) || a.id.toLowerCase().includes(q));
-
+      const hay = `${a.name ?? ''} ${a.rescue_id ?? ''} ${a.id}`.toLowerCase();
+      return hay.includes(q);
     }).
     slice(0, 12);
   }, [universe, query, selectedIds]);
@@ -88,11 +88,13 @@ export function AnimalMultiPicker({
             size="sm"
             className="w-6 h-6" />
 
-              <span className="font-medium text-text-primary">{a.name}</span>
+              <span className="font-medium text-text-primary">
+                {animalDisplayName(a)}
+              </span>
               <button
             type="button"
             onClick={() => remove(a.id)}
-            aria-label={`Remove ${a.name}`}
+            aria-label={`Remove ${animalDisplayName(a)}`}
             className="p-0.5 rounded-full text-text-secondary hover:text-text-primary hover:bg-card transition-colors">
 
                 <XIcon className="w-3.5 h-3.5" />
@@ -156,11 +158,19 @@ export function AnimalMultiPicker({
                         </div>
                         <div className="min-w-0">
                           <p className="font-medium text-text-primary truncate text-sm">
-                            {a.name}
+                            {animalDisplayName(a)}
                           </p>
-                          <p className="text-xs text-text-secondary font-mono">
-                            #{a.id}
-                          </p>
+                          {animalShowsRescueIdBadge(a) ?
+                    <p className="text-xs text-text-secondary font-mono">
+                              {a.rescue_id}
+                            </p> :
+                    a.rescue_id ?
+                    null :
+
+                    <p className="text-xs text-text-secondary font-mono">
+                              #{a.id}
+                            </p>
+                    }
                         </div>
                       </button>
                     </li>

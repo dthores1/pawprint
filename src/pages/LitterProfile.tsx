@@ -16,7 +16,11 @@ import {
   PlusIcon,
   Edit2Icon } from
 'lucide-react';
-import { formatDate, calculateAge } from '../lib/utils';
+import {
+  formatDate,
+  calculateAge,
+  animalDisplayName } from
+'../lib/utils';
 import {
   litterMembers,
   litterLabel,
@@ -153,7 +157,7 @@ export function LitterProfile() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-text-primary group-hover:text-primary transition-colors truncate">
-                        {animal.name}
+                        {animalDisplayName(animal)}
                       </p>
                       <p className="text-sm text-text-secondary">
                         {calculateAge(animal.estimated_birth_date)} · {animal.sex}

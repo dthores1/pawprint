@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { SearchIcon, XIcon } from 'lucide-react';
 import { Input } from './Forms';
 import { Avatar } from './Avatar';
+import { CalendarPopover } from './CalendarPopover';
 import { Person, PersonRole } from '../../types';
 
 // Single-select typeahead for picking a Person. Optionally filter to a role
@@ -29,6 +29,7 @@ export function PersonSearchPicker({
 }: Props) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
+  const [menuWidth, setMenuWidth] = useState<number>();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const selected = people.find((p) => p.id === value) || null;
 
@@ -48,18 +49,10 @@ export function PersonSearchPicker({
     slice(0, 12);
   }, [people, query, role, excludeIds]);
 
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (
-      wrapperRef.current &&
-      !wrapperRef.current.contains(e.target as Node))
-      {
-        setOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
+  // Match the dropdown width to the input each time it opens.
+  useLayoutEffect(() => {
+    if (open) setMenuWidth(wrapperRef.current?.offsetWidth);
+  }, [open]);
 
   if (selected) {
     return (
@@ -114,27 +107,27 @@ export function PersonSearchPicker({
         className="pl-9" />
 
 
-      <AnimatePresence>
-        {open &&
-        <motion.div
-          initial={{ opacity: 0, y: -4 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -4 }}
-          transition={{ duration: 0.15 }}
-          className="absolute z-10 mt-1.5 w-full bg-card border border-border rounded-xl shadow-soft-lg overflow-hidden max-h-72 overflow-y-auto">
+      <CalendarPopover
+        anchorRef={wrapperRef}
+        open={open}
+        onClose={() => setOpen(false)}
+        padded={false}>
 
-            {results.length === 0 ?
+        <div
+          style={{ width: menuWidth }}
+          className="max-h-72 overflow-y-auto">
+
+          {results.length === 0 ?
           <div className="p-4 text-sm text-text-secondary text-center">
-                {query ?
+              {query ?
             <>No matches for "{query}".</> :
-
             'No people available.'}
-              </div> :
+            </div> :
 
           <ul className="py-1">
-                {results.map((p) =>
+              {results.map((p) =>
             <li key={p.id}>
-                    <button
+                  <button
                 type="button"
                 onClick={() => {
                   onChange(p.id);
@@ -143,28 +136,27 @@ export function PersonSearchPicker({
                 }}
                 className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-background cursor-pointer transition-colors">
 
-                      <Avatar
-                src={p.photo_url}
-                name={`${p.first_name} ${p.last_name}`}
-                colorKey={p.id}
-                size="sm" />
+                    <Avatar
+                  src={p.photo_url}
+                  name={`${p.first_name} ${p.last_name}`}
+                  colorKey={p.id}
+                  size="sm" />
 
-                      <div className="min-w-0">
-                        <p className="font-medium text-text-primary truncate text-sm">
-                          {p.first_name} {p.last_name}
-                        </p>
-                        <p className="text-xs text-text-secondary truncate">
-                          {p.organization_name || p.email}
-                        </p>
-                      </div>
-                    </button>
-                  </li>
+                    <div className="min-w-0">
+                      <p className="font-medium text-text-primary truncate text-sm">
+                        {p.first_name} {p.last_name}
+                      </p>
+                      <p className="text-xs text-text-secondary truncate">
+                        {p.organization_name || p.email}
+                      </p>
+                    </div>
+                  </button>
+                </li>
             )}
-              </ul>
+            </ul>
           }
-          </motion.div>
-        }
-      </AnimatePresence>
+        </div>
+      </CalendarPopover>
     </div>);
 
 }

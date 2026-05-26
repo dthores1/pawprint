@@ -10,6 +10,8 @@ interface CalendarPopoverProps {
   open: boolean;
   onClose: () => void;
   align?: 'start' | 'end';
+  /** Default true (calendar inset). Pass false for full-bleed content (lists). */
+  padded?: boolean;
   children: React.ReactNode;
 }
 export function CalendarPopover({
@@ -17,6 +19,7 @@ export function CalendarPopover({
   open,
   onClose,
   align = 'start',
+  padded = true,
   children
 }: CalendarPopoverProps) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -87,7 +90,9 @@ export function CalendarPopover({
           zIndex: 60,
           visibility: pos ? 'visible' : 'hidden'
         }}
-        className="bg-card border border-border rounded-xl shadow-soft-lg p-2">
+        className={`bg-card border border-border rounded-xl shadow-soft-lg ${
+        padded ? 'p-2' : 'overflow-hidden'}`
+        }>
 
           {children}
         </motion.div>

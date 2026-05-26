@@ -11,7 +11,7 @@ import {
   TruckIcon,
   PackageIcon } from
 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, animalDisplayName } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { SittingRequest, SittingRequestStatus, Animal } from '../types';
 
@@ -250,7 +250,7 @@ function SittingCard({
             <h3 className="text-lg font-heading font-bold text-text-primary">
               {coveredAnimals.length === 0 ?
               'No animals attached' :
-              coveredAnimals.map((a) => a.name).join(', ')}
+              coveredAnimals.map((a) => animalDisplayName(a)).join(', ')}
             </h3>
             <span
               className={cn(

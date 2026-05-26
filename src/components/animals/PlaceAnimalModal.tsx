@@ -8,6 +8,7 @@ import { StatusBadge } from '../ui/Badge';
 import { useWhisker } from '../../context/WhiskerContext';
 import { SearchIcon, XIcon, CheckIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { animalDisplayName } from '../../lib/utils';
 
 // Placement can be launched from either side of the relationship:
 //   • animal-anchored (pass animalId): search for a foster to place this animal
@@ -121,7 +122,9 @@ export function PlaceAnimalModal({
     filter((a) => !filterBySpecies || prefs.includes(a.species)).
     filter((a) => {
       if (!q) return true;
-      return `${a.name} ${a.id}`.toLowerCase().includes(q);
+      return `${a.name ?? ''} ${a.rescue_id ?? ''} ${a.id}`.
+      toLowerCase().
+      includes(q);
     }).
     slice(0, 30);
   }, [animals, placements, query, anchorFoster, showAllSpecies, mode]);
@@ -436,9 +439,14 @@ export function PlaceAnimalModal({
 
                                   <div className="min-w-0">
                                     <p className="font-medium text-text-primary truncate text-sm">
-                                      {animal.name}
+                                      {animalDisplayName(animal)}
                                     </p>
                                     <p className="text-xs text-text-secondary truncate">
+                                      {animal.rescue_id ?
+                            <span className="font-mono">
+                                          {animal.rescue_id} ·{' '}
+                                        </span> :
+                            null}
                                       {animal.species} • {animal.sex}
                                     </p>
                                   </div>

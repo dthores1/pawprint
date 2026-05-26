@@ -20,7 +20,8 @@ import {
   ClinicSlot,
   ClinicSlotProcedure,
   AnimalActionItem,
-  Litter } from
+  Litter,
+  Adoption } from
 '../types';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -646,6 +647,10 @@ export const seedLitters: Litter[] = [
   notes: 'Litter born during a mother-cat intake stay.'
 }];
 
+
+// Adoptions start empty in the demo — use "Start Adoption" on an adoptable
+// animal to exercise the workflow (resets on refresh, like all demo mutations).
+export const seedAdoptions: Adoption[] = [];
 
 export const seedRelationships: AnimalRelationship[] = [
 // Marmalade gave birth in care — Willow is her kitten.
