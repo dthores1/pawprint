@@ -6,15 +6,27 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input, Select, Label, FieldError } from '../components/ui/Forms';
 import { Avatar } from '../components/ui/Avatar';
+import { RolesMultiSelect } from '../components/ui/RolesMultiSelect';
+import { PersonRole } from '../types';
 import {
   UsersIcon,
   MailIcon,
   CopyIcon,
   CheckIcon,
   XIcon,
-  BuildingIcon } from
+  BuildingIcon,
+  TrashIcon } from
 'lucide-react';
 import { formatDate } from '../lib/utils';
+
+type OrgRole = 'owner' | 'admin' | 'member';
+
+interface OrgMember {
+  id: string;
+  user_id: string;
+  role: OrgRole;
+  created_at: string;
+}
 
 interface Invite {
   id: string;
@@ -50,11 +62,31 @@ export function OrganizationPage() {
 
   const [invites, setInvites] = useState<Invite[]>([]);
   const [invitesLoading, setInvitesLoading] = useState(false);
+  const [members, setMembers] = useState<OrgMember[]>([]);
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'member' | 'admin'>('member');
+  const [personRoles, setPersonRoles] = useState<PersonRole[]>([]);
   const [formError, setFormError] = useState<string | undefined>();
   const [submitting, setSubmitting] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [memberActionError, setMemberActionError] = useState<string | null>(null);
+
+  const loadMembers = useCallback(async () => {
+    if (!currentOrg) {
+      setMembers([]);
+      return;
+    }
+    const { data, error } = await supabase.
+    from('organization_members').
+    select('id, user_id, role, created_at').
+    eq('organization_id', currentOrg.id).
+    order('created_at', { ascending: true });
+    if (error) {
+      console.error('[members] load failed:', error.message);
+    } else {
+      setMembers((data ?? []) as OrgMember[]);
+    }
+  }, [currentOrg]);
 
   const loadInvites = useCallback(async () => {
     if (!currentOrg || !isAdmin) {
@@ -79,7 +111,8 @@ export function OrganizationPage() {
 
   useEffect(() => {
     loadInvites();
-  }, [loadInvites]);
+    loadMembers();
+  }, [loadInvites, loadMembers]);
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,18 +123,35 @@ export function OrganizationPage() {
     }
     setSubmitting(true);
     setFormError(undefined);
-    const { error } = await supabase.rpc('create_org_invite', {
+    const { data, error } = await supabase.rpc('create_org_invite', {
       p_org_id: currentOrg.id,
       p_email: email.trim(),
-      p_role: role
+      p_role: role,
+      p_person_roles: personRoles
     });
     if (error) {
       setFormError(error.message);
       setSubmitting(false);
       return;
     }
+    // Best-effort: send the invite email via the edge function if deployed. If
+    // it isn't configured the inviter can still copy the link manually.
+    const token = (data as { token?: string } | null)?.token;
+    if (token) {
+      supabase.functions.
+      invoke('send-invite-email', {
+        body: {
+          token,
+          email: email.trim(),
+          organization_name: currentOrg.name,
+          role
+        }
+      }).
+      catch((err) => console.warn('[invites] email send failed:', err));
+    }
     setEmail('');
     setRole('member');
+    setPersonRoles([]);
     await loadInvites();
     setSubmitting(false);
   };
@@ -132,7 +182,38 @@ export function OrganizationPage() {
     loadInvites();
   };
 
-  const members = people.filter((p) => !!p.user_id);
+  const changeMemberRole = async (member: OrgMember, next: OrgRole) => {
+    setMemberActionError(null);
+    const { error } = await supabase.rpc('update_member_role', {
+      p_member_id: member.id,
+      p_role: next
+    });
+    if (error) {
+      setMemberActionError(error.message);
+      return;
+    }
+    loadMembers();
+  };
+  const removeMember = async (member: OrgMember) => {
+    const person = people.find((p) => p.user_id === member.user_id);
+    const label = person ?
+    `${person.first_name} ${person.last_name}` :
+    'this member';
+    if (!window.confirm(`Remove ${label} from the organization?`)) return;
+    setMemberActionError(null);
+    const { error } = await supabase.rpc('remove_member', {
+      p_member_id: member.id
+    });
+    if (error) {
+      setMemberActionError(error.message);
+      return;
+    }
+    loadMembers();
+  };
+
+  const personByUserId = new Map(
+    people.filter((p) => p.user_id).map((p) => [p.user_id as string, p])
+  );
   const pendingInvites = invites.filter((i) => inviteStatus(i) === 'pending');
   const historyInvites = invites.filter((i) => inviteStatus(i) !== 'pending');
 
@@ -192,10 +273,22 @@ export function OrganizationPage() {
                 {submitting ? 'Sending…' : 'Create invite'}
               </Button>
             </div>
+            <div>
+              <Label className="mb-2 block">Operational roles (optional)</Label>
+              <RolesMultiSelect
+                value={personRoles}
+                onChange={setPersonRoles} />
+
+              <p className="text-xs text-text-secondary mt-1.5">
+                Pre-assign hats the invitee should wear (foster parent, trapper,
+                etc.). Applied to their profile when they accept.
+              </p>
+            </div>
             <FieldError>{formError}</FieldError>
             <p className="text-xs text-text-secondary">
-              Creates a single-use invite link valid for 14 days. Copy the link
-              from the list below and send it to the person you're inviting.
+              Creates a single-use invite link valid for 14 days. We'll try to
+              email it to them — and you can always copy the link from the list
+              below as a fallback.
             </p>
           </form>
         </Card>
@@ -303,33 +396,72 @@ export function OrganizationPage() {
           <UsersIcon className="w-5 h-5 text-primary" />
           Members
         </h2>
+        {memberActionError &&
+        <FieldError>{memberActionError}</FieldError>
+        }
         {members.length === 0 ?
-        <p className="text-sm text-text-secondary">
-            No members linked to app users yet.
-          </p> :
+        <p className="text-sm text-text-secondary">No members yet.</p> :
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {members.map((m) =>
-          <div
-            key={m.id}
-            className="flex items-center gap-3 p-3 rounded-xl border border-border">
+        <div className="space-y-2">
+            {members.map((m) => {
+            const p = personByUserId.get(m.user_id);
+            const name = p ?
+            `${p.first_name} ${p.last_name}` :
+            'Pending profile';
+            return (
+              <div
+                key={m.id}
+                className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border">
 
-                <Avatar
-              src={m.photo_url}
-              name={`${m.first_name} ${m.last_name}`}
-              colorKey={m.id}
-              type="person" />
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Avatar
+                  src={p?.photo_url}
+                  name={name}
+                  colorKey={m.user_id}
+                  type="person" />
 
-                <div className="min-w-0">
-                  <p className="font-medium text-text-primary truncate">
-                    {m.first_name} {m.last_name}
-                  </p>
-                  <p className="text-xs text-text-secondary truncate">
-                    {m.email}
-                  </p>
-                </div>
-              </div>
-          )}
+                    <div className="min-w-0">
+                      <p className="font-medium text-text-primary truncate">
+                        {name}
+                      </p>
+                      <p className="text-xs text-text-secondary truncate">
+                        {p?.email ?? 'No profile yet'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {isAdmin ?
+                  <Select
+                    value={m.role}
+                    onChange={(e) =>
+                    changeMemberRole(m, e.target.value as OrgRole)
+                    }
+                    className="text-sm">
+
+                        <option value="member">Member</option>
+                        <option value="admin">Admin</option>
+                        <option value="owner">Owner</option>
+                      </Select> :
+
+                  <span className="text-sm text-text-secondary capitalize">
+                        {m.role}
+                      </span>
+                  }
+                    {isAdmin &&
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => removeMember(m)}
+                    className="text-[#9B3A3A] hover:bg-[#F5D7D7]/60 hover:text-[#9B3A3A]"
+                    aria-label={`Remove ${name}`}>
+
+                        <TrashIcon className="w-4 h-4" />
+                      </Button>
+                  }
+                  </div>
+                </div>);
+
+          })}
           </div>
         }
         {!isAdmin &&

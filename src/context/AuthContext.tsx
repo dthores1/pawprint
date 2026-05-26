@@ -199,6 +199,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [user, currentOrgIdResolved]);
 
+  // After the user's self-record is ready, merge any operational roles the
+  // admin pre-assigned on the invite. Stashed by AcceptInvitePage.
+  useEffect(() => {
+    if (!currentPersonId) return;
+    const raw = localStorage.getItem('whiskerville.pendingInviteRoles');
+    if (!raw) return;
+    let pending: string[] = [];
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) pending = parsed.filter((r) => typeof r === 'string');
+    } catch {
+      // ignore malformed
+    }
+    localStorage.removeItem('whiskerville.pendingInviteRoles');
+    if (pending.length === 0) return;
+    (async () => {
+      const { data: row, error: readErr } = await supabase.
+      from('people').
+      select('roles, role').
+      eq('id', currentPersonId).
+      maybeSingle();
+      if (readErr || !row) {
+        console.error(
+          '[auth] could not read self-record for role merge:',
+          readErr?.message
+        );
+        return;
+      }
+      const existing: string[] = Array.isArray(row.roles) ? row.roles : [];
+      const merged = Array.from(new Set([...existing, ...pending]));
+      if (merged.length === existing.length) return;
+      const { error: writeErr } = await supabase.
+      from('people').
+      update({ roles: merged }).
+      eq('id', currentPersonId);
+      if (writeErr) {
+        console.error(
+          '[auth] applying invited roles failed:',
+          writeErr.message
+        );
+      }
+    })();
+  }, [currentPersonId]);
+
   const signInWithGoogle = useCallback(async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'google',

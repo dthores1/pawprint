@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, Link } from 'react-router-dom';
 import {
   LayoutDashboardIcon,
   PawPrintIcon,
@@ -10,13 +10,14 @@ import {
   HeartHandshakeIcon,
   StethoscopeIcon,
   BuildingIcon,
+  UserCircleIcon,
   LogOutIcon } from
 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../context/AuthContext';
 import { isDemoMode } from '../../lib/appMode';
 export function Sidebar() {
-  const { user, currentOrg, signOut } = useAuth();
+  const { user, currentOrg, currentPersonId, signOut } = useAuth();
   const navItems = [
   {
     to: '/',
@@ -108,10 +109,20 @@ export function Sidebar() {
             </p>
           </div>
         }
-        {user &&
+        {user && currentPersonId ?
+        <Link
+          to={`/contacts/${currentPersonId}`}
+          className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm font-semibold text-text-primary/80 hover:bg-background hover:text-text-primary transition-colors"
+          title={user.email}>
+
+            <UserCircleIcon className="w-5 h-5" />
+            <span className="truncate">My profile</span>
+          </Link> :
+        user ?
         <p className="px-3 text-xs text-text-secondary truncate" title={user.email}>
             {user.email}
-          </p>
+          </p> :
+        null
         }
         {!isDemoMode &&
         <button

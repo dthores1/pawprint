@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
 
 const PENDING_TOKEN_KEY = 'whiskerville.pendingInviteToken';
+const PENDING_ROLES_KEY = 'whiskerville.pendingInviteRoles';
 
 interface InviteInfo {
   invite_id: string;
@@ -13,9 +14,14 @@ interface InviteInfo {
   organization_name: string;
   email: string;
   role: string;
+  person_roles?: string[];
   expires_at: string;
   accepted: boolean;
   revoked: boolean;
+}
+
+function humanizeRole(r: string): string {
+  return r.replace(/_/g, ' ');
 }
 
 // Public route — reachable without a session. If the visitor isn't signed in
@@ -69,6 +75,14 @@ export function AcceptInvitePage() {
     }
     await refreshOrganizations();
     if (data) setCurrentOrgId(data as string);
+    // Stash invited operational roles so AuthContext can merge them into the
+    // user's self-record once it's ready.
+    if (invite.person_roles && invite.person_roles.length > 0) {
+      localStorage.setItem(
+        PENDING_ROLES_KEY,
+        JSON.stringify(invite.person_roles)
+      );
+    }
     localStorage.removeItem(PENDING_TOKEN_KEY);
     setAccepted(true);
     setAccepting(false);
@@ -76,6 +90,12 @@ export function AcceptInvitePage() {
 
   const stashAndSignIn = () => {
     localStorage.setItem(PENDING_TOKEN_KEY, token);
+    if (invite?.person_roles && invite.person_roles.length > 0) {
+      localStorage.setItem(
+        PENDING_ROLES_KEY,
+        JSON.stringify(invite.person_roles)
+      );
+    }
     navigate('/');
   };
 
@@ -127,13 +147,30 @@ export function AcceptInvitePage() {
               <h1 className="text-xl font-heading font-bold text-text-primary mb-1">
                 Join {invite.organization_name}
               </h1>
-              <p className="text-sm text-text-secondary mb-6">
+              <p className="text-sm text-text-secondary mb-3">
                 You've been invited as{' '}
                 <span className="font-medium text-text-primary capitalize">
                   {invite.role}
                 </span>{' '}
                 ({invite.email}).
               </p>
+              {invite.person_roles && invite.person_roles.length > 0 &&
+              <div className="mb-6">
+                  <p className="text-xs uppercase tracking-wider text-text-secondary mb-1.5">
+                    Roles on your profile
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {invite.person_roles.map((r) =>
+                  <span
+                    key={r}
+                    className="text-xs px-2 py-0.5 bg-background border border-border text-text-secondary rounded-md font-medium capitalize">
+
+                        {humanizeRole(r)}
+                      </span>
+                  )}
+                  </div>
+                </div>
+              }
 
               {invite.revoked ?
             <p className="text-sm text-status-urgent-text mb-4">
