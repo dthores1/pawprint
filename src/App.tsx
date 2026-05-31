@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { WhiskerProvider } from './context/WhiskerContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DemoAuthProvider, DemoWhiskerProvider } from './context/DemoProviders';
@@ -25,6 +25,7 @@ import { AcceptInvitePage } from './pages/AcceptInvitePage';
 import { OrganizationPage } from './pages/OrganizationPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { LegalPage } from './pages/LegalPage';
+import { LandingPage } from './pages/LandingPage';
 import { LogoHero } from './components/ui/Logo';
 
 // Keeps the browser tab title in sync with the active org.
@@ -90,17 +91,29 @@ function useMinSplashHold() {
   return done;
 }
 
-// Production gate: loading → splash, no session → login, no org → onboarding,
-// otherwise the routed app. Splash is also held for a minimum duration so the
-// brand moment is visible on fast loads.
+// Production gate: loading → splash, no session → public landing page, no org →
+// onboarding, otherwise the routed app. The minimum splash hold keeps the brand
+// moment visible when booting *into* the app; signed-out visitors skip it so the
+// public landing page loads promptly (the `!session` check runs before the hold).
 function Gate() {
   const { loading, session, orgsLoading, currentOrg } = useAuth();
   const minSplashDone = useMinSplashHold();
-  if (loading || !minSplashDone) return <Splash />;
-  if (!session) return <Login />;
+  if (loading) return <Splash />;
+  if (!session) return <LandingPage />;
+  if (!minSplashDone) return <Splash />;
   if (orgsLoading) return <Splash />;
   if (!currentOrg) return <Onboarding />;
   return <AppRoutes />;
+}
+
+// Public /login route. Renders the auth screen for signed-out visitors and
+// redirects to "/" once a session exists — so signing in here (or landing on
+// /login while already authenticated) hands off to the Gate/app cleanly.
+function LoginRoute() {
+  const { loading, session } = useAuth();
+  if (loading) return <Splash />;
+  if (session) return <Navigate to="/" replace />;
+  return <Login />;
 }
 
 // Demo-mode equivalent of the splash hold. Demo mode has no auth/loading
@@ -144,6 +157,10 @@ function ProductionApp() {
         <DocumentTitle />
         <BrowserRouter>
           <Routes>
+            {/* Public sign-in route. The signed-out front door is the landing
+             page (rendered by the Gate at "/"); this is the explicit /login the
+             landing page's Sign In button links to. */}
+            <Route path="/login" element={<LoginRoute />} />
             {/* Invite acceptance is reachable without a session — signed-out
              visitors stash the token and sign in; AuthContext consumes it. */}
             <Route path="/invite/:token" element={<AcceptInvitePage />} />

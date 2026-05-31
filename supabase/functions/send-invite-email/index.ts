@@ -37,11 +37,15 @@ interface InvitePayload {
   invited_by_name?: string;
 }
 
-function emailHtml(p: InvitePayload, link: string): string {
+function emailHtml(p: InvitePayload, link: string, logoUrl: string): string {
   const inviter = p.invited_by_name ? `${escapeHtml(p.invited_by_name)} on ` : '';
   return `<!doctype html>
 <html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:#f1eee8;padding:24px;color:#2b2b2b">
   <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e7e2d8;border-radius:16px;padding:32px">
+    <div style="text-align:center;margin:0 0 24px">
+      <img src="${logoUrl}" alt="Whiskerville" width="64" style="display:block;margin:0 auto 8px;width:64px;height:auto;border:0" />
+      <div style="font-size:18px;font-weight:700;color:#2b2b2b">Whiskerville</div>
+    </div>
     <h1 style="font-size:22px;margin:0 0 8px">You're invited to ${escapeHtml(p.organization_name)}</h1>
     <p style="margin:0 0 16px;color:#5a5a5a">${inviter}Whiskerville sent you an invite to join as <strong>${escapeHtml(p.role)}</strong>.</p>
     <p style="margin:0 0 24px"><a href="${link}" style="display:inline-block;background:#3e7b52;color:#fff;text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:600">Accept invite</a></p>
@@ -95,8 +99,9 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   const link = `${baseUrl.replace(/\/$/, '')}/invite/${payload.token}`;
-  const subject = `You're invited to ${payload.organization_name} on Pawprint`;
-  const html = emailHtml(payload, link);
+  const logoUrl = `${baseUrl.replace(/\/$/, '')}/images/whiskerville-logo-minimum.png`;
+  const subject = `You're invited to ${payload.organization_name} on Whiskerville`;
+  const html = emailHtml(payload, link, logoUrl);
 
   const resp = await fetch('https://api.resend.com/emails', {
     method: 'POST',
