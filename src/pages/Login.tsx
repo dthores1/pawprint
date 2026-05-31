@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Input, Label } from '../components/ui/Forms';
 import { Button } from '../components/ui/Button';
@@ -196,6 +197,16 @@ export function Login() {
             </>
           }
         </div>
+
+        <p className="text-xs text-text-secondary text-center mt-5">
+          <Link to="/terms" className="hover:underline">
+            Terms of Service
+          </Link>
+          {' · '}
+          <Link to="/privacy" className="hover:underline">
+            Privacy Policy
+          </Link>
+        </p>
       </div>
     </div>);
 

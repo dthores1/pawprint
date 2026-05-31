@@ -1,16 +1,16 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useWhisker } from '../context/WhiskerContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { NewClinicEventModal } from '../components/clinics/NewClinicEventModal';
-import { ClinicDetailModal } from '../components/clinics/ClinicDetailModal';
 import {
   StethoscopeIcon,
   PlusIcon,
   MapPinIcon,
   UserIcon } from
 'lucide-react';
-import { cn, formatDate } from '../lib/utils';
+import { cn } from '../lib/utils';
 import { ClinicEvent, ClinicEventStatus } from '../types';
 
 const EVENT_STATUS_LABEL: Record<ClinicEventStatus, string> = {
@@ -31,7 +31,6 @@ const EVENT_STATUS_PILL: Record<ClinicEventStatus, string> = {
 export function Clinics() {
   const { clinicEvents, clinicSlots, people } = useWhisker();
   const [isNewOpen, setIsNewOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
 
   const now = Date.now();
@@ -127,8 +126,7 @@ export function Clinics() {
               key={e.id}
               event={e}
               vetName={vet ? `${vet.first_name} ${vet.last_name}` : undefined}
-              slotsFilled={slotsForEvent.length}
-              onOpen={() => setSelectedId(e.id)} />);
+              slotsFilled={slotsForEvent.length} />);
 
 
         })}
@@ -139,11 +137,6 @@ export function Clinics() {
         isOpen={isNewOpen}
         onClose={() => setIsNewOpen(false)} />
 
-      <ClinicDetailModal
-        isOpen={selectedId !== null}
-        onClose={() => setSelectedId(null)}
-        clinicEventId={selectedId} />
-
     </div>);
 
 }
@@ -152,13 +145,11 @@ interface ClinicEventCardProps {
   event: ClinicEvent;
   vetName?: string;
   slotsFilled: number;
-  onOpen: () => void;
 }
 function ClinicEventCard({
   event,
   vetName,
-  slotsFilled,
-  onOpen
+  slotsFilled
 }: ClinicEventCardProps) {
   const date = new Date(event.date_time);
   const dayLabel = date.toLocaleString('en-US', {
@@ -173,58 +164,56 @@ function ClinicEventCard({
   });
   const percentFilled = Math.min(
     100,
-    Math.round((slotsFilled / Math.max(1, event.slot_capacity)) * 100)
+    Math.round(slotsFilled / Math.max(1, event.slot_capacity) * 100)
   );
   return (
-    <Card
-      className="p-5 cursor-pointer hover:shadow-soft-lg transition-shadow"
-      onClick={onOpen}>
-
-      <div className="flex items-start justify-between gap-3 mb-2">
-        <div>
-          <h3 className="text-lg font-heading font-bold text-text-primary">
-            {dayLabel}
-          </h3>
-          <p className="text-sm text-text-secondary">{timeLabel}</p>
-        </div>
-        <span
-          className={cn(
-            'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold shrink-0',
-            EVENT_STATUS_PILL[event.status]
-          )}>
-
-          {EVENT_STATUS_LABEL[event.status]}
-        </span>
-      </div>
-
-      <div className="space-y-1.5 text-sm text-text-secondary mb-3">
-        <div className="flex items-start gap-2">
-          <MapPinIcon className="w-4 h-4 mt-0.5 shrink-0" />
-          <span className="truncate">{event.location}</span>
-        </div>
-        {vetName &&
-        <div className="flex items-center gap-2">
-            <UserIcon className="w-4 h-4 shrink-0" />
-            <span>{vetName}</span>
+    <Link to={`/clinics/${event.id}`} className="block">
+      <Card className="p-5 cursor-pointer hover:shadow-soft-lg transition-shadow">
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <div>
+            <h3 className="text-lg font-heading font-bold text-text-primary">
+              {dayLabel}
+            </h3>
+            <p className="text-sm text-text-secondary">{timeLabel}</p>
           </div>
-        }
-      </div>
+          <span
+            className={cn(
+              'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold shrink-0',
+              EVENT_STATUS_PILL[event.status]
+            )}>
 
-      {/* Capacity bar */}
-      <div>
-        <div className="flex items-center justify-between text-xs text-text-secondary mb-1">
-          <span>Slot capacity</span>
-          <span className="tabular-nums font-medium text-text-primary">
-            {slotsFilled} / {event.slot_capacity}
+            {EVENT_STATUS_LABEL[event.status]}
           </span>
         </div>
-        <div className="w-full bg-background rounded-full h-1.5 overflow-hidden">
-          <div
-            className="h-1.5 rounded-full transition-all duration-500 bg-primary"
-            style={{ width: `${percentFilled}%` }} />
 
+        <div className="space-y-1.5 text-sm text-text-secondary mb-3">
+          <div className="flex items-start gap-2">
+            <MapPinIcon className="w-4 h-4 mt-0.5 shrink-0" />
+            <span className="truncate">{event.location}</span>
+          </div>
+          {vetName &&
+          <div className="flex items-center gap-2">
+              <UserIcon className="w-4 h-4 shrink-0" />
+              <span>{vetName}</span>
+            </div>
+          }
         </div>
-      </div>
-    </Card>);
+
+        <div>
+          <div className="flex items-center justify-between text-xs text-text-secondary mb-1">
+            <span>Slot capacity</span>
+            <span className="tabular-nums font-medium text-text-primary">
+              {slotsFilled} / {event.slot_capacity}
+            </span>
+          </div>
+          <div className="w-full bg-background rounded-full h-1.5 overflow-hidden">
+            <div
+              className="h-1.5 rounded-full transition-all duration-500 bg-primary"
+              style={{ width: `${percentFilled}%` }} />
+
+          </div>
+        </div>
+      </Card>
+    </Link>);
 
 }

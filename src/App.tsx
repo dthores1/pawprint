@@ -18,11 +18,13 @@ import { ProductCatalog } from './pages/ProductCatalog';
 import { Transports } from './pages/Transports';
 import { Sitting } from './pages/Sitting';
 import { Clinics } from './pages/Clinics';
+import { ClinicProfile } from './pages/ClinicProfile';
 import { Login } from './pages/Login';
 import { Onboarding } from './pages/Onboarding';
 import { AcceptInvitePage } from './pages/AcceptInvitePage';
 import { OrganizationPage } from './pages/OrganizationPage';
 import { ReportsPage } from './pages/ReportsPage';
+import { LegalPage } from './pages/LegalPage';
 import { LogoHero } from './components/ui/Logo';
 
 // Keeps the browser tab title in sync with the active org.
@@ -63,6 +65,7 @@ function AppRoutes() {
         <Route path="transports" element={<Transports />} />
         <Route path="sitting" element={<Sitting />} />
         <Route path="clinics" element={<Clinics />} />
+        <Route path="clinics/:id" element={<ClinicProfile />} />
         <Route path="contacts" element={<Contacts />} />
         <Route path="contacts/:id" element={<ContactProfile />} />
         <Route path="organization" element={<OrganizationPage />} />
@@ -116,9 +119,18 @@ function DemoApp() {
       <DemoWhiskerProvider>
         <DocumentTitle />
         <BrowserRouter>
-          <DemoGate>
-            <AppRoutes />
-          </DemoGate>
+          <Routes>
+            {/* Public legal pages render outside the gate in demo mode too. */}
+            <Route path="/terms" element={<LegalPage doc="terms" />} />
+            <Route path="/privacy" element={<LegalPage doc="privacy" />} />
+            <Route
+              path="*"
+              element={
+                <DemoGate>
+                  <AppRoutes />
+                </DemoGate>
+              } />
+          </Routes>
         </BrowserRouter>
       </DemoWhiskerProvider>
     </DemoAuthProvider>);
@@ -135,6 +147,10 @@ function ProductionApp() {
             {/* Invite acceptance is reachable without a session — signed-out
              visitors stash the token and sign in; AuthContext consumes it. */}
             <Route path="/invite/:token" element={<AcceptInvitePage />} />
+            {/* Public legal pages — must render outside the auth Gate so
+             external reviewers (e.g. Google OAuth verification) can load them. */}
+            <Route path="/terms" element={<LegalPage doc="terms" />} />
+            <Route path="/privacy" element={<LegalPage doc="privacy" />} />
             <Route path="*" element={<Gate />} />
           </Routes>
         </BrowserRouter>

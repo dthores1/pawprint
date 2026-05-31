@@ -650,13 +650,13 @@ export function DemoWhiskerProvider({
       );
     },
     clinicSlotProcedures,
-    addClinicSlotProcedure: (clinic_slot_id, procedure_type) =>
+    addClinicSlotProcedure: (clinic_slot_id, procedure_type, opts) =>
     setClinicSlotProcedures((prev) => [
     {
       id: `csp${generateId()}`,
       clinic_slot_id,
       procedure_type,
-      completed: false
+      completed: opts?.completed ?? false
     },
     ...prev]
     ),

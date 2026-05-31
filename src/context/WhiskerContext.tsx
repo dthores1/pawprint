@@ -267,7 +267,8 @@ export interface WhiskerContextType {
   deleteClinicSlot: (id: string) => void;
   addClinicSlotProcedure: (
   clinic_slot_id: string,
-  procedure_type: ClinicSlotProcedureType)
+  procedure_type: ClinicSlotProcedureType,
+  opts?: { completed?: boolean })
   => void;
   updateClinicSlotProcedure: (
   id: string,
@@ -1647,14 +1648,19 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   };
   const addClinicSlotProcedure = async (
   clinic_slot_id: string,
-  procedure_type: ClinicSlotProcedureType) =>
+  procedure_type: ClinicSlotProcedureType,
+  opts?: { completed?: boolean }) =>
   {
     if (!orgId) return;
     const { data, error } = await supabase.
     from('clinic_slot_procedures').
     insert(
       clinicSlotProcedureToInsert(
-        { clinic_slot_id, procedure_type, completed: false },
+        {
+          clinic_slot_id,
+          procedure_type,
+          completed: opts?.completed ?? false
+        },
         orgId
       )
     ).
