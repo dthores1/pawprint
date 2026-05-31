@@ -9,7 +9,7 @@
 //      sandbox from-address while testing).
 //   2. supabase secrets set RESEND_API_KEY=re_xxx
 //      supabase secrets set APP_BASE_URL=https://your-app.example
-//      supabase secrets set INVITE_FROM_EMAIL="Pawprint <invites@your-domain>"
+//      supabase secrets set INVITE_FROM_EMAIL="Whiskerville <support@whiskerville.app>"
 //   3. supabase functions deploy send-invite-email
 //
 // Request body (JSON): {
@@ -43,7 +43,7 @@ function emailHtml(p: InvitePayload, link: string): string {
 <html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:#f1eee8;padding:24px;color:#2b2b2b">
   <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e7e2d8;border-radius:16px;padding:32px">
     <h1 style="font-size:22px;margin:0 0 8px">You're invited to ${escapeHtml(p.organization_name)}</h1>
-    <p style="margin:0 0 16px;color:#5a5a5a">${inviter}Pawprint sent you an invite to join as <strong>${escapeHtml(p.role)}</strong>.</p>
+    <p style="margin:0 0 16px;color:#5a5a5a">${inviter}Whiskerville sent you an invite to join as <strong>${escapeHtml(p.role)}</strong>.</p>
     <p style="margin:0 0 24px"><a href="${link}" style="display:inline-block;background:#3e7b52;color:#fff;text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:600">Accept invite</a></p>
     <p style="margin:0 0 8px;font-size:13px;color:#5a5a5a">Or open this link directly:</p>
     <p style="margin:0;font-size:13px;word-break:break-all"><a href="${link}" style="color:#3e7b52">${link}</a></p>
@@ -70,7 +70,7 @@ const handler = async (req: Request): Promise<Response> => {
 
   const apiKey = Deno.env.get('RESEND_API_KEY');
   const baseUrl = Deno.env.get('APP_BASE_URL');
-  const from = Deno.env.get('INVITE_FROM_EMAIL') || 'Pawprint <onboarding@resend.dev>';
+  const from = Deno.env.get('INVITE_FROM_EMAIL') || 'Whiskerville <onboarding@resend.dev>';
   if (!apiKey || !baseUrl) {
     return new Response(
       JSON.stringify({ error: 'Server not configured (RESEND_API_KEY / APP_BASE_URL)' }),
