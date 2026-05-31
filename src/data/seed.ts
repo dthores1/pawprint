@@ -217,7 +217,7 @@ export const seedAnimals: Animal[] = [
   estimated_birth_date: '2023-05-15',
   intake_date: '2023-11-15',
   intake_source: 'Hoarding Case',
-  status: 'not_ready',
+  status: 'intake',
   priority: 'normal',
   has_behavior_concern: true,
   description:
@@ -256,7 +256,7 @@ export const seedAnimals: Animal[] = [
   estimated_birth_date: '2023-11-01',
   intake_date: '2023-11-20',
   intake_source: 'Born in Care',
-  status: 'not_ready',
+  status: 'intake',
   priority: 'normal',
   description: 'Playful kitten, part of a litter of 4.',
   primary_photo_url:
@@ -291,9 +291,8 @@ export const seedAnimals: Animal[] = [
   estimated_birth_date: '2017-09-20',
   intake_date: '2023-10-10',
   intake_source: 'City Shelter Transfer',
-  status: 'not_ready',
+  status: 'medical',
   priority: 'needs_attention',
-  has_medical_concern: true,
   action_needed:
   'Review senior bloodwork results with vet and confirm renal diet plan.',
   description: 'Senior kitty who loves heated blankets and quiet afternoons.',
@@ -679,7 +678,7 @@ export const seedPhotos: AnimalPhoto[] = [
   id: 'ph1',
   animal_id: 'a2',
   url: 'https://images.unsplash.com/photo-1513360371669-4adf3dd7dff8?auto=format&fit=crop&q=80&w=1200',
-  category: 'profile',
+  category: 'general',
   caption: 'Sun nap on the windowsill.',
   uploaded_at: '2023-11-06T10:00:00Z'
 },
@@ -704,7 +703,7 @@ export const seedPhotos: AnimalPhoto[] = [
   id: 'ph4',
   animal_id: 'a1',
   url: 'https://images.unsplash.com/photo-1552053831-71594a27632d?auto=format&fit=crop&q=80&w=1200',
-  category: 'profile',
+  category: 'general',
   caption: 'Adoption-listing headshot.',
   uploaded_at: '2023-10-20T11:00:00Z'
 },
@@ -720,7 +719,7 @@ export const seedPhotos: AnimalPhoto[] = [
   id: 'ph6',
   animal_id: 'a1',
   url: 'https://images.unsplash.com/photo-1477884213360-7e9d7dcc1e48?auto=format&fit=crop&q=80&w=1200',
-  category: 'foster',
+  category: 'general',
   caption: 'First weekend at meet-and-greet.',
   uploaded_at: '2023-11-04T15:00:00Z'
 },
@@ -746,7 +745,7 @@ export const seedPhotos: AnimalPhoto[] = [
   id: 'ph9',
   animal_id: 'a5',
   url: 'https://images.unsplash.com/photo-1605568420105-eb2a4caa5e3e?auto=format&fit=crop&q=80&w=1200',
-  category: 'profile',
+  category: 'general',
   caption: 'Adoption-ready profile shot.',
   uploaded_at: '2023-10-01T10:00:00Z'
 },
@@ -754,7 +753,7 @@ export const seedPhotos: AnimalPhoto[] = [
   id: 'ph10',
   animal_id: 'a5',
   url: 'https://images.unsplash.com/photo-1568393691622-c7ba131d63b4?auto=format&fit=crop&q=80&w=1200',
-  category: 'adoption',
+  category: 'adoption_listing',
   caption: 'Going-home day with her new family!',
   uploaded_at: '2023-10-30T14:00:00Z'
 }];
@@ -1031,7 +1030,7 @@ export const seedSupplyRequests: SupplyRequest[] = [
   id: 'sr2',
   requester_person_id: 'pe6', // Sam
   requested_for_animal_id: 'a10', // Willow
-  status: 'reviewing',
+  status: 'in_progress',
   priority: 'normal',
   requested_date: '2023-11-22T10:00:00Z',
   created_at: '2025-11-22T10:00:00Z',
@@ -1041,7 +1040,7 @@ export const seedSupplyRequests: SupplyRequest[] = [
   id: 'sr3',
   requester_person_id: 'pe7', // Rachel
   requested_for_animal_id: 'a2', // Marmalade
-  status: 'approved',
+  status: 'in_progress',
   priority: 'normal',
   requested_date: '2023-11-20T09:00:00Z',
   approved_by_person_id: 'pe3', // Jessica (staff)
@@ -1052,7 +1051,7 @@ export const seedSupplyRequests: SupplyRequest[] = [
 {
   id: 'sr4',
   requester_person_id: 'pe8', // Ian
-  status: 'ordered',
+  status: 'in_progress',
   priority: 'normal',
   requested_date: '2023-11-18T11:00:00Z',
   approved_by_person_id: 'pe4', // Brian (staff)
@@ -1063,7 +1062,7 @@ export const seedSupplyRequests: SupplyRequest[] = [
   id: 'sr5',
   requester_person_id: 'pe9', // Zoe
   requested_for_animal_id: 'a3', // Juniper
-  status: 'ready_for_pickup',
+  status: 'fulfilled',
   priority: 'normal',
   requested_date: '2023-11-15T14:00:00Z',
   approved_by_person_id: 'pe3',
@@ -1075,7 +1074,9 @@ export const seedSupplyRequests: SupplyRequest[] = [
   id: 'sr6',
   requester_person_id: 'pe10', // Alex
   requested_for_animal_id: 'a12', // Clementine
-  status: 'delivered',
+  status: 'fulfilled',
+  supplier: 'Chewy',
+  total_cost: 48.5,
   priority: 'normal',
   requested_date: '2023-11-10T09:00:00Z',
   approved_by_person_id: 'pe2', // Dr. Evans
@@ -1088,13 +1089,15 @@ export const seedSupplyRequests: SupplyRequest[] = [
 {
   id: 'sr7',
   requester_person_id: 'pe5', // Chloe
-  status: 'completed',
+  status: 'fulfilled',
   priority: 'normal',
   requested_date: '2023-10-01T10:00:00Z',
   approved_by_person_id: 'pe3',
   fulfilled_by_person_id: 'pe3',
   fulfilled_date: '2023-10-05T10:00:00Z',
   delivery_method: 'pickup',
+  supplier: 'Amazon',
+  total_cost: 124.95,
   created_at: '2025-10-01T10:00:00Z',
   updated_at: '2025-10-05T10:00:00Z'
 }];

@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Input, Label } from '../components/ui/Forms';
 import { Button } from '../components/ui/Button';
-import { PawPrintIcon } from 'lucide-react';
+import { LogoHero } from '../components/ui/Logo';
 
 // Shown when a signed-in user belongs to no organization yet (e.g. a fresh
 // Google sign-up). Creating an org relies on the `add_org_creator_as_owner`
@@ -40,11 +40,8 @@ export function Onboarding() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
-        <div className="flex items-center justify-center gap-2 text-primary mb-6">
-          <PawPrintIcon className="w-9 h-9" />
-          <span className="font-heading font-bold text-3xl tracking-tight">
-            Whiskerville
-          </span>
+        <div className="flex justify-center mb-6">
+          <LogoHero className="w-44" />
         </div>
 
         <div className="bg-card rounded-2xl shadow-soft-lg border border-border p-7">

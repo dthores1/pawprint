@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { PawPrintIcon, CheckCircle2Icon, AlertCircleIcon } from 'lucide-react';
+import { CheckCircle2Icon, AlertCircleIcon } from 'lucide-react';
+import { LogoHero } from '../components/ui/Logo';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
@@ -102,11 +103,8 @@ export function AcceptInvitePage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
-        <div className="flex items-center justify-center gap-2 text-primary mb-6">
-          <PawPrintIcon className="w-9 h-9" />
-          <span className="font-heading font-bold text-3xl tracking-tight">
-            Whiskerville
-          </span>
+        <div className="flex justify-center mb-6">
+          <LogoHero className="w-44" />
         </div>
 
         <div className="bg-card rounded-2xl shadow-soft-lg border border-border p-7">

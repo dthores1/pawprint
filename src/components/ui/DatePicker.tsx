@@ -73,7 +73,11 @@ export function DatePicker({
           className
         )}>
 
-        <span className={valid ? 'text-text-primary' : 'text-text-secondary'}>
+        <span
+          className={cn(
+            'truncate whitespace-nowrap',
+            valid ? 'text-text-primary' : 'text-text-secondary'
+          )}>
           {valid ? format(parsed as Date, 'MMM d, yyyy') : placeholder}
         </span>
         <CalendarIcon className="w-4 h-4 text-text-secondary shrink-0" />

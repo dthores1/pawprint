@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Input, Label } from '../components/ui/Forms';
 import { Button } from '../components/ui/Button';
-import { PawPrintIcon } from 'lucide-react';
+import { LogoHero } from '../components/ui/Logo';
 
 // Inline Google "G" so we don't pull in a brand-icon dependency.
 function GoogleGlyph({ className }: { className?: string }) {
@@ -64,11 +64,8 @@ export function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
-        <div className="flex items-center justify-center gap-2 text-primary mb-6">
-          <PawPrintIcon className="w-9 h-9" />
-          <span className="font-heading font-bold text-3xl tracking-tight">
-            Whiskerville
-          </span>
+        <div className="flex justify-center mb-6">
+          <LogoHero className="w-44" />
         </div>
 
         <div className="bg-card rounded-2xl shadow-soft-lg border border-border p-7">

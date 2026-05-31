@@ -22,6 +22,31 @@ function isValidUrl(value: string): boolean {
   }
 }
 
+function ConcernCheckbox({
+  label,
+  checked,
+  onChange,
+  help
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  help: string;
+}) {
+  return (
+    <div>
+      <label className="flex items-center gap-2.5 cursor-pointer text-sm font-medium text-text-primary">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          className="w-4 h-4 rounded text-primary focus:ring-primary" />
+        {label}
+      </label>
+      <p className="text-xs text-text-secondary mt-2 ml-[26px]">{help}</p>
+    </div>);
+}
+
 // File name kept for now (the import path is stable); the modal has expanded
 // from "change status & priority" to a general "Edit animal" modal.
 interface ChangeStatusModalProps {
@@ -223,9 +248,28 @@ export function ChangeStatusModal({
       isOpen={isOpen}
       onClose={onClose}
       title={`Edit ${animalDisplayName(animal)}`}
-      className="max-w-2xl">
+      size="lg"
+      footer={
+      <div className="flex items-center justify-between gap-3">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={handleDelete}
+            className="text-[#9B3A3A] hover:bg-[#F5D7D7]/60 hover:text-[#9B3A3A]">
+            Delete
+          </Button>
+          <div className="flex gap-3">
+            <Button type="button" variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" form="edit-animal-form">
+              Save Changes
+            </Button>
+          </div>
+        </div>
+      }>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form id="edit-animal-form" onSubmit={handleSubmit} className="space-y-4">
         {/* Basic Information */}
         <FormSection title="Basic Information">
           <div className="grid grid-cols-2 gap-4">
@@ -381,10 +425,9 @@ export function ChangeStatusModal({
 
                 <option value="intake">Intake</option>
                 <option value="medical">Medical</option>
-                <option value="not_ready">Not Ready</option>
                 <option value="adoptable">Adoptable</option>
-                <option value="adoption_pending">Adoption Pending</option>
                 <option value="adopted">Adopted</option>
+                <option value="released">Released</option>
                 <option value="hospice">Hospice</option>
                 <option value="deceased">Deceased</option>
               </Select>
@@ -407,64 +450,39 @@ export function ChangeStatusModal({
 
         {/* Care Considerations */}
         <FormSection title="Care Considerations">
-          <div className="space-y-6">
-            {[
-            {
-              heading: 'Operational',
-              items: [
-              {
-                label: 'On Hold',
-                checked: isOnHold,
-                set: setIsOnHold,
-                help: 'Temporarily unavailable for adoption or transfer'
-              }]
-            },
-            {
-              heading: 'Care Considerations',
-              items: [
-              {
-                label: 'Behavior Concern',
-                checked: behaviorConcern,
-                set: setBehaviorConcern,
-                help: 'Behavioral considerations staff or fosters should know'
-              },
-              {
-                label: 'Medical Concern',
-                checked: medicalConcern,
-                set: setMedicalConcern,
-                help: 'Medical considerations requiring ongoing awareness'
-              }]
-            }].
-            map((group) =>
-            <div key={group.heading}>
-                <h4 className="text-xs uppercase tracking-wider font-semibold text-text-secondary mb-3">
-                  {group.heading}
-                </h4>
-                <div className="space-y-5">
-                  {group.items.map((item) =>
-                <div key={item.label}>
-                      <label className="flex items-center gap-2.5 cursor-pointer text-sm font-medium text-text-primary">
-                        <input
-                      type="checkbox"
-                      checked={item.checked}
-                      onChange={(e) => item.set(e.target.checked)}
-                      className="w-4 h-4 rounded text-primary focus:ring-primary" />
-
-                        {item.label}
-                      </label>
-                      <p className="text-xs text-text-secondary mt-2 ml-[26px]">
-                        {item.help}
-                      </p>
-                    </div>
-                )}
-                </div>
+          <div className="space-y-5">
+            <div>
+              <h4 className="text-xs uppercase tracking-wider font-semibold text-text-secondary mb-3">
+                Operational
+              </h4>
+              <ConcernCheckbox
+                label="On Hold"
+                checked={isOnHold}
+                onChange={setIsOnHold}
+                help="Temporarily unavailable for adoption or transfer" />
+            </div>
+            <div>
+              <h4 className="text-xs uppercase tracking-wider font-semibold text-text-secondary mb-3">
+                Care Considerations
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
+                <ConcernCheckbox
+                  label="Behavior Concern"
+                  checked={behaviorConcern}
+                  onChange={setBehaviorConcern}
+                  help="Behavioral considerations staff or fosters should know" />
+                <ConcernCheckbox
+                  label="Medical Concern"
+                  checked={medicalConcern}
+                  onChange={setMedicalConcern}
+                  help="Medical considerations requiring ongoing awareness" />
               </div>
-            )}
+            </div>
           </div>
         </FormSection>
 
         {/* Notes & Activity */}
-        <FormSection title="Notes & Activity">
+        <FormSection title="Notes & Activity" collapsible defaultOpen={false}>
           <div>
             <Label htmlFor="edit_description">Intake Notes</Label>
             <Textarea
@@ -506,22 +524,6 @@ export function ChangeStatusModal({
           </div>
         </FormSection>
 
-        <div className="pt-5 flex items-center justify-between gap-3 border-t border-border">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={handleDelete}
-            className="text-[#9B3A3A] hover:bg-[#F5D7D7]/60 hover:text-[#9B3A3A]">
-
-            Delete
-          </Button>
-          <div className="flex gap-3">
-            <Button type="button" variant="ghost" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit">Save Changes</Button>
-          </div>
-        </div>
       </form>
     </Modal>);
 

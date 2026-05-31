@@ -10,10 +10,12 @@ import {
   HeartHandshakeIcon,
   StethoscopeIcon,
   BuildingIcon,
+  BarChart3Icon,
   UserCircleIcon,
   LogOutIcon } from
 'lucide-react';
 import { cn } from '../../lib/utils';
+import { LogoMark } from '../ui/Logo';
 import { useAuth } from '../../context/AuthContext';
 import { isDemoMode } from '../../lib/appMode';
 export function Sidebar() {
@@ -61,6 +63,11 @@ export function Sidebar() {
     label: 'Contacts'
   },
   {
+    to: '/reports',
+    icon: BarChart3Icon,
+    label: 'Reports'
+  },
+  {
     to: '/organization',
     icon: BuildingIcon,
     label: 'Organization'
@@ -69,8 +76,8 @@ export function Sidebar() {
   return (
     <aside className="w-64 bg-card border-r border-border h-full flex flex-col hidden md:flex">
       <div className="h-16 flex items-center px-6 border-b border-border">
-        <div className="flex items-center gap-2 text-primary">
-          <PawPrintIcon className="w-7 h-7" />
+        <div className="flex items-center gap-1 text-primary">
+          <LogoMark className="w-16 h-14" />
           <span className="font-heading font-bold text-xl tracking-tight">
             Whiskerville
           </span>

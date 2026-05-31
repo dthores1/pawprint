@@ -3,6 +3,7 @@ import { SearchIcon, XIcon } from 'lucide-react';
 import { Input } from './Forms';
 import { Avatar } from './Avatar';
 import { SpeciesBadge } from './SpeciesBadge';
+import { StatusBadge } from './Badge';
 import { CalendarPopover } from './CalendarPopover';
 import { Animal } from '../../types';
 import { animalDisplayName, animalShowsRescueIdBadge } from '../../lib/utils';
@@ -70,11 +71,16 @@ export function AnimalSearchPicker({
           </div>
           <div className="min-w-0">
             <p className="font-medium text-text-primary truncate">
-              {selected.name}
+              {animalDisplayName(selected)}
             </p>
-            <p className="text-xs text-text-secondary font-mono">
-              #{selected.id}
-            </p>
+            <div className="flex items-center gap-2 mt-0.5 min-w-0">
+              <StatusBadge status={selected.status} />
+              {animalShowsRescueIdBadge(selected) &&
+                <span className="text-xs text-text-secondary font-mono truncate">
+                  {selected.rescue_id}
+                </span>
+              }
+            </div>
           </div>
         </div>
         <button
@@ -153,17 +159,14 @@ export function AnimalSearchPicker({
                       <p className="font-medium text-text-primary truncate text-sm">
                         {animalDisplayName(a)}
                       </p>
-                      {animalShowsRescueIdBadge(a) ?
-                  <p className="text-xs text-text-secondary font-mono">
-                          {a.rescue_id}
-                        </p> :
-                  a.rescue_id ?
-                  null :
-
-                  <p className="text-xs text-text-secondary font-mono">
-                          #{a.id}
-                        </p>
-                  }
+                      <div className="flex items-center gap-2 mt-0.5 min-w-0">
+                        <StatusBadge status={a.status} />
+                        {animalShowsRescueIdBadge(a) &&
+                    <span className="text-xs text-text-secondary font-mono truncate">
+                            {a.rescue_id}
+                          </span>
+                    }
+                      </div>
                     </div>
                   </button>
                 </li>

@@ -44,7 +44,7 @@ import {
   adoptionUpdateToRow,
   rowToAdoption } from
 '../lib/adoptionsApi';
-import { adoptionStatusPatch, ADOPTION_FLOW } from '../lib/adoptions';
+import { adoptionStatusPatch } from '../lib/adoptions';
 import { useAuth } from './AuthContext';
 import {
   rowToAnimal,
@@ -996,30 +996,16 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     }
     setAdoptions((prev) => [rowToAdoption(data), ...prev]);
     ensureAdopterRole(input.adopter_id);
+    // Mark the animal on hold for the duration of the adoption — this is now
+    // the canonical "adoption pending" signal (replaces the old
+    // status='adoption_pending'). cancelAdoption / completeAdoption clear it.
+    updateAnimal(input.animal_id, { is_on_hold: true });
   };
   const updateAdoption: WhiskerContextType['updateAdoption'] = (id, updates) => {
     const prev = adoptions;
     setAdoptions((cur) =>
     cur.map((a) => a.id === id ? { ...a, ...updates } : a)
     );
-    // In-flow status changes drive the animal's lifecycle status: beyond the
-    // inquiry stage the animal is "Adoption Pending" (effectively on hold);
-    // back to inquiry returns it to Adoptable. Terminal statuses are handled by
-    // completeAdoption / cancelAdoption.
-    if (updates.status && ADOPTION_FLOW.includes(updates.status)) {
-      const adoption = adoptions.find((a) => a.id === id);
-      const animal = adoption ?
-      animals.find((an) => an.id === adoption.animal_id) :
-      undefined;
-      if (
-      animal && (
-      animal.status === 'adoptable' || animal.status === 'adoption_pending'))
-      {
-        const next =
-        updates.status === 'inquiry' ? 'adoptable' : 'adoption_pending';
-        if (animal.status !== next) updateAnimal(animal.id, { status: next });
-      }
-    }
     const row = adoptionUpdateToRow(updates);
     if (Object.keys(row).length === 0) return;
     supabase.
@@ -1054,11 +1040,13 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       completed_at: ts,
       ...(donationAmount != null ? { donation_amount: donationAmount } : {})
     });
-    // 2. The animal becomes adopted; stamp the adopter + clear the foster cache.
+    // 2. The animal becomes adopted; stamp the adopter, clear the foster cache,
+    //    and lift the adoption-driven hold.
     const animalUpdates: Partial<Animal> = {
       status: 'adopted',
       adopted_by_id: adoption.adopter_id,
-      adopted_at: ts
+      adopted_at: ts,
+      is_on_hold: false
     };
     (animalUpdates as Record<string, unknown>).current_foster_id = null;
     updateAnimal(adoption.animal_id, animalUpdates);
@@ -1106,12 +1094,9 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       cancelled_at: new Date().toISOString(),
       ...(reason && reason.trim() ? { notes: reason.trim() } : {})
     });
-    // Free the animal back up if the cancelled adoption had it pending.
+    // Lift the adoption-driven hold so the animal is selectable again.
     if (adoption) {
-      const animal = animals.find((an) => an.id === adoption.animal_id);
-      if (animal && animal.status === 'adoption_pending') {
-        updateAnimal(animal.id, { status: 'adoptable' });
-      }
+      updateAnimal(adoption.animal_id, { is_on_hold: false });
     }
   };
   const addPhoto = async (input: NewPhotoInput) => {

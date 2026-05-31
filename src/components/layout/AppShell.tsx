@@ -3,7 +3,8 @@ import { Outlet, NavLink } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { DemoBanner } from './DemoBanner';
 import { isDemoMode } from '../../lib/appMode';
-import { PawPrintIcon, MenuIcon } from 'lucide-react';
+import { MenuIcon } from 'lucide-react';
+import { LogoMark } from '../ui/Logo';
 export function AppShell() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   return (
@@ -15,8 +16,8 @@ export function AppShell() {
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         {/* Mobile Header */}
         <header className="md:hidden h-16 bg-card border-b border-border flex items-center justify-between px-4 shrink-0">
-          <div className="flex items-center gap-2 text-primary">
-            <PawPrintIcon className="w-7 h-7" />
+          <div className="flex items-center gap-1 text-primary">
+            <LogoMark className="w-16 h-14" />
             <span className="font-heading font-bold text-xl tracking-tight">
               Whiskerville
             </span>

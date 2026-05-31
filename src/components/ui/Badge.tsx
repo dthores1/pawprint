@@ -8,21 +8,19 @@ interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
 const STATUS_STYLES: Record<string, string> = {
   intake: 'bg-[#E5E2DC] text-[#6B6B6B]',
   medical: 'bg-[#F8E7C8] text-[#A36B00]',
-  not_ready: 'bg-[#E2E5EA] text-[#5A6473]',
   adoptable: 'bg-[#DDEFE2] text-[#3E7B52]',
-  adoption_pending: 'bg-[#FBE7D2] text-[#B4641E]',
   adopted: 'bg-[#F3E4D7] text-[#B8632E]',
+  released: 'bg-[#DCEBE7] text-[#4F7A70]',
   hospice: 'bg-[#EDE0DA] text-[#7C4A3D]',
   deceased: 'bg-[#E0E0E0] text-[#555555]',
   neutral: 'bg-background text-text-secondary border border-border'
 };
-const STATUS_LABELS: Record<AnimalStatus, string> = {
+export const STATUS_LABELS: Record<AnimalStatus, string> = {
   intake: 'Intake',
   medical: 'Medical',
-  not_ready: 'Not Ready',
   adoptable: 'Adoptable',
-  adoption_pending: 'Adoption Pending',
   adopted: 'Adopted',
+  released: 'Released',
   hospice: 'Hospice',
   deceased: 'Deceased'
 };

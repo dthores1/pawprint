@@ -60,7 +60,7 @@ export function Avatar({
       return (
         <div
           className={cn(
-            'relative inline-flex items-center justify-center overflow-hidden rounded-full font-semibold tracking-tight',
+            'relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-semibold tracking-tight',
             sizes[size],
             className
           )}
@@ -76,7 +76,7 @@ export function Avatar({
     return (
       <div
         className={cn(
-          'relative inline-flex items-center justify-center overflow-hidden bg-accent rounded-full',
+          'relative inline-flex shrink-0 items-center justify-center overflow-hidden bg-accent rounded-full',
           sizes[size],
           className
         )}>
@@ -102,7 +102,7 @@ export function Avatar({
   return (
     <div
       className={cn(
-        'relative inline-flex items-center justify-center overflow-hidden bg-accent rounded-full',
+        'relative inline-flex shrink-0 items-center justify-center overflow-hidden bg-accent rounded-full',
         sizes[size],
         className
       )}>

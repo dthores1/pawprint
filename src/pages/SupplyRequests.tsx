@@ -21,23 +21,17 @@ import { SupplyRequest, SupplyRequestStatus } from '../types';
 import { motion } from 'framer-motion';
 const STATUS_LABELS: Record<SupplyRequestStatus, string> = {
   submitted: 'Submitted',
-  reviewing: 'Reviewing',
-  approved: 'Approved',
-  ordered: 'Ordered',
-  ready_for_pickup: 'Ready for Pickup',
-  delivered: 'Delivered',
-  completed: 'Completed',
-  canceled: 'Canceled'
+  in_progress: 'In Progress',
+  fulfilled: 'Fulfilled',
+  cancelled: 'Cancelled',
+  denied: 'Denied'
 };
 const STATUS_COLORS: Record<SupplyRequestStatus, string> = {
   submitted: 'bg-[#E5E2DC] text-[#6B6B6B]',
-  reviewing: 'bg-[#F8E7C8] text-[#A36B00]',
-  approved: 'bg-[#DCEAF7] text-[#356A9A]',
-  ordered: 'bg-[#E8DEEC] text-[#6E4E80]',
-  ready_for_pickup: 'bg-[#F3E4D7] text-[#B8632E]',
-  delivered: 'bg-[#DDEFE2] text-[#3E7B52]',
-  completed: 'bg-background text-text-secondary border border-border',
-  canceled: 'bg-[#F5D7D7] text-[#9B3A3A]'
+  in_progress: 'bg-[#F8E7C8] text-[#A36B00]',
+  fulfilled: 'bg-[#DDEFE2] text-[#3E7B52]',
+  cancelled: 'bg-[#F5D7D7] text-[#9B3A3A]',
+  denied: 'bg-[#F5D7D7] text-[#9B3A3A]'
 };
 export function SupplyRequests() {
   const {
@@ -59,14 +53,24 @@ export function SupplyRequests() {
     'active'
   );
   const activeRequests = supplyRequests.
-  filter((r) => r.status !== 'completed' && r.status !== 'canceled').
+  filter(
+    (r) =>
+    r.status !== 'fulfilled' &&
+    r.status !== 'cancelled' &&
+    r.status !== 'denied'
+  ).
   sort(
     (a, b) =>
     new Date(b.requested_date).getTime() -
     new Date(a.requested_date).getTime()
   );
   const completedRequests = supplyRequests.
-  filter((r) => r.status === 'completed' || r.status === 'canceled').
+  filter(
+    (r) =>
+    r.status === 'fulfilled' ||
+    r.status === 'cancelled' ||
+    r.status === 'denied'
+  ).
   sort(
     (a, b) =>
     new Date(b.requested_date).getTime() -
@@ -164,7 +168,7 @@ export function SupplyRequests() {
           <Link to="/supplies/catalog">
             <Button variant="soft" className="gap-2">
               <PackageIcon className="w-4 h-4" />
-              Manage Catalog
+              Manage Product Options
             </Button>
           </Link>
           <Button onClick={() => setIsNewModalOpen(true)} className="gap-2">
@@ -323,8 +327,9 @@ export function SupplyRequests() {
                 className={cn(
                   'p-5 hover:border-primary/30 transition-colors cursor-pointer group',
                   request.priority !== 'normal' &&
-                  request.status !== 'completed' &&
-                  request.status !== 'canceled' ?
+                  request.status !== 'fulfilled' &&
+                  request.status !== 'cancelled' &&
+                  request.status !== 'denied' ?
                   'border-[#9B3A3A]/30 bg-[#F5D7D7]/10' :
                   ''
                 )}
@@ -400,8 +405,9 @@ export function SupplyRequests() {
                           {STATUS_LABELS[request.status]}
                         </span>
                         {request.priority !== 'normal' &&
-                      request.status !== 'completed' &&
-                      request.status !== 'canceled' &&
+                      request.status !== 'fulfilled' &&
+                      request.status !== 'cancelled' &&
+                      request.status !== 'denied' &&
                       <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[#9B3A3A]">
                               <AlertCircleIcon className="w-3 h-3" />
                               {request.priority}

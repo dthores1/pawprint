@@ -1,17 +1,14 @@
 // Lifecycle stage only. "In foster" is NOT a status — it's derived from an
 // active FosterPlacement (current_foster_id). Holds/concerns are flags on the
 // Animal (is_on_hold / has_behavior_concern / has_medical_concern), orthogonal
-// to lifecycle. 'not_ready' = in care but not yet posted for adoption.
-// 'adoption_pending' is set automatically while an adoption is past the inquiry
-// stage (an active Adoption drives it); completing the adoption moves it to
-// 'adopted'. It signals the animal is effectively on hold for that adopter.
+// to lifecycle. An active (non-terminal) adoption is signaled via is_on_hold,
+// kept in sync by addAdoption/cancelAdoption/completeAdoption.
 export type AnimalStatus =
 'intake' |
 'medical' |
-'not_ready' |
 'adoptable' |
-'adoption_pending' |
 'adopted' |
+'released' |
 'hospice' |
 'deceased';
 
@@ -135,12 +132,9 @@ export interface Breed {
 
 export type PhotoCategory =
 'intake' |
-'profile' |
 'medical' |
-'foster' |
-'adoption' |
-'post_adoption' |
-'other';
+'general' |
+'adoption_listing';
 
 export interface AnimalPhoto {
   id: string;
@@ -365,19 +359,33 @@ export interface Person {
   preferred_species?: Species[];
 }
 
+// Simplified five-state lifecycle. Fulfillment details (pickup vs. shipping)
+// live on the supply request as separate fields, not as statuses. `denied` is
+// the reviewer-side rejection (with a required denial_reason); `cancelled` is
+// the requester pulling the request themselves.
 export type SupplyRequestStatus =
 'submitted' |
-'reviewing' |
-'approved' |
-'ordered' |
-'ready_for_pickup' |
-'delivered' |
-'completed' |
-'canceled';
+'in_progress' |
+'fulfilled' |
+'cancelled' |
+'denied';
 
 export type SupplyRequestPriority = 'normal' | 'urgent' | 'critical';
 
 export type DeliveryMethod = 'pickup' | 'drop_off' | 'shipped';
+
+// Constrained at the DB level (see 0006/0019 migrations) — keep in sync.
+export type SupplySupplier =
+'Amazon' |
+'Chewy' |
+'Petco' |
+'PetSmart' |
+'Target' |
+'Walmart' |
+'Costco' |
+'Tractor Supply' |
+'Local Store' |
+'Other';
 
 export type ProductCategory =
 'food' |
@@ -409,6 +417,12 @@ export interface SupplyRequest {
   fulfilled_date?: string;
   delivery_method?: DeliveryMethod;
   notes?: string;
+  /** Where the order was placed (Amazon, Chewy, …). Set when fulfilling. */
+  supplier?: SupplySupplier;
+  /** Total order cost in USD. Captured at fulfillment for spend tracking. */
+  total_cost?: number;
+  /** Required when status is 'denied'. Free text from the reviewer. */
+  denial_reason?: string;
   /**
    * When true, this request doubles as a reusable "common request" template for
    * its requester. Reusing it creates a brand-new request copied from this one
@@ -429,6 +443,8 @@ export interface SupplyRequestItem {
   quantity: number;
   unit: string;
   notes?: string;
+  /** Requester-provided product URL (Amazon link, Chewy link, etc.). */
+  product_url?: string;
 }
 
 // — Transport Requests —————————————————————————————————————

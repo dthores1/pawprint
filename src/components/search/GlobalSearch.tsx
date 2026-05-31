@@ -13,7 +13,7 @@ import {
 import { useWhisker } from '../../context/WhiskerContext';
 import { animalDisplayName } from '../../lib/utils';
 import { Avatar } from '../ui/Avatar';
-import { StatusBadge, PriorityBadge } from '../ui/Badge';
+import { StatusBadge, PriorityBadge, STATUS_LABELS } from '../ui/Badge';
 import { SpeciesBadge } from '../ui/SpeciesBadge';
 import { getDaysUntil } from '../../lib/utils';
 import { cn } from '../../lib/utils';
@@ -287,15 +287,15 @@ export function GlobalSearch({
                         <p className="font-medium text-text-primary text-sm truncate">
                           {animalDisplayName(a)}
                         </p>
-                        {a.rescue_id ?
-                    <p className="text-xs text-text-secondary font-mono">
-                            {a.rescue_id}
-                          </p> :
-
-                    <p className="text-xs text-text-secondary font-mono">
-                            #{a.id}
-                          </p>
-                    }
+                        <p className="text-xs text-text-secondary truncate">
+                          {STATUS_LABELS[a.status]}
+                          {a.rescue_id &&
+                          <>
+                              {' · '}
+                              <span className="font-mono">{a.rescue_id}</span>
+                            </>
+                          }
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">

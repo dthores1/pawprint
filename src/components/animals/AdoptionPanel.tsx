@@ -5,14 +5,16 @@ import { Button } from '../ui/Button';
 import { useWhisker } from '../../context/WhiskerContext';
 import { UpdateAdoptionModal } from './UpdateAdoptionModal';
 import { CompleteAdoptionModal } from './CompleteAdoptionModal';
+import { CancelAdoptionModal } from './CancelAdoptionModal';
 import {
   HeartIcon,
   CheckCircle2Icon,
   CircleIcon,
   Edit2Icon,
-  XIcon } from
+  XIcon,
+  LockIcon } from
 'lucide-react';
-import { formatDate } from '../../lib/utils';
+import { animalDisplayName, formatDate } from '../../lib/utils';
 import {
   ADOPTION_STATUS_LABELS,
   adoptionMilestones,
@@ -26,26 +28,18 @@ interface AdoptionPanelProps {
 // Shown on the animal profile while an adoption is active (not completed /
 // cancelled). Surfaces the adopter, status, milestones, and the workflow actions.
 export function AdoptionPanel({ adoptionId }: AdoptionPanelProps) {
-  const { adoptions, people, cancelAdoption } = useWhisker();
+  const { adoptions, people, animals } = useWhisker();
   const [isUpdateOpen, setIsUpdateOpen] = useState(false);
   const [isCompleteOpen, setIsCompleteOpen] = useState(false);
+  const [isCancelOpen, setIsCancelOpen] = useState(false);
 
   const adoption = adoptions.find((a) => a.id === adoptionId);
   if (!adoption) return null;
   const adopter = people.find((p) => p.id === adoption.adopter_id);
+  const animal = animals.find((a) => a.id === adoption.animal_id);
   const milestones = adoptionMilestones(adoption);
   const donation = formatDonation(adoption.donation_amount);
   const readyToComplete = adoption.status === 'ready_for_placement';
-
-  const handleCancel = () => {
-    if (
-    window.confirm(
-      'Cancel this adoption? The record is kept in history; the animal is not marked adopted.'
-    ))
-    {
-      cancelAdoption(adoption.id);
-    }
-  };
 
   return (
     <Card className="p-6 border-l-4 border-l-[#D98C5F]">
@@ -112,6 +106,16 @@ export function AdoptionPanel({ adoptionId }: AdoptionPanelProps) {
         </p>
       }
 
+      {animal?.is_on_hold &&
+      <div className="flex items-start gap-2 mb-5 px-3 py-2 rounded-md bg-[#E8DEEC]/40 border border-[#D7C5DE] text-sm text-[#6E4E80]">
+          <LockIcon className="w-4 h-4 shrink-0 mt-0.5" />
+          <p>
+            <span className="font-medium">{animalDisplayName(animal)}</span> is
+            on hold pending the outcome of this adoption.
+          </p>
+        </div>
+      }
+
       <div className="flex flex-wrap gap-2 pt-4 border-t border-border">
         {readyToComplete &&
         <Button
@@ -130,7 +134,7 @@ export function AdoptionPanel({ adoptionId }: AdoptionPanelProps) {
         <Button
           variant="ghost"
           size="sm"
-          onClick={handleCancel}
+          onClick={() => setIsCancelOpen(true)}
           className="text-[#9B3A3A] hover:bg-[#F5D7D7]/60 hover:text-[#9B3A3A]">
 
           <XIcon className="w-4 h-4 mr-1.5" />
@@ -147,6 +151,11 @@ export function AdoptionPanel({ adoptionId }: AdoptionPanelProps) {
         isOpen={isCompleteOpen}
         adoptionId={adoption.id}
         onClose={() => setIsCompleteOpen(false)} />
+
+      <CancelAdoptionModal
+        isOpen={isCancelOpen}
+        adoptionId={adoption.id}
+        onClose={() => setIsCancelOpen(false)} />
 
     </Card>);
 

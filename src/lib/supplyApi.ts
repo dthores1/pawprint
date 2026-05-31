@@ -15,6 +15,10 @@ export function rowToSupplyRequest(r: any): SupplyRequest {
     fulfilled_date: r.fulfilled_date ?? undefined,
     delivery_method: r.delivery_method ?? undefined,
     notes: r.notes ?? undefined,
+    supplier: r.supplier ?? undefined,
+    // numeric(10,2) arrives as a string from PostgREST.
+    total_cost: r.total_cost != null ? Number(r.total_cost) : undefined,
+    denial_reason: r.denial_reason ?? undefined,
     is_common_request: r.is_common_request ?? false,
     common_request_name: r.common_request_name ?? undefined,
     common_request_last_used_at: r.common_request_last_used_at ?? undefined,
@@ -35,6 +39,9 @@ const SUPPLY_COLUMNS = [
 'fulfilled_date',
 'delivery_method',
 'notes',
+'supplier',
+'total_cost',
+'denial_reason',
 'is_common_request',
 'common_request_name',
 'common_request_last_used_at'] as
@@ -75,7 +82,8 @@ export function rowToSupplyItem(r: any): SupplyRequestItem {
     custom_item_name: r.custom_item_name ?? undefined,
     quantity: Number(r.quantity) || 1,
     unit: r.unit ?? 'each',
-    notes: r.notes ?? undefined
+    notes: r.notes ?? undefined,
+    product_url: r.product_url ?? undefined
   };
 }
 
@@ -90,6 +98,7 @@ organizationId: string)
     custom_item_name: item.custom_item_name ?? null,
     quantity: item.quantity ?? 1,
     unit: item.unit ?? 'each',
-    notes: item.notes ?? null
+    notes: item.notes ?? null,
+    product_url: item.product_url ?? null
   };
 }

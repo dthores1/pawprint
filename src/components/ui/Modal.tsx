@@ -3,19 +3,32 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { XIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
+type ModalSize = 'md' | 'lg' | 'xl';
+
+const SIZE_CLASS: Record<ModalSize, string> = {
+  md: 'max-w-lg',
+  lg: 'max-w-[38rem]',
+  xl: 'max-w-2xl'
+};
+
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
   className?: string;
+  size?: ModalSize;
+  /** Rendered in a non-scrolling region pinned to the bottom of the panel. */
+  footer?: React.ReactNode;
 }
 export function Modal({
   isOpen,
   onClose,
   title,
   children,
-  className
+  className,
+  size = 'md',
+  footer
 }: ModalProps) {
   useEffect(() => {
     if (isOpen) {
@@ -82,11 +95,12 @@ export function Modal({
               bounce: 0
             }}
             className={cn(
-              'bg-card w-full max-w-lg rounded-2xl shadow-soft-lg pointer-events-auto flex flex-col max-h-[90vh]',
+              'bg-card w-full rounded-2xl shadow-soft-lg pointer-events-auto flex flex-col max-h-[90vh]',
+              SIZE_CLASS[size],
               className
             )}>
 
-              <div className="flex items-center justify-between px-7 py-5 border-b border-border">
+              <div className="flex items-center justify-between px-7 py-5 border-b border-border shrink-0">
                 <h2 className="text-lg font-heading font-bold text-text-primary">
                   {title}
                 </h2>
@@ -97,9 +111,14 @@ export function Modal({
                   <XIcon className="w-5 h-5" />
                 </button>
               </div>
-              <div className="px-7 py-6 overflow-y-auto scrollbar-hide">
+              <div className="px-7 py-6 overflow-y-auto scrollbar-hide flex-1">
                 {children}
               </div>
+              {footer &&
+              <div className="px-7 py-4 border-t border-border bg-card rounded-b-2xl shrink-0">
+                  {footer}
+                </div>
+              }
             </motion.div>
           </div>
         </>

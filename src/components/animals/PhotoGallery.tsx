@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ImageIcon,
@@ -21,31 +22,22 @@ interface PhotoGalleryProps {
 }
 const CATEGORY_LABELS: Record<PhotoCategory, string> = {
   intake: 'Intake',
-  profile: 'Profile',
   medical: 'Medical',
-  foster: 'Foster Updates',
-  adoption: 'Adoption Day',
-  post_adoption: 'Post-Adoption',
-  other: 'Other'
+  general: 'General',
+  adoption_listing: 'Adoption Listing'
 };
 const CATEGORY_TONE: Record<PhotoCategory, string> = {
   intake: 'bg-[#E5E2DC] text-[#6B6B6B]',
-  profile: 'bg-[#DDEFE2] text-[#3E7B52]',
   medical: 'bg-[#F8E7C8] text-[#A36B00]',
-  foster: 'bg-[#DCEAF7] text-[#356A9A]',
-  adoption: 'bg-[#F3E4D7] text-[#B8632E]',
-  post_adoption: 'bg-[#E8DEEC] text-[#6E4E80]',
-  other: 'bg-background text-text-secondary border border-border'
+  general: 'bg-[#DDEFE2] text-[#3E7B52]',
+  adoption_listing: 'bg-[#F3E4D7] text-[#B8632E]'
 };
 // Display order for category groups
 const CATEGORY_ORDER: PhotoCategory[] = [
-'profile',
 'intake',
 'medical',
-'foster',
-'adoption',
-'post_adoption',
-'other'];
+'general',
+'adoption_listing'];
 
 export function PhotoGallery({ animalId }: PhotoGalleryProps) {
   const { photos, deletePhoto, addPhoto, updateAnimal, animals } = useWhisker();
@@ -135,7 +127,7 @@ export function PhotoGallery({ animalId }: PhotoGalleryProps) {
       files.forEach((file) => {
         addPhoto({
           animal_id: animalId,
-          category: 'other',
+          category: 'general',
           file
         });
       });
@@ -335,7 +327,11 @@ function Lightbox({
   onSetProfile,
   onDelete
 }: LightboxProps) {
-  return (
+  // Portal to <body> so the fixed-position backdrop anchors to the viewport
+  // (not the AppShell page wrapper, which has framer-motion transforms that
+  // would otherwise establish a containing block and leave the sidebar
+  // un-dimmed at the top of the screen).
+  return createPortal(
     <motion.div
       initial={{
         opacity: 0
@@ -459,6 +455,8 @@ function Lightbox({
           }
         </div>
       </motion.div>
-    </motion.div>);
+    </motion.div>,
+    document.body
+  );
 
 }

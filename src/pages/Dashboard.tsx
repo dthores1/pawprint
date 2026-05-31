@@ -73,7 +73,7 @@ export function Dashboard() {
   );
   const activePlacementsCount = activePlacements.length;
   const totalCapacity = fosters.reduce(
-    (sum, f) => sum + (f.max_capacity ?? 0),
+    (sum, f) => sum + (f.active === false ? 0 : f.max_capacity ?? 0),
     0
   );
 
@@ -133,14 +133,15 @@ export function Dashboard() {
     (r) =>
     r.priority === 'urgent' ||
     r.priority === 'critical' &&
-    r.status !== 'completed' &&
-    r.status !== 'canceled'
+    r.status !== 'fulfilled' &&
+    r.status !== 'cancelled' &&
+    r.status !== 'denied'
   );
   const pendingReviewRequests = supplyRequests.filter(
-    (r) => r.status === 'submitted' || r.status === 'reviewing'
+    (r) => r.status === 'submitted'
   );
   const awaitingDeliveryRequests = supplyRequests.filter(
-    (r) => r.status === 'ready_for_pickup' || r.status === 'ordered'
+    (r) => r.status === 'in_progress'
   );
   const now = Date.now();
   const upcomingClinics = clinicEvents.
@@ -534,11 +535,6 @@ export function Dashboard() {
                   status: 'medical',
                   label: 'Medical',
                   color: 'bg-[#F8E7C8]'
-                },
-                {
-                  status: 'not_ready',
-                  label: 'Not Ready',
-                  color: 'bg-[#E2E5EA]'
                 },
                 {
                   status: 'adoptable',

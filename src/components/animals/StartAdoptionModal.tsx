@@ -20,8 +20,16 @@ export function StartAdoptionModal({
   onClose,
   animalId
 }: StartAdoptionModalProps) {
-  const { animals, people, addPerson, addAdoption } = useWhisker();
+  const { animals, people, placements, addPerson, addAdoption } = useWhisker();
   const animal = animals.find((a) => a.id === animalId);
+  // The animal's current foster (if any) — used for the "foster failure"
+  // shortcut that prefills the adopter with the foster they're already living with.
+  const activePlacement = placements.find(
+    (p) => p.animal_id === animalId && p.placement_status === 'active'
+  );
+  const currentFoster = activePlacement ?
+  people.find((p) => p.id === activePlacement.person_id) ?? null :
+  null;
 
   const [mode, setMode] = useState<'existing' | 'new'>('existing');
   const [selectedId, setSelectedId] = useState('');
@@ -46,8 +54,12 @@ export function StartAdoptionModal({
 
   if (!animal) return null;
 
-  // Directory contacts only (exclude app-user self records).
-  const directory = people.filter((p) => !p.user_id);
+  // Directory contacts only (exclude app-user self records) — but keep the
+  // current foster in the pool either way so the "foster wants to adopt"
+  // shortcut works even when that foster is also an app user.
+  const directory = people.filter(
+    (p) => !p.user_id || p.id === currentFoster?.id
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,6 +150,18 @@ export function StartAdoptionModal({
             }}
             placeholder="Search contacts by name or email…" />
 
+            {currentFoster && selectedId !== currentFoster.id &&
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedId(currentFoster.id);
+              setError(undefined);
+            }}
+            className="mt-2 text-xs font-medium text-primary hover:underline">
+
+                Foster wants to adopt?
+              </button>
+          }
           </div> :
 
         <div className="space-y-4">

@@ -97,7 +97,7 @@ export function AnimalProfile() {
     setHeroImageError(false);
     await addPhoto({
       animal_id: animal.id,
-      category: 'profile',
+      category: 'general',
       file,
       setAsProfile: true
     });

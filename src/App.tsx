@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { WhiskerProvider } from './context/WhiskerContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -22,13 +22,27 @@ import { Login } from './pages/Login';
 import { Onboarding } from './pages/Onboarding';
 import { AcceptInvitePage } from './pages/AcceptInvitePage';
 import { OrganizationPage } from './pages/OrganizationPage';
-import { PawPrintIcon } from 'lucide-react';
+import { ReportsPage } from './pages/ReportsPage';
+import { LogoHero } from './components/ui/Logo';
+
+// Keeps the browser tab title in sync with the active org.
+// Falls back to a plain product title before an org is selected
+// (login, onboarding, invite acceptance).
+function DocumentTitle() {
+  const { currentOrg } = useAuth();
+  useEffect(() => {
+    document.title = currentOrg
+      ? `Whiskerville | ${currentOrg.name}`
+      : 'Whiskerville';
+  }, [currentOrg]);
+  return null;
+}
 
 function Splash() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-3 text-primary">
-      <PawPrintIcon className="w-10 h-10 animate-pulse" />
-      <span className="text-sm text-text-secondary">Loading…</span>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4">
+      <LogoHero className="w-96 animate-pulse" />
+      <span className="text-2xl text-text-secondary">Loading…</span>
     </div>);
 
 }
@@ -52,20 +66,46 @@ function AppRoutes() {
         <Route path="contacts" element={<Contacts />} />
         <Route path="contacts/:id" element={<ContactProfile />} />
         <Route path="organization" element={<OrganizationPage />} />
+        <Route path="reports" element={<ReportsPage />} />
       </Route>
     </Routes>);
 
 }
 
+// Minimum time the hero splash stays on screen at app boot, even when the
+// underlying app is ready instantly. Keeps the brand moment from flashing.
+const MIN_SPLASH_MS = 2000;
+
+// One-shot timer that flips true after MIN_SPLASH_MS. Used by both the
+// production Gate and DemoGate so demo and prod feel identical at boot.
+function useMinSplashHold() {
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setDone(true), MIN_SPLASH_MS);
+    return () => clearTimeout(t);
+  }, []);
+  return done;
+}
+
 // Production gate: loading → splash, no session → login, no org → onboarding,
-// otherwise the routed app.
+// otherwise the routed app. Splash is also held for a minimum duration so the
+// brand moment is visible on fast loads.
 function Gate() {
   const { loading, session, orgsLoading, currentOrg } = useAuth();
-  if (loading) return <Splash />;
+  const minSplashDone = useMinSplashHold();
+  if (loading || !minSplashDone) return <Splash />;
   if (!session) return <Login />;
   if (orgsLoading) return <Splash />;
   if (!currentOrg) return <Onboarding />;
   return <AppRoutes />;
+}
+
+// Demo-mode equivalent of the splash hold. Demo mode has no auth/loading
+// states of its own, so the hold is the only thing keeping the splash up.
+function DemoGate({ children }: { children: React.ReactNode }) {
+  const minSplashDone = useMinSplashHold();
+  if (!minSplashDone) return <Splash />;
+  return <>{children}</>;
 }
 
 // Demo mode: no auth, no Supabase. Seed-backed providers feed the same
@@ -74,8 +114,11 @@ function DemoApp() {
   return (
     <DemoAuthProvider>
       <DemoWhiskerProvider>
+        <DocumentTitle />
         <BrowserRouter>
-          <AppRoutes />
+          <DemoGate>
+            <AppRoutes />
+          </DemoGate>
         </BrowserRouter>
       </DemoWhiskerProvider>
     </DemoAuthProvider>);
@@ -86,6 +129,7 @@ function ProductionApp() {
   return (
     <AuthProvider>
       <WhiskerProvider>
+        <DocumentTitle />
         <BrowserRouter>
           <Routes>
             {/* Invite acceptance is reachable without a session — signed-out

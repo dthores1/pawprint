@@ -23,7 +23,8 @@ import {
   XIcon,
   CatIcon,
   DogIcon,
-  PawPrintIcon } from
+  PawPrintIcon,
+  StarIcon } from
 'lucide-react';
 import {
   calculateAge,
@@ -32,6 +33,7 @@ import {
   animalShowsRescueIdBadge } from
 '../lib/utils';
 import { animalBreedLabel } from '../lib/breedsApi';
+import { isActiveAdoption } from '../lib/adoptions';
 import { motion } from 'framer-motion';
 import { useWindowRowVirtualizer } from '../lib/useWindowRowVirtualizer';
 import { ENABLED_SPECIES } from '../lib/config';
@@ -45,10 +47,9 @@ const SPECIES_ICONS = {
 const STATUS_LABELS: Record<AnimalStatus, string> = {
   intake: 'Intake',
   medical: 'Medical',
-  not_ready: 'Not Ready',
   adoptable: 'Adoptable',
-  adoption_pending: 'Adoption Pending',
   adopted: 'Adopted',
+  released: 'Released',
   hospice: 'Hospice',
   deceased: 'Deceased'
 };
@@ -76,7 +77,8 @@ export function AnimalsList() {
     fosters,
     medicalRecords,
     relationships,
-    breeds
+    breeds,
+    adoptions
   } = useWhisker();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [view, setView] = useState<'animals' | 'litters'>('animals');
@@ -107,6 +109,16 @@ export function AnimalsList() {
   );
   const [sort, setSort] = useState<SortState | null>(null);
   const onSort = (key: string) => setSort((cur) => nextSort(cur, key));
+
+  // Animals with an active (non-terminal) adoption — drives the "Pending
+  // Adoption" pill under the status badge.
+  const pendingAdoptionAnimalIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const a of adoptions) {
+      if (isActiveAdoption(a)) ids.add(a.animal_id);
+    }
+    return ids;
+  }, [adoptions]);
 
   // Precomputed lookups so per-row reads and sorting stay O(1) at scale.
   const fosterByAnimal = useMemo(() => {
@@ -540,7 +552,15 @@ export function AnimalsList() {
                         </div>
                       </td>
                       <td className="py-4 px-6">
-                        <StatusBadge status={animal.status} />
+                        <div className="flex flex-col items-start gap-1">
+                          <StatusBadge status={animal.status} />
+                          {pendingAdoptionAnimalIds.has(animal.id) &&
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#B4641E]">
+                              <StarIcon className="w-3 h-3 fill-[#B4641E]" />
+                              Pending Adoption
+                            </span>
+                          }
+                        </div>
                       </td>
                       <td className="py-4 px-6">
                         <PriorityBadge priority={animal.priority} />

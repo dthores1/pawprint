@@ -48,7 +48,7 @@ import {
   seedAdoptions } from
 '../data/seed';
 import { generateId } from '../lib/utils';
-import { adoptionStatusPatch, ADOPTION_FLOW } from '../lib/adoptions';
+import { adoptionStatusPatch } from '../lib/adoptions';
 
 // ============================================================
 // Demo mode providers — public portfolio. No auth, no Supabase.
@@ -353,19 +353,12 @@ export function DemoWhiskerProvider({
       p
       )
       );
+      updateAnimal(animal_id, { is_on_hold: true });
     },
     updateAdoption: (id, updates) => {
       setAdoptions((prev) =>
       prev.map((a) => a.id === id ? { ...a, ...updates } : a)
       );
-      if (updates.status && ADOPTION_FLOW.includes(updates.status)) {
-        const adoption = adoptions.find((a) => a.id === id);
-        if (adoption) {
-          const next =
-          updates.status === 'inquiry' ? 'adoptable' : 'adoption_pending';
-          updateAnimal(adoption.animal_id, { status: next });
-        }
-      }
     },
     setAdoptionStatus: (id, status) =>
     setAdoptions((prev) =>
@@ -393,7 +386,8 @@ export function DemoWhiskerProvider({
         status: 'adopted',
         adopted_by_id: adoption.adopter_id,
         adopted_at: ts,
-        current_foster_id: undefined
+        current_foster_id: undefined,
+        is_on_hold: false
       });
       setPlacements((prev) =>
       prev.map((p) =>
@@ -434,10 +428,7 @@ export function DemoWhiskerProvider({
       )
       );
       if (adoption) {
-        const animal = animals.find((an) => an.id === adoption.animal_id);
-        if (animal && animal.status === 'adoption_pending') {
-          updateAnimal(adoption.animal_id, { status: 'adoptable' });
-        }
+        updateAnimal(adoption.animal_id, { is_on_hold: false });
       }
     },
 

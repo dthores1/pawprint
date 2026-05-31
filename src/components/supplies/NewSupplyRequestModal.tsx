@@ -42,7 +42,8 @@ const emptyItem = (): DraftItem => ({
   product_id: '',
   quantity: 1,
   unit: 'each',
-  notes: ''
+  notes: '',
+  product_url: ''
 });
 
 // Order-insensitive content fingerprint (items + priority + notes) used to avoid
@@ -246,7 +247,8 @@ export function NewSupplyRequestModal({
         item.product_id === 'custom' ? item.custom_item_name : undefined,
         quantity: Number(item.quantity) || 1,
         unit: item.unit || 'each',
-        notes: item.notes?.trim() || undefined
+        notes: item.notes?.trim() || undefined,
+        product_url: item.product_url?.trim() || undefined
       })
       )
     );
@@ -487,7 +489,23 @@ export function NewSupplyRequestModal({
                       onChange={(e) =>
                       handleItemChange(index, 'notes', e.target.value)
                       } />
-                    
+
+                  </div>
+
+                  {/* Product link */}
+                  <div>
+                    <Label htmlFor={`product_url-${index}`} className="text-xs">
+                      Product link (optional)
+                    </Label>
+                    <Input
+                      id={`product_url-${index}`}
+                      type="url"
+                      placeholder="https://www.amazon.com/…  or  https://www.chewy.com/…"
+                      value={item.product_url || ''}
+                      onChange={(e) =>
+                      handleItemChange(index, 'product_url', e.target.value)
+                      } />
+
                   </div>
                 </div>);
 

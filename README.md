@@ -85,6 +85,7 @@ Status describes **where the animal is in its journey**. It is intentionally a c
 | `fostered` | Fostered | In an active foster placement. |
 | `adoptable` | Adoptable | Cleared for adoption and listed. |
 | `adopted` | Adopted | Final outcome — adopted out. |
+| `released` | Released | TNR - animal was returned to site. |
 | `hospice` | Hospice | End-of-life comfort care. |
 | `deceased` | Deceased | Final outcome — passed away. |
 
