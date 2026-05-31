@@ -56,7 +56,7 @@ export function PersonSearchPicker({
 
   if (selected) {
     return (
-      <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border border-primary/30 bg-primary/5">
+      <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border border-primary/30 bg-primary/5 min-h-[3.5rem]">
         <div className="flex items-center gap-3 min-w-0">
           <Avatar
             src={selected.photo_url}

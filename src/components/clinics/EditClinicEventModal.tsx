@@ -163,7 +163,7 @@ export function EditClinicEventModal({ isOpen, onClose, event }: Props) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label htmlFor="status">Status</Label>
             <Select
@@ -178,7 +178,7 @@ export function EditClinicEventModal({ isOpen, onClose, event }: Props) {
               )}
             </Select>
           </div>
-          <div className="sm:col-span-2">
+          <div>
             <Label htmlFor="location">Location</Label>
             <Input
               id="location"

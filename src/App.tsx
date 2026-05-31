@@ -20,12 +20,13 @@ import { Sitting } from './pages/Sitting';
 import { Clinics } from './pages/Clinics';
 import { ClinicProfile } from './pages/ClinicProfile';
 import { Login } from './pages/Login';
-import { Onboarding } from './pages/Onboarding';
+import { NoOrganizationScreen } from './pages/Onboarding';
 import { AcceptInvitePage } from './pages/AcceptInvitePage';
 import { OrganizationPage } from './pages/OrganizationPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { LegalPage } from './pages/LegalPage';
 import { LandingPage } from './pages/LandingPage';
+import { RequestAccessPage } from './pages/RequestAccessPage';
 import { LogoHero } from './components/ui/Logo';
 
 // Keeps the browser tab title in sync with the active org.
@@ -102,7 +103,9 @@ function Gate() {
   if (!session) return <LandingPage />;
   if (!minSplashDone) return <Splash />;
   if (orgsLoading) return <Splash />;
-  if (!currentOrg) return <Onboarding />;
+  // No org yet → honest "no access" gate (self-service org creation is disabled
+  // during the beta; orgs are provisioned by us and members join via invite).
+  if (!currentOrg) return <NoOrganizationScreen />;
   return <AppRoutes />;
 }
 
@@ -161,6 +164,9 @@ function ProductionApp() {
              page (rendered by the Gate at "/"); this is the explicit /login the
              landing page's Sign In button links to. */}
             <Route path="/login" element={<LoginRoute />} />
+            {/* Public "Request Beta Access" page — self-service org creation is
+             disabled during the beta, so prospective rescues request access. */}
+            <Route path="/request-access" element={<RequestAccessPage />} />
             {/* Invite acceptance is reachable without a session — signed-out
              visitors stash the token and sign in; AuthContext consumes it. */}
             <Route path="/invite/:token" element={<AcceptInvitePage />} />

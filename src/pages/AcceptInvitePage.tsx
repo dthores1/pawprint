@@ -31,13 +31,22 @@ function humanizeRole(r: string): string {
 export function AcceptInvitePage() {
   const { token = '' } = useParams<{ token: string }>();
   const navigate = useNavigate();
-  const { session, refreshOrganizations, setCurrentOrgId } = useAuth();
+  const { session, user, signOut, refreshOrganizations, setCurrentOrgId } =
+  useAuth();
 
   const [invite, setInvite] = useState<InviteInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [accepting, setAccepting] = useState(false);
   const [accepted, setAccepted] = useState(false);
+
+  // Mirror the server-side email binding (migration 0023) in the UI: only the
+  // invited address can accept. The DB is the real gate; this just stops a
+  // wrong-account user before they click. Compared case-insensitively.
+  const emailMatches =
+  !!user?.email &&
+  !!invite?.email &&
+  user.email.trim().toLowerCase() === invite.email.trim().toLowerCase();
 
   useEffect(() => {
     let cancelled = false;
@@ -48,9 +57,13 @@ export function AcceptInvitePage() {
       });
       if (cancelled) return;
       if (error) {
-        setError(error.message);
+        // A malformed token (e.g. a truncated/garbled link) comes back as a
+        // raw Postgres error like "invalid input syntax for type uuid" — don't
+        // surface DB internals; show a friendly message and log the detail.
+        console.error('[invite] lookup failed:', error.message);
+        setError('This invite link is invalid or has expired.');
       } else if (!data || (Array.isArray(data) && data.length === 0)) {
-        setError('Invite not found.');
+        setError('This invite link is invalid or has expired.');
       } else {
         const row = Array.isArray(data) ? data[0] : data;
         setInvite(row as InviteInfo);
@@ -97,7 +110,11 @@ export function AcceptInvitePage() {
         JSON.stringify(invite.person_roles)
       );
     }
-    navigate('/');
+    // Send the visitor to the sign-in screen (not "/", which is now the public
+    // landing page). Carry the invited email + an invite hint so Login can
+    // prefill it and default to sign-up — most invitees are creating their
+    // first account. AuthContext consumes the stashed token once they're in.
+    navigate('/login', { state: { email: invite?.email, fromInvite: true } });
   };
 
   return (
@@ -182,6 +199,28 @@ export function AcceptInvitePage() {
             <p className="text-sm text-status-urgent-text mb-4">
                   This invite has expired.
                 </p> :
+            session && !emailMatches ?
+            // Signed in, but with an account whose email isn't the invited one.
+            <div className="space-y-3">
+                  <div className="flex gap-2.5 rounded-lg border border-status-urgent-bg bg-status-urgent-bg/40 p-3">
+                    <AlertCircleIcon className="w-4 h-4 text-status-urgent-text shrink-0 mt-0.5" />
+                    <p className="text-sm text-status-urgent-text">
+                      This invite was sent to{' '}
+                      <span className="font-medium">{invite.email}</span>, but
+                      you're signed in as{' '}
+                      <span className="font-medium">{user?.email}</span>.
+                    </p>
+                  </div>
+                  <Button disabled className="w-full">
+                    Accept invite
+                  </Button>
+                  <button
+                onClick={signOut}
+                className="w-full text-sm font-medium text-primary hover:underline">
+
+                    Sign out and use {invite.email}
+                  </button>
+                </div> :
             session ?
             <Button
               onClick={accept}

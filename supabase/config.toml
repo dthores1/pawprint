@@ -1,0 +1,21 @@
+# Supabase project config.
+#
+# Intentionally minimal: this repo's schema is applied via the SQL files in
+# supabase/migrations/, and the live project's auth settings are managed in the
+# Supabase Dashboard. This file exists to version-control the auth *password
+# policy* so it isn't only a dashboard click. A full `supabase init` would
+# expand this with [api]/[db]/[studio]/etc. sections.
+project_id = "pawprint"
+
+[auth]
+# Keep these three in sync:
+#   1. this file
+#   2. Supabase Dashboard → Authentication → Providers → Email
+#   3. MIN_PASSWORD_LENGTH in src/pages/Login.tsx
+minimum_password_length = 8
+
+# Character-class requirement. "" = none (length only). Other valid values:
+#   "letters_digits"
+#   "lower_upper_letters_digits"
+#   "lower_upper_letters_digits_symbols"
+password_requirements = ""

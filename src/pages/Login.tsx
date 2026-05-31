@@ -1,9 +1,16 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Input, Label } from '../components/ui/Forms';
 import { Button } from '../components/ui/Button';
 import { LogoHero } from '../components/ui/Logo';
+
+// Minimum password length for sign-up. Mirror this with the Supabase Dashboard
+// setting (Authentication → Providers → Email → "Minimum password length") so
+// the client-side check and the server-side policy stay in sync. No additional
+// character-class requirements are enforced (dashboard requirements = "None").
+const MIN_PASSWORD_LENGTH = 8;
 
 // Inline Google "G" so we don't pull in a brand-icon dependency.
 function GoogleGlyph({ className }: { className?: string }) {
@@ -29,14 +36,88 @@ function GoogleGlyph({ className }: { className?: string }) {
 
 }
 
+// Password input with a show/hide eye toggle. Visibility is controlled by the
+// parent so the password + confirm fields reveal together. The toggle is
+// type="button" so it never submits the form.
+function PasswordField({
+  id,
+  label,
+  value,
+  onChange,
+  autoComplete,
+  show,
+  onToggleShow,
+  hint
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  autoComplete: string;
+  show: boolean;
+  onToggleShow: () => void;
+  hint?: string;
+}) {
+  return (
+    <div>
+      <Label htmlFor={id}>{label}</Label>
+      <div className="relative">
+        <Input
+          id={id}
+          type={show ? 'text' : 'password'}
+          autoComplete={autoComplete}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="pr-10"
+          required />
+
+        <button
+          type="button"
+          onClick={onToggleShow}
+          tabIndex={-1}
+          aria-label={show ? 'Hide password' : 'Show password'}
+          aria-pressed={show}
+          className="absolute inset-y-0 right-0 flex items-center pr-3 text-text-secondary hover:text-text-primary transition-colors">
+
+          {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+        </button>
+      </div>
+      {hint &&
+      <p className="mt-1.5 text-xs text-text-secondary">{hint}</p>
+      }
+    </div>);
+
+}
+
 export function Login() {
   const { signInWithGoogle, signInWithPassword, signUpWithPassword } =
   useAuth();
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  // When arriving from an invite link (AcceptInvitePage), prefill the invited
+  // email and start in sign-up mode — most invitees are creating a new account.
+  const location = useLocation();
+  const inviteState = location.state as
+  { email?: string; fromInvite?: boolean } | null;
+  // Self-service sign-up is disabled during the beta — accounts can only create
+  // value via an org, and org creation is gated. So the email sign-up path is
+  // offered ONLY to people coming from a valid invite. We detect that via the
+  // nav state OR a stashed pending invite token (the latter survives a refresh
+  // of /login, where nav state would be lost). Everyone else gets sign-in +
+  // "Request access". Google sign-in stays available to all (a cold Google
+  // sign-up with no org just lands on the honest no-access screen).
+  const hasPendingInvite =
+  typeof localStorage !== 'undefined' &&
+  !!localStorage.getItem('whiskerville.pendingInviteToken');
+  const canSignUp = Boolean(inviteState?.fromInvite) || hasPendingInvite;
+  const [mode, setMode] = useState<'signin' | 'signup'>(
+    canSignUp ? 'signup' : 'signin'
+  );
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(inviteState?.email ?? '');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmSent, setConfirmSent] = useState(false);
@@ -49,6 +130,16 @@ export function Login() {
       const { error } = await signInWithPassword(email, password);
       if (error) setError(error);
     } else {
+      if (password.length < MIN_PASSWORD_LENGTH) {
+        setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+        setBusy(false);
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError("Passwords don't match.");
+        setBusy(false);
+        return;
+      }
       const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
       const { error, needsConfirmation } = await signUpWithPassword(
         email,
@@ -155,19 +246,32 @@ export function Login() {
                   required />
 
                 </div>
-                <div>
-                  <Label htmlFor="login_password">Password</Label>
-                  <Input
+                <PasswordField
                   id="login_password"
-                  type="password"
+                  label="Password"
+                  value={password}
+                  onChange={setPassword}
                   autoComplete={
                   mode === 'signin' ? 'current-password' : 'new-password'
                   }
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required />
+                  show={showPassword}
+                  onToggleShow={() => setShowPassword((s) => !s)}
+                  hint={
+                  mode === 'signup' ?
+                  `Must be at least ${MIN_PASSWORD_LENGTH} characters.` :
+                  undefined
+                  } />
 
-                </div>
+                {mode === 'signup' &&
+                <PasswordField
+                  id="login_confirm_password"
+                  label="Confirm password"
+                  value={confirmPassword}
+                  onChange={setConfirmPassword}
+                  autoComplete="new-password"
+                  show={showConfirmPassword}
+                  onToggleShow={() => setShowConfirmPassword((s) => !s)} />
+                }
                 {error &&
               <p className="text-sm text-[#9B3A3A]">{error}</p>
               }
@@ -180,20 +284,35 @@ export function Login() {
                 </Button>
               </form>
 
-              <p className="text-sm text-text-secondary text-center mt-5">
-                {mode === 'signin' ?
+              {canSignUp ?
+            <p className="text-sm text-text-secondary text-center mt-5">
+                  {mode === 'signin' ?
               "Don't have an account? " :
               'Already have an account? '}
-                <button
+                  <button
                 onClick={() => {
                   setMode(mode === 'signin' ? 'signup' : 'signin');
                   setError(null);
+                  setConfirmPassword('');
                 }}
                 className="font-medium text-primary hover:underline">
 
-                  {mode === 'signin' ? 'Sign up' : 'Sign in'}
-                </button>
-              </p>
+                    {mode === 'signin' ? 'Sign up' : 'Sign in'}
+                  </button>
+                </p> :
+
+            // Self-service sign-up is gated during the beta — prospective
+            // rescues request access instead of creating an account/org.
+            <p className="text-sm text-text-secondary text-center mt-5">
+                  Want to use Whiskerville for your rescue?{' '}
+                  <Link
+                to="/request-access"
+                className="font-medium text-primary hover:underline">
+
+                    Request access
+                  </Link>
+                </p>
+            }
             </>
           }
         </div>

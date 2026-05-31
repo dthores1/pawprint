@@ -1,41 +1,32 @@
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { AlertCircleIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
-import { Input, Label } from '../components/ui/Forms';
 import { Button } from '../components/ui/Button';
 import { LogoHero } from '../components/ui/Logo';
 
-// Shown when a signed-in user belongs to no organization yet (e.g. a fresh
-// Google sign-up). Creating an org relies on the `add_org_creator_as_owner`
-// trigger to make them the owner, so they immediately gain access.
-export function Onboarding() {
-  const { user, refreshOrganizations, setCurrentOrgId, signOut } = useAuth();
-  const [name, setName] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+// Shown when a signed-in user belongs to no organization yet.
+//
+// Self-service organization creation is intentionally disabled during the beta:
+// orgs are provisioned by us (until billing/ownership/onboarding are real), and
+// members join via invite. So instead of an org-creation form, this screen is
+// an honest dead-end that points people to the two real paths — get invited, or
+// contact us about beta access. (The `create_organization_for_current_user` RPC
+// still exists; it's just no longer reachable from the UI.)
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) return;
-    setBusy(true);
-    setError(null);
-    // Use the SECURITY DEFINER RPC: it inserts the org + the creator's
-    // membership in one atomic step and avoids the "new row violates RLS policy"
-    // error you can hit doing a direct INSERT here.
-    const { data, error } = await supabase.rpc(
-      'create_organization_for_current_user',
-      { p_name: name.trim() }
-    );
-    if (error) {
-      setError(error.message);
-      setBusy(false);
-      return;
+export function NoOrganizationScreen() {
+  const { user, signOut } = useAuth();
+  // If the user just signed in via an invite link but acceptance was rejected
+  // (e.g. the invite was sent to a different email), AuthContext stashes the
+  // reason. Show it once, then clear it.
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  useEffect(() => {
+    const msg = localStorage.getItem('whiskerville.pendingInviteError');
+    if (msg) {
+      setInviteError(msg);
+      localStorage.removeItem('whiskerville.pendingInviteError');
     }
-    await refreshOrganizations();
-    if (data) setCurrentOrgId(data as string);
-    // Gate will advance to the app once organizations include this one.
-    setBusy(false);
-  };
+  }, []);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -46,43 +37,52 @@ export function Onboarding() {
 
         <div className="bg-card rounded-2xl shadow-soft-lg border border-border p-7">
           <h1 className="text-xl font-heading font-bold text-text-primary mb-1">
-            Create your organization
+            Welcome to Whiskerville
           </h1>
           <p className="text-sm text-text-secondary mb-6">
             You're signed in as{' '}
-            <span className="font-medium text-text-primary">
-              {user?.email}
-            </span>
-            , but you're not part of a rescue yet. Create one to get started.
+            <span className="font-medium text-text-primary">{user?.email}</span>
+            , but you don't have access to an organization yet.
           </p>
 
-          <form onSubmit={handleCreate} className="space-y-4">
-            <div>
-              <Label htmlFor="org_name">Organization name</Label>
-              <Input
-                id="org_name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Alley Cat Project"
-                required />
-
+          {inviteError &&
+          <div className="flex gap-2.5 mb-6 rounded-lg border border-status-urgent-bg bg-status-urgent-bg/40 p-3">
+              <AlertCircleIcon className="w-4 h-4 text-status-urgent-text shrink-0 mt-0.5" />
+              <p className="text-sm text-status-urgent-text">{inviteError}</p>
             </div>
-            {error && <p className="text-sm text-[#9B3A3A]">{error}</p>}
-            <Button type="submit" disabled={busy} className="w-full">
-              {busy ? 'Creating…' : 'Create Organization'}
-            </Button>
-          </form>
+          }
 
-          <p className="text-sm text-text-secondary text-center mt-5">
-            Joining an existing rescue? Ask an admin to invite you (invites
-            coming soon).{' '}
-            <button
-              onClick={signOut}
-              className="font-medium text-primary hover:underline">
+          <div className="space-y-4 mb-6">
+            <div className="flex gap-3">
+              <span className="text-secondary mt-0.5">•</span>
+              <p className="text-sm text-text-secondary">
+                <span className="font-medium text-text-primary">
+                  Joining an existing rescue?
+                </span>{' '}
+                Ask an administrator to invite you.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <span className="text-secondary mt-0.5">•</span>
+              <p className="text-sm text-text-secondary">
+                <span className="font-medium text-text-primary">
+                  Interested in using Whiskerville for your rescue?
+                </span>{' '}
+                Contact us to learn about beta access.
+              </p>
+            </div>
+          </div>
 
-              Sign out
-            </button>
-          </p>
+          <Link to="/request-access" className="block">
+            <Button className="w-full">Contact Us</Button>
+          </Link>
+
+          <button
+            onClick={signOut}
+            className="w-full mt-3 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors">
+
+            Sign out
+          </button>
         </div>
       </div>
     </div>);

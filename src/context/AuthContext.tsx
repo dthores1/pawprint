@@ -14,6 +14,7 @@ export interface Org {
   name: string;
   role: string;
 }
+
 export interface AuthContextType {
   /** Initial session restore in flight. */
   loading: boolean;
@@ -25,6 +26,7 @@ export interface AuthContextType {
   currentOrg: Org | null;
   setCurrentOrgId: (id: string) => void;
   refreshOrganizations: () => Promise<void>;
+
   /**
    * The signed-in user's `people` row id in the current org, used to attribute
    * "requested by" / "claimed by" on coordination records. Resolved (and
@@ -43,6 +45,7 @@ export interface AuthContextType {
   => Promise<{ error: string | null; needsConfirmation: boolean }>;
   signOut: () => Promise<void>;
 }
+
 export const AuthContext = createContext<AuthContextType | undefined>(
   undefined
 );
@@ -125,9 +128,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Clear regardless — we don't want to retry a bad/expired token forever.
       localStorage.removeItem('whiskerville.pendingInviteToken');
       if (error) {
+        // Surface the reason on the no-access screen the user is about to land
+        // on (e.g. signed in with an email the invite wasn't sent to). Stashed
+        // here because this runs outside any page's render.
         console.error('[invites] auto-accept failed:', error.message);
+        localStorage.setItem('whiskerville.pendingInviteError', error.message);
         return;
       }
+      localStorage.removeItem('whiskerville.pendingInviteError');
       await refreshOrganizations();
       if (data) {
         setCurrentOrgIdState(data as string);
@@ -256,7 +264,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: email.trim(),
         password
       });
-      return { error: error ? error.message : null };
+      if (!error) return { error: null };
+      // Supabase returns the generic "Invalid login credentials" for a wrong
+      // email OR password; reword it to something a user understands.
+      const message =
+      error.message === 'Invalid login credentials' ?
+      'Invalid email or password.' :
+      error.message;
+      return { error: message };
     },
     []
   );
