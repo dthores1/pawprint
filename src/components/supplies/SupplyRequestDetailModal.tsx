@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Avatar } from '../ui/Avatar';
@@ -109,9 +109,6 @@ export function SupplyRequestDetailModal({
     (i) => i.supply_request_id === request.id
   );
   const requester = people.find((p) => p.id === request.requester_person_id);
-  const fulfiller = request.fulfilled_by_person_id ?
-  people.find((p) => p.id === request.fulfilled_by_person_id) :
-  null;
   const approver = request.approved_by_person_id ?
   people.find((p) => p.id === request.approved_by_person_id) :
   null;
@@ -120,11 +117,6 @@ export function SupplyRequestDetailModal({
   // "Deny Request" flow with a required reason.
   const isRequester =
   !!currentPersonId && currentPersonId === request.requester_person_id;
-  const isTerminal =
-  request.status === 'cancelled' ||
-  request.status === 'denied' ||
-  request.status === 'fulfilled';
-
   const handleSetStatus = (next: SupplyRequestStatus) => {
     const patch: Partial<typeof request> = { status: next };
     // Stamp the actor on the appropriate column so history can attribute it.
@@ -317,7 +309,7 @@ export function SupplyRequestDetailModal({
         {/* Primary actions — contextual to the current status + who's viewing */}
         {denyMode ?
         <div className="space-y-2">
-            <Label htmlFor="deny_reason">Reason for denial (required)</Label>
+            <Label htmlFor="deny_reason" required>Reason for denial</Label>
             <Textarea
             id="deny_reason"
             value={denyReason}

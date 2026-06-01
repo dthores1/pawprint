@@ -95,7 +95,7 @@ export function EditLitterModal({
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="litter_edit_species">Species</Label>
+            <Label htmlFor="litter_edit_species" required>Species</Label>
             <Select
               id="litter_edit_species"
               value={species}
@@ -137,9 +137,10 @@ export function EditLitterModal({
 
           </div>
           <div>
-            <Label htmlFor="litter_edit_intake">Intake Date</Label>
+            <Label htmlFor="litter_edit_intake" required>Intake Date</Label>
             <DatePicker
               id="litter_edit_intake"
+              required
               error={Boolean(intakeError)}
               value={intakeDate}
               onChange={(v) => {

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Modal } from '../ui/Modal';
-import { Select, Textarea, Label } from '../ui/Forms';
+import { FieldError, Select, Textarea, Label } from '../ui/Forms';
 import { Button } from '../ui/Button';
 import { useWhisker } from '../../context/WhiskerContext';
-import { NoteType } from '../../types';
+import { Animal, NoteType } from '../../types';
 import { animalDisplayName } from '../../lib/utils';
 interface AddNoteModalProps {
   isOpen: boolean;
@@ -17,8 +17,13 @@ export function AddNoteModal({ isOpen, onClose, animalId, animal }: AddNoteModal
     note_type: 'general' as NoteType,
     body: ''
   });
+  const [bodyError, setBodyError] = useState<string | undefined>();
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.body.trim()) {
+      setBodyError('Note content is required.');
+      return;
+    }
     addNote({
       animal_id: animalId,
       author_name: 'Current User',
@@ -29,12 +34,13 @@ export function AddNoteModal({ isOpen, onClose, animalId, animal }: AddNoteModal
       note_type: 'general',
       body: ''
     });
+    setBodyError(undefined);
   };
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={animalDisplayName(animal) + " | Add Note"}>
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         <div>
-          <Label htmlFor="note_type">Note Type</Label>
+          <Label htmlFor="note_type" required>Note Type</Label>
           <Select
             id="note_type"
             name="note_type"
@@ -55,20 +61,24 @@ export function AddNoteModal({ isOpen, onClose, animalId, animal }: AddNoteModal
         </div>
 
         <div>
-          <Label htmlFor="body">Note Content</Label>
+          <Label htmlFor="body" required>Note Content</Label>
           <Textarea
             id="body"
             name="body"
-            required
+            aria-invalid={Boolean(bodyError)}
+            aria-describedby={bodyError ? 'body_error' : undefined}
+            className={bodyError && 'border-red-500 focus:ring-red-500'}
             rows={5}
             value={formData.body}
-            onChange={(e) =>
-            setFormData((prev) => ({
-              ...prev,
-              body: e.target.value
-            }))
-            }
+            onChange={(e) => {
+              setFormData((prev) => ({
+                ...prev,
+                body: e.target.value
+              }));
+              if (bodyError) setBodyError(undefined);
+            }}
             placeholder="Write your note here..." />
+          <FieldError id="body_error">{bodyError}</FieldError>
           
         </div>
 

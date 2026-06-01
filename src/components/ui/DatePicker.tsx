@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { DayPicker, Matcher } from 'react-day-picker';
 import { format, parseISO, isValid } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
@@ -21,6 +21,13 @@ interface DatePickerProps {
   min?: string;
   max?: string;
   className?: string;
+  /**
+   * Marks the field as required for assistive tech (`aria-required`). The
+   * project does inline validation at the form level, so this does NOT trigger
+   * the browser's native validation tooltip. Pair with `<Label required>` for
+   * the visual asterisk and `error` for the invalid state.
+   */
+  required?: boolean;
 }
 export function DatePicker({
   id,
@@ -32,7 +39,8 @@ export function DatePicker({
   align,
   min,
   max,
-  className
+  className,
+  required
 }: DatePickerProps) {
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLButtonElement>(null);
@@ -67,6 +75,7 @@ export function DatePicker({
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
         aria-invalid={error || undefined}
+        aria-required={required || undefined}
         className={cn(
           'flex h-11 w-full items-center justify-between gap-2 rounded-lg border border-border bg-white px-3.5 py-2 text-sm text-left focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50',
           error && 'border-red-500 focus:ring-red-500',

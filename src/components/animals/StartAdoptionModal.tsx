@@ -140,7 +140,7 @@ export function StartAdoptionModal({
 
         {mode === 'existing' ?
         <div>
-            <Label>Adopter</Label>
+            <Label required>Adopter</Label>
             <PersonSearchPicker
             people={directory}
             value={selectedId}
@@ -167,7 +167,7 @@ export function StartAdoptionModal({
         <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="adopter_first">First Name</Label>
+                <Label htmlFor="adopter_first" required>First Name</Label>
                 <Input
                 id="adopter_first"
                 value={first}
@@ -175,7 +175,7 @@ export function StartAdoptionModal({
 
               </div>
               <div>
-                <Label htmlFor="adopter_last">Last Name</Label>
+                <Label htmlFor="adopter_last" required>Last Name</Label>
                 <Input
                 id="adopter_last"
                 value={last}
@@ -184,7 +184,7 @@ export function StartAdoptionModal({
               </div>
             </div>
             <div>
-              <Label htmlFor="adopter_email">Email</Label>
+              <Label htmlFor="adopter_email" required>Email</Label>
               <Input
               id="adopter_email"
               type="email"

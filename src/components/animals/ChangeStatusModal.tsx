@@ -83,6 +83,7 @@ export function ChangeStatusModal({
   const [intakeDate, setIntakeDate] = useState('');
   const [intakeSource, setIntakeSource] = useState('');
   const [photoUrl, setPhotoUrl] = useState('');
+  const [microchipNumber, setMicrochipNumber] = useState('');
   const [description, setDescription] = useState('');
   const [intakeDateError, setIntakeDateError] = useState<string | undefined>();
   const [photoError, setPhotoError] = useState<string | undefined>();
@@ -126,6 +127,7 @@ export function ChangeStatusModal({
     setIntakeDate(animal.intake_date);
     setIntakeSource(animal.intake_source ?? '');
     setPhotoUrl(animal.primary_photo_url ?? '');
+    setMicrochipNumber(animal.microchip_number ?? '');
     setDescription(animal.description ?? '');
     setIntakeDateError(undefined);
     setPhotoError(undefined);
@@ -211,6 +213,7 @@ export function ChangeStatusModal({
       intake_date: intakeDate,
       intake_source: intakeSource.trim(),
       primary_photo_url: photoUrl.trim() || undefined,
+      microchip_number: microchipNumber.trim() || undefined,
       description: description.trim(),
       internal_notes: internalNotes.trim() || undefined
     });
@@ -313,7 +316,7 @@ export function ChangeStatusModal({
           </p>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="edit_species">Species</Label>
+              <Label htmlFor="edit_species" required>Species</Label>
               <Select
                 id="edit_species"
                 value={species}
@@ -325,7 +328,7 @@ export function ChangeStatusModal({
               </Select>
             </div>
             <div>
-              <Label htmlFor="edit_sex">Sex</Label>
+              <Label htmlFor="edit_sex" required>Sex</Label>
               <Select
                 id="edit_sex"
                 value={sex}
@@ -350,6 +353,10 @@ export function ChangeStatusModal({
               }} />
 
           </div>
+          {/* Photo URL field — temporarily hidden in favour of the hero
+              upload flow. Keep the state hydrated so the field can be
+              uncommented later without rebuilding the wiring. */}
+          {/*
           <div>
             <Label htmlFor="edit_photo">Photo URL (optional)</Label>
             <Input
@@ -364,6 +371,20 @@ export function ChangeStatusModal({
               placeholder="https://..." />
 
             <FieldError>{photoError}</FieldError>
+          </div>
+          */}
+          <div>
+            <Label htmlFor="edit_microchip">Microchip Number</Label>
+            <Input
+              id="edit_microchip"
+              value={microchipNumber}
+              onChange={(e) => setMicrochipNumber(e.target.value)}
+              placeholder="e.g. 985112345678901" />
+
+            <p className="mt-1 text-xs text-text-secondary">
+              Optional. The readiness checklist will mark Microchipped once a
+              chip number is on file.
+            </p>
           </div>
         </FormSection>
 
@@ -389,9 +410,10 @@ export function ChangeStatusModal({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="edit_intake_date">Intake Date</Label>
+              <Label htmlFor="edit_intake_date" required>Intake Date</Label>
               <DatePicker
                 id="edit_intake_date"
+                required
                 error={Boolean(intakeDateError)}
                 value={intakeDate}
                 onChange={(v) => {
@@ -417,7 +439,7 @@ export function ChangeStatusModal({
         <FormSection title="Status & Priority">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="edit_status">Status</Label>
+              <Label htmlFor="edit_status" required>Status</Label>
               <Select
                 id="edit_status"
                 value={status}
@@ -433,7 +455,7 @@ export function ChangeStatusModal({
               </Select>
             </div>
             <div>
-              <Label htmlFor="edit_priority">Priority</Label>
+              <Label htmlFor="edit_priority" required>Priority</Label>
               <Select
                 id="edit_priority"
                 value={priority}

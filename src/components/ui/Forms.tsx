@@ -69,11 +69,16 @@ export const Textarea = forwardRef<
 
   });
 Textarea.displayName = 'Textarea';
+interface LabelProps extends React.LabelHTMLAttributes<HTMLLabelElement> {
+  /** Append a red asterisk to mark the field as required. */
+  required?: boolean;
+}
 export function Label({
   className,
   children,
+  required,
   ...props
-}: React.LabelHTMLAttributes<HTMLLabelElement>) {
+}: LabelProps) {
   return (
     <label
       className={cn(
@@ -83,6 +88,11 @@ export function Label({
       {...props}>
       
       {children}
+      {required &&
+      <span aria-hidden="true" className="text-red-600 ml-0.5">
+          *
+        </span>
+      }
     </label>);
 
 }

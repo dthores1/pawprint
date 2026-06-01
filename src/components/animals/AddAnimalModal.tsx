@@ -247,7 +247,7 @@ export function AddAnimalModal({
           </p>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="species">Species</Label>
+              <Label htmlFor="species" required>Species</Label>
               <Select
                 id="species"
                 name="species"
@@ -260,7 +260,7 @@ export function AddAnimalModal({
               </Select>
             </div>
             <div>
-              <Label htmlFor="sex">Sex</Label>
+              <Label htmlFor="sex" required>Sex</Label>
               <Select
                 id="sex"
                 name="sex"
@@ -324,9 +324,10 @@ export function AddAnimalModal({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="intake_date">Intake Date</Label>
+              <Label htmlFor="intake_date" required>Intake Date</Label>
               <DatePicker
                 id="intake_date"
+                required
                 error={Boolean(errors.intake_date)}
                 value={formData.intake_date}
                 onChange={(v) => {
@@ -340,7 +341,7 @@ export function AddAnimalModal({
               </FieldError>
             </div>
             <div>
-              <Label htmlFor="intake_source">Intake Source</Label>
+              <Label htmlFor="intake_source" required>Intake Source</Label>
               <Input
                 id="intake_source"
                 name="intake_source"

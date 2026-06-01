@@ -128,7 +128,7 @@ export function LitterForm({ onClose }: LitterFormProps) {
         </p>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="litter_species">Species</Label>
+            <Label htmlFor="litter_species" required>Species</Label>
             <Select
               id="litter_species"
               value={species}
@@ -179,9 +179,10 @@ export function LitterForm({ onClose }: LitterFormProps) {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="litter_intake_date">Intake Date</Label>
+            <Label htmlFor="litter_intake_date" required>Intake Date</Label>
             <DatePicker
               id="litter_intake_date"
+              required
               error={Boolean(errors.intake_date)}
               value={intakeDate}
               onChange={(v) => {
@@ -191,7 +192,7 @@ export function LitterForm({ onClose }: LitterFormProps) {
             <FieldError>{errors.intake_date}</FieldError>
           </div>
           <div>
-            <Label htmlFor="litter_intake_source">Intake Source</Label>
+            <Label htmlFor="litter_intake_source" required>Intake Source</Label>
             <Input
               id="litter_intake_source"
               aria-invalid={Boolean(errors.intake_source)}

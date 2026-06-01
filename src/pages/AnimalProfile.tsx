@@ -371,6 +371,19 @@ export function AnimalProfile() {
     (m) => m.procedure_type === 'spay_neuter' && m.status === 'completed'
   );
   const hasMicrochip = !!animal.microchip_number;
+  // A completed microchip medical record means the chip was implanted, but
+  // the number may not be on hand yet. The checklist distinguishes "done"
+  // vs "needs number" so we can nudge for the missing data in amber rather
+  // than just showing pending.
+  const hasCompletedMicrochipRecord = animalMedical.some(
+    (m) => m.procedure_type === 'microchip' && m.status === 'completed'
+  );
+  const microchipState: 'done' | 'needs_number' | 'pending' =
+  hasMicrochip ?
+  'done' :
+  hasCompletedMicrochipRecord ?
+  'needs_number' :
+  'pending';
   // Behavior is "assessed" once there's no open behavior concern AND the animal
   // is past initial intake/medical (either placed in foster, or moved to a later
   // lifecycle stage where behavior would have been evaluated).
@@ -378,7 +391,13 @@ export function AnimalProfile() {
   !animal.has_behavior_concern && (
   !!animal.current_foster_id ||
   animal.status !== 'intake' && animal.status !== 'medical');
-  const checklist = [
+  type ChecklistItem = {
+    label: string;
+    done: boolean;
+    /** Amber-with-helper-text state for partially-complete items. */
+    warn?: { helper: string };
+  };
+  const checklist: ChecklistItem[] = [
   {
     label: 'Behavior Assessed',
     done: behaviorAssessed
@@ -389,7 +408,11 @@ export function AnimalProfile() {
   },
   {
     label: 'Microchipped',
-    done: hasMicrochip
+    done: microchipState === 'done',
+    warn:
+    microchipState === 'needs_number' ?
+    { helper: 'Needs microchip number' } :
+    undefined
   },
   {
     label: 'Rabies Vaccine',
@@ -659,7 +682,7 @@ export function AnimalProfile() {
                 onClick={() => setActiveTab('medical')}
                 className={`flex items-center gap-2 px-3 h-9 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'medical' ? 'bg-primary/10 text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-background'}`}>
                 
-                <MedicalKitIcon className="w-4 h-4" /> Medical History
+                <MedicalKitIcon className="w-4 h-4" /> Medical Records
                 {animalMedical.length > 0 &&
                 <span className="text-xs px-1.5 py-0.5 rounded-full bg-background text-text-secondary font-semibold">
                     {animalMedical.length}
@@ -891,19 +914,32 @@ export function AnimalProfile() {
             </div>
             <div className="space-y-3">
               {checklist.map((item, i) =>
-              <div key={i} className="flex items-center gap-3">
+              <div key={i} className="flex items-start gap-3">
                   {item.done ?
-                <CheckCircle2Icon className="w-5 h-5 text-[#3E7B52]" /> :
+                <CheckCircle2Icon className="w-5 h-5 text-[#3E7B52] shrink-0" /> :
+                item.warn ?
+                <AlertCircleIcon className="w-5 h-5 text-[#A36B00] shrink-0" /> :
 
-                <PawPrintGlyph className="w-5 h-5 text-border" />
+                <PawPrintGlyph className="w-5 h-5 text-border shrink-0" />
                 }
-                  <span
-                  className={
-                  item.done ? 'text-text-primary' : 'text-text-secondary'
-                  }>
-                  
-                    {item.label}
-                  </span>
+                  <div className="min-w-0">
+                    <span
+                    className={
+                    item.done ?
+                    'text-text-primary' :
+                    item.warn ?
+                    'text-[#A36B00]' :
+                    'text-text-secondary'
+                    }>
+
+                      {item.label}
+                    </span>
+                    {item.warn &&
+                  <p className="text-xs font-bold text-[#A36B00] mt-0.5">
+                        {item.warn.helper}
+                      </p>
+                  }
+                  </div>
                 </div>
               )}
             </div>

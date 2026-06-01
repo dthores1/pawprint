@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { Modal } from '../ui/Modal';
-import { Textarea, Label } from '../ui/Forms';
+import { FieldError, Textarea, Label } from '../ui/Forms';
 import { DatePicker } from '../ui/DatePicker';
 import { Button } from '../ui/Button';
 import { AnimalMultiPicker } from '../ui/AnimalMultiPicker';
@@ -36,6 +36,7 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [dateError, setDateError] = useState<string | null>(null);
+  const [scopeError, setScopeError] = useState<string | null>(null);
   const [medicationRequired, setMedicationRequired] = useState(false);
   const [fosterProvidesSupplies, setFosterProvidesSupplies] = useState(true);
   const [transportNeeded, setTransportNeeded] = useState(false);
@@ -53,6 +54,7 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
       setStartDate('');
       setEndDate('');
       setDateError(null);
+      setScopeError(null);
       setMedicationRequired(false);
       setFosterProvidesSupplies(true);
       setTransportNeeded(false);
@@ -71,7 +73,12 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!startDate || !endDate) return;
+    if (!startDate || !endDate) {
+      setDateError(
+        !startDate ? 'Start date is required.' : 'End date is required.'
+      );
+      return;
+    }
     // Backstop in case the modal was opened before midnight and submitted
     // after — the picker's day-grayout is computed at render time.
     if (startDate < todayStr) {
@@ -93,7 +100,10 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
       map((aid) => myPlacements.find((p) => p.animal_id === aid)?.id).
       filter((id): id is string => !!id);
     }
-    if (placementIds.length === 0) return;
+    if (placementIds.length === 0) {
+      setScopeError('Choose at least one active placement.');
+      return;
+    }
 
     addSittingRequest(
       {
@@ -128,10 +138,10 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
       title="Request Temporary Coverage"
       className="max-w-2xl">
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         {/* Coverage scope */}
         <div>
-          <Label>Coverage needed for</Label>
+          <Label required>Coverage needed for</Label>
           <div className="space-y-2">
             <label
               className={`block p-4 rounded-xl border cursor-pointer transition-colors ${scope === 'all_current_placements' ? 'border-primary bg-primary/5' : 'border-border hover:bg-background/60'}`}>
@@ -142,7 +152,10 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
                   name="scope"
                   value="all_current_placements"
                   checked={scope === 'all_current_placements'}
-                  onChange={() => setScope('all_current_placements')}
+                  onChange={() => {
+                    setScope('all_current_placements');
+                    setScopeError(null);
+                  }}
                   className="mt-1 w-4 h-4 text-primary focus:ring-primary" />
 
                 <div className="min-w-0">
@@ -166,7 +179,10 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
                   name="scope"
                   value="selected_placements"
                   checked={scope === 'selected_placements'}
-                  onChange={() => setScope('selected_placements')}
+                  onChange={() => {
+                    setScope('selected_placements');
+                    setScopeError(null);
+                  }}
                   className="mt-1 w-4 h-4 text-primary focus:ring-primary" />
 
                 <div className="min-w-0 flex-1">
@@ -179,7 +195,10 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
                       animals={animals}
                       scope={myAnimals}
                       selectedIds={selectedAnimalIds}
-                      onChange={setSelectedAnimalIds}
+                      onChange={(ids) => {
+                        setSelectedAnimalIds(ids);
+                        setScopeError(null);
+                      }}
                       placeholder="Search animals in your care…" />
 
                     </div>
@@ -188,13 +207,15 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
               </div>
             </label>
           </div>
+          <FieldError>{scopeError}</FieldError>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="start">Start date</Label>
+            <Label htmlFor="start" required>Start date</Label>
             <DatePicker
               id="start"
+              required
               value={startDate}
               onChange={handleStartChange}
               min={todayStr}
@@ -202,9 +223,10 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
 
           </div>
           <div>
-            <Label htmlFor="end">End date</Label>
+            <Label htmlFor="end" required>End date</Label>
             <DatePicker
               id="end"
+              required
               align="end"
               min={startDate || todayStr}
               value={endDate}
@@ -213,9 +235,7 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
 
           </div>
         </div>
-        {dateError &&
-        <p className="-mt-3 text-xs text-red-500">{dateError}</p>
-        }
+        <FieldError>{dateError}</FieldError>
 
         <fieldset className="space-y-2 p-4 rounded-xl bg-background/60 border border-border">
           <legend className="text-xs uppercase tracking-wider font-semibold text-text-secondary px-1">

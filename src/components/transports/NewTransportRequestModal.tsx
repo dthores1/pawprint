@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Modal } from '../ui/Modal';
-import { Input, Select, Textarea, Label } from '../ui/Forms';
+import { FieldError, Input, Select, Textarea, Label } from '../ui/Forms';
 import { DateTimePicker } from '../ui/DateTimePicker';
 import { Button } from '../ui/Button';
 import { AnimalSearchPicker } from '../ui/AnimalSearchPicker';
@@ -24,7 +24,12 @@ export function NewTransportRequestModal({ isOpen, onClose }: Props) {
   const [pickup, setPickup] = useState('');
   const [dropoff, setDropoff] = useState('');
   const [pickupTime, setPickupTime] = useState('');
-  const [pickupTimeError, setPickupTimeError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<{
+    animalId?: string;
+    pickup?: string;
+    dropoff?: string;
+    pickupTime?: string;
+  }>({});
   const [notes, setNotes] = useState('');
   const reset = () => {
     setType('animal');
@@ -33,7 +38,7 @@ export function NewTransportRequestModal({ isOpen, onClose }: Props) {
     setPickup('');
     setDropoff('');
     setPickupTime('');
-    setPickupTimeError(null);
+    setErrors({});
     setNotes('');
   };
   const handleClose = () => {
@@ -42,18 +47,26 @@ export function NewTransportRequestModal({ isOpen, onClose }: Props) {
   };
   const handlePickupTimeChange = (v: string) => {
     setPickupTime(v);
-    if (pickupTimeError) setPickupTimeError(null);
+    if (errors.pickupTime) {
+      setErrors((prev) => ({ ...prev, pickupTime: undefined }));
+    }
   };
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pickup.trim() || !dropoff.trim() || !pickupTime) return;
-    // Animal is required when the transport is for an animal.
-    if (type === 'animal' && !animalId) return;
+    const nextErrors: typeof errors = {};
+    if (type === 'animal' && !animalId) {
+      nextErrors.animalId = 'Animal is required.';
+    }
+    if (!pickup.trim()) nextErrors.pickup = 'Pickup location is required.';
+    if (!dropoff.trim()) nextErrors.dropoff = 'Dropoff location is required.';
+    if (!pickupTime) nextErrors.pickupTime = 'Pickup time is required.';
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
     // Guard against past times. The calendar already blocks past days,
     // but a same-day time can still slip into the past while the form is open.
     const pickupDate = new Date(pickupTime);
     if (pickupDate.getTime() < Date.now()) {
-      setPickupTimeError('Pickup time must be in the future.');
+      setErrors({ pickupTime: 'Pickup time must be in the future.' });
       return;
     }
     addTransportRequest({
@@ -77,10 +90,10 @@ export function NewTransportRequestModal({ isOpen, onClose }: Props) {
       title="New Transport Request"
       className="max-w-2xl">
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="type">Type</Label>
+            <Label htmlFor="type" required>Type</Label>
             <Select
               id="type"
               value={type}
@@ -93,7 +106,7 @@ export function NewTransportRequestModal({ isOpen, onClose }: Props) {
             </Select>
           </div>
           <div>
-            <Label htmlFor="urgency">Urgency</Label>
+            <Label htmlFor="urgency" required>Urgency</Label>
             <Select
               id="urgency"
               value={urgency}
@@ -110,50 +123,71 @@ export function NewTransportRequestModal({ isOpen, onClose }: Props) {
 
         {showAnimalPicker &&
         <div>
-            <Label htmlFor="animal">Animal *</Label>
+            <Label htmlFor="animal" required>Animal</Label>
             <AnimalSearchPicker
             id="animal"
             animals={animals}
             value={animalId}
-            onChange={setAnimalId} />
+            onChange={(value) => {
+              setAnimalId(value);
+              if (errors.animalId) {
+                setErrors((prev) => ({ ...prev, animalId: undefined }));
+              }
+            }} />
+            <FieldError>{errors.animalId}</FieldError>
 
           </div>
         }
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="pickup">Pickup location</Label>
+            <Label htmlFor="pickup" required>Pickup location</Label>
             <Input
               id="pickup"
-              required
+              aria-invalid={Boolean(errors.pickup)}
+              aria-describedby={errors.pickup ? 'pickup_error' : undefined}
+              className={errors.pickup && 'border-red-500 focus:ring-red-500'}
               value={pickup}
-              onChange={(e) => setPickup(e.target.value)}
+              onChange={(e) => {
+                setPickup(e.target.value);
+                if (errors.pickup) {
+                  setErrors((prev) => ({ ...prev, pickup: undefined }));
+                }
+              }}
               placeholder="Trap site, foster home, office…" />
+            <FieldError id="pickup_error">{errors.pickup}</FieldError>
 
           </div>
           <div>
-            <Label htmlFor="dropoff">Dropoff location</Label>
+            <Label htmlFor="dropoff" required>Dropoff location</Label>
             <Input
               id="dropoff"
-              required
+              aria-invalid={Boolean(errors.dropoff)}
+              aria-describedby={errors.dropoff ? 'dropoff_error' : undefined}
+              className={errors.dropoff && 'border-red-500 focus:ring-red-500'}
               value={dropoff}
-              onChange={(e) => setDropoff(e.target.value)}
+              onChange={(e) => {
+                setDropoff(e.target.value);
+                if (errors.dropoff) {
+                  setErrors((prev) => ({ ...prev, dropoff: undefined }));
+                }
+              }}
               placeholder="Vet clinic, foster home…" />
+            <FieldError id="dropoff_error">{errors.dropoff}</FieldError>
 
           </div>
         </div>
 
         <div>
-          <Label htmlFor="pickup_time">Pickup time</Label>
+          <Label htmlFor="pickup_time" required>Pickup time</Label>
           <DateTimePicker
             id="pickup_time"
+            required
             value={pickupTime}
             onChange={handlePickupTimeChange}
             minDate={new Date()}
-            error={!!pickupTimeError} />
-          {pickupTimeError &&
-          <p className="mt-1.5 text-xs text-red-500">{pickupTimeError}</p>
-          }
+            error={Boolean(errors.pickupTime)} />
+          <FieldError>{errors.pickupTime}</FieldError>
         </div>
 
         <div>

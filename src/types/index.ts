@@ -222,6 +222,12 @@ export interface MedicalRecord {
   clinic_id?: string;
   /** Free-text facility fallback (vet office, shelter, hospital, …). */
   facility_name?: string;
+  /**
+   * Captured chip number when procedure_type === 'microchip'. Optional —
+   * the chip may be implanted before the number is registered. The app
+   * mirrors a populated value onto animals.microchip_number on save.
+   */
+  microchip_number?: string;
   notes?: string;
   /**
    * When a recurring procedure (vaccine/exam/surgery/medication) becomes due

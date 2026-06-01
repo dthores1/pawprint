@@ -108,11 +108,12 @@ export function AgeInformationFields({
 
       {mode === 'birthdate' ?
       <div>
-          <Label htmlFor="estimated_birthdate" className="text-xs">
+          <Label htmlFor="estimated_birthdate" className="text-xs" required>
             Birthdate
           </Label>
           <DatePicker
           id="estimated_birthdate"
+          required
           value={birthdate}
           max={asOfDate}
           onChange={handleBirthdate} />
@@ -121,7 +122,7 @@ export function AgeInformationFields({
 
       <div className="grid grid-cols-2 gap-3">
           <div>
-            <Label htmlFor="estimated_age_value" className="text-xs">
+            <Label htmlFor="estimated_age_value" className="text-xs" required>
               Age
             </Label>
             <Input
@@ -135,7 +136,7 @@ export function AgeInformationFields({
 
           </div>
           <div>
-            <Label htmlFor="estimated_age_unit" className="text-xs">
+            <Label htmlFor="estimated_age_unit" className="text-xs" required>
               Unit
             </Label>
             <Select

@@ -484,7 +484,7 @@ export function ReportsPage() {
             Reports
           </h1>
           <p className="text-text-secondary mt-1">
-            Operational metrics across adoptions, animals, fosters, and clinic.
+            Operational metrics across adoptions, animals, fosters, and clinics.
           </p>
         </div>
         <ReportsDateFilter

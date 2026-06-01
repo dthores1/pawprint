@@ -91,16 +91,17 @@ export function NewClinicEventModal({ isOpen, onClose }: Props) {
       <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="datetime">Date & time</Label>
+            <Label htmlFor="datetime" required>Date & time</Label>
             <DateTimePicker
               id="datetime"
+              required
               error={Boolean(errors.dateTime)}
               value={form.dateTime}
               onChange={(v) => set('dateTime', v)} />
             <FieldError id="datetime_error">{errors.dateTime}</FieldError>
           </div>
           <div>
-            <Label htmlFor="capacity">Slot capacity</Label>
+            <Label htmlFor="capacity" required>Slot capacity</Label>
             <Input
               id="capacity"
               type="number"
@@ -123,7 +124,7 @@ export function NewClinicEventModal({ isOpen, onClose }: Props) {
         </div>
 
         <div>
-          <Label htmlFor="location">Location</Label>
+          <Label htmlFor="location" required>Location</Label>
           <Input
             id="location"
             aria-invalid={Boolean(errors.location)}

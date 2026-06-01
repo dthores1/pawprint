@@ -6,7 +6,7 @@ import { Avatar } from '../ui/Avatar';
 import { SpeciesBadge } from '../ui/SpeciesBadge';
 import { useWhisker } from '../../context/WhiskerContext';
 import { AnimalRelationship, Animal } from '../../types';
-import { SearchIcon, XIcon, CheckIcon } from 'lucide-react';
+import { SearchIcon, XIcon } from 'lucide-react';
 import { animalDisplayName, animalShowsRescueIdBadge } from '../../lib/utils';
 interface AddRelationshipModalProps {
   isOpen: boolean;
@@ -93,7 +93,7 @@ export function AddRelationshipModal({
     <Modal isOpen={isOpen} onClose={handleClose} title="Add Relationship">
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
-          <Label>Related Animal</Label>
+          <Label required>Related Animal</Label>
           {selectedAnimal ?
           <div className="flex items-center justify-between p-3 rounded-lg border border-primary bg-primary/5">
               <div className="flex items-center gap-3">
@@ -179,7 +179,7 @@ export function AddRelationshipModal({
         </div>
 
         <div>
-          <Label htmlFor="relationship_type">Relationship Type</Label>
+          <Label htmlFor="relationship_type" required>Relationship Type</Label>
           <Select
             id="relationship_type"
             value={type}

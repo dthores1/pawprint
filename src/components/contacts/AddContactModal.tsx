@@ -77,7 +77,7 @@ export function AddContactModal({ isOpen, onClose }: AddContactModalProps) {
       <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         <div className="grid grid-cols-2 gap-5">
           <div>
-            <Label htmlFor="first_name">First Name</Label>
+            <Label htmlFor="first_name" required>First Name</Label>
             <Input
               id="first_name"
               aria-invalid={Boolean(errors.first_name)}
@@ -89,7 +89,7 @@ export function AddContactModal({ isOpen, onClose }: AddContactModalProps) {
 
           </div>
           <div>
-            <Label htmlFor="last_name">Last Name</Label>
+            <Label htmlFor="last_name" required>Last Name</Label>
             <Input
               id="last_name"
               aria-invalid={Boolean(errors.last_name)}
@@ -127,7 +127,7 @@ export function AddContactModal({ isOpen, onClose }: AddContactModalProps) {
         </div>
 
         <div>
-          <Label>Roles</Label>
+          <Label required>Roles</Label>
           <RolesMultiSelect
             value={form.roles}
             onChange={(roles) => {

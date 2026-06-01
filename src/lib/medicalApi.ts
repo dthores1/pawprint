@@ -13,6 +13,7 @@ export function rowToMedicalRecord(r: any): MedicalRecord {
     provider_name: r.provider_name ?? undefined,
     clinic_id: r.clinic_id ?? undefined,
     facility_name: r.facility_name ?? undefined,
+    microchip_number: r.microchip_number ?? undefined,
     notes: r.notes ?? undefined,
     next_due_date: r.next_due_date ?? undefined
   };
@@ -29,6 +30,7 @@ const MEDICAL_COLUMNS = [
 'provider_name',
 'clinic_id',
 'facility_name',
+'microchip_number',
 'notes',
 'next_due_date'] as
 const;

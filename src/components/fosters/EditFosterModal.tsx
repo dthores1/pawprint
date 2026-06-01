@@ -132,7 +132,7 @@ export function EditFosterModal({
       <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="first_name">First Name</Label>
+            <Label htmlFor="first_name" required>First Name</Label>
             <Input
               id="first_name"
               name="first_name"
@@ -144,7 +144,7 @@ export function EditFosterModal({
             <FieldError>{errors.first_name}</FieldError>
           </div>
           <div>
-            <Label htmlFor="last_name">Last Name</Label>
+            <Label htmlFor="last_name" required>Last Name</Label>
             <Input
               id="last_name"
               name="last_name"
@@ -159,7 +159,7 @@ export function EditFosterModal({
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email" required>Email</Label>
             <Input
               id="email"
               name="email"
@@ -172,7 +172,7 @@ export function EditFosterModal({
             <FieldError>{errors.email}</FieldError>
           </div>
           <div>
-            <Label htmlFor="phone">Phone</Label>
+            <Label htmlFor="phone" required>Phone</Label>
             <Input
               id="phone"
               name="phone"
@@ -187,7 +187,7 @@ export function EditFosterModal({
         </div>
 
         <div>
-          <Label htmlFor="address">Address</Label>
+          <Label htmlFor="address" required>Address</Label>
           <Input
             id="address"
             name="address"
@@ -201,7 +201,7 @@ export function EditFosterModal({
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="max_capacity">Max Capacity</Label>
+            <Label htmlFor="max_capacity" required>Max Capacity</Label>
             <Input
               id="max_capacity"
               name="max_capacity"

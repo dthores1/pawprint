@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Modal } from '../ui/Modal';
-import { Input, Select, Label } from '../ui/Forms';
+import { FieldError, Input, Select, Label } from '../ui/Forms';
 import { Button } from '../ui/Button';
 import { useWhisker } from '../../context/WhiskerContext';
 import { Product, ProductCategory } from '../../types';
@@ -30,6 +30,7 @@ export function AddProductModal({ isOpen, onClose, product }: Props) {
   const [category, setCategory] = useState<ProductCategory>('food');
   const [unit, setUnit] = useState('each');
   const [active, setActive] = useState(true);
+  const [nameError, setNameError] = useState<string | undefined>();
   const editing = !!product;
 
   useEffect(() => {
@@ -45,11 +46,15 @@ export function AddProductModal({ isOpen, onClose, product }: Props) {
       setUnit('each');
       setActive(true);
     }
+    setNameError(undefined);
   }, [isOpen, product]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim()) {
+      setNameError('Name is required.');
+      return;
+    }
     if (editing && product) {
       updateProduct(product.id, {
         name: name.trim(),
@@ -74,20 +79,26 @@ export function AddProductModal({ isOpen, onClose, product }: Props) {
       onClose={onClose}
       title={editing ? 'Edit Product' : 'Add Product'}>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         <div>
-          <Label htmlFor="product_name">Name</Label>
+          <Label htmlFor="product_name" required>Name</Label>
           <Input
             id="product_name"
-            required
+            aria-invalid={Boolean(nameError)}
+            aria-describedby={nameError ? 'product_name_error' : undefined}
+            className={nameError && 'border-red-500 focus:ring-red-500'}
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => {
+              setName(e.target.value);
+              if (nameError) setNameError(undefined);
+            }}
             placeholder="e.g. Kitten Formula" />
+          <FieldError id="product_name_error">{nameError}</FieldError>
 
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="product_category">Category</Label>
+            <Label htmlFor="product_category" required>Category</Label>
             <Select
               id="product_category"
               value={category}
@@ -103,7 +114,7 @@ export function AddProductModal({ isOpen, onClose, product }: Props) {
             </Select>
           </div>
           <div>
-            <Label htmlFor="product_unit">Default unit</Label>
+            <Label htmlFor="product_unit" required>Default unit</Label>
             <Select
               id="product_unit"
               value={unit}

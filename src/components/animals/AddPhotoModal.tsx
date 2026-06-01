@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Modal } from '../ui/Modal';
-import { Input, Select, Textarea, Label } from '../ui/Forms';
+import { FieldError, Input, Select, Textarea, Label } from '../ui/Forms';
 import { Button } from '../ui/Button';
 import { useWhisker } from '../../context/WhiskerContext';
 import { PhotoCategory } from '../../types';
@@ -48,6 +48,7 @@ export function AddPhotoModal({
   const [previewUrl, setPreviewUrl] = useState('');
   const [category, setCategory] = useState<PhotoCategory>('general');
   const [caption, setCaption] = useState('');
+  const [sourceError, setSourceError] = useState<string | undefined>();
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(
     null
@@ -59,6 +60,7 @@ export function AddPhotoModal({
     setPreviewUrl('');
     setCategory('general');
     setCaption('');
+    setSourceError(undefined);
     setUploadMode('file');
     setProgress(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -68,6 +70,7 @@ export function AddPhotoModal({
     const selected = Array.from(e.target.files ?? []);
     if (selected.length === 0) return;
     setFiles(selected);
+    setSourceError(undefined);
     // Show a thumbnail only for the single-file case — generating data URLs
     // for many files would be heavy and the filenames already convey the set.
     if (selected.length === 1) {
@@ -84,8 +87,14 @@ export function AddPhotoModal({
   };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (uploadMode === 'file' && files.length === 0) return;
-    if (uploadMode === 'url' && !url.trim()) return;
+    if (uploadMode === 'file' && files.length === 0) {
+      setSourceError('Choose at least one image.');
+      return;
+    }
+    if (uploadMode === 'url' && !url.trim()) {
+      setSourceError('Photo URL is required.');
+      return;
+    }
     setSubmitting(true);
     if (uploadMode === 'file') {
       // Sequential to keep Storage happy with larger batches and to surface
@@ -123,21 +132,27 @@ export function AddPhotoModal({
       }}
       title="Add Photo">
       
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         <div>
           <div className="flex items-center justify-between mb-2">
-            <Label className="mb-0">Photo Source</Label>
+            <Label className="mb-0" required>Photo Source</Label>
             <div className="flex bg-background rounded-lg p-1">
               <button
                 type="button"
-                onClick={() => setUploadMode('file')}
+                onClick={() => {
+                  setUploadMode('file');
+                  setSourceError(undefined);
+                }}
                 className={`px-3 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 ${uploadMode === 'file' ? 'bg-white shadow-sm text-text-primary' : 'text-text-secondary hover:text-text-primary'}`}>
                 
                 <UploadIcon className="w-3.5 h-3.5" /> File
               </button>
               <button
                 type="button"
-                onClick={() => setUploadMode('url')}
+                onClick={() => {
+                  setUploadMode('url');
+                  setSourceError(undefined);
+                }}
                 className={`px-3 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 ${uploadMode === 'url' ? 'bg-white shadow-sm text-text-primary' : 'text-text-secondary hover:text-text-primary'}`}>
                 
                 <LinkIcon className="w-3.5 h-3.5" /> URL
@@ -147,7 +162,7 @@ export function AddPhotoModal({
 
           {uploadMode === 'file' ?
           <div
-            className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:bg-background/50 transition-colors cursor-pointer"
+            className={`border-2 border-dashed rounded-lg p-6 text-center hover:bg-background/50 transition-colors cursor-pointer ${sourceError ? 'border-red-500' : 'border-border'}`}
             onClick={() => fileInputRef.current?.click()}>
 
               <input
@@ -194,16 +209,22 @@ export function AddPhotoModal({
           <Input
             id="photo_url"
             type="url"
-            required={uploadMode === 'url'}
+            aria-invalid={Boolean(sourceError)}
+            aria-describedby={sourceError ? 'photo_source_error' : undefined}
+            className={sourceError && 'border-red-500 focus:ring-red-500'}
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={(e) => {
+              setUrl(e.target.value);
+              if (sourceError) setSourceError(undefined);
+            }}
             placeholder="https://..." />
 
           }
+          <FieldError id="photo_source_error">{sourceError}</FieldError>
         </div>
 
         <div>
-          <Label htmlFor="category">Category</Label>
+          <Label htmlFor="category" required>Category</Label>
           <Select
             id="category"
             value={category}

@@ -316,7 +316,7 @@ export function OrganizationPage() {
                       {inv.email}
                     </p>
                     <p className="text-xs text-text-secondary">
-                      {inv.role} · expires{' '}
+                      {inv.role} · invitation will expire on{' '}
                       {formatDate(inv.expires_at.split('T')[0])}
                     </p>
                   </div>

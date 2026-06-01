@@ -147,7 +147,7 @@ export function AdoptionReturnModal({
               </div>
             </div>
             <div>
-              <Label>Adopter</Label>
+              <Label required>Adopter</Label>
               <PersonSearchPicker
               people={directory}
               value={adopterId}
@@ -168,9 +168,10 @@ export function AdoptionReturnModal({
         }
 
         <div>
-          <Label htmlFor="returned_at">Returned on</Label>
+          <Label htmlFor="returned_at" required>Returned on</Label>
           <DatePicker
             id="returned_at"
+            required
             value={returnedAt}
             onChange={(v) => {
               setReturnedAt(v);
@@ -180,7 +181,7 @@ export function AdoptionReturnModal({
         </div>
 
         <div>
-          <Label htmlFor="return_reason">Return reason</Label>
+          <Label htmlFor="return_reason" required>Return reason</Label>
           <Select
             id="return_reason"
             value={reason}

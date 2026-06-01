@@ -253,7 +253,7 @@ export function PlaceAnimalModal({
 
         {/* Counterpart Typeahead */}
         <div ref={wrapperRef}>
-          <Label htmlFor="placement_search">
+          <Label htmlFor="placement_search" required>
             {mode === 'foster' ?
             'Animal' :
             isReassign ?
@@ -470,9 +470,10 @@ export function PlaceAnimalModal({
 
         {/* Start Date */}
         <div>
-          <Label htmlFor="start_date">Start Date</Label>
+          <Label htmlFor="start_date" required>Start Date</Label>
           <DatePicker
             id="start_date"
+            required
             value={startDate}
             onChange={setStartDate} />
 

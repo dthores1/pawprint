@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { DayPicker } from 'react-day-picker';
 import { format, parseISO, isValid } from 'date-fns';
 import { CalendarIcon, ClockIcon } from 'lucide-react';
@@ -15,6 +15,7 @@ interface DateTimePickerProps {
   placeholder?: string;
   disabled?: boolean;
   error?: boolean;
+  required?: boolean;
   align?: 'start' | 'end';
   className?: string;
   /** Earliest selectable day. Past days are grayed out in the calendar. */
@@ -31,6 +32,7 @@ export function DateTimePicker({
   placeholder = 'Select date & time',
   disabled,
   error,
+  required,
   align,
   className,
   minDate
@@ -82,6 +84,7 @@ export function DateTimePicker({
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
         aria-invalid={error || undefined}
+        aria-required={required || undefined}
         className={cn(
           'flex h-11 w-full items-center justify-between gap-2 rounded-lg border border-border bg-white px-3.5 py-2 text-sm text-left focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50',
           error && 'border-red-500 focus:ring-red-500',

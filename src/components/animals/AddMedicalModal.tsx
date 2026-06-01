@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { add, parseISO, format } from 'date-fns';
 import { Modal } from '../ui/Modal';
-import { Input, Select, Textarea, Label } from '../ui/Forms';
+import { FieldError, Input, Select, Textarea, Label } from '../ui/Forms';
 import { DatePicker } from '../ui/DatePicker';
 import { PersonSearchPicker } from '../ui/PersonSearchPicker';
 import { ClinicEventSearchPicker } from '../ui/ClinicEventSearchPicker';
 import { Button } from '../ui/Button';
 import { formatDate, animalDisplayName } from '../../lib/utils';
 import { useWhisker } from '../../context/WhiskerContext';
-import { ProcedureType, MedicalStatus, AgeUnit } from '../../types';
+import { Animal, ProcedureType, MedicalStatus, AgeUnit } from '../../types';
 
 interface AddMedicalModalProps {
   isOpen: boolean;
@@ -16,6 +16,11 @@ interface AddMedicalModalProps {
   animalId: string;
   animal: Animal;
 }
+type FormErrors = {
+  procedure_name?: string;
+  performed_date?: string;
+  due_date?: string;
+};
 // Only these procedure types are commonly recurring, so the "next due" prompt
 // is offered just for them (keeps the form low-friction for one-off records).
 const RECURRING_TYPES = new Set<ProcedureType>([
@@ -38,7 +43,7 @@ export function AddMedicalModal({
   animalId,
   animal
 }: AddMedicalModalProps) {
-  const { addMedicalRecord, people, clinicEvents } = useWhisker();
+  const { addMedicalRecord, updateAnimal, people, clinicEvents } = useWhisker();
   const INITIAL = {
     procedure_type: 'vaccine' as ProcedureType,
     procedure_name: '',
@@ -49,10 +54,12 @@ export function AddMedicalModal({
     provider_name: '',
     clinic_id: '',
     facility_name: '',
+    microchip_number: '',
     notes: '',
     next_due_date: ''
   };
   const [formData, setFormData] = useState(INITIAL);
+  const [errors, setErrors] = useState<FormErrors>({});
   // Each lookup falls back to free text: pick from contacts/clinics, or type.
   const [performedByMode, setPerformedByMode] = useState<'contact' | 'manual'>(
     'contact'
@@ -70,22 +77,52 @@ export function AddMedicalModal({
 
   const reset = () => {
     setFormData(INITIAL);
+    setErrors({});
     setPerformedByMode('contact');
     setFacilityMode('clinic');
     setNextDueMode('relative');
     setIntervalValue('');
     setIntervalUnit('months');
   };
+  const validate = (): FormErrors => {
+    const next: FormErrors = {};
+    if (!formData.procedure_name.trim()) {
+      next.procedure_name = 'Procedure name is required.';
+    }
+    if (formData.status === 'completed') {
+      if (!formData.performed_date) {
+        next.performed_date = 'Date performed is required.';
+      }
+    } else if (!formData.due_date) {
+      next.due_date = 'Due date is required.';
+    }
+    return next;
+  };
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const nextErrors = validate();
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+    const microchipNumber =
+    formData.procedure_type === 'microchip' ?
+    formData.microchip_number.trim() :
+    '';
     addMedicalRecord({
       animal_id: animalId,
       ...formData,
+      microchip_number: microchipNumber || undefined,
       performed_date:
       formData.status === 'completed' ? formData.performed_date : undefined,
       due_date: formData.status !== 'completed' ? formData.due_date : undefined,
       next_due_date: showNextDue ? formData.next_due_date || undefined : undefined
     });
+    // Mirror the chip number onto the animal record so the readiness checklist
+    // flips immediately and the chip badge in the hero reflects reality. We
+    // only overwrite when the user actually provided one this time — leaving
+    // an existing chip number alone if the field's blank.
+    if (microchipNumber && microchipNumber !== (animal.microchip_number ?? '')) {
+      updateAnimal(animalId, { microchip_number: microchipNumber });
+    }
     onClose();
     reset();
   };
@@ -95,18 +132,25 @@ export function AddMedicalModal({
   {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    if (name in errors && errors[name as keyof FormErrors]) {
+      setErrors((prev) => ({ ...prev, [name]: undefined }));
+    }
   };
   // Setting the performed/due date also re-derives next_due_date when a relative
   // interval is already entered (so the offset tracks the base date).
-  const handleBaseDateChange = (field: 'performed_date' | 'due_date', v: string) =>
-  setFormData((prev) => ({
-    ...prev,
-    [field]: v,
-    next_due_date:
-    nextDueMode === 'relative' && intervalValue ?
-    computeNextDue(v, Number(intervalValue), intervalUnit) :
-    prev.next_due_date
-  }));
+  const handleBaseDateChange = (field: 'performed_date' | 'due_date', v: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      [field]: v,
+      next_due_date:
+      nextDueMode === 'relative' && intervalValue ?
+      computeNextDue(v, Number(intervalValue), intervalUnit) :
+      prev.next_due_date
+    }));
+    if (errors[field]) {
+      setErrors((prev) => ({ ...prev, [field]: undefined }));
+    }
+  };
   const setInterval = (valueStr: string, unit: AgeUnit) => {
     setIntervalValue(valueStr);
     setIntervalUnit(unit);
@@ -117,10 +161,10 @@ export function AddMedicalModal({
   };
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={animalDisplayName(animal) + " | Add Medical Record"}>
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="procedure_type">Type</Label>
+            <Label htmlFor="procedure_type" required>Type</Label>
             <Select
               id="procedure_type"
               name="procedure_type"
@@ -138,7 +182,7 @@ export function AddMedicalModal({
             </Select>
           </div>
           <div>
-            <Label htmlFor="status">Status</Label>
+            <Label htmlFor="status" required>Status</Label>
             <Select
               id="status"
               name="status"
@@ -153,34 +197,59 @@ export function AddMedicalModal({
         </div>
 
         <div>
-          <Label htmlFor="procedure_name">Procedure Name</Label>
+          <Label htmlFor="procedure_name" required>Procedure Name</Label>
           <Input
             id="procedure_name"
             name="procedure_name"
-            required
+            aria-invalid={Boolean(errors.procedure_name)}
+            aria-describedby={errors.procedure_name ? 'procedure_name_error' : undefined}
+            className={errors.procedure_name ? 'border-red-500 focus:ring-red-500' : undefined}
             value={formData.procedure_name}
             onChange={handleChange}
             placeholder="e.g. Rabies Vaccine" />
-
+          <FieldError id="procedure_name_error">{errors.procedure_name}</FieldError>
         </div>
+
+        {/* Microchip number — only relevant when the procedure type is
+            Microchip. Optional: the chip may be implanted before the number
+            is on hand. Saving copies the value onto animals.microchip_number. */}
+        {formData.procedure_type === 'microchip' &&
+        <div>
+            <Label htmlFor="microchip_number">Microchip Number</Label>
+            <Input
+            id="microchip_number"
+            name="microchip_number"
+            value={formData.microchip_number}
+            onChange={handleChange}
+            placeholder="e.g. 985112345678901" />
+
+            <p className="mt-1 text-xs text-text-secondary">
+              Optional — leave blank if you don't have the number yet.
+            </p>
+          </div>
+        }
 
         {formData.status === 'completed' ?
         <div>
-            <Label htmlFor="performed_date">Date Performed</Label>
+            <Label htmlFor="performed_date" required>Date Performed</Label>
             <DatePicker
             id="performed_date"
+            required
+            error={Boolean(errors.performed_date)}
             value={formData.performed_date}
             onChange={(v) => handleBaseDateChange('performed_date', v)} />
-
+            <FieldError id="performed_date_error">{errors.performed_date}</FieldError>
           </div> :
 
         <div>
-            <Label htmlFor="due_date">Due Date</Label>
+            <Label htmlFor="due_date" required>Due Date</Label>
             <DatePicker
             id="due_date"
+            required
+            error={Boolean(errors.due_date)}
             value={formData.due_date}
             onChange={(v) => handleBaseDateChange('due_date', v)} />
-
+            <FieldError id="due_date_error">{errors.due_date}</FieldError>
           </div>
         }
 

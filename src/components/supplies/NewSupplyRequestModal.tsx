@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Modal } from '../ui/Modal';
-import { Input, Select, Textarea, Label } from '../ui/Forms';
+import { FieldError, Input, Select, Textarea, Label } from '../ui/Forms';
 import { Button } from '../ui/Button';
 import { useWhisker } from '../../context/WhiskerContext';
 import { useAuth } from '../../context/AuthContext';
@@ -100,6 +100,7 @@ export function NewSupplyRequestModal({
   const [priority, setPriority] = useState<SupplyRequestPriority>('normal');
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<DraftItem[]>([emptyItem()]);
+  const [itemsError, setItemsError] = useState<string | undefined>();
   const [saveAsCommon, setSaveAsCommon] = useState(false);
   const [commonName, setCommonName] = useState('');
   // Set when the form was prefilled from a common request — bumps that
@@ -109,6 +110,7 @@ export function NewSupplyRequestModal({
     setPriority('normal');
     setNotes('');
     setItems([emptyItem()]);
+    setItemsError(undefined);
     setSaveAsCommon(false);
     setCommonName('');
     setUsedTemplateId(null);
@@ -205,15 +207,22 @@ export function NewSupplyRequestModal({
       }
     }
     setItems(newItems);
+    if (itemsError) setItemsError(undefined);
   };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (items.length === 0) return;
+    if (items.length === 0) {
+      setItemsError('Add at least one item.');
+      return;
+    }
     // Filter out empty items
     const validItems = items.filter(
       (i) => i.product_id && i.product_id !== 'custom' || i.custom_item_name
     );
-    if (validItems.length === 0) return;
+    if (validItems.length === 0) {
+      setItemsError('Select a product or enter a custom item.');
+      return;
+    }
     // Don't create a duplicate template: if "save as common" is on but the
     // content already matches one of the user's common requests, treat it as a
     // reuse of that one (bump its last-used) instead of saving a new copy.
@@ -278,7 +287,7 @@ export function NewSupplyRequestModal({
       title="Request Supplies"
       className="max-w-2xl">
       
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6" noValidate>
         {/* Reuse one of the requester's saved common requests. */}
         {myCommonRequests.length > 0 &&
         <div className="p-3 rounded-xl bg-primary/5 border border-primary/15">
@@ -314,7 +323,7 @@ export function NewSupplyRequestModal({
             </div>
           </div>
           <div>
-            <Label htmlFor="priority">Priority</Label>
+            <Label htmlFor="priority" required>Priority</Label>
             <Select
               id="priority"
               value={priority}
@@ -369,7 +378,7 @@ export function NewSupplyRequestModal({
 
         {/* Items — card-style stacked layout */}
         <div>
-          <Label className="mb-3">Items *</Label>
+          <Label className="mb-3" required>Items</Label>
 
           <div className="space-y-3">
             {items.map((item, index) => {
@@ -377,7 +386,7 @@ export function NewSupplyRequestModal({
               return (
                 <div
                   key={index}
-                  className="p-4 bg-card rounded-xl border border-border space-y-3">
+                  className={`p-4 bg-card rounded-xl border space-y-3 ${itemsError ? 'border-red-500' : 'border-border'}`}>
                   
                   {/* Header row: item number + remove */}
                   <div className="flex items-center justify-between">
@@ -398,7 +407,7 @@ export function NewSupplyRequestModal({
 
                   {/* Product picker */}
                   <div>
-                    <Label htmlFor={`product-${index}`} className="text-xs">
+                    <Label htmlFor={`product-${index}`} className="text-xs" required>
                       Product
                     </Label>
                     <Select
@@ -406,8 +415,7 @@ export function NewSupplyRequestModal({
                       value={item.product_id || ''}
                       onChange={(e) =>
                       handleItemChange(index, 'product_id', e.target.value)
-                      }
-                      required>
+                      }>
                       
                       <option value="">Select an item...</option>
                       {products.map((p) =>
@@ -429,8 +437,7 @@ export function NewSupplyRequestModal({
                         e.target.value
                       )
                       }
-                      className="mt-2"
-                      required />
+                      className="mt-2" />
 
                     }
                   </div>
@@ -438,7 +445,7 @@ export function NewSupplyRequestModal({
                   {/* Quantity + Unit */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label htmlFor={`qty-${index}`} className="text-xs">
+                      <Label htmlFor={`qty-${index}`} className="text-xs" required>
                         Quantity
                       </Label>
                       <Input
@@ -448,12 +455,11 @@ export function NewSupplyRequestModal({
                         value={item.quantity ?? ''}
                         onChange={(e) =>
                         handleItemChange(index, 'quantity', e.target.value)
-                        }
-                        required />
+                        } />
                       
                     </div>
                     <div>
-                      <Label htmlFor={`unit-${index}`} className="text-xs">
+                      <Label htmlFor={`unit-${index}`} className="text-xs" required>
                         Unit
                       </Label>
                       <Select
@@ -461,8 +467,7 @@ export function NewSupplyRequestModal({
                         value={item.unit || 'each'}
                         onChange={(e) =>
                         handleItemChange(index, 'unit', e.target.value)
-                        }
-                        required>
+                        }>
                         
                         {UNIT_OPTIONS.map((u) =>
                         <option key={u} value={u}>
@@ -511,6 +516,7 @@ export function NewSupplyRequestModal({
 
             })}
           </div>
+          <FieldError>{itemsError}</FieldError>
 
           {/* Add another item — full-width dashed CTA */}
           <button
