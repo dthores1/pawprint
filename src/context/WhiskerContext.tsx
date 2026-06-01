@@ -9,6 +9,7 @@ import React, {
 import {
   Animal,
   Adoption,
+  AdoptionReturnReason,
   Breed,
   Litter,
   Sex,
@@ -30,7 +31,9 @@ import {
   ClinicEvent,
   ClinicSlot,
   ClinicSlotProcedure,
-  ClinicSlotProcedureType } from
+  ClinicSlotProcedureType,
+  ArchiveTable,
+  ArchivedRecord } from
 '../types';
 import { supabase } from '../lib/supabase';
 import { rowToBreed } from '../lib/breedsApi';
@@ -41,6 +44,7 @@ import {
 '../lib/littersApi';
 import {
   adoptionToInsert,
+  adoptionReturnToInsert,
   adoptionUpdateToRow,
   rowToAdoption } from
 '../lib/adoptionsApi';
@@ -192,6 +196,31 @@ export interface WhiskerContextType {
   /** Finalize: animal -> adopted, set adopted_by/at, close active placement. */
   completeAdoption: (id: string, donationAmount?: number) => void;
   cancelAdoption: (id: string, reason?: string) => void;
+  /**
+   * Reverse a completed adoption: mark the record `returned` (reason/notes) and
+   * bring the animal back into care (status -> intake, clears adopter fields).
+   */
+  returnAdoption: (
+  id: string,
+  input: {
+    returned_at: string;
+    return_reason: AdoptionReturnReason;
+    return_notes?: string;
+  })
+  => void;
+  /**
+   * Record a return when no adoption record exists yet — creates a `returned`
+   * adoption row (original adopter + details) and brings the animal into care.
+   */
+  recordAdoptionReturn: (
+  input: {
+    animal_id: string;
+    adopter_id: string;
+    returned_at: string;
+    return_reason: AdoptionReturnReason;
+    return_notes?: string;
+  })
+  => Promise<void>;
   addPhoto: (input: NewPhotoInput) => Promise<void>;
   deletePhoto: (id: string) => void;
   addRelationship: (rel: Omit<AnimalRelationship, 'id'>) => void;
@@ -275,6 +304,18 @@ export interface WhiskerContextType {
   updates: Partial<ClinicSlotProcedure>)
   => void;
   deleteClinicSlotProcedure: (id: string) => void;
+  // --- Archive / Recycle Bin ---
+  /**
+   * Soft-delete a record. Goes through the archive_record RPC, which enforces
+   * permission (creator-or-admin for low-risk tables, admin-only otherwise)
+   * and per-table active-obligation blockers. Throws on failure so callers
+   * can show the server's reason.
+   */
+  archiveRecord: (table: ArchiveTable, id: string) => Promise<void>;
+  /** Restore a soft-deleted record (original archiver or admin). Throws on failure. */
+  restoreRecord: (table: ArchiveTable, id: string) => Promise<void>;
+  /** Read the unified Recycle Bin (newest first). */
+  fetchArchived: () => Promise<ArchivedRecord[]>;
 }
 export const WhiskerContext = createContext<WhiskerContextType | undefined>(
   undefined
@@ -296,6 +337,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     from('animals').
     select('*').
     eq('organization_id', orgId).
+    eq('is_deleted', false).
     order('updated_at', { ascending: false });
     if (error) {
       console.error('[animals] load failed:', error.message);
@@ -321,6 +363,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     from('animal_notes').
     select('*').
     eq('organization_id', orgId).
+    eq('is_deleted', false).
     order('created_at', { ascending: false });
     if (error) {
       console.error('[notes] load failed:', error.message);
@@ -343,6 +386,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     from('animal_action_items').
     select('*').
     eq('organization_id', orgId).
+    eq('is_deleted', false).
     order('created_at', { ascending: false });
     if (error) {
       console.error('[action items] load failed:', error.message);
@@ -365,6 +409,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     from('foster_placements').
     select('*').
     eq('organization_id', orgId).
+    eq('is_deleted', false).
     order('start_date', { ascending: false });
     if (error) {
       console.error('[placements] load failed:', error.message);
@@ -385,7 +430,8 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     const { data, error } = await supabase.
     from('medical_records').
     select('*').
-    eq('organization_id', orgId);
+    eq('organization_id', orgId).
+    eq('is_deleted', false);
     if (error) {
       console.error('[medical] load failed:', error.message);
     } else {
@@ -404,7 +450,8 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     const { data, error } = await supabase.
     from('animal_relationships').
     select('*').
-    eq('organization_id', orgId);
+    eq('organization_id', orgId).
+    eq('is_deleted', false);
     if (error) {
       console.error('[relationships] load failed:', error.message);
     } else {
@@ -427,6 +474,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     from('litters').
     select('*').
     eq('organization_id', orgId).
+    eq('is_deleted', false).
     order('created_at', { ascending: false });
     if (error) {
       console.error('[litters] load failed:', error.message);
@@ -451,6 +499,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     from('adoptions').
     select('*').
     eq('organization_id', orgId).
+    eq('is_deleted', false).
     order('created_at', { ascending: false });
     if (error) {
       console.error('[adoptions] load failed:', error.message);
@@ -473,6 +522,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     from('animal_photos').
     select('*').
     eq('organization_id', orgId).
+    eq('is_deleted', false).
     order('created_at', { ascending: false });
     if (error) {
       console.error('[photos] load failed:', error.message);
@@ -496,6 +546,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     from('people').
     select('*').
     eq('organization_id', orgId).
+    eq('is_deleted', false).
     order('last_name', { ascending: true });
     if (error) {
       console.error('[people] load failed:', error.message);
@@ -606,7 +657,8 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         const { data, error } = await supabase.
         from(table).
         select('*').
-        eq('organization_id', orgId);
+        eq('organization_id', orgId).
+        eq('is_deleted', false);
         if (error) {
           console.error(`[${table}] load failed:`, error.message);
         } else {
@@ -861,7 +913,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     }
     const { data, error } = await supabase.
     from('animal_action_items').
-    insert(actionItemToInsert(item, orgId)).
+    insert(actionItemToInsert(item, orgId, user?.id ?? null)).
     select('*').
     single();
     if (error || !data) {
@@ -1100,6 +1152,49 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       updateAnimal(adoption.animal_id, { is_on_hold: false });
     }
   };
+  // Shared: bring a returned animal back into the care pipeline. Inverse of the
+  // animal side of completeAdoption — re-enter at 'intake' for reassessment and
+  // drop the now-stale adopter stamps.
+  const bringAnimalBackIntoCare = (animalId: string) => {
+    const animalUpdates: Partial<Animal> = {
+      status: 'intake',
+      is_on_hold: false
+    };
+    (animalUpdates as Record<string, unknown>).adopted_by_id = null;
+    (animalUpdates as Record<string, unknown>).adopted_at = null;
+    updateAnimal(animalId, animalUpdates);
+  };
+  const returnAdoption: WhiskerContextType['returnAdoption'] = (id, input) => {
+    const adoption = adoptions.find((a) => a.id === id);
+    if (!adoption) return;
+    updateAdoption(id, {
+      status: 'returned',
+      returned_at: input.returned_at,
+      return_reason: input.return_reason,
+      return_notes: input.return_notes?.trim() || undefined
+    });
+    bringAnimalBackIntoCare(adoption.animal_id);
+  };
+  const recordAdoptionReturn: WhiskerContextType['recordAdoptionReturn'] = async (
+  input) =>
+  {
+    if (!orgId) {
+      console.error('[adoptions] cannot record return — no current organization');
+      return;
+    }
+    const { data, error } = await supabase.
+    from('adoptions').
+    insert(adoptionReturnToInsert(input, orgId)).
+    select('*').
+    single();
+    if (error || !data) {
+      console.error('[adoptions] record-return failed:', error?.message);
+      return;
+    }
+    setAdoptions((prev) => [rowToAdoption(data), ...prev]);
+    ensureAdopterRole(input.adopter_id);
+    bringAnimalBackIntoCare(input.animal_id);
+  };
   const addPhoto = async (input: NewPhotoInput) => {
     if (!orgId) {
       console.error('[photos] cannot create — no current organization');
@@ -1138,7 +1233,8 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
           storage_path: storagePath,
           public_url: publicUrl
         },
-        orgId
+        orgId,
+        user?.id ?? null
       )
     ).
     select('*').
@@ -1706,6 +1802,84 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       }
     });
   };
+
+  // --- Archive / Recycle Bin --------------------------------------------
+  // Loader-by-table map so restoreRecord can refetch the right collection
+  // without an extra round-trip to figure out where the row belongs.
+  const loaderForTable: Partial<Record<ArchiveTable, () => void>> = {
+    animals: loadAnimals,
+    animal_notes: loadNotes,
+    animal_photos: loadPhotos,
+    animal_action_items: loadActionItems,
+    animal_relationships: loadRelationships,
+    people: loadPeople,
+    medical_records: loadMedicalRecords,
+    foster_placements: loadPlacements,
+    litters: loadLitters,
+    adoptions: loadAdoptions,
+    clinic_events: loadCoordination,
+    clinic_slots: loadCoordination,
+    clinic_slot_procedures: loadCoordination,
+    products: loadCoordination,
+    supply_requests: loadCoordination,
+    supply_request_items: loadCoordination,
+    transport_requests: loadCoordination,
+    sitting_requests: loadCoordination,
+    sitting_request_placements: loadCoordination
+  };
+
+  const removeLocalById = (table: ArchiveTable, id: string) => {
+    switch (table) {
+      case 'animals': setAnimals((p) => p.filter((r) => r.id !== id)); break;
+      case 'animal_notes': setNotes((p) => p.filter((r) => r.id !== id)); break;
+      case 'animal_photos': setPhotos((p) => p.filter((r) => r.id !== id)); break;
+      case 'animal_action_items': setActionItems((p) => p.filter((r) => r.id !== id)); break;
+      case 'animal_relationships': setRelationships((p) => p.filter((r) => r.id !== id)); break;
+      case 'people': setPeople((p) => p.filter((r) => r.id !== id)); break;
+      case 'medical_records': setMedicalRecords((p) => p.filter((r) => r.id !== id)); break;
+      case 'foster_placements': setPlacements((p) => p.filter((r) => r.id !== id)); break;
+      case 'litters': setLitters((p) => p.filter((r) => r.id !== id)); break;
+      case 'adoptions': setAdoptions((p) => p.filter((r) => r.id !== id)); break;
+      case 'clinic_events': setClinicEvents((p) => p.filter((r) => r.id !== id)); break;
+      case 'clinic_slots': setClinicSlots((p) => p.filter((r) => r.id !== id)); break;
+      case 'clinic_slot_procedures': setClinicSlotProcedures((p) => p.filter((r) => r.id !== id)); break;
+      case 'products': setProducts((p) => p.filter((r) => r.id !== id)); break;
+      case 'supply_requests': setSupplyRequests((p) => p.filter((r) => r.id !== id)); break;
+      case 'supply_request_items': setSupplyRequestItems((p) => p.filter((r) => r.id !== id)); break;
+      case 'transport_requests': setTransportRequests((p) => p.filter((r) => r.id !== id)); break;
+      case 'sitting_requests': setSittingRequests((p) => p.filter((r) => r.id !== id)); break;
+      case 'sitting_request_placements': setSittingRequestPlacements((p) => p.filter((r) => r.id !== id)); break;
+    }
+  };
+
+  const archiveRecord = async (table: ArchiveTable, id: string) => {
+    const { error } = await supabase.rpc('archive_record', {
+      p_table: table,
+      p_id: id
+    });
+    if (error) throw new Error(error.message);
+    removeLocalById(table, id);
+  };
+  const restoreRecord = async (table: ArchiveTable, id: string) => {
+    const { error } = await supabase.rpc('restore_record', {
+      p_table: table,
+      p_id: id
+    });
+    if (error) throw new Error(error.message);
+    loaderForTable[table]?.();
+  };
+  const fetchArchived = async (): Promise<ArchivedRecord[]> => {
+    if (!orgId) return [];
+    const { data, error } = await supabase.rpc('list_archived', {
+      p_org_id: orgId
+    });
+    if (error) {
+      console.error('[archive] list failed:', error.message);
+      return [];
+    }
+    return (data ?? []) as ArchivedRecord[];
+  };
+
   return (
     <WhiskerContext.Provider
       value={{
@@ -1754,6 +1928,8 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         setAdoptionStatus,
         completeAdoption,
         cancelAdoption,
+        returnAdoption,
+        recordAdoptionReturn,
         addPhoto,
         deletePhoto,
         addRelationship,
@@ -1782,7 +1958,10 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         deleteClinicSlot,
         addClinicSlotProcedure,
         updateClinicSlotProcedure,
-        deleteClinicSlotProcedure
+        deleteClinicSlotProcedure,
+        archiveRecord,
+        restoreRecord,
+        fetchArchived
       }}>
       
       {children}

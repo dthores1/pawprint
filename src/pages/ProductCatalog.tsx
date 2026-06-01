@@ -4,9 +4,17 @@ import { useWhisker } from '../context/WhiskerContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { AddProductModal } from '../components/supplies/AddProductModal';
-import { ArrowLeftIcon, PlusIcon, PackageIcon, Edit2Icon } from 'lucide-react';
+import {
+  ArrowLeftIcon,
+  PlusIcon,
+  PackageIcon,
+  Edit2Icon,
+  Trash2Icon } from
+'lucide-react';
 import { cn } from '../lib/utils';
 import { Product, ProductCategory } from '../types';
+import { ArchiveConfirmDialog } from '../components/archive/ArchiveConfirmDialog';
+import { useCanArchive } from '../components/archive/useCanArchive';
 
 const CATEGORY_LABEL: Record<ProductCategory, string> = {
   food: 'Food',
@@ -31,6 +39,8 @@ export function ProductCatalog() {
   const { products, updateProduct } = useWhisker();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
+  const [archiving, setArchiving] = useState<Product | null>(null);
+  const canArchive = useCanArchive('products', { id: 'na' });
 
   const sorted = [...products].sort((a, b) => {
     if (a.active !== b.active) return a.active ? -1 : 1;
@@ -123,6 +133,16 @@ export function ProductCatalog() {
 
                   <Edit2Icon className="w-4 h-4" />
                 </button>
+                {canArchive &&
+              <button
+                type="button"
+                onClick={() => setArchiving(p)}
+                aria-label={`Archive ${p.name}`}
+                className="p-1.5 rounded-md text-text-secondary hover:text-[#9B3A3A] hover:bg-[#F5D7D7]/60 transition-colors shrink-0">
+
+                    <Trash2Icon className="w-4 h-4" />
+                  </button>
+              }
               </div>
           )}
           </div>
@@ -138,6 +158,16 @@ export function ProductCatalog() {
         product={editing}
         onClose={() => setEditing(null)} />
 
+      {archiving &&
+      <ArchiveConfirmDialog
+        isOpen={true}
+        onClose={() => setArchiving(null)}
+        table="products"
+        id={archiving.id}
+        typeLabel="product"
+        entityLabel={archiving.name} />
+
+      }
     </div>);
 
 }

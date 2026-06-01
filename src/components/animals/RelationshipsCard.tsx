@@ -9,6 +9,8 @@ import { BoneIcon } from '../ui/BoneIcon';
 import { Animal } from '../../types';
 import { calculateAge, animalDisplayName } from '../../lib/utils';
 import { AddRelationshipModal } from './AddRelationshipModal';
+import { ArchiveConfirmDialog } from '../archive/ArchiveConfirmDialog';
+import { useCanArchive } from '../archive/useCanArchive';
 interface RelationshipsCardProps {
   animalId: string;
 }
@@ -30,8 +32,13 @@ interface GroupedRelationships {
   bondedWith: RelEntry[];
 }
 export function RelationshipsCard({ animalId }: RelationshipsCardProps) {
-  const { relationships, animals, deleteRelationship } = useWhisker();
+  const { relationships, animals } = useWhisker();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [archiving, setArchiving] = useState<
+    {id: string;label: string;animalName: string;} | null>(
+    null);
+  // Admin gate is the same for every chip; the row id is just a sentinel.
+  const canArchive = useCanArchive('animal_relationships', { id: 'na' });
   const grouped = computeRelationships(animalId, relationships, animals);
   const isEmpty =
   !grouped.mother &&
@@ -42,13 +49,11 @@ export function RelationshipsCard({ animalId }: RelationshipsCardProps) {
   grouped.siblings.length === 0 &&
   grouped.bondedWith.length === 0;
   const handleDelete = (entry: RelEntry, label: string) => {
-    if (
-    window.confirm(
-      `Remove the ${label.toLowerCase()} link to ${animalDisplayName(entry.animal)}? This only removes the relationship, not the animal.`
-    ))
-    {
-      deleteRelationship(entry.relationshipId);
-    }
+    setArchiving({
+      id: entry.relationshipId,
+      label: label.toLowerCase(),
+      animalName: animalDisplayName(entry.animal)
+    });
   };
   return (
     <>
@@ -85,28 +90,28 @@ export function RelationshipsCard({ animalId }: RelationshipsCardProps) {
           <RelationshipRow
             label="Mother"
             entries={[grouped.mother]}
-            onDelete={handleDelete} />
+            onDelete={canArchive ? handleDelete : undefined} />
 
           }
             {grouped.father &&
           <RelationshipRow
             label="Father"
             entries={[grouped.father]}
-            onDelete={handleDelete} />
+            onDelete={canArchive ? handleDelete : undefined} />
 
           }
             {grouped.parents.length > 0 &&
           <RelationshipRow
             label="Parent"
             entries={grouped.parents}
-            onDelete={handleDelete} />
+            onDelete={canArchive ? handleDelete : undefined} />
 
           }
             {grouped.children.length > 0 &&
           <RelationshipRow
             label={grouped.children.length === 1 ? 'Child' : 'Children'}
             entries={grouped.children}
-            onDelete={handleDelete} />
+            onDelete={canArchive ? handleDelete : undefined} />
 
           }
             {grouped.littermates.length > 0 &&
@@ -117,21 +122,21 @@ export function RelationshipsCard({ animalId }: RelationshipsCardProps) {
             'Littermates'
             }
             entries={grouped.littermates}
-            onDelete={handleDelete} />
+            onDelete={canArchive ? handleDelete : undefined} />
 
           }
             {grouped.siblings.length > 0 &&
           <RelationshipRow
             label={grouped.siblings.length === 1 ? 'Sibling' : 'Siblings'}
             entries={grouped.siblings}
-            onDelete={handleDelete} />
+            onDelete={canArchive ? handleDelete : undefined} />
 
           }
             {grouped.bondedWith.length > 0 &&
           <RelationshipRow
             label="Bonded With"
             entries={grouped.bondedWith}
-            onDelete={handleDelete}
+            onDelete={canArchive ? handleDelete : undefined}
             highlight />
 
           }
@@ -143,7 +148,17 @@ export function RelationshipsCard({ animalId }: RelationshipsCardProps) {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         animalId={animalId} />
-      
+
+      {archiving &&
+      <ArchiveConfirmDialog
+        isOpen={true}
+        onClose={() => setArchiving(null)}
+        table="animal_relationships"
+        id={archiving.id}
+        typeLabel="relationship"
+        entityLabel={`${archiving.label} link to ${archiving.animalName}`} />
+
+      }
     </>);
 
 }
@@ -155,7 +170,7 @@ function RelationshipRow({
 }: {
   label: string;
   entries: RelEntry[];
-  onDelete: (entry: RelEntry, label: string) => void;
+  onDelete?: (entry: RelEntry, label: string) => void;
   highlight?: boolean;
 }) {
   return (
@@ -193,11 +208,12 @@ function RelationshipRow({
                 </p>
               </div>
             </Link>
-            {!entry.derived &&
+            {!entry.derived && onDelete &&
           <button
             type="button"
             onClick={() => onDelete(entry, label)}
-            aria-label={`Remove ${label.toLowerCase()} link to ${animalDisplayName(entry.animal)}`}
+            aria-label={`Archive ${label.toLowerCase()} link to ${animalDisplayName(entry.animal)}`}
+            title="Archive relationship"
             className="shrink-0 p-1.5 rounded-md text-text-secondary opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-[#9B3A3A] hover:bg-[#F5D7D7]/60 transition-opacity transition-colors">
 
               <XIcon className="w-3.5 h-3.5" />

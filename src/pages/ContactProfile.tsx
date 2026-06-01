@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useWhisker } from '../context/WhiskerContext';
+import { ArchiveConfirmDialog } from '../components/archive/ArchiveConfirmDialog';
+import { useCanArchive } from '../components/archive/useCanArchive';
 import { Card } from '../components/ui/Card';
 import { Avatar } from '../components/ui/Avatar';
 import { Button } from '../components/ui/Button';
@@ -17,6 +19,7 @@ import {
   HomeIcon,
   HeartIcon,
   Edit2Icon,
+  Trash2Icon,
   CheckCircle2Icon } from
 'lucide-react';
 import { PersonRole } from '../types';
@@ -27,6 +30,9 @@ export function ContactProfile() {
   const { id } = useParams<{ id: string }>();
   const { people, animals, placements } = useWhisker();
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const navigate = useNavigate();
+  const canArchive = useCanArchive('people', { id: id ?? 'na' });
 
   const person = people.find((p) => p.id === id);
   if (!person) {
@@ -49,9 +55,22 @@ export function ContactProfile() {
 
           <ArrowLeftIcon className="w-4 h-4" /> Back to Contacts
         </Link>
-        <Button variant="soft" size="sm" onClick={() => setIsEditOpen(true)}>
-          <Edit2Icon className="w-4 h-4 mr-2" /> Edit
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="soft" size="sm" onClick={() => setIsEditOpen(true)}>
+            <Edit2Icon className="w-4 h-4 mr-2" /> Edit
+          </Button>
+          {canArchive &&
+          <button
+            type="button"
+            onClick={() => setArchiving(true)}
+            aria-label="Archive contact"
+            title="Archive contact"
+            className="p-2 rounded-lg text-text-secondary hover:text-[#9B3A3A] hover:bg-[#F5D7D7]/60 transition-colors">
+
+              <Trash2Icon className="w-4 h-4" />
+            </button>
+          }
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -234,6 +253,17 @@ export function ContactProfile() {
         onClose={() => setIsEditOpen(false)}
         person={person} />
 
+      {archiving &&
+      <ArchiveConfirmDialog
+        isOpen={true}
+        onClose={() => setArchiving(false)}
+        table="people"
+        id={person.id}
+        typeLabel="contact"
+        entityLabel={`${person.first_name} ${person.last_name}`}
+        onArchived={() => navigate('/contacts')} />
+
+      }
     </div>);
 
 }

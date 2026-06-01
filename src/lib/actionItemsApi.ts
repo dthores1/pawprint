@@ -7,6 +7,7 @@ export function rowToActionItem(r: any): AnimalActionItem {
     description: r.description,
     priority: r.priority,
     status: r.status,
+    created_by: r.created_by ?? undefined,
     created_at: r.created_at,
     completed_at: r.completed_at ?? undefined,
     completed_by: r.completed_by ?? undefined,
@@ -16,14 +17,16 @@ export function rowToActionItem(r: any): AnimalActionItem {
 
 export function actionItemToInsert(
 item: Pick<AnimalActionItem, 'animal_id' | 'description' | 'priority'>,
-organizationId: string)
+organizationId: string,
+createdBy: string | null)
 {
   return {
     organization_id: organizationId,
     animal_id: item.animal_id,
     description: item.description,
     priority: item.priority,
-    status: 'open'
+    status: 'open',
+    created_by: createdBy
   };
 }
 

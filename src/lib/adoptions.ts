@@ -1,4 +1,4 @@
-import { Adoption, AdoptionStatus } from '../types';
+import { Adoption, AdoptionStatus, AdoptionReturnReason } from '../types';
 
 // The linear in-progress flow (terminal 'completed'/'cancelled' are reached via
 // dedicated actions, not the regular advance dropdown).
@@ -17,11 +17,38 @@ export const ADOPTION_STATUS_LABELS: Record<AdoptionStatus, string> = {
   pending_paperwork: 'Pending Paperwork',
   ready_for_placement: 'Ready for Placement',
   completed: 'Completed',
-  cancelled: 'Cancelled'
+  cancelled: 'Cancelled',
+  returned: 'Returned'
 };
 
+// Adopter-facing reasons for a return. Order doubles as the dropdown order.
+export const ADOPTION_RETURN_REASON_LABELS: Record<
+  AdoptionReturnReason,
+  string> =
+{
+  behavior: 'Behavioral issues',
+  medical: 'Medical needs',
+  financial: 'Financial hardship',
+  housing: 'Housing restrictions',
+  pet_compatibility: 'Pet compatibility',
+  family_compatibility: 'Family compatibility',
+  life_changes: 'Life changes',
+  rescue_request: 'Rescue request',
+  other: 'Other'
+};
+
+export const ADOPTION_RETURN_REASONS = Object.keys(
+  ADOPTION_RETURN_REASON_LABELS
+) as AdoptionReturnReason[];
+
+const TERMINAL_STATUSES: AdoptionStatus[] = [
+'completed',
+'cancelled',
+'returned'];
+
+
 export function isActiveAdoption(a: Adoption): boolean {
-  return a.status !== 'completed' && a.status !== 'cancelled';
+  return !TERMINAL_STATUSES.includes(a.status);
 }
 
 // When moving to a status, stamp the matching milestone timestamp — but only if
@@ -55,7 +82,8 @@ a: Adoption)
   { label: 'Paperwork sent', at: a.paperwork_sent_at },
   { label: 'Paperwork completed', at: a.paperwork_completed_at },
   { label: 'Completed', at: a.completed_at },
-  { label: 'Cancelled', at: a.cancelled_at }].
+  { label: 'Cancelled', at: a.cancelled_at },
+  { label: 'Returned', at: a.returned_at }].
   filter((m) => m.at);
 }
 

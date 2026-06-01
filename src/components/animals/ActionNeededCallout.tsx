@@ -4,11 +4,14 @@ import {
   AlertCircleIcon,
   PencilIcon,
   CheckCircle2Icon,
-  PlusIcon } from
+  PlusIcon,
+  Trash2Icon } from
 'lucide-react';
 import { Priority } from '../../types';
 import { useWhisker } from '../../context/WhiskerContext';
 import { cn } from '../../lib/utils';
+import { ArchiveConfirmDialog } from '../archive/ArchiveConfirmDialog';
+import { useCanArchive } from '../archive/useCanArchive';
 
 type ElevatedPriority = Exclude<Priority, 'normal'>;
 interface ActionNeededCalloutProps {
@@ -63,10 +66,15 @@ export function ActionNeededCallout({
   const [draft, setDraft] = useState('');
   const [draftPriority, setDraftPriority] =
   useState<ElevatedPriority>('needs_attention');
+  const [archiving, setArchiving] = useState(false);
 
   const openItem = actionItems.find(
     (a) => a.animal_id === animalId && a.status === 'open'
   );
+  const canArchiveOpen = useCanArchive('animal_action_items', {
+    id: openItem?.id,
+    created_by: openItem?.created_by ?? null
+  });
 
   // Visible when there's an open item, the animal is still elevated, or a form
   // is mid-flow (so "Complete & Add Next Step" doesn't vanish the banner).
@@ -311,6 +319,17 @@ export function ActionNeededCallout({
 
                   <PencilIcon className="w-4 h-4" />
                 </button>
+                {canArchiveOpen &&
+              <button
+                type="button"
+                onClick={() => setArchiving(true)}
+                title="Archive"
+                aria-label="Archive action item"
+                className={iconBtn}>
+
+                    <Trash2Icon className="w-4 h-4" />
+                  </button>
+              }
               </div>
             </motion.div> :
 
@@ -344,6 +363,17 @@ export function ActionNeededCallout({
           }
         </AnimatePresence>
       </div>
+
+      {archiving && openItem &&
+      <ArchiveConfirmDialog
+        isOpen={true}
+        onClose={() => setArchiving(false)}
+        table="animal_action_items"
+        id={openItem.id}
+        typeLabel="action item"
+        entityLabel={`"${openItem.description.slice(0, 60)}${openItem.description.length > 60 ? '…' : ''}"`} />
+
+      }
     </motion.div>);
 
 }

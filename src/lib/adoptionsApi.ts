@@ -12,6 +12,9 @@ export function rowToAdoption(r: any): Adoption {
     cancelled_at: r.cancelled_at ?? undefined,
     paperwork_sent_at: r.paperwork_sent_at ?? undefined,
     paperwork_completed_at: r.paperwork_completed_at ?? undefined,
+    returned_at: r.returned_at ?? undefined,
+    return_reason: r.return_reason ?? undefined,
+    return_notes: r.return_notes ?? undefined,
     // numeric(10,2) comes back as a string from PostgREST.
     donation_amount: r.donation_amount != null ? Number(r.donation_amount) : undefined,
     notes: r.notes ?? undefined,
@@ -33,6 +36,33 @@ organizationId: string)
   };
 }
 
+/**
+ * Build an INSERT for a return recorded with no prior adoption record on file —
+ * the row is created already in the terminal `returned` state, stamping the
+ * original adopter and the return details (reason satisfies the DB CHECK). We
+ * don't know the original completion date, so `completed_at` is left null.
+ */
+export function adoptionReturnToInsert(
+input: {
+  animal_id: string;
+  adopter_id: string;
+  returned_at: string;
+  return_reason: string;
+  return_notes?: string;
+},
+organizationId: string)
+{
+  return {
+    organization_id: organizationId,
+    animal_id: input.animal_id,
+    adopter_id: input.adopter_id,
+    status: 'returned',
+    returned_at: input.returned_at,
+    return_reason: input.return_reason,
+    return_notes: input.return_notes?.trim() || null
+  };
+}
+
 const UPDATABLE = [
 'status',
 'submitted_at',
@@ -41,6 +71,9 @@ const UPDATABLE = [
 'cancelled_at',
 'paperwork_sent_at',
 'paperwork_completed_at',
+'returned_at',
+'return_reason',
+'return_notes',
 'donation_amount',
 'notes'] as
 const;

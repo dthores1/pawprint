@@ -72,7 +72,8 @@ const ADOPTION_COLORS: Record<string, string> = {
   pending_paperwork: '#B4641E',
   ready_for_placement: '#3E7B52',
   completed: '#B8632E',
-  cancelled: '#9B3A3A'
+  cancelled: '#9B3A3A',
+  returned: '#B5677E'
 };
 const NEUTRAL_BARS = ['#3E7B52', '#356A9A', '#B8632E', '#A36B00', '#6E4E80'];
 

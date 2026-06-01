@@ -11,6 +11,7 @@ import {
   StethoscopeIcon,
   BuildingIcon,
   BarChart3Icon,
+  Trash2Icon,
   UserCircleIcon,
   LogOutIcon } from
 'lucide-react';
@@ -70,7 +71,12 @@ export function Sidebar() {
   {
     to: '/organization',
     icon: BuildingIcon,
-    label: 'Organization'
+    label: 'Members'
+  },
+  {
+    to: '/recycle-bin',
+    icon: Trash2Icon,
+    label: 'Recycle Bin'
   }];
 
   return (

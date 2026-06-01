@@ -229,7 +229,7 @@ export function OrganizationPage() {
     <div className="space-y-6 pb-12">
       <div>
         <h1 className="text-3xl font-heading font-bold text-text-primary">
-          Organization
+          Members
         </h1>
         <p className="text-text-secondary mt-1 flex items-center gap-2">
           <BuildingIcon className="w-4 h-4" />

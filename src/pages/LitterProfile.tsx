@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useWhisker } from '../context/WhiskerContext';
+import { ArchiveConfirmDialog } from '../components/archive/ArchiveConfirmDialog';
+import { useCanArchive } from '../components/archive/useCanArchive';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Avatar } from '../components/ui/Avatar';
@@ -14,7 +16,8 @@ import {
   HeartIcon,
   HomeIcon,
   PlusIcon,
-  Edit2Icon } from
+  Edit2Icon,
+  Trash2Icon } from
 'lucide-react';
 import {
   formatDate,
@@ -33,6 +36,9 @@ export function LitterProfile() {
   const { litters, animals, fosters, breeds } = useWhisker();
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const navigate = useNavigate();
+  const canArchive = useCanArchive('litters', { id: id ?? 'na' });
 
   const litter = litters.find((l) => l.id === id);
   if (!litter) {
@@ -66,6 +72,17 @@ export function LitterProfile() {
           <Button variant="soft" size="sm" onClick={() => setIsEditOpen(true)}>
             <Edit2Icon className="w-4 h-4 mr-2" /> Update Group
           </Button>
+          {canArchive &&
+          <button
+            type="button"
+            onClick={() => setArchiving(true)}
+            aria-label="Archive litter"
+            title="Archive litter"
+            className="p-2 rounded-lg text-text-secondary hover:text-[#9B3A3A] hover:bg-[#F5D7D7]/60 transition-colors">
+
+              <Trash2Icon className="w-4 h-4" />
+            </button>
+          }
         </div>
       </div>
 
@@ -189,6 +206,17 @@ export function LitterProfile() {
         litterId={litter.id}
         onClose={() => setIsAddOpen(false)} />
 
+      {archiving &&
+      <ArchiveConfirmDialog
+        isOpen={true}
+        onClose={() => setArchiving(false)}
+        table="litters"
+        id={litter.id}
+        typeLabel="litter"
+        entityLabel={litterLabel(litter)}
+        onArchived={() => navigate('/animals')} />
+
+      }
     </div>);
 
 }
