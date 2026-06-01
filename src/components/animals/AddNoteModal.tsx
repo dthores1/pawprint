@@ -4,12 +4,14 @@ import { Select, Textarea, Label } from '../ui/Forms';
 import { Button } from '../ui/Button';
 import { useWhisker } from '../../context/WhiskerContext';
 import { NoteType } from '../../types';
+import { animalDisplayName } from '../../lib/utils';
 interface AddNoteModalProps {
   isOpen: boolean;
   onClose: () => void;
   animalId: string;
+  animal: Animal;
 }
-export function AddNoteModal({ isOpen, onClose, animalId }: AddNoteModalProps) {
+export function AddNoteModal({ isOpen, onClose, animalId, animal }: AddNoteModalProps) {
   const { addNote } = useWhisker();
   const [formData, setFormData] = useState({
     note_type: 'general' as NoteType,
@@ -29,7 +31,7 @@ export function AddNoteModal({ isOpen, onClose, animalId }: AddNoteModalProps) {
     });
   };
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Add Note">
+    <Modal isOpen={isOpen} onClose={onClose} title={animalDisplayName(animal) + " | Add Note"}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <Label htmlFor="note_type">Note Type</Label>

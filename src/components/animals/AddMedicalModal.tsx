@@ -6,13 +6,15 @@ import { DatePicker } from '../ui/DatePicker';
 import { PersonSearchPicker } from '../ui/PersonSearchPicker';
 import { ClinicEventSearchPicker } from '../ui/ClinicEventSearchPicker';
 import { Button } from '../ui/Button';
-import { formatDate } from '../../lib/utils';
+import { formatDate, animalDisplayName } from '../../lib/utils';
 import { useWhisker } from '../../context/WhiskerContext';
 import { ProcedureType, MedicalStatus, AgeUnit } from '../../types';
+
 interface AddMedicalModalProps {
   isOpen: boolean;
   onClose: () => void;
   animalId: string;
+  animal: Animal;
 }
 // Only these procedure types are commonly recurring, so the "next due" prompt
 // is offered just for them (keeps the form low-friction for one-off records).
@@ -33,7 +35,8 @@ function computeNextDue(base: string, value: number, unit: AgeUnit): string {
 export function AddMedicalModal({
   isOpen,
   onClose,
-  animalId
+  animalId,
+  animal
 }: AddMedicalModalProps) {
   const { addMedicalRecord, people, clinicEvents } = useWhisker();
   const INITIAL = {
@@ -113,7 +116,7 @@ export function AddMedicalModal({
     }));
   };
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Add Medical Record">
+    <Modal isOpen={isOpen} onClose={onClose} title={animalDisplayName(animal) + " | Add Medical Record"}>
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="grid grid-cols-2 gap-4">
           <div>

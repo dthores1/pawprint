@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ImageIcon,
-  PlusIcon,
   XIcon,
   Trash2Icon,
   ChevronLeftIcon,
@@ -13,12 +12,16 @@ import {
 'lucide-react';
 import { useWhisker } from '../../context/WhiskerContext';
 import { Card } from '../ui/Card';
-import { Button } from '../ui/Button';
 import { AddPhotoModal } from './AddPhotoModal';
 import { PhotoCategory, AnimalPhoto } from '../../types';
 import { formatDate, cn } from '../../lib/utils';
+import { ArchiveConfirmDialog } from '../archive/ArchiveConfirmDialog';
+import { useCanArchive } from '../archive/useCanArchive';
 interface PhotoGalleryProps {
   animalId: string;
+  /** Add-photo modal state, lifted so the trigger can live in the tab row. */
+  isAddOpen: boolean;
+  onAddOpenChange: (open: boolean) => void;
 }
 const CATEGORY_LABELS: Record<PhotoCategory, string> = {
   intake: 'Intake',
@@ -39,13 +42,17 @@ const CATEGORY_ORDER: PhotoCategory[] = [
 'general',
 'adoption_listing'];
 
-export function PhotoGallery({ animalId }: PhotoGalleryProps) {
-  const { photos, deletePhoto, addPhoto, updateAnimal, animals } = useWhisker();
+export function PhotoGallery({
+  animalId,
+  isAddOpen,
+  onAddOpenChange
+}: PhotoGalleryProps) {
+  const { photos, addPhoto, updateAnimal, animals } = useWhisker();
   const animal = animals.find((a) => a.id === animalId);
   const profileUrl = animal?.primary_photo_url;
-  const [isAddOpen, setIsAddOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [archivingPhoto, setArchivingPhoto] = useState<AnimalPhoto | null>(null);
   const animalPhotos = useMemo(
     () =>
     photos.
@@ -77,20 +84,19 @@ export function PhotoGallery({ animalId }: PhotoGalleryProps) {
     },
     [updateAnimal, animalId]
   );
-  const handleRemovePhoto = useCallback(
+  // Open the archive confirm dialog. If the photo being archived is currently
+  // the animal's profile picture, slide the badge to the next remaining photo
+  // (or clear it) up-front so the hero doesn't render a stale broken image
+  // once the archive RPC removes the row from the loaded `photos` collection.
+  const handleArchivePhoto = useCallback(
     (photo: AnimalPhoto) => {
-      if (!window.confirm('Delete this photo? This removes it permanently.')) {
-        return;
-      }
-      // If we're removing the current profile photo, move the badge to the
-      // next remaining photo (or clear it) so the hero doesn't break.
       if (profileUrl && profileUrl === photo.url) {
         const next = animalPhotos.find((p) => p.id !== photo.id);
         updateAnimal(animalId, { primary_photo_url: next?.url ?? '' });
       }
-      deletePhoto(photo.id);
+      setArchivingPhoto(photo);
     },
-    [profileUrl, animalPhotos, updateAnimal, animalId, deletePhoto]
+    [profileUrl, animalPhotos, updateAnimal, animalId]
   );
   // Lightbox keyboard nav
   useEffect(() => {
@@ -166,20 +172,12 @@ export function PhotoGallery({ animalId }: PhotoGalleryProps) {
           }
         </AnimatePresence>
 
-        <div className="flex items-center justify-between">
+        {animalPhotos.length > 0 &&
           <p className="text-sm text-text-secondary">
-            {animalPhotos.length === 0 ?
-            'No photos yet — capture this animal\u2019s journey.' :
+            {
             `${animalPhotos.length} photo${animalPhotos.length === 1 ? '' : 's'} across ${grouped.length} categor${grouped.length === 1 ? 'y' : 'ies'}.`}
           </p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsAddOpen(true)}>
-            
-            <PlusIcon className="w-4 h-4 mr-2" /> Add Photo
-          </Button>
-        </div>
+        }
 
         {animalPhotos.length === 0 ?
         <Card className="p-12 text-center text-text-secondary">
@@ -254,15 +252,10 @@ export function PhotoGallery({ animalId }: PhotoGalleryProps) {
                             <StarIcon className="w-3.5 h-3.5" />
                           </button>
                     }
-                        <button
-                      type="button"
-                      onClick={() => handleRemovePhoto(photo)}
-                      aria-label="Delete photo"
-                      title="Delete photo"
-                      className="p-1.5 rounded-md bg-card/95 text-text-secondary hover:text-[#9B3A3A] shadow-soft transition-colors">
+                        <PhotoArchiveButton
+                      photo={photo}
+                      onArchive={() => handleArchivePhoto(photo)} />
 
-                          <Trash2Icon className="w-3.5 h-3.5" />
-                        </button>
                       </div>
                     </div>);
 
@@ -275,9 +268,20 @@ export function PhotoGallery({ animalId }: PhotoGalleryProps) {
 
       <AddPhotoModal
         isOpen={isAddOpen}
-        onClose={() => setIsAddOpen(false)}
+        onClose={() => onAddOpenChange(false)}
         animalId={animalId} />
       
+
+      {archivingPhoto &&
+      <ArchiveConfirmDialog
+        isOpen={true}
+        onClose={() => setArchivingPhoto(null)}
+        table="animal_photos"
+        id={archivingPhoto.id}
+        typeLabel="photo"
+        entityLabel={archivingPhoto.caption || 'this photo'} />
+
+      }
 
       <AnimatePresence>
         {lightboxIndex !== null && flatPhotos[lightboxIndex] &&
@@ -293,11 +297,12 @@ export function PhotoGallery({ animalId }: PhotoGalleryProps) {
           onClose={() => setLightboxIndex(null)}
           onSetProfile={() => handleSetProfile(flatPhotos[lightboxIndex])}
           onDelete={() => {
-            handleRemovePhoto(flatPhotos[lightboxIndex]);
+            const photo = flatPhotos[lightboxIndex];
             // close if last photo
             if (flatPhotos.length === 1) setLightboxIndex(null);else
             if (lightboxIndex >= flatPhotos.length - 1)
             setLightboxIndex(lightboxIndex - 1);
+            handleArchivePhoto(photo);
           }} />
 
         }
@@ -305,6 +310,34 @@ export function PhotoGallery({ animalId }: PhotoGalleryProps) {
     </>);
 
 }
+// Per-thumbnail archive button. The useCanArchive check happens here so each
+// photo independently decides whether to render the action — uploaders see it
+// for their own photos, admins see it everywhere.
+function PhotoArchiveButton({
+  photo,
+  onArchive
+}: {
+  photo: AnimalPhoto;
+  onArchive: () => void;
+}) {
+  const canArchive = useCanArchive('animal_photos', {
+    id: photo.id,
+    created_by: photo.created_by ?? null
+  });
+  if (!canArchive) return null;
+  return (
+    <button
+      type="button"
+      onClick={onArchive}
+      aria-label="Archive photo"
+      title="Archive photo"
+      className="p-1.5 rounded-md bg-card/95 text-text-secondary hover:text-[#9B3A3A] shadow-soft transition-colors">
+
+      <Trash2Icon className="w-3.5 h-3.5" />
+    </button>);
+
+}
+
 interface LightboxProps {
   photo: AnimalPhoto;
   isProfile: boolean;

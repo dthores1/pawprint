@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useWhisker } from '../context/WhiskerContext';
 import { Card } from '../components/ui/Card';
 import { Avatar } from '../components/ui/Avatar';
@@ -17,8 +17,11 @@ import {
   HomeIcon,
   CheckCircle2Icon,
   Edit2Icon,
+  Trash2Icon,
   InfoIcon } from
 'lucide-react';
+import { ArchiveConfirmDialog } from '../components/archive/ArchiveConfirmDialog';
+import { useCanArchive } from '../components/archive/useCanArchive';
 export function FosterProfile() {
   const { id } = useParams<{
     id: string;
@@ -26,6 +29,9 @@ export function FosterProfile() {
   const { fosters, placements, animals } = useWhisker();
   const [isPlaceModalOpen, setIsPlaceModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const navigate = useNavigate();
+  const canArchive = useCanArchive('people', { id: id ?? 'na' });
   const foster = fosters.find((f) => f.id === id);
   if (!foster) {
     return <div className="p-8 text-center">Foster not found.</div>;
@@ -52,13 +58,26 @@ export function FosterProfile() {
 
           <ArrowLeftIcon className="w-4 h-4" /> Back to Fosters
         </Link>
-        <Button
-          variant="soft"
-          size="sm"
-          onClick={() => setIsEditModalOpen(true)}>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="soft"
+            size="sm"
+            onClick={() => setIsEditModalOpen(true)}>
 
-          <Edit2Icon className="w-4 h-4 mr-2" /> Edit
-        </Button>
+            <Edit2Icon className="w-4 h-4 mr-2" /> Edit
+          </Button>
+          {canArchive &&
+          <button
+            type="button"
+            onClick={() => setArchiving(true)}
+            aria-label="Archive foster"
+            title="Archive foster"
+            className="p-2 rounded-lg text-text-secondary hover:text-[#9B3A3A] hover:bg-[#F5D7D7]/60 transition-colors">
+
+              <Trash2Icon className="w-4 h-4" />
+            </button>
+          }
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -312,6 +331,17 @@ export function FosterProfile() {
         onClose={() => setIsEditModalOpen(false)}
         foster={foster} />
 
+      {archiving &&
+      <ArchiveConfirmDialog
+        isOpen={true}
+        onClose={() => setArchiving(false)}
+        table="people"
+        id={foster.id}
+        typeLabel="foster"
+        entityLabel={`${foster.first_name} ${foster.last_name}`}
+        onArchived={() => navigate('/fosters')} />
+
+      }
     </div>);
 
 }

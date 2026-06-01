@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { MedicalRecord } from '../types';
 import { useWhisker } from '../context/WhiskerContext';
 import { Card } from '../components/ui/Card';
@@ -12,6 +12,7 @@ import { AddNoteModal } from '../components/animals/AddNoteModal';
 import { ChangeStatusModal } from '../components/animals/ChangeStatusModal';
 import { PlaceAnimalModal } from '../components/animals/PlaceAnimalModal';
 import { StartAdoptionModal } from '../components/animals/StartAdoptionModal';
+import { AdoptionReturnModal } from '../components/animals/AdoptionReturnModal';
 import { AdoptionPanel } from '../components/animals/AdoptionPanel';
 import { ActionNeededCallout } from '../components/animals/ActionNeededCallout';
 import { RelationshipsCard } from '../components/animals/RelationshipsCard';
@@ -29,6 +30,7 @@ import {
   FileTextIcon,
   HomeIcon,
   HeartIcon,
+  FrownIcon,
   CheckCircle2Icon,
   CircleIcon,
   ArrowLeftIcon,
@@ -38,13 +40,20 @@ import {
   ClockIcon,
   AlertCircleIcon,
   ImageIcon,
-  CameraIcon } from
+  CameraIcon,
+  Trash2Icon } from
 'lucide-react';
+import { ArchiveConfirmDialog } from '../components/archive/ArchiveConfirmDialog';
+import { useCanArchive } from '../components/archive/useCanArchive';
 import { motion } from 'framer-motion';
 import { MedicalKitIcon } from '../components/ui/MedicalKitIcon';
 import { PawPrintIcon as PawPrintGlyph } from '../components/ui/PawPrintIcon';
 import { CatIcon } from '../components/icons/CatIcon';
 import { animalBreedLabel } from '../lib/breedsApi';
+import {
+  ADOPTION_RETURN_REASON_LABELS,
+  isActiveAdoption } from
+'../lib/adoptions';
 export function AnimalProfile() {
   const { id } = useParams<{
     id: string;
@@ -67,12 +76,31 @@ export function AnimalProfile() {
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isPlaceModalOpen, setIsPlaceModalOpen] = useState(false);
   const [isStartAdoptionOpen, setIsStartAdoptionOpen] = useState(false);
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+  const [isAddPhotoOpen, setIsAddPhotoOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'timeline' | 'medical' | 'photos'>(
     'timeline'
   );
   const [timelineFilter, setTimelineFilter] = useState<
     'all' | 'placements' | 'medical' | 'notes'>(
     'all');
+  const [archivingNote, setArchivingNote] = useState<
+    {id: string;preview: string;} | null>(
+    null);
+  const [archivingAction, setArchivingAction] = useState<
+    {id: string;preview: string;} | null>(
+    null);
+  const [archivingMedical, setArchivingMedical] = useState<
+    {id: string;preview: string;} | null>(
+    null);
+  const [archivingPlacement, setArchivingPlacement] = useState<
+    {id: string;fosterName: string;} | null>(
+    null);
+  const [archivingAdoption, setArchivingAdoption] = useState<
+    {id: string;adopterName: string;} | null>(
+    null);
+  const [archivingAnimal, setArchivingAnimal] = useState(false);
+  const navigate = useNavigate();
   const [heroImageError, setHeroImageError] = useState(false);
   const [heroUploading, setHeroUploading] = useState(false);
   const heroFileInputRef = useRef<HTMLInputElement>(null);
@@ -117,10 +145,9 @@ export function AnimalProfile() {
   people.find((p) => p.id === animal.adopted_by_id) :
   null;
   const animalAdoptions = adoptions.filter((a) => a.animal_id === animal.id);
-  // At most one in-progress adoption per animal (terminal ones are history).
-  const activeAdoption = animalAdoptions.find(
-    (a) => a.status !== 'completed' && a.status !== 'cancelled'
-  );
+  // At most one in-progress adoption per animal (terminal ones — completed,
+  // cancelled, returned — are history).
+  const activeAdoption = animalAdoptions.find(isActiveAdoption);
   const animalMedical = medicalRecords.filter((m) => m.animal_id === animal.id);
   const upcomingMedical = animalMedical.filter(
     (m) =>
@@ -145,6 +172,14 @@ export function AnimalProfile() {
     description: string;
     icon: React.ElementType;
     color: string;
+    /** Note rows opt in here so the timeline can offer an Archive control. */
+    note?: { id: string; created_by?: string };
+    /** Resolved action-item rows opt in so they can be archived from history. */
+    actionItem?: { id: string; created_by?: string };
+    /** Medical rows opt in for the admin-only Archive control. */
+    medical?: { id: string };
+    /** Cancelled-adoption events opt in for the admin-only Archive control. */
+    adoption?: { id: string };
   };
   const timeline: TimelineEvent[] = [
   {
@@ -167,7 +202,8 @@ export function AnimalProfile() {
     title: `Medical: ${m.procedure_name}`,
     description: `Provider: ${m.provider_name || 'Unknown'}${m.notes ? ` - ${m.notes}` : ''}`,
     icon: SyringeIcon,
-    color: 'bg-[#F3E4D7] text-[#D98C5F]'
+    color: 'bg-[#F3E4D7] text-[#D98C5F]',
+    medical: { id: m.id }
   })),
   ...animalPlacements.map((p) => {
     const foster = fosters.find((f) => f.id === p.person_id);
@@ -190,7 +226,8 @@ export function AnimalProfile() {
     title: `Note: ${n.note_type}`,
     description: n.body,
     icon: MessageSquareIcon,
-    color: 'bg-background text-text-secondary'
+    color: 'bg-background text-text-secondary',
+    note: { id: n.id, created_by: n.created_by }
   })),
   // Action items: a "created" event, plus a resolution event when done.
   ...animalActionItems.flatMap((a) => {
@@ -223,7 +260,8 @@ export function AnimalProfile() {
         icon: done ? CheckCircle2Icon : CircleIcon,
         color: done ?
         'bg-[#DDEFE2] text-[#3E7B52]' :
-        'bg-background text-text-secondary'
+        'bg-background text-text-secondary',
+        actionItem: { id: a.id, created_by: a.created_by }
       });
     }
     return events;
@@ -301,7 +339,24 @@ export function AnimalProfile() {
       title: 'Adoption cancelled',
       description: ad.notes ?? '',
       icon: CircleIcon,
-      color: 'bg-background text-text-secondary'
+      color: 'bg-background text-text-secondary',
+      adoption: { id: ad.id }
+    });
+    if (ad.returned_at)
+    evs.push({
+      id: `adoption-${ad.id}-returned`,
+      date: ad.returned_at.split('T')[0],
+      ts: ad.returned_at,
+      type: 'adoption' as const,
+      title: 'Adoption return',
+      description: [
+      ad.return_reason ?
+      `Reason: ${ADOPTION_RETURN_REASON_LABELS[ad.return_reason]}.` :
+      '',
+      ad.return_notes ?? ''].
+      filter(Boolean).join(' '),
+      icon: FrownIcon,
+      color: 'bg-[#F5D7D7] text-[#9B3A3A]'
     });
     return evs;
   })].
@@ -475,6 +530,16 @@ export function AnimalProfile() {
                       {currentFoster ? 'Reassign Foster' : 'Place in Foster'}
                     </Button>
                   }
+                  {isAdopted &&
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setIsReturnModalOpen(true)}>
+
+                      <FrownIcon className="w-4 h-4 mr-2" />
+                      Adoption Return
+                    </Button>
+                  }
                   <Button
                     variant="outline"
                     size="sm"
@@ -482,6 +547,7 @@ export function AnimalProfile() {
 
                     <Edit2Icon className="w-4 h-4 mr-2" /> Edit
                   </Button>
+                  <AnimalArchiveButton onClick={() => setArchivingAnimal(true)} />
                 </div>
               </div>
 
@@ -613,24 +679,34 @@ export function AnimalProfile() {
               </button>
             </div>
 
-            {activeTab !== 'photos' &&
             <div className="flex gap-2">
-                <Button
+              {activeTab === 'photos' ?
+              <Button
                 variant="soft"
                 size="sm"
-                onClick={() => setIsNoteModalOpen(true)}>
+                onClick={() => setIsAddPhotoOpen(true)}>
 
-                  <FileTextIcon className="w-4 h-4 mr-2" /> Add Note
-                </Button>
-                <Button
-                variant="soft"
-                size="sm"
-                onClick={() => setIsMedicalModalOpen(true)}>
+                  <ImageIcon className="w-4 h-4 mr-2" /> Add Photo
+                </Button> :
 
-                  <SyringeIcon className="w-4 h-4 mr-2" /> Add Medical Record
-                </Button>
-              </div>
-            }
+              <>
+                  <Button
+                  variant="soft"
+                  size="sm"
+                  onClick={() => setIsNoteModalOpen(true)}>
+
+                    <FileTextIcon className="w-4 h-4 mr-2" /> Add Note
+                  </Button>
+                  <Button
+                  variant="soft"
+                  size="sm"
+                  onClick={() => setIsMedicalModalOpen(true)}>
+
+                    <SyringeIcon className="w-4 h-4 mr-2" /> Add Medical Record
+                  </Button>
+                </>
+              }
+            </div>
           </div>
 
           {activeTab === 'timeline' &&
@@ -659,7 +735,10 @@ export function AnimalProfile() {
               {timelineFilter === 'placements' ?
             <PlacementTimelineList
               placements={animalPlacements}
-              fosters={fosters} /> :
+              fosters={fosters}
+              onArchive={(id, fosterName) =>
+              setArchivingPlacement({ id, fosterName })
+              } /> :
 
 
             <div className="p-6">
@@ -700,6 +779,60 @@ export function AnimalProfile() {
                                 <span className="text-sm text-text-secondary">
                                   {formatDate(event.date)}
                                 </span>
+                                {event.note &&
+                          <NoteArchiveButton
+                            note={event.note}
+                            onClick={() =>
+                            setArchivingNote({
+                              id: event.note!.id,
+                              preview:
+                              event.description.slice(0, 60) +
+                              (event.description.length > 60 ? '…' : '')
+                            })
+                            } />
+
+                          }
+                                {event.actionItem &&
+                          <ActionArchiveButton
+                            actionItem={event.actionItem}
+                            onClick={() =>
+                            setArchivingAction({
+                              id: event.actionItem!.id,
+                              preview:
+                              event.description.slice(0, 60) +
+                              (event.description.length > 60 ? '…' : '')
+                            })
+                            } />
+
+                          }
+                                {event.medical &&
+                          <MedicalArchiveButton
+                            onClick={() =>
+                            setArchivingMedical({
+                              id: event.medical!.id,
+                              preview: event.title.replace(/^Medical:\s*/, '')
+                            })
+                            } />
+
+                          }
+                                {event.adoption &&
+                          <AdoptionArchiveButton
+                            onClick={() => {
+                              const ad = animalAdoptions.find(
+                                (a) => a.id === event.adoption!.id
+                              );
+                              const adopter = ad ?
+                              people.find((p) => p.id === ad.adopter_id) :
+                              undefined;
+                              setArchivingAdoption({
+                                id: event.adoption!.id,
+                                adopterName: adopter ?
+                                `${adopter.first_name} ${adopter.last_name}` :
+                                'an adopter'
+                              });
+                            }} />
+
+                          }
                               </div>
                               <p className="text-text-secondary">
                                 {event.description}
@@ -716,10 +849,19 @@ export function AnimalProfile() {
           }
 
           {activeTab === 'medical' &&
-          <MedicalHistoryView records={animalMedical} />
+          <MedicalHistoryView
+            records={animalMedical}
+            onArchive={(r) =>
+            setArchivingMedical({ id: r.id, preview: r.procedure_name })
+            } />
           }
 
-          {activeTab === 'photos' && <PhotoGallery animalId={animal.id} />}
+          {activeTab === 'photos' &&
+          <PhotoGallery
+            animalId={animal.id}
+            isAddOpen={isAddPhotoOpen}
+            onAddOpenChange={setIsAddPhotoOpen} />
+          }
         </div>
 
         {/* Right Column: Sidebar Widgets */}
@@ -811,15 +953,17 @@ export function AnimalProfile() {
         </div>
       </div>
 
-      <AddMedicalModal
+    <AddMedicalModal
         isOpen={isMedicalModalOpen}
         onClose={() => setIsMedicalModalOpen(false)}
-        animalId={animal.id} />
+        animalId={animal.id}
+        animal={animal} />
       
       <AddNoteModal
         isOpen={isNoteModalOpen}
         onClose={() => setIsNoteModalOpen(false)}
-        animalId={animal.id} />
+        animalId={animal.id}
+        animal={animal} />
       
       <ChangeStatusModal
         isOpen={isStatusModalOpen}
@@ -836,9 +980,183 @@ export function AnimalProfile() {
         onClose={() => setIsStartAdoptionOpen(false)}
         animalId={animal.id} />
 
+      <AdoptionReturnModal
+        isOpen={isReturnModalOpen}
+        onClose={() => setIsReturnModalOpen(false)}
+        animalId={animal.id} />
+
+      {archivingNote &&
+      <ArchiveConfirmDialog
+        isOpen={true}
+        onClose={() => setArchivingNote(null)}
+        table="animal_notes"
+        id={archivingNote.id}
+        typeLabel="note"
+        entityLabel={`"${archivingNote.preview}"`} />
+
+      }
+      {archivingAction &&
+      <ArchiveConfirmDialog
+        isOpen={true}
+        onClose={() => setArchivingAction(null)}
+        table="animal_action_items"
+        id={archivingAction.id}
+        typeLabel="action item"
+        entityLabel={`"${archivingAction.preview}"`} />
+
+      }
+      {archivingMedical &&
+      <ArchiveConfirmDialog
+        isOpen={true}
+        onClose={() => setArchivingMedical(null)}
+        table="medical_records"
+        id={archivingMedical.id}
+        typeLabel="medical record"
+        entityLabel={archivingMedical.preview} />
+
+      }
+      {archivingPlacement &&
+      <ArchiveConfirmDialog
+        isOpen={true}
+        onClose={() => setArchivingPlacement(null)}
+        table="foster_placements"
+        id={archivingPlacement.id}
+        typeLabel="placement"
+        entityLabel={`placement with ${archivingPlacement.fosterName}`} />
+
+      }
+      {archivingAdoption &&
+      <ArchiveConfirmDialog
+        isOpen={true}
+        onClose={() => setArchivingAdoption(null)}
+        table="adoptions"
+        id={archivingAdoption.id}
+        typeLabel="adoption"
+        entityLabel={`cancelled adoption (${archivingAdoption.adopterName})`} />
+
+      }
+      {archivingAnimal &&
+      <ArchiveConfirmDialog
+        isOpen={true}
+        onClose={() => setArchivingAnimal(false)}
+        table="animals"
+        id={animal.id}
+        typeLabel="animal"
+        entityLabel={animalDisplayName(animal)}
+        onArchived={() => navigate('/animals')} />
+
+      }
     </div>);
 
 }
+
+// Per-note archive button. The hook check is local so each event row can
+// independently decide whether to render the action — keeps the rules in one
+// place (useCanArchive) without scattering admin checks through the timeline.
+function NoteArchiveButton({
+  note,
+  onClick
+}: {
+  note: { id: string; created_by?: string };
+  onClick: () => void;
+}) {
+  const canArchive = useCanArchive('animal_notes', {
+    id: note.id,
+    created_by: note.created_by ?? null
+  });
+  if (!canArchive) return null;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Archive note"
+      className="ml-auto p-1 -mr-1 rounded-md text-text-secondary/60 hover:text-[#9B3A3A] hover:bg-[#F5D7D7]/60 transition-colors">
+
+      <Trash2Icon className="w-3.5 h-3.5" />
+    </button>);
+
+}
+
+function ActionArchiveButton({
+  actionItem,
+  onClick
+}: {
+  actionItem: { id: string; created_by?: string };
+  onClick: () => void;
+}) {
+  const canArchive = useCanArchive('animal_action_items', {
+    id: actionItem.id,
+    created_by: actionItem.created_by ?? null
+  });
+  if (!canArchive) return null;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Archive action item"
+      className="ml-auto p-1 -mr-1 rounded-md text-text-secondary/60 hover:text-[#9B3A3A] hover:bg-[#F5D7D7]/60 transition-colors">
+
+      <Trash2Icon className="w-3.5 h-3.5" />
+    </button>);
+
+}
+
+// Medical records are admin-only — no `created_by` on the row, so useCanArchive
+// only renders the button for users whose org role is owner/admin.
+function MedicalArchiveButton({ onClick }: {onClick: () => void;}) {
+  const canArchive = useCanArchive('medical_records', { id: 'na' });
+  if (!canArchive) return null;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Archive medical record"
+      className="ml-auto p-1 -mr-1 rounded-md text-text-secondary/60 hover:text-[#9B3A3A] hover:bg-[#F5D7D7]/60 transition-colors">
+
+      <Trash2Icon className="w-3.5 h-3.5" />
+    </button>);
+
+}
+
+// Animal-level archive — admin-only, blockers are all server-side. The
+// button is hidden for non-admins; clicking opens the confirm dialog and
+// the server raises a specific reason when a blocker fires.
+function AnimalArchiveButton({ onClick }: {onClick: () => void;}) {
+  const canArchive = useCanArchive('animals', { id: 'na' });
+  if (!canArchive) return null;
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={onClick}
+      aria-label="Archive animal"
+      title="Archive animal"
+      className="text-text-secondary hover:text-[#9B3A3A]">
+
+      <Trash2Icon className="w-4 h-4" />
+    </Button>);
+
+}
+
+// Adoptions are admin-only. Server only allows archive on status='cancelled',
+// and the consuming code only emits an `event.adoption` field on the cancelled
+// event — so this button is only ever rendered next to an "Adoption cancelled"
+// row, with no extra status guard needed here.
+function AdoptionArchiveButton({ onClick }: {onClick: () => void;}) {
+  const canArchive = useCanArchive('adoptions', { id: 'na' });
+  if (!canArchive) return null;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Archive adoption"
+      className="ml-auto p-1 -mr-1 rounded-md text-text-secondary/60 hover:text-[#9B3A3A] hover:bg-[#F5D7D7]/60 transition-colors">
+
+      <Trash2Icon className="w-3.5 h-3.5" />
+    </button>);
+
+}
+
 // — Placement Timeline View ————————————————————————————————————
 // Compact, range-based history of an animal's fosters. Each row shows
 // "MMM YYYY – MMM YYYY" (or "MMM YYYY – Present" for the active row) and
@@ -877,11 +1195,16 @@ function formatPlacementDuration(startISO: string, endISO?: string): string {
 interface PlacementTimelineListProps {
   placements: ReturnType<typeof useWhisker>['placements'];
   fosters: ReturnType<typeof useWhisker>['fosters'];
+  onArchive: (placementId: string, fosterName: string) => void;
 }
 function PlacementTimelineList({
   placements,
-  fosters
+  fosters,
+  onArchive
 }: PlacementTimelineListProps) {
+  // Admin gate; row id is a sentinel since useCanArchive ignores it for
+  // non-low-risk tables.
+  const canArchive = useCanArchive('foster_placements', { id: 'na' });
   if (placements.length === 0) {
     return (
       <div className="p-10 text-center text-text-secondary">
@@ -907,8 +1230,11 @@ function PlacementTimelineList({
         {sorted.map((p) => {
           const foster = fosters.find((f) => f.id === p.person_id);
           const isActive = p.placement_status === 'active';
+          const fosterName = foster ?
+          `${foster.first_name} ${foster.last_name}` :
+          'unknown foster';
           return (
-            <div key={p.id} className="relative pl-8">
+            <div key={p.id} className="relative pl-8 group">
               <div className="absolute -left-[17px] top-1 w-8 h-8 rounded-full flex items-center justify-center border-4 border-card bg-[#DCEAF7] text-[#356A9A]">
                 <HomeIcon className="w-3.5 h-3.5" />
               </div>
@@ -920,6 +1246,17 @@ function PlacementTimelineList({
                   <span className="text-xs text-text-secondary tabular-nums">
                     · {formatPlacementDuration(p.start_date, p.end_date)}
                   </span>
+                  {canArchive && !isActive &&
+                  <button
+                    type="button"
+                    onClick={() => onArchive(p.id, fosterName)}
+                    aria-label="Archive placement"
+                    title="Archive placement"
+                    className="ml-auto p-1 rounded-md text-text-secondary/60 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-[#9B3A3A] hover:bg-[#F5D7D7]/60 transition-opacity transition-colors">
+
+                      <Trash2Icon className="w-3.5 h-3.5" />
+                    </button>
+                  }
                 </div>
                 <div className="flex items-center gap-2 flex-wrap text-text-secondary">
                   <span>
@@ -1005,8 +1342,9 @@ const STATUS_TONE: Record<
 };
 interface MedicalHistoryViewProps {
   records: ReturnType<typeof useWhisker>['medicalRecords'];
+  onArchive: (record: MedicalRecord) => void;
 }
-function MedicalHistoryView({ records }: MedicalHistoryViewProps) {
+function MedicalHistoryView({ records, onArchive }: MedicalHistoryViewProps) {
   if (records.length === 0) {
     return (
       <Card className="p-10 text-center text-text-secondary">
@@ -1046,7 +1384,8 @@ function MedicalHistoryView({ records }: MedicalHistoryViewProps) {
         icon={AlertCircleIcon}
         tone="urgent"
         count={overdue.length}
-        records={overdue} />
+        records={overdue}
+        onArchive={onArchive} />
 
       }
       {upcoming.length > 0 &&
@@ -1055,7 +1394,8 @@ function MedicalHistoryView({ records }: MedicalHistoryViewProps) {
         icon={ClockIcon}
         tone="info"
         count={upcoming.length}
-        records={upcoming} />
+        records={upcoming}
+        onArchive={onArchive} />
 
       }
       {completed.length > 0 &&
@@ -1064,7 +1404,8 @@ function MedicalHistoryView({ records }: MedicalHistoryViewProps) {
         icon={CheckCircle2Icon}
         tone="success"
         count={completed.length}
-        records={completed} />
+        records={completed}
+        onArchive={onArchive} />
 
       }
       {other.length > 0 &&
@@ -1073,7 +1414,8 @@ function MedicalHistoryView({ records }: MedicalHistoryViewProps) {
         icon={CircleIcon}
         tone="neutral"
         count={other.length}
-        records={other} />
+        records={other}
+        onArchive={onArchive} />
 
       }
     </div>);
@@ -1085,13 +1427,15 @@ interface MedicalGroupProps {
   tone: 'urgent' | 'info' | 'success' | 'neutral';
   count: number;
   records: ReturnType<typeof useWhisker>['medicalRecords'];
+  onArchive: (r: MedicalRecord) => void;
 }
 function MedicalGroup({
   title,
   icon: Icon,
   tone,
   count,
-  records
+  records,
+  onArchive
 }: MedicalGroupProps) {
   const { people, clinicEvents } = useWhisker();
   const toneColor = {
@@ -1153,9 +1497,10 @@ function MedicalGroup({
                 </div>
                 <span
                   className={`shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${tone.wrap}`}>
-                  
+
                   {tone.label}
                 </span>
+                <MedicalArchiveButton onClick={() => onArchive(r)} />
               </div>
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-text-secondary">
                 <span>

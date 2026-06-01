@@ -19,6 +19,7 @@ export function rowToNote(r: any, currentUser?: CurrentUserLite): AnimalNote {
     id: r.id,
     animal_id: r.animal_id,
     author_name: authorName,
+    created_by: r.created_by ?? undefined,
     note_type: r.note_type,
     body: r.body,
     created_at: r.created_at

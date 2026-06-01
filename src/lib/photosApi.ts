@@ -20,6 +20,7 @@ export function rowToPhoto(r: any): AnimalPhoto {
     storage_path: r.storage_path ?? undefined,
     category: r.category,
     caption: r.caption ?? undefined,
+    created_by: r.created_by ?? undefined,
     uploaded_at: r.created_at
   };
 }
@@ -32,7 +33,8 @@ p: {
   storage_path: string | null;
   public_url: string;
 },
-organizationId: string)
+organizationId: string,
+createdBy: string | null)
 {
   return {
     organization_id: organizationId,
@@ -40,6 +42,7 @@ organizationId: string)
     category: p.category,
     caption: p.caption ?? null,
     storage_path: p.storage_path,
-    public_url: p.public_url
+    public_url: p.public_url,
+    created_by: createdBy
   };
 }

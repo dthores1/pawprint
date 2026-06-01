@@ -9,11 +9,16 @@ import {
   PlusIcon,
   PillIcon,
   TruckIcon,
-  PackageIcon } from
+  PackageIcon,
+  Trash2Icon } from
 'lucide-react';
 import { cn, animalDisplayName } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { SittingRequest, SittingRequestStatus, Animal } from '../types';
+import { ArchiveConfirmDialog } from '../components/archive/ArchiveConfirmDialog';
+import { useCanArchive } from '../components/archive/useCanArchive';
+
+const SITTING_ARCHIVABLE: SittingRequestStatus[] = ['completed', 'canceled'];
 
 const STATUS_LABEL: Record<SittingRequestStatus, string> = {
   open: 'Unclaimed',
@@ -60,6 +65,9 @@ export function Sitting() {
   const { currentPersonId } = useAuth();
   const [isNewOpen, setIsNewOpen] = useState(false);
   const [tab, setTab] = useState<'unclaimed' | 'mine'>('unclaimed');
+  const [archiving, setArchiving] = useState<SittingRequest | null>(null);
+  // Same admin check on every card — useCanArchive doesn't depend on the row id.
+  const isAdminForArchive = useCanArchive('sitting_requests', { id: 'na' });
 
   const sorted = [...sittingRequests].sort(
     (a, b) =>
@@ -179,7 +187,11 @@ export function Sitting() {
               }
               onCancel={() =>
               updateSittingRequest(s.id, { status: 'canceled' })
-              } />);
+              }
+              canArchive={
+              isAdminForArchive && SITTING_ARCHIVABLE.includes(s.status)
+              }
+              onArchive={() => setArchiving(s)} />);
 
 
         })}
@@ -190,6 +202,16 @@ export function Sitting() {
         isOpen={isNewOpen}
         onClose={() => setIsNewOpen(false)} />
 
+      {archiving &&
+      <ArchiveConfirmDialog
+        isOpen={true}
+        onClose={() => setArchiving(null)}
+        table="sitting_requests"
+        id={archiving.id}
+        typeLabel="sitting request"
+        entityLabel={formatDateRange(archiving.start_date, archiving.end_date)} />
+
+      }
     </div>);
 
 }
@@ -203,6 +225,8 @@ interface SittingCardProps {
   onAccept: () => void;
   canCancel: boolean;
   onCancel: () => void;
+  canArchive: boolean;
+  onArchive: () => void;
 }
 function SittingCard({
   request,
@@ -212,7 +236,9 @@ function SittingCard({
   canAccept,
   onAccept,
   canCancel,
-  onCancel
+  onCancel,
+  canArchive,
+  onArchive
 }: SittingCardProps) {
   const handleCancel = () => {
     if (
@@ -302,7 +328,7 @@ function SittingCard({
           }
         </div>
 
-        {(canAccept || canCancel) &&
+        {(canAccept || canCancel || canArchive) &&
         <div className="shrink-0 flex sm:flex-col items-start sm:items-end gap-2">
             {canAccept &&
           <Button size="sm" onClick={onAccept}>
@@ -318,6 +344,17 @@ function SittingCard({
 
                 Cancel Request
               </Button>
+          }
+            {canArchive &&
+          <button
+            type="button"
+            onClick={onArchive}
+            aria-label="Archive request"
+            title="Archive request"
+            className="p-1.5 rounded-md text-text-secondary hover:text-[#9B3A3A] hover:bg-[#F5D7D7]/60 transition-colors">
+
+                <Trash2Icon className="w-4 h-4" />
+              </button>
           }
           </div>
         }

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useWhisker } from '../context/WhiskerContext';
 import { useAuth } from '../context/AuthContext';
+import { ArchiveConfirmDialog } from '../components/archive/ArchiveConfirmDialog';
+import { useCanArchive } from '../components/archive/useCanArchive';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Avatar } from '../components/ui/Avatar';
@@ -93,7 +95,6 @@ export function ClinicProfile() {
     people,
     addClinicSlot,
     updateClinicSlot,
-    deleteClinicSlot,
     addClinicSlotProcedure,
     updateClinicSlotProcedure,
     deleteClinicSlotProcedure
@@ -102,12 +103,14 @@ export function ClinicProfile() {
 
   const [editing, setEditing] = useState(false);
   const [completing, setCompleting] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const [adding, setAdding] = useState(false);
   const [newAnimalId, setNewAnimalId] = useState('');
   const [newProcedures, setNewProcedures] = useState<ClinicSlotProcedureType[]>([
   'spay_neuter']
   );
   const [newNotes, setNewNotes] = useState('');
+  const navigate = useNavigate();
 
   const event = clinicEvents.find((e) => e.id === id);
   if (!event) {
@@ -147,6 +150,22 @@ export function ClinicProfile() {
   const canComplete =
   (event.status === 'scheduled' || event.status === 'in_progress') &&
   slots.length > 0;
+
+  // Clinic archives are admin-only and gated to states where it's safe to
+  // remove from active workflows (planning / completed / canceled). The
+  // server enforces the same rule; this just hides the button.
+  const canArchive =
+  useCanArchive('clinic_events', { id: event.id }) &&
+  event.status !== 'scheduled' &&
+  event.status !== 'in_progress';
+  // Per-slot archive is admin-only and blocked while the clinic is running.
+  // Same gate the server applies; we just hide the icon proactively.
+  const canArchiveSlot =
+  useCanArchive('clinic_slots', { id: 'na' }) &&
+  event.status !== 'in_progress';
+  const [archivingSlot, setArchivingSlot] = useState<
+    {id: string;animalName: string;} | null>(
+    null);
 
   const handleAddSlot = (e: React.FormEvent) => {
     e.preventDefault();
@@ -196,6 +215,17 @@ export function ClinicProfile() {
           <Button variant="soft" size="sm" onClick={() => setEditing(true)}>
             <Edit2Icon className="w-4 h-4 mr-2" /> Edit
           </Button>
+          {canArchive &&
+          <button
+            type="button"
+            onClick={() => setArchiving(true)}
+            aria-label="Archive clinic"
+            title="Archive clinic"
+            className="p-2 rounded-lg text-text-secondary hover:text-[#9B3A3A] hover:bg-[#F5D7D7]/60 transition-colors">
+
+              <Trash2Icon className="w-4 h-4" />
+            </button>
+          }
         </div>
       </div>
 
@@ -466,18 +496,22 @@ export function ClinicProfile() {
                             </option>
                       )}
                       </select>
-                      <button
+                      {canArchiveSlot &&
+                    <button
                       type="button"
-                      onClick={() => {
-                        if (window.confirm(`Remove ${animal?.name || 'this animal'} from this clinic?`)) {
-                          deleteClinicSlot(s.id);
-                        }
-                      }}
-                      aria-label="Remove slot"
+                      onClick={() =>
+                      setArchivingSlot({
+                        id: s.id,
+                        animalName: animal?.name || 'this animal'
+                      })
+                      }
+                      aria-label="Archive slot"
+                      title="Archive slot"
                       className="shrink-0 p-1.5 rounded-md text-text-secondary hover:text-[#9B3A3A] hover:bg-[#F5D7D7]/60 transition-colors">
 
                         <Trash2Icon className="w-4 h-4" />
                       </button>
+                    }
                     </div>);
 
               })}
@@ -498,6 +532,27 @@ export function ClinicProfile() {
         onClose={() => setCompleting(false)}
         clinicEventId={event.id} />
 
+      {archiving &&
+      <ArchiveConfirmDialog
+        isOpen={true}
+        onClose={() => setArchiving(false)}
+        table="clinic_events"
+        id={event.id}
+        typeLabel="clinic"
+        entityLabel={`${formatDate(event.date_time)} clinic`}
+        onArchived={() => navigate('/clinics')} />
+
+      }
+      {archivingSlot &&
+      <ArchiveConfirmDialog
+        isOpen={true}
+        onClose={() => setArchivingSlot(null)}
+        table="clinic_slots"
+        id={archivingSlot.id}
+        typeLabel="slot"
+        entityLabel={`${archivingSlot.animalName}'s slot`} />
+
+      }
     </div>);
 
 }

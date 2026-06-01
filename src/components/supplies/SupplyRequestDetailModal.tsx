@@ -14,8 +14,11 @@ import {
   ExternalLinkIcon,
   MapPinIcon,
   RotateCcwIcon,
+  Trash2Icon,
   XCircleIcon } from
 'lucide-react';
+import { ArchiveConfirmDialog } from '../archive/ArchiveConfirmDialog';
+import { useCanArchive } from '../archive/useCanArchive';
 
 interface SupplyRequestDetailModalProps {
   isOpen: boolean;
@@ -76,6 +79,19 @@ export function SupplyRequestDetailModal({
   const [addressCopied, setAddressCopied] = useState(false);
   const [denyMode, setDenyMode] = useState(false);
   const [denyReason, setDenyReason] = useState('');
+  const [archiving, setArchiving] = useState(false);
+  // Status blockers mirror the server-side rule in archive_record. Admin gate
+  // comes from useCanArchive; the status guard is layered on top so the
+  // button doesn't appear while the request is still in flight.
+  // Fulfilled is intentionally NOT in this list — once items have been
+  // sourced and delivered, the request is audit history, not clutter. The
+  // server's archive_record enforces the same rule.
+  const archivableStatuses: SupplyRequestStatus[] = ['cancelled', 'denied'];
+
+  const canArchive =
+  useCanArchive('supply_requests', { id: request?.id }) &&
+  !!request &&
+  archivableStatuses.includes(request.status);
 
   useEffect(() => {
     setSupplier(request?.supplier ?? '');
@@ -283,6 +299,17 @@ export function SupplyRequestDetailModal({
 
                 {request.priority}
               </span>
+            }
+            {canArchive &&
+            <button
+              type="button"
+              onClick={() => setArchiving(true)}
+              aria-label="Archive request"
+              title="Archive request"
+              className="p-1.5 rounded-md text-text-secondary hover:text-[#9B3A3A] hover:bg-[#F5D7D7]/60 transition-colors">
+
+                <Trash2Icon className="w-4 h-4" />
+              </button>
             }
           </div>
         </div>
@@ -547,6 +574,22 @@ export function SupplyRequestDetailModal({
           </div>
         }
       </div>
+      {archiving && request &&
+      <ArchiveConfirmDialog
+        isOpen={true}
+        onClose={() => {
+          setArchiving(false);
+          // The parent modal also closes because the request will vanish from
+          // local state — but if the user cancels we stay put. Closing the
+          // outer modal on success keeps the surrounding list responsive.
+        }}
+        table="supply_requests"
+        id={request.id}
+        typeLabel="supply request"
+        entityLabel={`request from ${requester?.first_name ?? ''} ${requester?.last_name ?? ''}`.trim() || 'this request'}
+        onArchived={onClose} />
+
+      }
     </Modal>);
 
 }

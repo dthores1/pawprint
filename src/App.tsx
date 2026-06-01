@@ -24,6 +24,7 @@ import { NoOrganizationScreen } from './pages/Onboarding';
 import { AcceptInvitePage } from './pages/AcceptInvitePage';
 import { OrganizationPage } from './pages/OrganizationPage';
 import { ReportsPage } from './pages/ReportsPage';
+import { RecycleBin } from './pages/RecycleBin';
 import { LegalPage } from './pages/LegalPage';
 import { LandingPage } from './pages/LandingPage';
 import { RequestAccessPage } from './pages/RequestAccessPage';
@@ -72,6 +73,7 @@ function AppRoutes() {
         <Route path="contacts/:id" element={<ContactProfile />} />
         <Route path="organization" element={<OrganizationPage />} />
         <Route path="reports" element={<ReportsPage />} />
+        <Route path="recycle-bin" element={<RecycleBin />} />
       </Route>
     </Routes>);
 
@@ -81,14 +83,40 @@ function AppRoutes() {
 // underlying app is ready instantly. Keeps the brand moment from flashing.
 const MIN_SPLASH_MS = 2000;
 
-// One-shot timer that flips true after MIN_SPLASH_MS. Used by both the
-// production Gate and DemoGate so demo and prod feel identical at boot.
-function useMinSplashHold() {
-  const [done, setDone] = useState(false);
+// Per-tab-session flag so the cosmetic hold runs only on the *first time you
+// enter the app* — the boot right after signing in (or restoring a session in
+// a fresh tab). sessionStorage survives page refreshes within the same tab but
+// resets on a new tab/session, so refreshing a record or list won't replay the
+// 2s brand moment, while signing in fresh always shows it.
+const SPLASH_SHOWN_KEY = 'wv:splashShown';
+
+function splashAlreadyShown() {
+  try {
+    return sessionStorage.getItem(SPLASH_SHOWN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+// One-shot timer that flips true after MIN_SPLASH_MS — but only the first time
+// the app boots into an authenticated session this tab. `active` gates it on a
+// real session so the flag isn't burned while a signed-out visitor sits on the
+// landing page (which would suppress the brand moment at the next login). On
+// later refreshes it resolves instantly, so the splash only lingers while
+// something is genuinely loading. Shared by the production Gate and DemoGate.
+function useMinSplashHold(active = true) {
+  const [done, setDone] = useState(splashAlreadyShown);
   useEffect(() => {
+    if (!active || done) return;
     const t = setTimeout(() => setDone(true), MIN_SPLASH_MS);
+    // Mark shown immediately so a refresh mid-hold also skips the replay.
+    try {
+      sessionStorage.setItem(SPLASH_SHOWN_KEY, '1');
+    } catch {
+      // Ignore — worst case the hold simply plays again.
+    }
     return () => clearTimeout(t);
-  }, []);
+  }, [active, done]);
   return done;
 }
 
@@ -98,7 +126,10 @@ function useMinSplashHold() {
 // public landing page loads promptly (the `!session` check runs before the hold).
 function Gate() {
   const { loading, session, orgsLoading, currentOrg } = useAuth();
-  const minSplashDone = useMinSplashHold();
+  // Only arm the brand hold once a session exists — i.e. we're booting *into*
+  // the app — so it isn't consumed while a signed-out visitor views the landing
+  // page (the `!session` branch below returns before the hold is ever checked).
+  const minSplashDone = useMinSplashHold(Boolean(session));
   if (loading) return <Splash />;
   if (!session) return <LandingPage />;
   if (!minSplashDone) return <Splash />;

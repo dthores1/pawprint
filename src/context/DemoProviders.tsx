@@ -665,7 +665,14 @@ export function DemoWhiskerProvider({
     prev.map((p) => p.id === id ? { ...p, ...updates } : p)
     ),
     deleteClinicSlotProcedure: (id) =>
-    setClinicSlotProcedures((prev) => prev.filter((p) => p.id !== id))
+    setClinicSlotProcedures((prev) => prev.filter((p) => p.id !== id)),
+    // Demo mode has no real archive layer (the demo store is in-memory),
+    // so these are stubs that no-op against the seed. Recycle Bin returns
+    // an empty list. This keeps the contract while ensuring demo never
+    // pretends to permanently remove seed records.
+    archiveRecord: async () => {},
+    restoreRecord: async () => {},
+    fetchArchived: async () => []
   };
 
   return (

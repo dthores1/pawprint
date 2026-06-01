@@ -7,7 +7,8 @@ import {
   TruckIcon,
   PlusIcon,
   ArrowRightIcon,
-  AlertCircleIcon } from
+  AlertCircleIcon,
+  Trash2Icon } from
 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
@@ -17,6 +18,10 @@ import {
   TransportRequestType,
   TransportRequestUrgency } from
 '../types';
+import { ArchiveConfirmDialog } from '../components/archive/ArchiveConfirmDialog';
+import { useCanArchive } from '../components/archive/useCanArchive';
+
+const TRANSPORT_ARCHIVABLE: TransportRequestStatus[] = ['completed', 'canceled'];
 
 const STATUS_LABEL: Record<TransportRequestStatus, string> = {
   open: 'Open',
@@ -78,6 +83,8 @@ export function Transports() {
   const [activeTab, setActiveTab] = useState<
     'open' | 'claimed' | 'completed'>(
     'open');
+  const [archiving, setArchiving] = useState<TransportRequest | null>(null);
+  const isAdminForArchive = useCanArchive('transport_requests', { id: 'na' });
 
   const sorted = [...transportRequests].sort(
     (a, b) =>
@@ -188,7 +195,11 @@ export function Transports() {
           }
           onCancel={() =>
           updateTransportRequest(r.id, { status: 'canceled' })
-          } />
+          }
+          canArchive={
+          isAdminForArchive && TRANSPORT_ARCHIVABLE.includes(r.status)
+          }
+          onArchive={() => setArchiving(r)} />
 
         )}
         </div>
@@ -198,6 +209,16 @@ export function Transports() {
         isOpen={isNewOpen}
         onClose={() => setIsNewOpen(false)} />
 
+      {archiving &&
+      <ArchiveConfirmDialog
+        isOpen={true}
+        onClose={() => setArchiving(null)}
+        table="transport_requests"
+        id={archiving.id}
+        typeLabel="transport request"
+        entityLabel={`${archiving.pickup_location} → ${archiving.dropoff_location}`} />
+
+      }
     </div>);
 
 }
@@ -211,6 +232,8 @@ interface TransportCardProps {
   onClaim: () => void;
   canCancel: boolean;
   onCancel: () => void;
+  canArchive: boolean;
+  onArchive: () => void;
 }
 function TransportCard({
   request,
@@ -220,7 +243,9 @@ function TransportCard({
   canClaim,
   onClaim,
   canCancel,
-  onCancel
+  onCancel,
+  canArchive,
+  onArchive
 }: TransportCardProps) {
   const subject =
   animalName ||
@@ -297,6 +322,17 @@ function TransportCard({
 
               Cancel Request
             </Button>
+          }
+          {canArchive &&
+          <button
+            type="button"
+            onClick={onArchive}
+            aria-label="Archive request"
+            title="Archive request"
+            className="p-1.5 rounded-md text-text-secondary hover:text-[#9B3A3A] hover:bg-[#F5D7D7]/60 transition-colors">
+
+              <Trash2Icon className="w-4 h-4" />
+            </button>
           }
         </div>
       </div>

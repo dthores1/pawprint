@@ -25,6 +25,8 @@ export interface AnimalActionItem {
   /** Mirrors the elevated Priority levels (no 'normal'). */
   priority: Exclude<Priority, 'normal'>;
   status: ActionItemStatus;
+  /** Auth user id who opened it. Used for archive permission. */
+  created_by?: string;
   created_at: string;
   completed_at?: string;
   /** Auth user id who completed/cancelled it. */
@@ -147,6 +149,8 @@ export interface AnimalPhoto {
   storage_path?: string;
   category: PhotoCategory;
   caption?: string;
+  /** Auth user id who uploaded it. Used for archive permission. */
+  created_by?: string;
   uploaded_at: string;
 }
 
@@ -238,6 +242,8 @@ export interface AnimalNote {
   id: string;
   animal_id: string;
   author_name: string;
+  /** auth.users.id of whoever wrote the note. Used for archive permission. */
+  created_by?: string;
   note_type: NoteType;
   body: string;
   created_at: string;
@@ -263,7 +269,20 @@ export type AdoptionStatus =
 'pending_paperwork' |
 'ready_for_placement' |
 'completed' |
-'cancelled';
+'cancelled' |
+'returned';
+
+// Why an adopter returned an animal. Required (DB CHECK) when status='returned'.
+export type AdoptionReturnReason =
+'behavior' |
+'medical' |
+'financial' |
+'housing' |
+'pet_compatibility' |
+'family_compatibility' |
+'life_changes' |
+'rescue_request' |
+'other';
 export interface Adoption {
   id: string;
   animal_id: string;
@@ -275,6 +294,10 @@ export interface Adoption {
   cancelled_at?: string;
   paperwork_sent_at?: string;
   paperwork_completed_at?: string;
+  /** Set when a completed adoption is reversed (animal returned to the rescue). */
+  returned_at?: string;
+  return_reason?: AdoptionReturnReason;
+  return_notes?: string;
   donation_amount?: number;
   notes?: string;
   created_at: string;
@@ -592,4 +615,40 @@ export interface ClinicSlotProcedure {
   procedure_type: ClinicSlotProcedureType;
   notes?: string;
   completed: boolean;
+}
+
+// Every archive-supporting table. Used as the discriminant for archive_record /
+// restore_record RPC calls and the row.record_type returned by list_archived.
+export type ArchiveTable =
+'animals' |
+'animal_notes' |
+'animal_photos' |
+'animal_action_items' |
+'animal_relationships' |
+'people' |
+'medical_records' |
+'foster_placements' |
+'clinic_events' |
+'clinic_slots' |
+'clinic_slot_procedures' |
+'litters' |
+'adoptions' |
+'products' |
+'supply_requests' |
+'supply_request_items' |
+'transport_requests' |
+'sitting_requests' |
+'sitting_request_placements';
+
+// One row in the Recycle Bin — returned by the list_archived() RPC.
+export interface ArchivedRecord {
+  /** Logical type, e.g. 'animal_note' (singular form of the table name). */
+  record_type: string;
+  record_id: string;
+  /** e.g. animal_id for notes/photos/relationships; null when n/a. */
+  parent_id?: string;
+  /** Best-effort short label rendered by the bin's "Name" column. */
+  display_name: string;
+  deleted_at: string;
+  deleted_by: string | null;
 }

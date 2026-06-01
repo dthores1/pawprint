@@ -62,6 +62,7 @@ Two more Animal fields worth calling out:
 - **`MedicalRecord`** — procedure log with `procedure_type`, `procedure_name`, `status` (`completed` / `due` / `scheduled` / `overdue` / `canceled`), `performed_date` and/or `due_date`, `notes`, and an optional `next_due_date` for recurring procedures (vaccine/exam/surgery/medication) — e.g. a rabies booster due in a year. The Add Medical modal only prompts for next-due on those types, via a relative interval (in N days/weeks/months/years) or an exact date. **Attribution** uses paired lookup-or-free-text fields: **Performed by** is either a known contact (`provider_contact_id` → `people`) or a free-text `provider_name`; **Facility / Event** is either a scheduled clinic (`clinic_id` → `clinic_events`) or a free-text `facility_name`. Each pair is mutually exclusive (picking a contact/clinic clears the free-text, and vice versa). FKs are `ON DELETE SET NULL` so removing a contact or clinic never deletes medical history.
 - **`AnimalNote`** — timestamped free-text note with a `note_type` (`behavior` / `medical` / `foster_update` / `adoption` / `general`).
 - **`AnimalActionItem`** — a tracked "next step" with `description`, elevated `priority`, and `status` (`open` / `completed` / `cancelled`). Replaces the old `action_needed` field so completions are kept in history. At most one `open` per animal. See §4.
+- **`Adoption`** — the operational adoption workflow record (one row per adoption attempt; at most one *active* per animal). `status` runs `inquiry` → `application_submitted` → `meet_and_greet` → `pending_paperwork` → `ready_for_placement`, then a terminal state: `completed` (finalized — sets the animal to `adopted`, stamps `adopted_by_id` / `adopted_at`, closes any active placement), `cancelled` (abandoned), or **`returned`** (a completed adoption reversed because the adopter returned the animal — see §8). Started via **Start Adoption** on the Animal Profile; advanced/completed through the `AdoptionPanel`.
 - **`AnimalRelationship`** — animal-to-animal link (mother, father, sibling, etc.). See §8.
 - **`Litter`** — groups animals that share intake/age/origin metadata (species, breed, estimated birth date, intake date/source). Members link via `animals.litter_id`; littermates are derived from that shared id, not from `AnimalRelationship`. Created by the Add Litter flow. See §8.
 - **`AnimalPhoto`** — gallery photo with a `category`. See §8.
@@ -84,7 +85,7 @@ Status describes **where the animal is in its journey**. It is intentionally a c
 | `hold` | Hold | Administrative hold (court case, bite quarantine, owner dispute, etc.). |
 | `fostered` | Fostered | In an active foster placement. |
 | `adoptable` | Adoptable | Cleared for adoption and listed. |
-| `adopted` | Adopted | Final outcome — adopted out. |
+| `adopted` | Adopted | Adopted out. Reversible — an **Adoption Return** sends the animal back to `intake` (see §8). |
 | `released` | Released | TNR - animal was returned to site. |
 | `hospice` | Hospice | End-of-life comfort care. |
 | `deceased` | Deceased | Final outcome — passed away. |
@@ -209,6 +210,15 @@ Animals can carry many photos (`AnimalPhoto` records) categorized by `PhotoCateg
 
 ### Adoption listing
 When an animal's `status` is `adoptable`, the `AdoptionProfileCard` appears in the right sidebar with the external `adoption_profile_url` (Petfinder, Adopt-a-Pet, or the org's own site) plus Open / Copy / Edit actions. If status is adoptable but no URL is set, the card prompts to add one — same forcing-function pattern as Action Needed. The card is hidden entirely for non-adoptable statuses.
+
+### Adoption return
+Adopted animals are sometimes returned. When `animal.status === 'adopted'`, the Animal Profile shows an **Adoption Return** button (in the slot that otherwise holds Place in Foster / Start Adoption — the three are mutually exclusive). It opens the `AdoptionReturnModal`, which:
+
+- Finds the **latest completed `Adoption`** for the animal. If one exists, that record is flipped to `status: 'returned'`. If none exists (e.g. the adoption predates this workflow), the modal first captures the original adopter and creates a `returned` record inline.
+- Captures `returned_at` (defaults to now), a required `return_reason` (a fixed vocabulary: behavioral / medical / financial / housing / pet- or family-compatibility / life changes / rescue request / other), and optional `return_notes`. A DB CHECK (`chk_return_reason_required`, migration `0029`) enforces that a `returned` adoption always carries a reason.
+- Brings the animal **back into care**: `status` → `intake`, clears `adopted_by_id` / `adopted_at`, and lifts any adoption hold. The return surfaces as an event on the Animal Profile timeline.
+
+A `returned` adoption is terminal (`isActiveAdoption` treats it like `completed` / `cancelled`) and is excluded from completed-adoption metrics on the Reports page.
 
 ---
 
