@@ -51,14 +51,15 @@ function validateForm(formData: FosterForm): FormErrors {
   nextErrors.first_name = 'First name is required.';
   if (!formData.last_name.trim())
   nextErrors.last_name = 'Last name is required.';
-  if (!formData.email.trim()) {
-    nextErrors.email = 'Email is required.';
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+
+  if (!formData.email && !formData.phone) {
+    const msg = 'Provide an email or a phone number.';
+    nextErrors.email = msg;
+    nextErrors.phone = msg;
+  } else if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
     nextErrors.email = 'Enter a valid email address.';
   }
-  if (!formData.phone.trim()) nextErrors.phone = 'Phone is required.';
-  if (!formData.address?.formatted.trim())
-  nextErrors.address = 'Address is required.';
+
   if (
   formData.max_capacity === '' ||
   formData.max_capacity < 1 ||
@@ -193,7 +194,7 @@ export function EditFosterModal({
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="email" required>Email</Label>
+            <Label htmlFor="email">Email</Label>
             <Input
               id="email"
               name="email"
@@ -206,7 +207,7 @@ export function EditFosterModal({
             <FieldError>{errors.email}</FieldError>
           </div>
           <div>
-            <Label htmlFor="phone" required>Phone</Label>
+            <Label htmlFor="phone">Phone</Label>
             <Input
               id="phone"
               name="phone"
@@ -221,7 +222,7 @@ export function EditFosterModal({
         </div>
 
         <div>
-          <Label htmlFor="address" required>Address</Label>
+          <Label htmlFor="address">Address</Label>
           <AddressAutocomplete
             id="address"
             error={Boolean(errors.address)}

@@ -41,8 +41,11 @@ import {
   AlertCircleIcon,
   ImageIcon,
   CameraIcon,
-  Trash2Icon } from
+  Trash2Icon,
+  PencilIcon,
+  CheckIcon } from
 'lucide-react';
+import { format } from 'date-fns';
 import { ArchiveConfirmDialog } from '../components/archive/ArchiveConfirmDialog';
 import { useCanArchive } from '../components/archive/useCanArchive';
 import { motion } from 'framer-motion';
@@ -69,9 +72,13 @@ export function AnimalProfile() {
     actionItems,
     photos,
     breeds,
-    addPhoto
+    addPhoto,
+    updateMedicalRecord
   } = useWhisker();
   const [isMedicalModalOpen, setIsMedicalModalOpen] = useState(false);
+  const [editingMedical, setEditingMedical] = useState<MedicalRecord | null>(
+    null
+  );
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isPlaceModalOpen, setIsPlaceModalOpen] = useState(false);
@@ -876,6 +883,13 @@ export function AnimalProfile() {
             records={animalMedical}
             onArchive={(r) =>
             setArchivingMedical({ id: r.id, preview: r.procedure_name })
+            }
+            onEdit={(r) => setEditingMedical(r)}
+            onComplete={(r) =>
+            updateMedicalRecord(r.id, {
+              status: 'completed',
+              performed_date: format(new Date(), 'yyyy-MM-dd')
+            })
             } />
           }
 
@@ -990,10 +1004,14 @@ export function AnimalProfile() {
       </div>
 
     <AddMedicalModal
-        isOpen={isMedicalModalOpen}
-        onClose={() => setIsMedicalModalOpen(false)}
+        isOpen={isMedicalModalOpen || !!editingMedical}
+        onClose={() => {
+          setIsMedicalModalOpen(false);
+          setEditingMedical(null);
+        }}
         animalId={animal.id}
-        animal={animal} />
+        animal={animal}
+        record={editingMedical ?? undefined} />
       
       <AddNoteModal
         isOpen={isNoteModalOpen}
@@ -1379,8 +1397,15 @@ const STATUS_TONE: Record<
 interface MedicalHistoryViewProps {
   records: ReturnType<typeof useWhisker>['medicalRecords'];
   onArchive: (record: MedicalRecord) => void;
+  onEdit: (record: MedicalRecord) => void;
+  onComplete: (record: MedicalRecord) => void;
 }
-function MedicalHistoryView({ records, onArchive }: MedicalHistoryViewProps) {
+function MedicalHistoryView({
+  records,
+  onArchive,
+  onEdit,
+  onComplete
+}: MedicalHistoryViewProps) {
   if (records.length === 0) {
     return (
       <Card className="p-10 text-center text-text-secondary">
@@ -1421,17 +1446,21 @@ function MedicalHistoryView({ records, onArchive }: MedicalHistoryViewProps) {
         tone="urgent"
         count={overdue.length}
         records={overdue}
-        onArchive={onArchive} />
+        onArchive={onArchive}
+        onEdit={onEdit}
+        onComplete={onComplete} />
 
       }
       {upcoming.length > 0 &&
       <MedicalGroup
-        title="Upcoming"
+        title="Upcoming or Unresolved"
         icon={ClockIcon}
         tone="info"
         count={upcoming.length}
         records={upcoming}
-        onArchive={onArchive} />
+        onArchive={onArchive}
+        onEdit={onEdit}
+        onComplete={onComplete} />
 
       }
       {completed.length > 0 &&
@@ -1441,7 +1470,9 @@ function MedicalHistoryView({ records, onArchive }: MedicalHistoryViewProps) {
         tone="success"
         count={completed.length}
         records={completed}
-        onArchive={onArchive} />
+        onArchive={onArchive}
+        onEdit={onEdit}
+        onComplete={onComplete} />
 
       }
       {other.length > 0 &&
@@ -1451,7 +1482,9 @@ function MedicalHistoryView({ records, onArchive }: MedicalHistoryViewProps) {
         tone="neutral"
         count={other.length}
         records={other}
-        onArchive={onArchive} />
+        onArchive={onArchive}
+        onEdit={onEdit}
+        onComplete={onComplete} />
 
       }
     </div>);
@@ -1464,6 +1497,8 @@ interface MedicalGroupProps {
   count: number;
   records: ReturnType<typeof useWhisker>['medicalRecords'];
   onArchive: (r: MedicalRecord) => void;
+  onEdit: (r: MedicalRecord) => void;
+  onComplete: (r: MedicalRecord) => void;
 }
 function MedicalGroup({
   title,
@@ -1471,7 +1506,9 @@ function MedicalGroup({
   tone,
   count,
   records,
-  onArchive
+  onArchive,
+  onEdit,
+  onComplete
 }: MedicalGroupProps) {
   const { people, clinicEvents } = useWhisker();
   const toneColor = {
@@ -1516,6 +1553,16 @@ function MedicalGroup({
           r.status === 'overdue' ?
           'Was due' :
           'Due';
+          // A scheduled/due row whose due_date has passed reads as "unresolved"
+          // — flagged inline so the user can mark it completed or canceled
+          // without wading into the modal first.
+          const today = format(new Date(), 'yyyy-MM-dd');
+          const isPastDue =
+          (r.status === 'due' || r.status === 'scheduled') &&
+          !!r.due_date &&
+          r.due_date < today;
+          const canMarkComplete =
+          r.status !== 'completed' && r.status !== 'canceled';
           return (
             <div
               key={r.id}
@@ -1531,12 +1578,34 @@ function MedicalGroup({
                     r.procedure_type}
                   </p>
                 </div>
-                <span
-                  className={`shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${tone.wrap}`}>
+                <div className="flex items-center gap-1 shrink-0">
+                  <span
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${tone.wrap}`}>
 
-                  {tone.label}
-                </span>
-                <MedicalArchiveButton onClick={() => onArchive(r)} />
+                    {tone.label}
+                  </span>
+                  {canMarkComplete &&
+                  <button
+                    type="button"
+                    onClick={() => onComplete(r)}
+                    aria-label="Mark complete"
+                    title="Mark complete"
+                    className="p-1 rounded-md text-text-secondary/60 hover:text-[#3E7B52] hover:bg-[#DDEFE2]/60 transition-colors">
+
+                      <CheckIcon className="w-3.5 h-3.5" />
+                    </button>
+                  }
+                  <button
+                    type="button"
+                    onClick={() => onEdit(r)}
+                    aria-label="Edit medical record"
+                    title="Edit"
+                    className="p-1 rounded-md text-text-secondary/60 hover:text-primary hover:bg-primary/10 transition-colors">
+
+                    <PencilIcon className="w-3.5 h-3.5" />
+                  </button>
+                  <MedicalArchiveButton onClick={() => onArchive(r)} />
+                </div>
               </div>
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-text-secondary">
                 <span>
@@ -1566,6 +1635,12 @@ function MedicalGroup({
                   </span>
                 }
               </div>
+              {isPastDue &&
+              <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-[#A36B00]">
+                  <AlertCircleIcon className="w-3.5 h-3.5 shrink-0" />
+                  Overdue — mark as completed or cancelled
+                </p>
+              }
               {r.notes &&
               <p className="text-sm text-text-secondary mt-2 italic">
                   {r.notes}

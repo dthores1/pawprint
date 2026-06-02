@@ -60,7 +60,15 @@ export function AddressAutocomplete({
 
   // Load the Google Maps Places library once and build the services.
   useEffect(() => {
-    if (!isGoogleMapsConfigured()) return;
+    if (!isGoogleMapsConfigured()) {
+      // Explicit signal: VITE_ vars are inlined at *build* time, so this means
+      // the key wasn't present when the bundle was built (not a runtime issue).
+      console.warn(
+        '[address] VITE_GOOGLE_MAPS_API_KEY was empty when this build was ' +
+        'created — set it in the host env and rebuild.'
+      );
+      return;
+    }
     let cancelled = false;
     loadGoogleMaps().
     then((google) => {

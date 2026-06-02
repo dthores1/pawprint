@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { add, parseISO, format } from 'date-fns';
+import { AlertCircleIcon } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { FieldError, Input, Select, Textarea, Label } from '../ui/Forms';
 import { DatePicker } from '../ui/DatePicker';
@@ -8,13 +9,25 @@ import { ClinicEventSearchPicker } from '../ui/ClinicEventSearchPicker';
 import { Button } from '../ui/Button';
 import { formatDate, animalDisplayName } from '../../lib/utils';
 import { useWhisker } from '../../context/WhiskerContext';
-import { Animal, ProcedureType, MedicalStatus, AgeUnit } from '../../types';
+import {
+  Animal,
+  ProcedureType,
+  MedicalStatus,
+  AgeUnit,
+  MedicalRecord } from
+'../../types';
 
 interface AddMedicalModalProps {
   isOpen: boolean;
   onClose: () => void;
   animalId: string;
   animal: Animal;
+  /**
+   * When provided, the modal switches to edit mode: form is pre-populated
+   * with the record's current values and Save calls `updateMedicalRecord`
+   * instead of creating a new row.
+   */
+  record?: MedicalRecord;
 }
 type FormErrors = {
   procedure_name?: string;
@@ -29,6 +42,26 @@ const RECURRING_TYPES = new Set<ProcedureType>([
 'surgery',
 'medication']
 );
+// Procedure types that should never have more than one active record per
+// animal — duplicates are blocked unless the existing one is canceled.
+const UNIQUE_TYPES = new Set<ProcedureType>(['spay_neuter', 'microchip']);
+const PROCEDURE_TYPE_LABELS: Record<ProcedureType, string> = {
+  vaccine: 'Vaccine',
+  exam: 'Exam',
+  spay_neuter: 'Spay/Neuter',
+  medication: 'Medication',
+  surgery: 'Surgery',
+  microchip: 'Microchip',
+  deworming: 'Deworming',
+  test: 'Test'
+};
+const STATUS_LABELS: Record<MedicalStatus, string> = {
+  completed: 'completed',
+  due: 'due',
+  scheduled: 'scheduled',
+  overdue: 'overdue',
+  canceled: 'canceled'
+};
 const AGE_UNITS: AgeUnit[] = ['days', 'weeks', 'months', 'years'];
 
 // base + N units → yyyy-MM-dd (or '' when inputs are incomplete).
@@ -36,54 +69,136 @@ function computeNextDue(base: string, value: number, unit: AgeUnit): string {
   if (!base || !value || value <= 0) return '';
   return format(add(parseISO(base), { [unit]: value }), 'yyyy-MM-dd');
 }
+// Indefinite article matching the leading vowel sound of the next word.
+// Cheap heuristic — fine for the closed set of status labels we use here.
+function articleFor(word: string): 'a' | 'an' {
+  return /^[aeiou]/i.test(word) ? 'an' : 'a';
+}
+type FormState = {
+  procedure_type: ProcedureType;
+  procedure_name: string;
+  status: MedicalStatus;
+  performed_date: string;
+  due_date: string;
+  provider_contact_id: string;
+  provider_name: string;
+  clinic_id: string;
+  facility_name: string;
+  microchip_number: string;
+  notes: string;
+  next_due_date: string;
+};
+const EMPTY_FORM: FormState = {
+  procedure_type: 'vaccine',
+  procedure_name: '',
+  status: 'completed',
+  performed_date: '',
+  due_date: '',
+  provider_contact_id: '',
+  provider_name: '',
+  clinic_id: '',
+  facility_name: '',
+  microchip_number: '',
+  notes: '',
+  next_due_date: ''
+};
+function formStateFromRecord(r: MedicalRecord | undefined): FormState {
+  if (!r) return EMPTY_FORM;
+  return {
+    procedure_type: r.procedure_type,
+    procedure_name: r.procedure_name,
+    status: r.status,
+    performed_date: r.performed_date ?? '',
+    due_date: r.due_date ?? '',
+    provider_contact_id: r.provider_contact_id ?? '',
+    provider_name: r.provider_name ?? '',
+    clinic_id: r.clinic_id ?? '',
+    facility_name: r.facility_name ?? '',
+    microchip_number: r.microchip_number ?? '',
+    notes: r.notes ?? '',
+    next_due_date: r.next_due_date ?? ''
+  };
+}
 
 export function AddMedicalModal({
   isOpen,
   onClose,
   animalId,
-  animal
+  animal,
+  record
 }: AddMedicalModalProps) {
-  const { addMedicalRecord, updateAnimal, people, clinicEvents } = useWhisker();
-  const INITIAL = {
-    procedure_type: 'vaccine' as ProcedureType,
-    procedure_name: '',
-    status: 'completed' as MedicalStatus,
-    performed_date: '',
-    due_date: '',
-    provider_contact_id: '',
-    provider_name: '',
-    clinic_id: '',
-    facility_name: '',
-    microchip_number: '',
-    notes: '',
-    next_due_date: ''
-  };
-  const [formData, setFormData] = useState(INITIAL);
+  const {
+    addMedicalRecord,
+    updateMedicalRecord,
+    updateAnimal,
+    people,
+    clinicEvents,
+    medicalRecords
+  } = useWhisker();
+  const isEditMode = !!record;
+  const [formData, setFormData] = useState<FormState>(() =>
+  formStateFromRecord(record)
+  );
   const [errors, setErrors] = useState<FormErrors>({});
   // Each lookup falls back to free text: pick from contacts/clinics, or type.
   const [performedByMode, setPerformedByMode] = useState<'contact' | 'manual'>(
-    'contact'
+    record?.provider_name && !record.provider_contact_id ? 'manual' : 'contact'
   );
-  const [facilityMode, setFacilityMode] = useState<'clinic' | 'other'>('clinic');
+  const [facilityMode, setFacilityMode] = useState<'clinic' | 'other'>(
+    record?.facility_name && !record.clinic_id ? 'other' : 'clinic'
+  );
   // Next-due input mode: relative interval (default) or an explicit date.
-  const [nextDueMode, setNextDueMode] = useState<'relative' | 'date'>('relative');
+  const [nextDueMode, setNextDueMode] = useState<'relative' | 'date'>(
+    record?.next_due_date ? 'date' : 'relative'
+  );
   const [intervalValue, setIntervalValue] = useState('');
   const [intervalUnit, setIntervalUnit] = useState<AgeUnit>('months');
+
+  // Re-populate the form whenever the modal is opened (or the editing target
+  // changes), so closing and reopening the modal always reflects the current
+  // record/blank state instead of stale values from the previous session.
+  useEffect(() => {
+    if (!isOpen) return;
+    setFormData(formStateFromRecord(record));
+    setErrors({});
+    setPerformedByMode(
+      record?.provider_name && !record.provider_contact_id ?
+      'manual' :
+      'contact'
+    );
+    setFacilityMode(
+      record?.facility_name && !record.clinic_id ? 'other' : 'clinic'
+    );
+    setNextDueMode(record?.next_due_date ? 'date' : 'relative');
+    setIntervalValue('');
+    setIntervalUnit('months');
+  }, [isOpen, record]);
 
   // The date the next-due offset is measured from (and the gate for showing it).
   const baseDate =
   formData.status === 'completed' ? formData.performed_date : formData.due_date;
   const showNextDue = RECURRING_TYPES.has(formData.procedure_type) && !!baseDate;
 
-  const reset = () => {
-    setFormData(INITIAL);
-    setErrors({});
-    setPerformedByMode('contact');
-    setFacilityMode('clinic');
-    setNextDueMode('relative');
-    setIntervalValue('');
-    setIntervalUnit('months');
-  };
+  // Duplicate detection — at most one non-canceled spay/neuter or microchip
+  // record per animal. In edit mode we exclude the current record itself so
+  // the user can keep editing the existing row without tripping the warning.
+  const conflictingRecord = useMemo(() => {
+    if (!UNIQUE_TYPES.has(formData.procedure_type)) return undefined;
+    return medicalRecords.find(
+      (m) =>
+      m.animal_id === animalId &&
+      m.procedure_type === formData.procedure_type &&
+      m.status !== 'canceled' &&
+      m.id !== record?.id
+    );
+  }, [animalId, formData.procedure_type, medicalRecords, record?.id]);
+  const duplicateMessage = conflictingRecord ?
+  (() => {
+    const typeLabel = PROCEDURE_TYPE_LABELS[conflictingRecord.procedure_type];
+    const statusLabel = STATUS_LABELS[conflictingRecord.status];
+    return `${animalDisplayName(animal)} already has ${articleFor(statusLabel)} ${statusLabel} ${typeLabel}. Please edit the existing ${typeLabel} medical record.`;
+  })() :
+  null;
   const validate = (): FormErrors => {
     const next: FormErrors = {};
     if (!formData.procedure_name.trim()) {
@@ -100,6 +215,7 @@ export function AddMedicalModal({
   };
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (duplicateMessage) return;
     const nextErrors = validate();
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
@@ -107,15 +223,38 @@ export function AddMedicalModal({
     formData.procedure_type === 'microchip' ?
     formData.microchip_number.trim() :
     '';
-    addMedicalRecord({
-      animal_id: animalId,
-      ...formData,
-      microchip_number: microchipNumber || undefined,
-      performed_date:
-      formData.status === 'completed' ? formData.performed_date : undefined,
-      due_date: formData.status !== 'completed' ? formData.due_date : undefined,
-      next_due_date: showNextDue ? formData.next_due_date || undefined : undefined
-    });
+    const performedDate =
+    formData.status === 'completed' ? formData.performed_date : undefined;
+    const dueDate =
+    formData.status !== 'completed' ? formData.due_date : undefined;
+    const nextDueDate = showNextDue ?
+    formData.next_due_date || undefined :
+    undefined;
+    if (isEditMode && record) {
+      updateMedicalRecord(record.id, {
+        procedure_type: formData.procedure_type,
+        procedure_name: formData.procedure_name,
+        status: formData.status,
+        performed_date: performedDate,
+        due_date: dueDate,
+        provider_contact_id: formData.provider_contact_id || undefined,
+        provider_name: formData.provider_name || undefined,
+        clinic_id: formData.clinic_id || undefined,
+        facility_name: formData.facility_name || undefined,
+        microchip_number: microchipNumber || undefined,
+        notes: formData.notes || undefined,
+        next_due_date: nextDueDate
+      });
+    } else {
+      addMedicalRecord({
+        animal_id: animalId,
+        ...formData,
+        microchip_number: microchipNumber || undefined,
+        performed_date: performedDate,
+        due_date: dueDate,
+        next_due_date: nextDueDate
+      });
+    }
     // Mirror the chip number onto the animal record so the readiness checklist
     // flips immediately and the chip badge in the hero reflects reality. We
     // only overwrite when the user actually provided one this time — leaving
@@ -124,7 +263,6 @@ export function AddMedicalModal({
       updateAnimal(animalId, { microchip_number: microchipNumber });
     }
     onClose();
-    reset();
   };
   const handleChange = (
   e: React.ChangeEvent<
@@ -159,18 +297,24 @@ export function AddMedicalModal({
       next_due_date: computeNextDue(baseDate, Number(valueStr), unit)
     }));
   };
+  const titleSuffix = isEditMode ? 'Edit Medical Record' : 'Add Medical Record';
+  const submitLabel = isEditMode ? 'Update Record' : 'Save Record';
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={animalDisplayName(animal) + ' | Add Medical Record'}
+      title={animalDisplayName(animal) + ' | ' + titleSuffix}
       footer={
       <div className="flex justify-end gap-3">
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" form="add-medical-form">
-            Save Record
+          <Button
+          type="submit"
+          form="add-medical-form"
+          disabled={!!duplicateMessage}>
+
+            {submitLabel}
           </Button>
         </div>
       }>
@@ -198,6 +342,15 @@ export function AddMedicalModal({
               <option value="deworming">Deworming</option>
               <option value="test">Test</option>
             </Select>
+            {duplicateMessage &&
+            <p
+              role="alert"
+              className="mt-1.5 flex items-start gap-1.5 text-xs font-medium text-[#A36B00]">
+
+                <AlertCircleIcon className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <span>{duplicateMessage}</span>
+              </p>
+            }
           </div>
           <div>
             <Label htmlFor="status" required>Status</Label>
@@ -210,6 +363,8 @@ export function AddMedicalModal({
               <option value="completed">Completed</option>
               <option value="scheduled">Scheduled</option>
               <option value="due">Due</option>
+              {isEditMode && <option value="overdue">Overdue</option>}
+              {isEditMode && <option value="canceled">Canceled</option>}
             </Select>
           </div>
         </div>

@@ -37,18 +37,20 @@ const STATUS_PILL: Record<SittingRequestStatus, string> = {
 
 function formatDateRange(startISO: string, endISO: string) {
   const start = new Date(startISO);
-  const end = new Date(endISO);
-  const sameYear = start.getFullYear() === end.getFullYear();
+  const end = endISO ? new Date(endISO) : undefined;
+  const sameYear = end && start.getFullYear() === end.getFullYear();
+
   const startStr = start.toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
     year: sameYear ? undefined : 'numeric'
   });
-  const endStr = end.toLocaleString('en-US', {
+
+  const endStr = end ? end.toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric'
-  });
+  }) : 'No end date specified';
   return `${startStr} – ${endStr}`;
 }
 
