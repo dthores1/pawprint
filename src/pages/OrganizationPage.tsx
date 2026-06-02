@@ -6,7 +6,7 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input, Select, Label, FieldError } from '../components/ui/Forms';
 import { Avatar } from '../components/ui/Avatar';
-import { RolesMultiSelect } from '../components/ui/RolesMultiSelect';
+import { RolesPickerPopover } from '../components/ui/RolesPickerPopover';
 import { PersonRole } from '../types';
 import {
   UsersIcon,
@@ -245,46 +245,63 @@ export function OrganizationPage() {
             Invite a member
           </h2>
           <form onSubmit={handleInvite} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-3 items-end">
-              <div>
-                <Label htmlFor="invite_email">Email</Label>
-                <Input
-                id="invite_email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@rescue.org" />
-
-              </div>
-              <div>
-                <Label htmlFor="invite_role">Role</Label>
-                <Select
-                id="invite_role"
-                value={role}
-                onChange={(e) =>
-                setRole(e.target.value as 'member' | 'admin')
-                }>
-
-                  <option value="member">Member</option>
-                  <option value="admin">Admin</option>
-                </Select>
-              </div>
-              <Button type="submit" disabled={submitting}>
-                {submitting ? 'Sending…' : 'Create invite'}
-              </Button>
-            </div>
+            {/* Email + Permission share one visual field. The native select
+                lives flush inside the input on the right with a subtle
+                divider, so the form reads as "what email, what level" in a
+                single glance. `pr-32` reserves room for the select; if the
+                Member/Admin label ever grows past that we'll widen it. */}
             <div>
-              <Label className="mb-2 block">Operational roles (optional)</Label>
-              <RolesMultiSelect
+              <Label htmlFor="invite_email">Email</Label>
+              <div className="relative">
+                <Input
+                  id="invite_email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@rescue.org"
+                  className="pr-32" />
+
+                <div className="absolute inset-y-1 right-1 flex items-center">
+                  <div className="h-full w-px bg-border mr-1" />
+                  <select
+                    aria-label="Permission level"
+                    value={role}
+                    onChange={(e) =>
+                    setRole(e.target.value as 'member' | 'admin')
+                    }
+                    className="h-full pl-2 pr-7 text-sm font-medium text-text-primary bg-transparent border-0 cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-primary rounded-md
+                       bg-[length:0.65em_0.65em] bg-no-repeat bg-[right_0.5rem_center]
+                       bg-[url('data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20d%3D%22M2%204l4%204%204-4%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')]">
+
+                    <option value="member">Member</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="invite_op_roles">
+                Operational Roles (optional)
+              </Label>
+              <RolesPickerPopover
+                id="invite_op_roles"
                 value={personRoles}
                 onChange={setPersonRoles} />
 
               <p className="text-xs text-text-secondary mt-1.5">
-                Pre-assign hats the invitee should wear (foster parent, trapper,
-                etc.). Applied to their profile when they accept.
+                Pre-assign hats the invitee should wear (foster parent,
+                trapper, etc.). Applied to their profile when they accept.
               </p>
             </div>
+
             <FieldError>{formError}</FieldError>
+
+            <div className="flex justify-end pt-2 border-t border-border">
+              <Button type="submit" disabled={submitting}>
+                {submitting ? 'Sending…' : 'Create Invite'}
+              </Button>
+            </div>
             <p className="text-xs text-text-secondary">
               Creates a single-use invite link valid for 14 days. We'll try to
               email it to them — and you can always copy the link from the list

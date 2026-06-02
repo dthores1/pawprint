@@ -6,7 +6,7 @@ import { cn } from '../../lib/utils';
 // is no separate "volunteer type"). Grouped visually for clarity. `locked` roles
 // render selected and can't be toggled off (used to pin 'foster_parent' on the
 // foster form). 'volunteer' is intentionally not offered here (legacy fallback).
-const ROLE_GROUPS: {
+export const ROLE_GROUPS: {
   label: string;
   roles: { value: PersonRole; label: string }[];
 }[] = [
@@ -19,8 +19,12 @@ const ROLE_GROUPS: {
 },
 {
   label: 'Volunteer / Support',
+  // 'admin' is intentionally NOT offered here — it's an *org-level* permission
+  // (owner / admin / member), not a hat someone wears day-to-day. Mixing the
+  // two confused inviters into double-granting access. Existing rows that
+  // still carry 'admin' in `roles` keep displaying; only new selections are
+  // restricted.
   roles: [
-  { value: 'admin', label: 'Admin' },
   { value: 'event_support', label: 'Event Support' },
   { value: 'social_media', label: 'Social Media' },
   { value: 'trapper', label: 'Trapper' },

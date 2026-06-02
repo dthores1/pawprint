@@ -37,17 +37,24 @@ const INITIAL_FORM: FosterForm = {
 type FormField = keyof FosterForm;
 type FormErrors = Partial<Record<FormField, string>>;
 
+// Provides form validations -- required fields, validation rules, email formatting, etc.
 function validateForm(formData: FosterForm): FormErrors {
   const nextErrors: FormErrors = {};
   if (!formData.first_name.trim()) nextErrors.first_name = 'First name is required.';
   if (!formData.last_name.trim()) nextErrors.last_name = 'Last name is required.';
-  if (!formData.email.trim()) {
-    nextErrors.email = 'Email is required.';
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+
+  // At least one contact method — email or phone — is required, but not both.
+  // The shared "missing" message is mirrored on both fields so the user sees it
+  // regardless of which they were focused on.
+  const email = formData.email.trim();
+  const phone = formData.phone.trim();
+  if (!email && !phone) {
+    const msg = 'Provide an email or a phone number.';
+    nextErrors.email = msg;
+    nextErrors.phone = msg;
+  } else if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     nextErrors.email = 'Enter a valid email address.';
   }
-  if (!formData.phone.trim()) nextErrors.phone = 'Phone is required.';
-  if (!formData.address.trim()) nextErrors.address = 'Address is required.';
   if (
     formData.max_capacity === '' ||
     formData.max_capacity < 1 ||
@@ -102,6 +109,14 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
     if (errors[fieldName]) {
       setErrors((prev) => ({ ...prev, [fieldName]: undefined }));
     }
+    // Email and phone share an "at least one" rule — typing into either clears
+    // the error on the other so the red border doesn't linger after the user
+    // satisfies the rule by filling the alternate field.
+    if (fieldName === 'email' && errors.phone) {
+      setErrors((prev) => ({ ...prev, phone: undefined }));
+    } else if (fieldName === 'phone' && errors.email) {
+      setErrors((prev) => ({ ...prev, email: undefined }));
+    }
   };
   const toggleSpecies = (species: Species) => {
     setFormData((prev) => {
@@ -153,41 +168,44 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="email" required>Email</Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="off"
-              aria-invalid={Boolean(errors.email)}
-              aria-describedby={errors.email ? 'email_error' : undefined}
-              className={errors.email && 'border-red-500 focus:ring-red-500'}
-              value={formData.email}
-              onChange={handleChange} />
-            <FieldError id="email_error">{errors.email}</FieldError>
-            
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="off"
+                aria-invalid={Boolean(errors.email)}
+                aria-describedby={errors.email ? 'email_error' : undefined}
+                className={errors.email && 'border-red-500 focus:ring-red-500'}
+                value={formData.email}
+                onChange={handleChange} />
+              <FieldError id="email_error">{errors.email}</FieldError>
+            </div>
+            <div>
+              <Label htmlFor="phone">Phone</Label>
+              <Input
+                id="phone"
+                name="phone"
+                type="tel"
+                autoComplete="off"
+                aria-invalid={Boolean(errors.phone)}
+                aria-describedby={errors.phone ? 'phone_error' : undefined}
+                className={errors.phone && 'border-red-500 focus:ring-red-500'}
+                value={formData.phone}
+                onChange={handleChange} />
+              <FieldError id="phone_error">{errors.phone}</FieldError>
+            </div>
           </div>
-          <div>
-            <Label htmlFor="phone" required>Phone</Label>
-            <Input
-              id="phone"
-              name="phone"
-              type="tel"
-              autoComplete="off"
-              aria-invalid={Boolean(errors.phone)}
-              aria-describedby={errors.phone ? 'phone_error' : undefined}
-              className={errors.phone && 'border-red-500 focus:ring-red-500'}
-              value={formData.phone}
-              onChange={handleChange} />
-            <FieldError id="phone_error">{errors.phone}</FieldError>
-            
-          </div>
+          <p className="text-xs text-text-secondary">
+            Provide an email or a phone number. Most fosters will have both.
+          </p>
         </div>
 
         <div>
-          <Label htmlFor="address" required>Address</Label>
+          <Label htmlFor="address">Address</Label>
           <Input
             id="address"
             name="address"

@@ -165,15 +165,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setCurrentPersonId(null);
         return;
       }
-      const { data: existing } = await supabase.
+      // Tolerant lookup — uses `.limit(1)` instead of `.maybeSingle()`,
+      // which previously raised PGRST116 when ≥2 self-rows existed and
+      // caused the caller to insert yet another. Picking the oldest keeps
+      // the canonical row stable even if a legacy account still has dupes.
+      const { data: existingRows, error: lookupErr } = await supabase.
       from('people').
       select('id').
       eq('organization_id', currentOrgIdResolved).
       eq('user_id', user.id).
-      maybeSingle();
+      order('created_at', { ascending: true }).
+      limit(1);
       if (cancelled) return;
-      if (existing) {
-        setCurrentPersonId(existing.id);
+      if (lookupErr) {
+        console.error('[auth] self-person lookup failed:', lookupErr.message);
+        return;
+      }
+      if (existingRows && existingRows.length > 0) {
+        setCurrentPersonId(existingRows[0].id);
         return;
       }
       // No self-record yet — create one from auth metadata.
@@ -196,10 +205,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       select('id').
       single();
       if (cancelled) return;
+      if (created) {
+        setCurrentPersonId(created.id);
+        return;
+      }
+      // Insert failed. If it lost the unique-index race against a
+      // concurrent effect (PG `23505`), refetch and use whoever won.
+      if (error?.code === '23505') {
+        const { data: refetched } = await supabase.
+        from('people').
+        select('id').
+        eq('organization_id', currentOrgIdResolved).
+        eq('user_id', user.id).
+        order('created_at', { ascending: true }).
+        limit(1);
+        if (cancelled) return;
+        if (refetched && refetched.length > 0) {
+          setCurrentPersonId(refetched[0].id);
+        }
+        return;
+      }
       if (error) {
         console.error('[auth] self-person create failed:', error.message);
-      } else if (created) {
-        setCurrentPersonId(created.id);
       }
     })();
     return () => {

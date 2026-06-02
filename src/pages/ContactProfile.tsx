@@ -3,6 +3,9 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useWhisker } from '../context/WhiskerContext';
 import { ArchiveConfirmDialog } from '../components/archive/ArchiveConfirmDialog';
 import { useCanArchive } from '../components/archive/useCanArchive';
+import { InviteToAppModal } from '../components/people/InviteToAppModal';
+import { useAuth } from '../context/AuthContext';
+import { Send as SendIcon } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Avatar } from '../components/ui/Avatar';
 import { Button } from '../components/ui/Button';
@@ -30,9 +33,15 @@ export function ContactProfile() {
   const { id } = useParams<{ id: string }>();
   const { people, animals, placements } = useWhisker();
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const navigate = useNavigate();
-  const canArchive = useCanArchive('people', { id: id ?? 'na' });
+  const canArchiveBase = useCanArchive('people', { id: id ?? 'na' });
+  const { currentOrg, currentPersonId } = useAuth();
+  const isAdmin = currentOrg?.role === 'owner' || currentOrg?.role === 'admin';
+  // Block self-archive — no sensible recovery from removing your own record.
+  const isSelf = !!currentPersonId && currentPersonId === id;
+  const canArchive = canArchiveBase && !isSelf;
 
   const person = people.find((p) => p.id === id);
   if (!person) {
@@ -56,6 +65,15 @@ export function ContactProfile() {
           <ArrowLeftIcon className="w-4 h-4" /> Back to Contacts
         </Link>
         <div className="flex items-center gap-2">
+          {isAdmin && !person.user_id && person.email &&
+          <Button
+            variant="soft"
+            size="sm"
+            onClick={() => setIsInviteOpen(true)}>
+
+              <SendIcon className="w-4 h-4 mr-2" /> Invite to Whiskerville
+            </Button>
+          }
           <Button variant="soft" size="sm" onClick={() => setIsEditOpen(true)}>
             <Edit2Icon className="w-4 h-4 mr-2" /> Edit
           </Button>
@@ -264,6 +282,11 @@ export function ContactProfile() {
         onArchived={() => navigate('/contacts')} />
 
       }
+      <InviteToAppModal
+        isOpen={isInviteOpen}
+        onClose={() => setIsInviteOpen(false)}
+        person={person} />
+
     </div>);
 
 }
