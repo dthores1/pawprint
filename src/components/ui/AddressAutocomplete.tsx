@@ -101,8 +101,14 @@ export function AddressAutocomplete({
         types: ['address'],
         componentRestrictions: country ? { country } : undefined
       },
-      (results: any[] | null) => {
+      (results: any[] | null, status: string) => {
         setLoading(false);
+        const ok = googleRef.current?.maps?.places?.PlacesServiceStatus;
+        // Surface anything that isn't a normal hit / empty result — REQUEST_DENIED
+        // (API not enabled / referrer blocked / billing) is otherwise invisible.
+        if (status !== ok?.OK && status !== ok?.ZERO_RESULTS) {
+          console.warn('[address] Places prediction status:', status);
+        }
         setPredictions(
           (results ?? []).map((r) => ({
             placeId: r.place_id,
