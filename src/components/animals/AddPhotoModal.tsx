@@ -123,6 +123,13 @@ export function AddPhotoModal({
     onClose();
   };
   const selectedHint = CATEGORIES.find((c) => c.value === category)?.hint;
+  const submitLabel = submitting ?
+  progress && progress.total > 1 ?
+  `Uploading ${progress.done}/${progress.total}…` :
+  'Uploading…' :
+  files.length > 1 ?
+  `Add ${files.length} Photos` :
+  'Add Photo';
   return (
     <Modal
       isOpen={isOpen}
@@ -130,9 +137,26 @@ export function AddPhotoModal({
         reset();
         onClose();
       }}
-      title="Add Photo">
-      
-      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+      title="Add Photo"
+      footer={
+      <div className="flex justify-end gap-3">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+          type="submit"
+          form="add-photo-form"
+          disabled={submitting}>
+            {submitLabel}
+          </Button>
+        </div>
+      }>
+
+      <form
+        id="add-photo-form"
+        onSubmit={handleSubmit}
+        className="space-y-5"
+        noValidate>
         <div>
           <div className="flex items-center justify-between mb-2">
             <Label className="mb-0" required>Photo Source</Label>
@@ -281,21 +305,6 @@ export function AddPhotoModal({
             </div>);
 
         })()}
-
-        <div className="pt-5 flex justify-end gap-3 border-t border-border mt-7">
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={submitting}>
-            {submitting ?
-            progress && progress.total > 1 ?
-            `Uploading ${progress.done}/${progress.total}…` :
-            'Uploading…' :
-            files.length > 1 ?
-            `Add ${files.length} Photos` :
-            'Add Photo'}
-          </Button>
-        </div>
       </form>
     </Modal>);
 

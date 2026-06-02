@@ -136,9 +136,23 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
       isOpen={isOpen}
       onClose={onClose}
       title="Request Temporary Coverage"
-      className="max-w-2xl">
+      className="max-w-2xl"
+      footer={
+      <div className="flex justify-end gap-3">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="new-sitting-form">
+            Request Coverage
+          </Button>
+        </div>
+      }>
 
-      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+      <form
+        id="new-sitting-form"
+        onSubmit={handleSubmit}
+        className="space-y-5"
+        noValidate>
         {/* Coverage scope */}
         <div>
           <Label required>Coverage needed for</Label>
@@ -279,13 +293,6 @@ export function NewSittingRequestModal({ isOpen, onClose }: Props) {
             placeholder="Anything a sitter should know — meds, routines, quirks…"
             rows={3} />
 
-        </div>
-
-        <div className="pt-4 flex justify-end gap-3 border-t border-border">
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit">Request Coverage</Button>
         </div>
       </form>
     </Modal>);

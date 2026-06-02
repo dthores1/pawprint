@@ -61,9 +61,22 @@ export function AddLitterMemberModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={`Add Animal to ${litterLabel(litter, breeds)}`}>
+      title={`Add Animal to ${litterLabel(litter, breeds)}`}
+      footer={
+      <div className="flex justify-end gap-3">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="add-litter-member-form">
+            Add Animal
+          </Button>
+        </div>
+      }>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form
+        id="add-litter-member-form"
+        onSubmit={handleSubmit}
+        className="space-y-4">
         <p className="text-xs text-text-secondary">
           Inherits the litter's species, breed, and intake details. Starts as{' '}
           <span className="font-medium">Intake</span> /{' '}
@@ -100,12 +113,6 @@ export function AddLitterMemberModal({
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Distinguishing markings or notes…" />
 
-        </div>
-        <div className="pt-4 flex justify-end gap-3 border-t border-border">
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit">Add Animal</Button>
         </div>
       </form>
     </Modal>);

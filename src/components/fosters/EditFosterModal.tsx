@@ -3,8 +3,10 @@ import { Modal } from '../ui/Modal';
 import { FieldError, Input, Textarea, Label } from '../ui/Forms';
 import { Button } from '../ui/Button';
 import { RolesMultiSelect } from '../ui/RolesMultiSelect';
+import { AddressAutocomplete } from '../ui/AddressAutocomplete';
 import { useWhisker } from '../../context/WhiskerContext';
-import { Person, PersonRole, Species } from '../../types';
+import { AddressValue, Person, PersonRole, Species } from '../../types';
+import { personToAddressValue } from '../../lib/address';
 interface EditFosterModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -16,7 +18,7 @@ type FosterForm = {
   last_name: string;
   email: string;
   phone: string;
-  address: string;
+  address: AddressValue | null;
   // `''` lets the user clear the field while typing; coerced to a number on submit.
   max_capacity: number | '';
   preferred_species: Species[];
@@ -33,7 +35,7 @@ function fromFoster(f: Person): FosterForm {
     last_name: f.last_name,
     email: f.email,
     phone: f.phone ?? '',
-    address: f.address ?? '',
+    address: personToAddressValue(f),
     max_capacity: f.max_capacity ?? 1,
     preferred_species: f.preferred_species ?? [],
     notes: f.notes ?? '',
@@ -55,7 +57,8 @@ function validateForm(formData: FosterForm): FormErrors {
     nextErrors.email = 'Enter a valid email address.';
   }
   if (!formData.phone.trim()) nextErrors.phone = 'Phone is required.';
-  if (!formData.address.trim()) nextErrors.address = 'Address is required.';
+  if (!formData.address?.formatted.trim())
+  nextErrors.address = 'Address is required.';
   if (
   formData.max_capacity === '' ||
   formData.max_capacity < 1 ||
@@ -87,13 +90,26 @@ export function EditFosterModal({
     const nextErrors = validateForm(formData);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
+    const addr = formData.address;
     updateFoster(foster.id, {
       ...formData,
       first_name: formData.first_name.trim(),
       last_name: formData.last_name.trim(),
       email: formData.email.trim(),
       phone: formData.phone.trim(),
-      address: formData.address.trim(),
+      // Legacy single-line field + the structured components. Empty strings let
+      // the API layer null out columns the picked address doesn't supply.
+      address: addr?.formatted ?? '',
+      address_google_place_id: addr?.placeId || '',
+      address_formatted: addr?.formatted || '',
+      address_street_1: addr?.street1 || '',
+      address_street_2: addr?.street2 || '',
+      address_city: addr?.city || '',
+      address_state: addr?.state || '',
+      address_postal_code: addr?.postalCode || '',
+      address_country: addr?.country || '',
+      address_latitude: addr?.latitude,
+      address_longitude: addr?.longitude,
       notes: formData.notes.trim(),
       max_capacity: Number(formData.max_capacity)
     });
@@ -128,8 +144,26 @@ export function EditFosterModal({
     });
   };
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Edit Foster Parent">
-      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Edit Foster Parent"
+      footer={
+      <div className="flex justify-end gap-3">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="edit-foster-form">
+            Save Changes
+          </Button>
+        </div>
+      }>
+
+      <form
+        id="edit-foster-form"
+        onSubmit={handleSubmit}
+        className="space-y-5"
+        noValidate>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label htmlFor="first_name" required>First Name</Label>
@@ -188,14 +222,16 @@ export function EditFosterModal({
 
         <div>
           <Label htmlFor="address" required>Address</Label>
-          <Input
+          <AddressAutocomplete
             id="address"
-            name="address"
-            autoComplete="off"
-            aria-invalid={Boolean(errors.address)}
-            className={errors.address && 'border-red-500 focus:ring-red-500'}
+            error={Boolean(errors.address)}
             value={formData.address}
-            onChange={handleChange} />
+            onChange={(addr) => {
+              setFormData((prev) => ({ ...prev, address: addr }));
+              if (errors.address) {
+                setErrors((prev) => ({ ...prev, address: undefined }));
+              }
+            }} />
           <FieldError>{errors.address}</FieldError>
         </div>
 
@@ -275,13 +311,6 @@ export function EditFosterModal({
             </span>
           </span>
         </label>
-
-        <div className="pt-4 flex justify-end gap-3 border-t border-border mt-6">
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit">Save Changes</Button>
-        </div>
       </form>
     </Modal>);
 

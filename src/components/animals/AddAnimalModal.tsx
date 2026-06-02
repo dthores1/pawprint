@@ -96,6 +96,12 @@ export function AddAnimalModal({
   const [formData, setFormData] = useState(INITIAL);
   const [ageMode, setAgeMode] = useState<AgeInputMode>('birthdate');
   const [errors, setErrors] = useState<FormErrors>({});
+  // Lifted from LitterForm so the modal's sticky footer can show the correct
+  // button state ("Add Litter (N)" / "Adding…", disabled while submitting).
+  // The litter starts with 2 members (see LitterForm); matches the form's
+  // initial state so the button label is correct before any user interaction.
+  const [litterMembersCount, setLitterMembersCount] = useState(2);
+  const [litterSubmitting, setLitterSubmitting] = useState(false);
   // Open on the requested sub-form each time the modal is shown.
   useEffect(() => {
     if (isOpen) setMode(initialMode);
@@ -105,6 +111,8 @@ export function AddAnimalModal({
     setAgeMode('birthdate');
     setErrors({});
     setMode(initialMode);
+    setLitterMembersCount(2);
+    setLitterSubmitting(false);
     onClose();
   };
   // Estimated age means "current age", so anchor it to today — not intake.
@@ -168,7 +176,31 @@ export function AddAnimalModal({
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title={mode === 'litter' ? 'Add Litter' : 'Add New Animal'}>
+      title={mode === 'litter' ? 'Add Litter' : 'Add New Animal'}
+      footer={
+      mode === 'litter' ?
+      <div className="flex justify-end gap-3">
+            <Button type="button" variant="ghost" onClick={handleClose}>
+              Cancel
+            </Button>
+            <Button
+            type="submit"
+            form="add-litter-form"
+            disabled={litterSubmitting}>
+              {litterSubmitting ?
+            'Adding…' :
+            `Add Litter (${litterMembersCount})`}
+            </Button>
+          </div> :
+      <div className="flex justify-end gap-3">
+            <Button type="button" variant="ghost" onClick={handleClose}>
+              Cancel
+            </Button>
+            <Button type="submit" form="add-animal-form">
+              Add Animal
+            </Button>
+          </div>
+      }>
 
       <div className="space-y-4">
         {/* — What are you adding? — */}
@@ -201,9 +233,18 @@ export function AddAnimalModal({
         </div>
 
         {mode === 'litter' ?
-        <LitterForm onClose={handleClose} /> :
+        <LitterForm
+          onClose={handleClose}
+          formId="add-litter-form"
+          onMembersCountChange={setLitterMembersCount}
+          onSubmittingChange={setLitterSubmitting} /> :
 
-        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+
+        <form
+          id="add-animal-form"
+          onSubmit={handleSubmit}
+          className="space-y-4"
+          noValidate>
         {/* — Basic Information — */}
         <FormSection title="Basic Information">
           <div className="grid grid-cols-2 gap-4">
@@ -387,13 +428,6 @@ export function AddAnimalModal({
           <span className="font-medium">Place in Foster</span> on the profile to
           update status.
         </p>
-
-        <div className="pt-4 flex justify-end gap-3 border-t border-border">
-          <Button type="button" variant="ghost" onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button type="submit">Add Animal</Button>
-        </div>
         </form>
         }
       </div>

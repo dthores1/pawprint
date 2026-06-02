@@ -203,8 +203,26 @@ export function PlaceAnimalModal({
   'Place in Foster Care';
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={title}>
-      <form onSubmit={handleSubmit} className="space-y-5">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={title}
+      footer={
+      <div className="flex justify-end gap-3">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+          type="submit"
+          form="place-animal-form"
+          disabled={!selectedId}>
+            <CheckIcon className="w-4 h-4 mr-2" />
+            {isReassign ? 'Reassign Foster' : 'Place Animal'}
+          </Button>
+        </div>
+      }>
+
+      <form id="place-animal-form" onSubmit={handleSubmit} className="space-y-5">
         {/* Reassign mode (animal-anchored): show who is being replaced */}
         {isReassign && currentFoster &&
         <div className="flex items-center gap-3 p-3 rounded-xl bg-background border border-border">
@@ -504,16 +522,6 @@ export function PlaceAnimalModal({
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Any specific instructions or notes for this placement…" />
 
-        </div>
-
-        <div className="pt-4 flex justify-end gap-3 border-t border-border mt-6">
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={!selectedId}>
-            <CheckIcon className="w-4 h-4 mr-2" />
-            {isReassign ? 'Reassign Foster' : 'Place Animal'}
-          </Button>
         </div>
       </form>
     </Modal>);

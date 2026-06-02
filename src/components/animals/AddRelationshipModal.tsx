@@ -90,8 +90,28 @@ export function AddRelationshipModal({
     handleClose();
   };
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Add Relationship">
-      <form onSubmit={handleSubmit} className="space-y-5">
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title="Add Relationship"
+      footer={
+      <div className="flex justify-end gap-3">
+          <Button type="button" variant="ghost" onClick={handleClose}>
+            Cancel
+          </Button>
+          <Button
+          type="submit"
+          form="add-relationship-form"
+          disabled={!selectedAnimal}>
+            Save Relationship
+          </Button>
+        </div>
+      }>
+
+      <form
+        id="add-relationship-form"
+        onSubmit={handleSubmit}
+        className="space-y-5">
         <div>
           <Label required>Related Animal</Label>
           {selectedAnimal ?
@@ -205,15 +225,6 @@ export function AddRelationshipModal({
             placeholder="e.g., Must be adopted together..."
             disabled={!selectedAnimal} />
           
-        </div>
-
-        <div className="pt-5 flex justify-end gap-3 border-t border-border mt-7">
-          <Button type="button" variant="ghost" onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={!selectedAnimal}>
-            Save Relationship
-          </Button>
         </div>
       </form>
     </Modal>);

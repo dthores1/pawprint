@@ -60,7 +60,30 @@ export function ArchiveConfirmDialog({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title={`Archive ${typeLabel}?`}>
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title={`Archive ${typeLabel}?`}
+      footer={
+      <div className="flex justify-end gap-3">
+          <Button
+          type="button"
+          variant="ghost"
+          onClick={handleClose}
+          disabled={submitting}>
+            Cancel
+          </Button>
+          <Button
+          type="button"
+          variant="danger"
+          onClick={handleConfirm}
+          disabled={submitting}>
+            <Trash2Icon className="w-4 h-4 mr-1.5" />
+            {submitting ? 'Archiving…' : `Archive ${typeLabel}`}
+          </Button>
+        </div>
+      }>
+
       <div className="space-y-4">
         <div className="flex items-start gap-3 p-3 rounded-xl border border-[#F8E7C8] bg-[#FFF7E6] text-sm text-[#A36B00]">
           <AlertTriangleIcon className="w-4 h-4 mt-0.5 shrink-0" />
@@ -80,26 +103,6 @@ export function ArchiveConfirmDialog({
             {error}
           </p>
         }
-
-        <div className="flex justify-end gap-3 pt-2 border-t border-border">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={handleClose}
-            disabled={submitting}>
-
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            variant="danger"
-            onClick={handleConfirm}
-            disabled={submitting}>
-
-            <Trash2Icon className="w-4 h-4 mr-1.5" />
-            {submitting ? 'Archiving…' : `Archive ${typeLabel}`}
-          </Button>
-        </div>
       </div>
     </Modal>);
 

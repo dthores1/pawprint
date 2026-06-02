@@ -160,8 +160,26 @@ export function AddMedicalModal({
     }));
   };
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={animalDisplayName(animal) + " | Add Medical Record"}>
-      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={animalDisplayName(animal) + ' | Add Medical Record'}
+      footer={
+      <div className="flex justify-end gap-3">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="add-medical-form">
+            Save Record
+          </Button>
+        </div>
+      }>
+
+      <form
+        id="add-medical-form"
+        onSubmit={handleSubmit}
+        className="space-y-5"
+        noValidate>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label htmlFor="procedure_type" required>Type</Label>
@@ -444,13 +462,6 @@ export function AddMedicalModal({
             onChange={handleChange}
             placeholder="Any additional details..." />
 
-        </div>
-
-        <div className="pt-4 flex justify-end gap-3 border-t border-border mt-6">
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit">Save Record</Button>
         </div>
       </form>
     </Modal>);

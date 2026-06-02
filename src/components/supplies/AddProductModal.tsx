@@ -77,9 +77,23 @@ export function AddProductModal({ isOpen, onClose, product }: Props) {
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={editing ? 'Edit Product' : 'Add Product'}>
+      title={editing ? 'Edit Product' : 'Add Product'}
+      footer={
+      <div className="flex justify-end gap-3">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="product-form">
+            {editing ? 'Save Changes' : 'Add Product'}
+          </Button>
+        </div>
+      }>
 
-      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+      <form
+        id="product-form"
+        onSubmit={handleSubmit}
+        className="space-y-5"
+        noValidate>
         <div>
           <Label htmlFor="product_name" required>Name</Label>
           <Input
@@ -137,13 +151,6 @@ export function AddProductModal({ isOpen, onClose, product }: Props) {
 
           Active (available when creating supply requests)
         </label>
-
-        <div className="pt-4 flex justify-end gap-3 border-t border-border">
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit">{editing ? 'Save Changes' : 'Add Product'}</Button>
-        </div>
       </form>
     </Modal>);
 

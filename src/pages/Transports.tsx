@@ -8,8 +8,10 @@ import {
   PlusIcon,
   ArrowRightIcon,
   AlertCircleIcon,
+  MapPinIcon,
   Trash2Icon } from
 'lucide-react';
+import { AddressDisplay } from '../components/ui/AddressDisplay';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -283,7 +285,19 @@ function TransportCard({
               </span>
             }
           </div>
-          <p className="text-sm text-text-primary font-medium">
+          <p className="text-sm text-text-secondary mt-1 flex items-center gap-1.5 min-w-0">
+            <MapPinIcon className="w-3.5 h-3.5 shrink-0" />
+            <AddressDisplay
+              value={request.pickup_address ?? null}
+              singleLine
+              className="text-text-primary min-w-0" />
+            <ArrowRightIcon className="w-3.5 h-3.5 shrink-0" />
+            <AddressDisplay
+              value={request.dropoff_address ?? null}
+              singleLine
+              className="text-text-primary min-w-0" />
+          </p>
+          <p className="text-sm text-text-primary font-medium mt-1">
             {formatPickupTime(request.requested_pickup_time)}
           </p>
           <p className="text-sm text-text-secondary mt-1">

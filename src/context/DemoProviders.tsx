@@ -431,6 +431,61 @@ export function DemoWhiskerProvider({
         updateAnimal(adoption.animal_id, { is_on_hold: false });
       }
     },
+    returnAdoption: (id, input) => {
+      const adoption = adoptions.find((a) => a.id === id);
+      if (!adoption) return;
+      setAdoptions((prev) =>
+      prev.map((a) =>
+      a.id === id ?
+      {
+        ...a,
+        status: 'returned',
+        returned_at: input.returned_at,
+        return_reason: input.return_reason,
+        return_notes: input.return_notes?.trim() || undefined
+      } :
+      a
+      )
+      );
+      updateAnimal(adoption.animal_id, {
+        status: 'intake',
+        adopted_by_id: undefined,
+        adopted_at: undefined,
+        is_on_hold: false
+      });
+    },
+    recordAdoptionReturn: async (input) => {
+      setAdoptions((prev) => [
+      {
+        id: `ad${generateId()}`,
+        animal_id: input.animal_id,
+        adopter_id: input.adopter_id,
+        status: 'returned',
+        returned_at: input.returned_at,
+        return_reason: input.return_reason,
+        return_notes: input.return_notes?.trim() || undefined,
+        created_at: now()
+      },
+      ...prev]
+      );
+      setPeople((prev) =>
+      prev.map((p) =>
+      p.id === input.adopter_id && !p.roles.includes('adopter') ?
+      {
+        ...p,
+        roles: [...p.roles, 'adopter'],
+        role: legacyRoleFor([...p.roles, 'adopter'])
+      } :
+      p
+      )
+      );
+      updateAnimal(input.animal_id, {
+        status: 'intake',
+        adopted_by_id: undefined,
+        adopted_at: undefined,
+        is_on_hold: false
+      });
+    },
 
     addPhoto: async (input: NewPhotoInput) => {
       const url = input.file ?

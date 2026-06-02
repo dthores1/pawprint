@@ -12,6 +12,8 @@ import { Button } from '../components/ui/Button';
 import { SpeciesBadge } from '../components/ui/SpeciesBadge';
 import { StatusBadge } from '../components/ui/Badge';
 import { EditContactModal } from '../components/contacts/EditContactModal';
+import { AddressDisplay } from '../components/ui/AddressDisplay';
+import { personToAddressValue } from '../lib/address';
 import { animalDisplayName } from '../lib/utils';
 import {
   ArrowLeftIcon,
@@ -130,7 +132,7 @@ export function ContactProfile() {
               {person.address &&
               <div className="flex items-start gap-3">
                   <MapPinIcon className="w-5 h-5 text-text-secondary shrink-0 mt-0.5" />
-                  <span className="text-text-primary">{person.address}</span>
+                  <AddressDisplay value={personToAddressValue(person)} />
                 </div>
               }
               {person.phone &&

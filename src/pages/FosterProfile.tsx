@@ -8,6 +8,8 @@ import { StatusBadge } from '../components/ui/Badge';
 import { SpeciesBadge } from '../components/ui/SpeciesBadge';
 import { PlaceAnimalModal } from '../components/animals/PlaceAnimalModal';
 import { EditFosterModal } from '../components/fosters/EditFosterModal';
+import { AddressDisplay } from '../components/ui/AddressDisplay';
+import { personToAddressValue } from '../lib/address';
 import { animalDisplayName } from '../lib/utils';
 import {
   ArrowLeftIcon,
@@ -131,9 +133,10 @@ export function FosterProfile() {
             <div className="space-y-4 pt-6 border-t border-border">
               <div className="flex items-start gap-3">
                 <MapPinIcon className="w-5 h-5 text-text-secondary shrink-0 mt-0.5" />
-                <span className="text-text-primary">
-                  {foster.address || '—'}
-                </span>
+                {personToAddressValue(foster) ?
+                <AddressDisplay value={personToAddressValue(foster)} /> :
+                <span className="text-text-primary">—</span>
+                }
               </div>
               <div className="flex items-center gap-3">
                 <PhoneIcon className="w-5 h-5 text-text-secondary shrink-0" />

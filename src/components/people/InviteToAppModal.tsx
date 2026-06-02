@@ -86,7 +86,34 @@ export function InviteToAppModal({ isOpen, onClose, person }: Props) {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Invite to Whiskerville">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Invite to Whiskerville"
+      footer={
+      link ?
+      <div className="flex justify-end gap-3">
+            <Button type="button" onClick={onClose}>
+              Done
+            </Button>
+          </div> :
+      <div className="flex justify-end gap-3">
+            <Button
+            type="button"
+            variant="ghost"
+            onClick={onClose}
+            disabled={submitting}>
+              Cancel
+            </Button>
+            <Button
+            type="submit"
+            form="invite-to-app-form"
+            disabled={submitting || !person.email}>
+              {submitting ? 'Sending…' : 'Send invite'}
+            </Button>
+          </div>
+      }>
+
       {link ?
       <div className="space-y-4">
           <p className="text-sm text-text-primary">
@@ -115,14 +142,13 @@ export function InviteToAppModal({ isOpen, onClose, person }: Props) {
             }
             </button>
           </div>
-          <div className="flex justify-end gap-3 pt-2 border-t border-border">
-            <Button type="button" onClick={onClose}>
-              Done
-            </Button>
-          </div>
         </div> :
 
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+      <form
+        id="invite-to-app-form"
+        onSubmit={handleSubmit}
+        className="space-y-4"
+        noValidate>
           <p className="text-sm text-text-secondary">
             Sends an invite to{' '}
             <span className="font-medium text-text-primary">
@@ -160,19 +186,6 @@ export function InviteToAppModal({ isOpen, onClose, person }: Props) {
           {error &&
         <FieldError>{error}</FieldError>
         }
-          <div className="flex justify-end gap-3 pt-2 border-t border-border">
-            <Button
-            type="button"
-            variant="ghost"
-            onClick={onClose}
-            disabled={submitting}>
-
-              Cancel
-            </Button>
-            <Button type="submit" disabled={submitting || !person.email}>
-              {submitting ? 'Sending…' : 'Send invite'}
-            </Button>
-          </div>
         </form>
       }
     </Modal>);

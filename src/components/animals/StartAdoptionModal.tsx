@@ -101,9 +101,22 @@ export function StartAdoptionModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={`Start Adoption for ${animalDisplayName(animal)}`}>
+      title={`Start Adoption for ${animalDisplayName(animal)}`}
+      footer={
+      <div className="flex justify-end gap-3">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+          type="submit"
+          form="start-adoption-form"
+          disabled={submitting}>
+            {submitting ? 'Starting…' : 'Start Adoption'}
+          </Button>
+        </div>
+      }>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form id="start-adoption-form" onSubmit={handleSubmit} className="space-y-5">
         <p className="text-sm text-text-secondary">
           Record an adopter and open an adoption inquiry. You'll move it through
           the workflow and mark it complete once paperwork is done.
@@ -204,15 +217,6 @@ export function StartAdoptionModal({
         }
 
         {error && <FieldError>{error}</FieldError>}
-
-        <div className="pt-4 flex justify-end gap-3 border-t border-border">
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={submitting}>
-            {submitting ? 'Starting…' : 'Start Adoption'}
-          </Button>
-        </div>
       </form>
     </Modal>);
 

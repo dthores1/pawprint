@@ -58,8 +58,25 @@ export function UpdateAdoptionModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Update Adoption">
-      <form onSubmit={handleSubmit} className="space-y-5">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Update Adoption"
+      footer={
+      <div className="flex justify-end gap-3">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="update-adoption-form">
+            Save
+          </Button>
+        </div>
+      }>
+
+      <form
+        id="update-adoption-form"
+        onSubmit={handleSubmit}
+        className="space-y-5">
         <div>
           <Label htmlFor="adoption_status">Status</Label>
           <Select
@@ -99,12 +116,6 @@ export function UpdateAdoptionModal({
             placeholder="Anything relevant to this adoption…"
             rows={3} />
 
-        </div>
-        <div className="pt-4 flex justify-end gap-3 border-t border-border">
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit">Save</Button>
         </div>
       </form>
     </Modal>);

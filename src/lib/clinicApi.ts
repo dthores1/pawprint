@@ -1,4 +1,5 @@
 import { ClinicEvent, ClinicSlot, ClinicSlotProcedure } from '../types';
+import { addressFromColumns, addressToColumns } from './address';
 
 // — Clinic events —————————————————————————————————————
 export function rowToClinicEvent(r: any): ClinicEvent {
@@ -6,6 +7,7 @@ export function rowToClinicEvent(r: any): ClinicEvent {
     id: r.id,
     date_time: r.date_time,
     location: r.location ?? '',
+    location_address: addressFromColumns(r, 'location', r.location),
     veterinarian_person_id: r.veterinarian_person_id ?? undefined,
     contact_person_id: r.contact_person_id ?? undefined,
     slot_capacity: r.slot_capacity ?? 0,
@@ -45,6 +47,7 @@ organizationId: string)
     if (v === undefined) continue;
     row[col] = normalize(v);
   }
+  Object.assign(row, addressToColumns('location', ev.location_address ?? null));
   return row;
 }
 
@@ -53,6 +56,9 @@ export function clinicEventUpdateToRow(updates: Partial<ClinicEvent>) {
   for (const col of CLINIC_EVENT_COLUMNS) {
     if (!(col in updates)) continue;
     row[col] = normalize((updates as any)[col]);
+  }
+  if ('location_address' in updates) {
+    Object.assign(row, addressToColumns('location', updates.location_address ?? null));
   }
   return row;
 }

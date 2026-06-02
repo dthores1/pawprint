@@ -9,6 +9,7 @@ import { Button } from '../components/ui/Button';
 import { Avatar } from '../components/ui/Avatar';
 import { Label, Input } from '../components/ui/Forms';
 import { AnimalSearchPicker } from '../components/ui/AnimalSearchPicker';
+import { AddressDisplay } from '../components/ui/AddressDisplay';
 import { EditClinicEventModal } from '../components/clinics/EditClinicEventModal';
 import { ClinicCompletionModal } from '../components/clinics/ClinicCompletionModal';
 import {
@@ -259,7 +260,10 @@ export function ClinicProfile() {
             <div className="space-y-3 pt-4 border-t border-border text-sm">
               <div className="flex items-start gap-3">
                 <MapPinIcon className="w-5 h-5 text-text-secondary shrink-0 mt-0.5" />
+                {event.location_address ?
+                <AddressDisplay value={event.location_address} /> :
                 <span className="text-text-primary">{event.location}</span>
+                }
               </div>
               <div className="flex items-start gap-3">
                 <UsersIcon className="w-5 h-5 text-text-secondary shrink-0 mt-0.5" />

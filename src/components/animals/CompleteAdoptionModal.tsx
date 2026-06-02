@@ -54,7 +54,22 @@ export function CompleteAdoptionModal({
   'the adopter';
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Complete Adoption">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Complete Adoption"
+      footer={
+      <div className="flex justify-end gap-3">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="button" onClick={handleConfirm}>
+            <CheckIcon className="w-4 h-4 mr-2" />
+            Complete Adoption
+          </Button>
+        </div>
+      }>
+
       <div className="space-y-5">
         <p className="text-sm text-text-primary">
           This finalizes the adoption of{' '}
@@ -81,15 +96,6 @@ export function CompleteAdoptionModal({
             onChange={(e) => setDonation(e.target.value)}
             placeholder="e.g. 75.00" />
 
-        </div>
-        <div className="pt-4 flex justify-end gap-3 border-t border-border">
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="button" onClick={handleConfirm}>
-            <CheckIcon className="w-4 h-4 mr-2" />
-            Complete Adoption
-          </Button>
         </div>
       </div>
     </Modal>);

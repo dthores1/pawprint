@@ -3,8 +3,9 @@ import { Modal } from '../ui/Modal';
 import { FieldError, Input, Textarea, Label } from '../ui/Forms';
 import { Button } from '../ui/Button';
 import { RolesMultiSelect } from '../ui/RolesMultiSelect';
+import { AddressAutocomplete } from '../ui/AddressAutocomplete';
 import { useWhisker } from '../../context/WhiskerContext';
-import { PersonRole, Species } from '../../types';
+import { AddressValue, PersonRole, Species } from '../../types';
 interface AddFosterModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -14,7 +15,7 @@ type FosterForm = {
   last_name: string;
   email: string;
   phone: string;
-  address: string;
+  address: AddressValue | null;
   // `''` lets the user clear the field while typing; coerced to a number on submit.
   max_capacity: number | '';
   preferred_species: Species[];
@@ -27,7 +28,7 @@ const INITIAL_FORM: FosterForm = {
   last_name: '',
   email: '',
   phone: '',
-  address: '',
+  address: null,
   max_capacity: 1,
   preferred_species: ['Dog', 'Cat'],
   notes: '',
@@ -78,13 +79,26 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
     const nextErrors = validateForm(formData);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
+    const addr = formData.address;
     addFoster({
       ...formData,
       first_name: formData.first_name.trim(),
       last_name: formData.last_name.trim(),
       email: formData.email.trim(),
       phone: formData.phone.trim(),
-      address: formData.address.trim(),
+      // Legacy single-line field + the structured components. Empty strings let
+      // the API layer null out columns the picked address doesn't supply.
+      address: addr?.formatted ?? '',
+      address_google_place_id: addr?.placeId || '',
+      address_formatted: addr?.formatted || '',
+      address_street_1: addr?.street1 || '',
+      address_street_2: addr?.street2 || '',
+      address_city: addr?.city || '',
+      address_state: addr?.state || '',
+      address_postal_code: addr?.postalCode || '',
+      address_country: addr?.country || '',
+      address_latitude: addr?.latitude,
+      address_longitude: addr?.longitude,
       notes: formData.notes.trim(),
       max_capacity: Number(formData.max_capacity)
     });
@@ -135,8 +149,26 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
     });
   };
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Add Foster Parent">
-      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title="Add Foster Parent"
+      footer={
+      <div className="flex justify-end gap-3">
+          <Button type="button" variant="ghost" onClick={handleClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="add-foster-form">
+            Add Foster
+          </Button>
+        </div>
+      }>
+
+      <form
+        id="add-foster-form"
+        onSubmit={handleSubmit}
+        className="space-y-5"
+        noValidate>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label htmlFor="first_name" required>First Name</Label>
@@ -206,15 +238,16 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
 
         <div>
           <Label htmlFor="address">Address</Label>
-          <Input
+          <AddressAutocomplete
             id="address"
-            name="address"
-            autoComplete="off"
-            aria-invalid={Boolean(errors.address)}
-            aria-describedby={errors.address ? 'address_error' : undefined}
-            className={errors.address && 'border-red-500 focus:ring-red-500'}
+            error={Boolean(errors.address)}
             value={formData.address}
-            onChange={handleChange} />
+            onChange={(addr) => {
+              setFormData((prev) => ({ ...prev, address: addr }));
+              if (errors.address) {
+                setErrors((prev) => ({ ...prev, address: undefined }));
+              }
+            }} />
           <FieldError id="address_error">{errors.address}</FieldError>
         </div>
 
@@ -281,13 +314,6 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
             value={formData.notes}
             onChange={handleChange} />
 
-        </div>
-
-        <div className="pt-4 flex justify-end gap-3 border-t border-border mt-6">
-          <Button type="button" variant="ghost" onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button type="submit">Add Foster</Button>
         </div>
       </form>
     </Modal>);

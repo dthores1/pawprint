@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { PlusIcon, XIcon } from 'lucide-react';
 import { FieldError, Input, Select, Textarea, Label } from '../ui/Forms';
 import { DatePicker } from '../ui/DatePicker';
-import { Button } from '../ui/Button';
 import { FormSection } from '../ui/FormSection';
 import { AgeInformationFields, AgeInputMode } from './AgeInformationFields';
 import { BreedCombobox } from './BreedCombobox';
@@ -12,6 +11,12 @@ import { deriveAgeInfo } from '../../lib/age';
 
 interface LitterFormProps {
   onClose: () => void;
+  /** `id` for the `<form>` so a sticky submit button in the parent modal can target it via `form="…"`. */
+  formId?: string;
+  /** Notifies the parent of the current member count so its sticky footer button can show "Add Litter (N)". */
+  onMembersCountChange?: (count: number) => void;
+  /** Notifies the parent that the async submit is in flight so the sticky button can disable + show "Adding…". */
+  onSubmittingChange?: (submitting: boolean) => void;
 }
 
 interface MemberRow {
@@ -36,7 +41,12 @@ const newMember = (): MemberRow => ({
   description: ''
 });
 
-export function LitterForm({ onClose }: LitterFormProps) {
+export function LitterForm({
+  onClose,
+  formId,
+  onMembersCountChange,
+  onSubmittingChange
+}: LitterFormProps) {
   const { addLitter } = useWhisker();
   // Shared, litter-wide fields.
   const [litterName, setLitterName] = useState('');
@@ -61,6 +71,14 @@ export function LitterForm({ onClose }: LitterFormProps) {
     intake_source?: string;
   }>({});
   const [submitting, setSubmitting] = useState(false);
+
+  // Mirror the two pieces of state that the parent's sticky submit button needs.
+  useEffect(() => {
+    onMembersCountChange?.(members.length);
+  }, [members.length, onMembersCountChange]);
+  useEffect(() => {
+    onSubmittingChange?.(submitting);
+  }, [submitting, onSubmittingChange]);
 
   const asOf = intakeDate || today();
   const noun = memberNoun(species);
@@ -120,7 +138,7 @@ export function LitterForm({ onClose }: LitterFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+    <form id={formId} onSubmit={handleSubmit} className="space-y-4" noValidate>
       {/* — Shared Information — */}
       <FormSection title="Shared Information">
         <p className="text-xs text-text-secondary">
@@ -302,15 +320,6 @@ export function LitterForm({ onClose }: LitterFormProps) {
         littermates. Use <span className="font-medium">Edit</span> on each
         profile to refine later.
       </p>
-
-      <div className="pt-4 flex justify-end gap-3 border-t border-border">
-        <Button type="button" variant="ghost" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button type="submit" disabled={submitting}>
-          {submitting ? 'Adding…' : `Add Litter (${members.length})`}
-        </Button>
-      </div>
     </form>);
 
 }

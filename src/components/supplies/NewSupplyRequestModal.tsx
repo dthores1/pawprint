@@ -285,9 +285,23 @@ export function NewSupplyRequestModal({
       isOpen={isOpen}
       onClose={handleClose}
       title="Request Supplies"
-      className="max-w-2xl">
-      
-      <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+      className="max-w-2xl"
+      footer={
+      <div className="flex justify-end gap-3">
+          <Button type="button" variant="ghost" onClick={handleClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="new-supply-request-form">
+            Submit Request
+          </Button>
+        </div>
+      }>
+
+      <form
+        id="new-supply-request-form"
+        onSubmit={handleSubmit}
+        className="space-y-6"
+        noValidate>
         {/* Reuse one of the requester's saved common requests. */}
         {myCommonRequests.length > 0 &&
         <div className="p-3 rounded-xl bg-primary/5 border border-primary/15">
@@ -587,13 +601,6 @@ export function NewSupplyRequestModal({
               maxLength={60} />
             }
           </div>
-        </div>
-
-        <div className="pt-5 flex justify-end gap-3 border-t border-border mt-7">
-          <Button type="button" variant="ghost" onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button type="submit">Submit Request</Button>
         </div>
       </form>
     </Modal>);

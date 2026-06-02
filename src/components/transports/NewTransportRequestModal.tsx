@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { Modal } from '../ui/Modal';
-import { FieldError, Input, Select, Textarea, Label } from '../ui/Forms';
+import { FieldError, Select, Textarea, Label } from '../ui/Forms';
 import { DateTimePicker } from '../ui/DateTimePicker';
+import { AddressAutocomplete } from '../ui/AddressAutocomplete';
 import { Button } from '../ui/Button';
 import { AnimalSearchPicker } from '../ui/AnimalSearchPicker';
 import { useWhisker } from '../../context/WhiskerContext';
 import { useAuth } from '../../context/AuthContext';
 import {
+  AddressValue,
   TransportRequestType,
   TransportRequestUrgency } from
 '../../types';
@@ -21,8 +23,8 @@ export function NewTransportRequestModal({ isOpen, onClose }: Props) {
   const [type, setType] = useState<TransportRequestType>('animal');
   const [urgency, setUrgency] = useState<TransportRequestUrgency>('normal');
   const [animalId, setAnimalId] = useState('');
-  const [pickup, setPickup] = useState('');
-  const [dropoff, setDropoff] = useState('');
+  const [pickup, setPickup] = useState<AddressValue | null>(null);
+  const [dropoff, setDropoff] = useState<AddressValue | null>(null);
   const [pickupTime, setPickupTime] = useState('');
   const [errors, setErrors] = useState<{
     animalId?: string;
@@ -35,8 +37,8 @@ export function NewTransportRequestModal({ isOpen, onClose }: Props) {
     setType('animal');
     setUrgency('normal');
     setAnimalId('');
-    setPickup('');
-    setDropoff('');
+    setPickup(null);
+    setDropoff(null);
     setPickupTime('');
     setErrors({});
     setNotes('');
@@ -57,8 +59,10 @@ export function NewTransportRequestModal({ isOpen, onClose }: Props) {
     if (type === 'animal' && !animalId) {
       nextErrors.animalId = 'Animal is required.';
     }
-    if (!pickup.trim()) nextErrors.pickup = 'Pickup location is required.';
-    if (!dropoff.trim()) nextErrors.dropoff = 'Dropoff location is required.';
+    if (!pickup?.formatted.trim())
+    nextErrors.pickup = 'Pickup location is required.';
+    if (!dropoff?.formatted.trim())
+    nextErrors.dropoff = 'Dropoff location is required.';
     if (!pickupTime) nextErrors.pickupTime = 'Pickup time is required.';
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
@@ -75,8 +79,10 @@ export function NewTransportRequestModal({ isOpen, onClose }: Props) {
       urgency,
       requested_by_person_id: currentPersonId ?? '',
       animal_id: animalId || undefined,
-      pickup_location: pickup.trim(),
-      dropoff_location: dropoff.trim(),
+      pickup_location: pickup?.formatted.trim() ?? '',
+      dropoff_location: dropoff?.formatted.trim() ?? '',
+      pickup_address: pickup,
+      dropoff_address: dropoff,
       requested_pickup_time: new Date(pickupTime).toISOString(),
       notes: notes.trim() || undefined
     });
@@ -88,9 +94,23 @@ export function NewTransportRequestModal({ isOpen, onClose }: Props) {
       isOpen={isOpen}
       onClose={handleClose}
       title="New Transport Request"
-      className="max-w-2xl">
+      className="max-w-2xl"
+      footer={
+      <div className="flex justify-end gap-3">
+          <Button type="button" variant="ghost" onClick={handleClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="new-transport-form">
+            Submit Request
+          </Button>
+        </div>
+      }>
 
-      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+      <form
+        id="new-transport-form"
+        onSubmit={handleSubmit}
+        className="space-y-5"
+        noValidate>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label htmlFor="type" required>Type</Label>
@@ -142,14 +162,12 @@ export function NewTransportRequestModal({ isOpen, onClose }: Props) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label htmlFor="pickup" required>Pickup location</Label>
-            <Input
+            <AddressAutocomplete
               id="pickup"
-              aria-invalid={Boolean(errors.pickup)}
-              aria-describedby={errors.pickup ? 'pickup_error' : undefined}
-              className={errors.pickup && 'border-red-500 focus:ring-red-500'}
+              error={Boolean(errors.pickup)}
               value={pickup}
-              onChange={(e) => {
-                setPickup(e.target.value);
+              onChange={(addr) => {
+                setPickup(addr);
                 if (errors.pickup) {
                   setErrors((prev) => ({ ...prev, pickup: undefined }));
                 }
@@ -160,14 +178,12 @@ export function NewTransportRequestModal({ isOpen, onClose }: Props) {
           </div>
           <div>
             <Label htmlFor="dropoff" required>Dropoff location</Label>
-            <Input
+            <AddressAutocomplete
               id="dropoff"
-              aria-invalid={Boolean(errors.dropoff)}
-              aria-describedby={errors.dropoff ? 'dropoff_error' : undefined}
-              className={errors.dropoff && 'border-red-500 focus:ring-red-500'}
+              error={Boolean(errors.dropoff)}
               value={dropoff}
-              onChange={(e) => {
-                setDropoff(e.target.value);
+              onChange={(addr) => {
+                setDropoff(addr);
                 if (errors.dropoff) {
                   setErrors((prev) => ({ ...prev, dropoff: undefined }));
                 }
@@ -199,13 +215,6 @@ export function NewTransportRequestModal({ isOpen, onClose }: Props) {
             placeholder="Carrier needed? Special instructions?"
             rows={3} />
 
-        </div>
-
-        <div className="pt-4 flex justify-end gap-3 border-t border-border">
-          <Button type="button" variant="ghost" onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button type="submit">Submit Request</Button>
         </div>
       </form>
     </Modal>);

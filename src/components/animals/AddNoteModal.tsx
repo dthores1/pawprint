@@ -37,8 +37,26 @@ export function AddNoteModal({ isOpen, onClose, animalId, animal }: AddNoteModal
     setBodyError(undefined);
   };
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={animalDisplayName(animal) + " | Add Note"}>
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={animalDisplayName(animal) + ' | Add Note'}
+      footer={
+      <div className="flex justify-end gap-3">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="add-note-form">
+            Add Note
+          </Button>
+        </div>
+      }>
+
+      <form
+        id="add-note-form"
+        onSubmit={handleSubmit}
+        className="space-y-4"
+        noValidate>
         <div>
           <Label htmlFor="note_type" required>Note Type</Label>
           <Select
@@ -80,13 +98,6 @@ export function AddNoteModal({ isOpen, onClose, animalId, animal }: AddNoteModal
             placeholder="Write your note here..." />
           <FieldError id="body_error">{bodyError}</FieldError>
           
-        </div>
-
-        <div className="pt-4 flex justify-end gap-3 border-t border-border mt-6">
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit">Add Note</Button>
         </div>
       </form>
     </Modal>);

@@ -1,4 +1,5 @@
 import { TransportRequest } from '../types';
+import { addressFromColumns, addressToColumns } from './address';
 
 export function rowToTransport(r: any): TransportRequest {
   return {
@@ -12,6 +13,8 @@ export function rowToTransport(r: any): TransportRequest {
     supply_request_id: r.supply_request_id ?? undefined,
     pickup_location: r.pickup_location ?? '',
     dropoff_location: r.dropoff_location ?? '',
+    pickup_address: addressFromColumns(r, 'pickup', r.pickup_location),
+    dropoff_address: addressFromColumns(r, 'dropoff', r.dropoff_location),
     requested_pickup_time: r.requested_pickup_time,
     completed_at: r.completed_at ?? undefined,
     notes: r.notes ?? undefined,
@@ -51,6 +54,8 @@ organizationId: string)
     if (v === undefined) continue;
     row[col] = normalize(v);
   }
+  Object.assign(row, addressToColumns('pickup', req.pickup_address ?? null));
+  Object.assign(row, addressToColumns('dropoff', req.dropoff_address ?? null));
   return row;
 }
 
@@ -59,6 +64,12 @@ export function transportUpdateToRow(updates: Partial<TransportRequest>) {
   for (const col of TRANSPORT_COLUMNS) {
     if (!(col in updates)) continue;
     row[col] = normalize((updates as any)[col]);
+  }
+  if ('pickup_address' in updates) {
+    Object.assign(row, addressToColumns('pickup', updates.pickup_address ?? null));
+  }
+  if ('dropoff_address' in updates) {
+    Object.assign(row, addressToColumns('dropoff', updates.dropoff_address ?? null));
   }
   return row;
 }

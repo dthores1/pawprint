@@ -161,7 +161,19 @@ export interface FosterInput {
   last_name: string;
   email: string;
   phone: string;
+  /** Legacy single-line address (kept in sync with address_formatted). */
   address: string;
+  // Structured address (optional — populated by AddressAutocomplete).
+  address_google_place_id?: string;
+  address_formatted?: string;
+  address_street_1?: string;
+  address_street_2?: string;
+  address_city?: string;
+  address_state?: string;
+  address_postal_code?: string;
+  address_country?: string;
+  address_latitude?: number;
+  address_longitude?: number;
   max_capacity: number;
   preferred_species: Species[];
   notes: string;
@@ -353,6 +365,29 @@ export type VolunteerType =
 'social_media' |
 'other';
 
+// A structured address resolved from a Google Places lookup (or typed by hand,
+// in which case only `formatted` is set). Stored flat on entities as
+// `address_*` columns; AddressAutocomplete emits/consumes this shape. See
+// `src/lib/address.ts` for the row ↔ value mappers.
+export interface AddressValue {
+  /** Single-line display string (Google `formatted_address`, or raw typed text). */
+  formatted: string;
+  /** Google Place ID — the durable key; safe to store long-term. */
+  placeId?: string;
+  /** Street number + route, e.g. "123 Main St". */
+  street1?: string;
+  /** Unit / apt / suite (Google `subpremise`). */
+  street2?: string;
+  city?: string;
+  /** State / province (2-letter where available). */
+  state?: string;
+  postalCode?: string;
+  /** ISO country code (e.g. "US"). */
+  country?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
 export interface Person {
   id: string;
   first_name: string;
@@ -382,8 +417,24 @@ export interface Person {
    * attribution but hidden from the Contacts directory.
    */
   user_id?: string;
-  // — Foster-specific (meaningful when roles includes 'foster_parent') —
+  // — Address —————————————————————————————————————————————————————
+  /**
+   * Legacy single-line address. Kept in sync with `address_formatted` so older
+   * displays keep working; new writes go through the structured fields below.
+   */
   address?: string;
+  /** Structured address from Google Places (see AddressValue / address.ts). */
+  address_google_place_id?: string;
+  address_formatted?: string;
+  address_street_1?: string;
+  address_street_2?: string;
+  address_city?: string;
+  address_state?: string;
+  address_postal_code?: string;
+  address_country?: string;
+  address_latitude?: number;
+  address_longitude?: number;
+  // — Foster-specific (meaningful when roles includes 'foster_parent') —
   max_capacity?: number;
   preferred_species?: Species[];
 }
@@ -501,8 +552,12 @@ export interface TransportRequest {
   animal_id?: string;
   clinic_event_id?: string;
   supply_request_id?: string;
+  /** Legacy single-line locations, kept in sync with the structured addresses. */
   pickup_location: string;
   dropoff_location: string;
+  /** Structured addresses from Google Places (see address.ts column mappers). */
+  pickup_address?: AddressValue | null;
+  dropoff_address?: AddressValue | null;
   requested_pickup_time: string;
   completed_at?: string;
   notes?: string;
@@ -569,7 +624,10 @@ export type ClinicEventStatus =
 export interface ClinicEvent {
   id: string;
   date_time: string;
+  /** Legacy single-line location, kept in sync with `location_address`. */
   location: string;
+  /** Structured location from Google Places (see address.ts column mappers). */
+  location_address?: AddressValue | null;
   /** Vet performing procedures. Person with role 'vet' in `people`. */
   veterinarian_person_id?: string;
   /**

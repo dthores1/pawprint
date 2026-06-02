@@ -300,7 +300,51 @@ export function ClinicCompletionModal({ isOpen, onClose, clinicEventId }: Props)
         onClose();
       }}
       title="Complete Clinic"
-      className="max-w-3xl">
+      className="max-w-3xl"
+      footer={
+      <div className="flex items-center justify-between gap-3">
+          <Button
+          type="button"
+          variant="ghost"
+          onClick={() => {
+            if (step === 1) {
+              setInitFor(null);
+              onClose();
+            } else {
+              setStep((s) => s - 1 as Step);
+            }
+          }}
+          disabled={submitting}>
+
+            {step === 1 ?
+          'Cancel' :
+
+          <span className="inline-flex items-center gap-1">
+                <ChevronLeftIcon className="w-4 h-4" />
+                Back
+              </span>
+          }
+          </Button>
+          {step < 3 ?
+        <Button
+          type="button"
+          onClick={() => setStep((s) => s + 1 as Step)}
+          disabled={blocksStep1 || submitting}>
+
+              Next
+              <ChevronRightIcon className="w-4 h-4 ml-1" />
+            </Button> :
+
+        <Button
+          type="button"
+          onClick={handleComplete}
+          disabled={submitting}>
+
+              {submitting ? 'Completing…' : 'Complete Clinic'}
+            </Button>
+        }
+        </div>
+      }>
 
       <div className="space-y-5">
         {/* Header */}
@@ -378,49 +422,6 @@ export function ClinicCompletionModal({ isOpen, onClose, clinicEventId }: Props)
           </div>
         }
 
-        {/* Footer */}
-        <div className="flex items-center justify-between pt-2 border-t border-border">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              if (step === 1) {
-                setInitFor(null);
-                onClose();
-              } else {
-                setStep((s) => (s - 1) as Step);
-              }
-            }}
-            disabled={submitting}>
-
-            {step === 1 ?
-            'Cancel' :
-
-            <span className="inline-flex items-center gap-1">
-                <ChevronLeftIcon className="w-4 h-4" />
-                Back
-              </span>
-            }
-          </Button>
-          {step < 3 ?
-          <Button
-            type="button"
-            onClick={() => setStep((s) => (s + 1) as Step)}
-            disabled={blocksStep1 || submitting}>
-
-              Next
-              <ChevronRightIcon className="w-4 h-4 ml-1" />
-            </Button> :
-
-          <Button
-            type="button"
-            onClick={handleComplete}
-            disabled={submitting}>
-
-              {submitting ? 'Completing…' : 'Complete Clinic'}
-            </Button>
-          }
-        </div>
       </div>
     </Modal>);
 

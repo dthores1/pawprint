@@ -3,9 +3,11 @@ import { Modal } from '../ui/Modal';
 import { FieldError, Input, Textarea, Label } from '../ui/Forms';
 import { Button } from '../ui/Button';
 import { RolesMultiSelect } from '../ui/RolesMultiSelect';
+import { AddressAutocomplete } from '../ui/AddressAutocomplete';
 import { useWhisker } from '../../context/WhiskerContext';
-import { PersonRole } from '../../types';
+import { AddressValue, PersonRole } from '../../types';
 import { legacyRoleFor } from '../../lib/peopleApi';
+import { addressValueToPersonFields } from '../../lib/address';
 interface AddContactModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -38,9 +40,11 @@ function validateForm(form: typeof INITIAL): FormErrors {
 export function AddContactModal({ isOpen, onClose }: AddContactModalProps) {
   const { addPerson } = useWhisker();
   const [form, setForm] = useState(INITIAL);
+  const [address, setAddress] = useState<AddressValue | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
   const handleClose = () => {
     setForm(INITIAL);
+    setAddress(null);
     setErrors({});
     onClose();
   };
@@ -62,7 +66,8 @@ export function AddContactModal({ isOpen, onClose }: AddContactModalProps) {
       form.organization_name.trim() || undefined :
       undefined,
       notes: form.notes.trim() || undefined,
-      active: true
+      active: true,
+      ...addressValueToPersonFields(address)
     });
     handleClose();
   };
@@ -73,8 +78,26 @@ export function AddContactModal({ isOpen, onClose }: AddContactModalProps) {
     }
   };
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Add Contact">
-      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title="Add Contact"
+      footer={
+      <div className="flex justify-end gap-3">
+          <Button type="button" variant="ghost" onClick={handleClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="add-contact-form">
+            Add Contact
+          </Button>
+        </div>
+      }>
+
+      <form
+        id="add-contact-form"
+        onSubmit={handleSubmit}
+        className="space-y-5"
+        noValidate>
         <div className="grid grid-cols-2 gap-5">
           <div>
             <Label htmlFor="first_name" required>First Name</Label>
@@ -127,6 +150,15 @@ export function AddContactModal({ isOpen, onClose }: AddContactModalProps) {
         </div>
 
         <div>
+          <Label htmlFor="address">Address</Label>
+          <AddressAutocomplete
+            id="address"
+            value={address}
+            onChange={setAddress} />
+
+        </div>
+
+        <div>
           <Label required>Roles</Label>
           <RolesMultiSelect
             value={form.roles}
@@ -161,13 +193,6 @@ export function AddContactModal({ isOpen, onClose }: AddContactModalProps) {
             value={form.notes}
             onChange={(e) => set('notes', e.target.value)} />
 
-        </div>
-
-        <div className="pt-4 flex justify-end gap-3 border-t border-border">
-          <Button type="button" variant="ghost" onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button type="submit">Add Contact</Button>
         </div>
       </form>
     </Modal>);

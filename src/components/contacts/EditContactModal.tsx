@@ -3,9 +3,14 @@ import { Modal } from '../ui/Modal';
 import { FieldError, Input, Textarea, Label } from '../ui/Forms';
 import { Button } from '../ui/Button';
 import { RolesMultiSelect } from '../ui/RolesMultiSelect';
+import { AddressAutocomplete } from '../ui/AddressAutocomplete';
 import { useWhisker } from '../../context/WhiskerContext';
-import { Person, PersonRole } from '../../types';
+import { AddressValue, Person, PersonRole } from '../../types';
 import { legacyRoleFor } from '../../lib/peopleApi';
+import {
+  addressValueToPersonFields,
+  personToAddressValue } from
+'../../lib/address';
 interface EditContactModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -55,10 +60,14 @@ export function EditContactModal({
 }: EditContactModalProps) {
   const { updatePerson } = useWhisker();
   const [form, setForm] = useState<ContactForm>(() => fromPerson(person));
+  const [address, setAddress] = useState<AddressValue | null>(() =>
+  personToAddressValue(person)
+  );
   const [errors, setErrors] = useState<FormErrors>({});
   useEffect(() => {
     if (isOpen) {
       setForm(fromPerson(person));
+      setAddress(personToAddressValue(person));
       setErrors({});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -81,7 +90,8 @@ export function EditContactModal({
       form.organization_name.trim() || undefined :
       undefined,
       notes: form.notes.trim() || undefined,
-      active: form.active
+      active: form.active,
+      ...addressValueToPersonFields(address)
     });
     onClose();
   };
@@ -90,8 +100,26 @@ export function EditContactModal({
     if (errors[key]) setErrors((prev) => ({ ...prev, [key]: undefined }));
   };
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Edit Contact">
-      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Edit Contact"
+      footer={
+      <div className="flex justify-end gap-3">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="edit-contact-form">
+            Save Changes
+          </Button>
+        </div>
+      }>
+
+      <form
+        id="edit-contact-form"
+        onSubmit={handleSubmit}
+        className="space-y-5"
+        noValidate>
         <div className="grid grid-cols-2 gap-5">
           <div>
             <Label htmlFor="first_name" required>First Name</Label>
@@ -134,6 +162,14 @@ export function EditContactModal({
               value={form.phone}
               onChange={(e) => set('phone', e.target.value)} />
           </div>
+        </div>
+
+        <div>
+          <Label htmlFor="address">Address</Label>
+          <AddressAutocomplete
+            id="address"
+            value={address}
+            onChange={setAddress} />
         </div>
 
         <div>
@@ -182,13 +218,6 @@ export function EditContactModal({
 
           <span className="text-sm text-text-primary">Active</span>
         </label>
-
-        <div className="pt-4 flex justify-end gap-3 border-t border-border">
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit">Save Changes</Button>
-        </div>
       </form>
     </Modal>);
 

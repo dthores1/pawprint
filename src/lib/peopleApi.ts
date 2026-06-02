@@ -26,6 +26,19 @@ export function rowToPerson(r: any): Person {
     created_at: r.created_at,
     user_id: r.user_id ?? undefined,
     address: r.address ?? undefined,
+    address_google_place_id: r.address_google_place_id ?? undefined,
+    address_formatted: r.address_formatted ?? undefined,
+    address_street_1: r.address_street_1 ?? undefined,
+    address_street_2: r.address_street_2 ?? undefined,
+    address_city: r.address_city ?? undefined,
+    address_state: r.address_state ?? undefined,
+    address_postal_code: r.address_postal_code ?? undefined,
+    address_country: r.address_country ?? undefined,
+    // numeric(10,7) comes back as a string from PostgREST.
+    address_latitude:
+    r.address_latitude != null ? Number(r.address_latitude) : undefined,
+    address_longitude:
+    r.address_longitude != null ? Number(r.address_longitude) : undefined,
     max_capacity: r.max_capacity ?? undefined,
     preferred_species:
     (r.preferred_species ?? undefined) as Species[] | undefined
@@ -45,6 +58,16 @@ const PERSON_COLUMNS = [
 'photo_url',
 'active',
 'address',
+'address_google_place_id',
+'address_formatted',
+'address_street_1',
+'address_street_2',
+'address_city',
+'address_state',
+'address_postal_code',
+'address_country',
+'address_latitude',
+'address_longitude',
 'max_capacity',
 'preferred_species'] as
 const;

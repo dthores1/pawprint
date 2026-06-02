@@ -123,9 +123,22 @@ export function AdoptionReturnModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={`Adoption Return for ${animalDisplayName(animal)}`}>
+      title={`Adoption Return for ${animalDisplayName(animal)}`}
+      footer={
+      <div className="flex justify-end gap-3">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+          type="submit"
+          form="adoption-return-form"
+          disabled={submitting}>
+            {submitting ? 'Recording…' : 'Record Return'}
+          </Button>
+        </div>
+      }>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form id="adoption-return-form" onSubmit={handleSubmit} className="space-y-5">
         {hasRecord ?
         <p className="text-sm text-text-secondary">
             Record this return against the completed adoption on file. Once saved,{' '}
@@ -212,15 +225,6 @@ export function AdoptionReturnModal({
         </div>
 
         {error && <FieldError>{error}</FieldError>}
-
-        <div className="pt-4 flex justify-end gap-3 border-t border-border">
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={submitting}>
-            {submitting ? 'Recording…' : 'Record Return'}
-          </Button>
-        </div>
       </form>
     </Modal>);
 

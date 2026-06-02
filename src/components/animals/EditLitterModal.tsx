@@ -80,9 +80,19 @@ export function EditLitterModal({
       isOpen={isOpen}
       onClose={onClose}
       title="Update Litter"
-      className="max-w-2xl">
+      className="max-w-2xl"
+      footer={
+      <div className="flex justify-end gap-3">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="edit-litter-form">
+            Save Changes
+          </Button>
+        </div>
+      }>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form id="edit-litter-form" onSubmit={handleSubmit} className="space-y-5">
         <div>
           <Label htmlFor="litter_edit_name">Litter Name (optional)</Label>
           <Input
@@ -182,13 +192,6 @@ export function EditLitterModal({
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Anything that applies to the whole litter…" />
 
-        </div>
-
-        <div className="pt-4 flex justify-end gap-3 border-t border-border">
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit">Save Changes</Button>
         </div>
       </form>
     </Modal>);

@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { FieldError, Input, Textarea, Label } from '../ui/Forms';
 import { DateTimePicker } from '../ui/DateTimePicker';
+import { AddressAutocomplete } from '../ui/AddressAutocomplete';
 import { Button } from '../ui/Button';
 import { PersonSearchPicker } from '../ui/PersonSearchPicker';
 import { useWhisker } from '../../context/WhiskerContext';
+import { AddressValue } from '../../types';
 
 interface Props {
   isOpen: boolean;
@@ -13,7 +15,7 @@ interface Props {
 
 type ClinicForm = {
   dateTime: string;
-  location: string;
+  location: AddressValue | null;
   vetId: string;
   contactId: string;
   // `''` lets the user clear the field while typing; coerced to a number on submit.
@@ -23,7 +25,7 @@ type ClinicForm = {
 
 const INITIAL: ClinicForm = {
   dateTime: '',
-  location: '',
+  location: null,
   vetId: '',
   contactId: '',
   capacity: 8,
@@ -36,7 +38,8 @@ type FormErrors = Partial<Record<FormField, string>>;
 function validateForm(form: ClinicForm): FormErrors {
   const nextErrors: FormErrors = {};
   if (!form.dateTime) nextErrors.dateTime = 'Date & time is required.';
-  if (!form.location.trim()) nextErrors.location = 'Location is required.';
+  if (!form.location?.formatted.trim())
+  nextErrors.location = 'Location is required.';
   if (form.capacity === '' || form.capacity < 1) {
     nextErrors.capacity = 'Slot capacity must be at least 1.';
   }
@@ -71,7 +74,8 @@ export function NewClinicEventModal({ isOpen, onClose }: Props) {
     if (Object.keys(nextErrors).length > 0) return;
     addClinicEvent({
       date_time: new Date(form.dateTime).toISOString(),
-      location: form.location.trim(),
+      location: form.location?.formatted.trim() ?? '',
+      location_address: form.location,
       veterinarian_person_id: form.vetId || undefined,
       contact_person_id: form.contactId || undefined,
       slot_capacity: Number(form.capacity),
@@ -86,9 +90,23 @@ export function NewClinicEventModal({ isOpen, onClose }: Props) {
       isOpen={isOpen}
       onClose={handleClose}
       title="New Clinic"
-      className="max-w-2xl">
+      className="max-w-2xl"
+      footer={
+      <div className="flex justify-end gap-3">
+          <Button type="button" variant="ghost" onClick={handleClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="new-clinic-form">
+            Create Clinic
+          </Button>
+        </div>
+      }>
 
-      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+      <form
+        id="new-clinic-form"
+        onSubmit={handleSubmit}
+        className="space-y-5"
+        noValidate>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label htmlFor="datetime" required>Date & time</Label>
@@ -125,14 +143,12 @@ export function NewClinicEventModal({ isOpen, onClose }: Props) {
 
         <div>
           <Label htmlFor="location" required>Location</Label>
-          <Input
+          <AddressAutocomplete
             id="location"
-            aria-invalid={Boolean(errors.location)}
-            aria-describedby={errors.location ? 'location_error' : undefined}
-            className={errors.location && 'border-red-500 focus:ring-red-500'}
+            error={Boolean(errors.location)}
             value={form.location}
-            onChange={(e) => set('location', e.target.value)}
-            placeholder="Clinic name and address" />
+            onChange={(addr) => set('location', addr)}
+            placeholder="Clinic name or address" />
           <FieldError id="location_error">{errors.location}</FieldError>
         </div>
 
@@ -167,13 +183,6 @@ export function NewClinicEventModal({ isOpen, onClose }: Props) {
             placeholder="Drop-off windows, special instructions…"
             rows={3} />
 
-        </div>
-
-        <div className="pt-4 flex justify-end gap-3 border-t border-border">
-          <Button type="button" variant="ghost" onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button type="submit">Create Clinic</Button>
         </div>
       </form>
     </Modal>);

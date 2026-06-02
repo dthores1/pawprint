@@ -42,7 +42,29 @@ export function CancelAdoptionModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Cancel Adoption">
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title="Cancel Adoption"
+      footer={
+      <div className="flex justify-end gap-3">
+          <Button
+          type="button"
+          variant="ghost"
+          onClick={handleClose}
+          disabled={submitting}>
+            Keep Adoption
+          </Button>
+          <Button
+          type="button"
+          onClick={handleConfirm}
+          disabled={submitting}
+          className="bg-[#9B3A3A] hover:bg-[#7F2F2F] text-white">
+            {submitting ? 'Cancelling…' : 'Cancel Adoption'}
+          </Button>
+        </div>
+      }>
+
       <div className="space-y-5">
         <div className="flex gap-3 p-4 rounded-lg bg-[#FBE7D2]/40 border border-[#F3D2B0]">
           <AlertTriangleIcon className="w-5 h-5 text-[#B4641E] shrink-0 mt-0.5" />
@@ -66,19 +88,6 @@ export function CancelAdoptionModal({
             onChange={(e) => setReason(e.target.value)}
             placeholder="e.g. Adopter withdrew, didn't pass home check…"
             rows={3} />
-        </div>
-
-        <div className="flex justify-end gap-3 pt-4 border-t border-border">
-          <Button type="button" variant="ghost" onClick={handleClose} disabled={submitting}>
-            Keep Adoption
-          </Button>
-          <Button
-            type="button"
-            onClick={handleConfirm}
-            disabled={submitting}
-            className="bg-[#9B3A3A] hover:bg-[#7F2F2F] text-white">
-            {submitting ? 'Cancelling…' : 'Cancel Adoption'}
-          </Button>
         </div>
       </div>
     </Modal>);

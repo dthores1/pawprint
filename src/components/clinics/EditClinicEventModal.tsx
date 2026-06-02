@@ -2,10 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { FieldError, Input, Textarea, Label, Select } from '../ui/Forms';
 import { DateTimePicker } from '../ui/DateTimePicker';
+import { AddressAutocomplete } from '../ui/AddressAutocomplete';
 import { Button } from '../ui/Button';
 import { PersonSearchPicker } from '../ui/PersonSearchPicker';
 import { useWhisker } from '../../context/WhiskerContext';
-import { ClinicEvent, ClinicEventStatus } from '../../types';
+import { AddressValue, ClinicEvent, ClinicEventStatus } from '../../types';
 
 const STATUS_LABEL: Record<ClinicEventStatus, string> = {
   planning: 'Planning',
@@ -31,7 +32,7 @@ interface Props {
 type ClinicForm = {
   dateTime: string;
   status: ClinicEventStatus;
-  location: string;
+  location: AddressValue | null;
   vetId: string;
   contactId: string;
   transportId: string;
@@ -57,7 +58,7 @@ function fromEvent(e: ClinicEvent): ClinicForm {
   return {
     dateTime: toLocalInput(e.date_time),
     status: e.status,
-    location: e.location,
+    location: e.location_address ?? null,
     vetId: e.veterinarian_person_id ?? '',
     contactId: e.contact_person_id ?? '',
     transportId: e.transport_coordinator_person_id ?? '',
@@ -70,7 +71,8 @@ function fromEvent(e: ClinicEvent): ClinicForm {
 function validateForm(form: ClinicForm): FormErrors {
   const next: FormErrors = {};
   if (!form.dateTime) next.dateTime = 'Date & time is required.';
-  if (!form.location.trim()) next.location = 'Location is required.';
+  if (!form.location?.formatted.trim())
+  next.location = 'Location is required.';
   if (form.capacity === '' || form.capacity < 1) {
     next.capacity = 'Slot capacity must be at least 1.';
   }
@@ -109,7 +111,8 @@ export function EditClinicEventModal({ isOpen, onClose, event }: Props) {
     updateClinicEvent(event.id, {
       date_time: new Date(form.dateTime).toISOString(),
       status: form.status,
-      location: form.location.trim(),
+      location: form.location?.formatted.trim() ?? '',
+      location_address: form.location,
       veterinarian_person_id: clear(form.vetId),
       contact_person_id: clear(form.contactId),
       transport_coordinator_person_id: clear(form.transportId),
@@ -125,9 +128,23 @@ export function EditClinicEventModal({ isOpen, onClose, event }: Props) {
       isOpen={isOpen}
       onClose={onClose}
       title="Edit Clinic"
-      className="max-w-2xl">
+      className="max-w-2xl"
+      footer={
+      <div className="flex justify-end gap-3">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="edit-clinic-form">
+            Save Changes
+          </Button>
+        </div>
+      }>
 
-      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+      <form
+        id="edit-clinic-form"
+        onSubmit={handleSubmit}
+        className="space-y-5"
+        noValidate>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label htmlFor="datetime" required>Date & time</Label>
@@ -181,14 +198,12 @@ export function EditClinicEventModal({ isOpen, onClose, event }: Props) {
           </div>
           <div>
             <Label htmlFor="location" required>Location</Label>
-            <Input
+            <AddressAutocomplete
               id="location"
-              aria-invalid={Boolean(errors.location)}
-              aria-describedby={errors.location ? 'location_error' : undefined}
-              className={errors.location && 'border-red-500 focus:ring-red-500'}
+              error={Boolean(errors.location)}
               value={form.location}
-              onChange={(e) => set('location', e.target.value)}
-              placeholder="Clinic name and address" />
+              onChange={(addr) => set('location', addr)}
+              placeholder="Clinic name or address" />
 
             <FieldError id="location_error">{errors.location}</FieldError>
           </div>
@@ -247,13 +262,6 @@ export function EditClinicEventModal({ isOpen, onClose, event }: Props) {
             placeholder="Drop-off windows, special instructions…"
             rows={3} />
 
-        </div>
-
-        <div className="pt-4 flex justify-end gap-3 border-t border-border">
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit">Save Changes</Button>
         </div>
       </form>
     </Modal>);
