@@ -969,8 +969,8 @@ export function AnimalProfile() {
             }
           </Card>
 
-          {/* Upcoming Medical Widget */}
-          {upcomingMedical.length > 0 &&
+          {/* TODO - REMOVE THIS IF WE DON'T NEED…Upcoming Medical Widget */}
+          {/* {upcomingMedical.length > 0 &&
           <Card className="p-6">
               <h3 className="text-lg font-heading font-bold mb-4">
                 Care Schedule
@@ -999,7 +999,7 @@ export function AnimalProfile() {
               )}
               </div>
             </Card>
-          }
+          } */}
         </div>
       </div>
 

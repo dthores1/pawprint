@@ -27,45 +27,36 @@ export function loadGoogleMaps(): Promise<GoogleNamespace> {
       reject(new Error('VITE_GOOGLE_MAPS_API_KEY is not set'));
       return;
     }
+    const w = window as any;
     // Already present (e.g. a previous load in this session).
-    const existing = (window as any).google?.maps?.places;
-    if (existing) {
-      resolve((window as any).google);
+    if (w.google?.maps?.places) {
+      resolve(w.google);
       return;
     }
+    // Don't rely on script.onload — with the Maps loader the script `load`
+    // event fires before the API core + libraries are attached, so reading
+    // google.maps.places there races ("loaded without the Places library").
+    // Instead let Google call us back: with `&callback=` + `&libraries=places`
+    // the callback runs only once google.maps.places is fully ready.
+    const CALLBACK = '__pawprintGmapsReady';
+    w[CALLBACK] = () => {
+      const g = w.google;
+      if (g?.maps?.places) resolve(g);
+      else {
+        loadPromise = null;
+        reject(new Error('Google Maps loaded without the Places library'));
+      }
+      try {delete w[CALLBACK];} catch {w[CALLBACK] = undefined;}
+    };
     const script = document.createElement('script');
-    // With loading=async the bootstrap sets up google.maps.importLibrary but
-    // does NOT attach libraries by onload — so we must await importLibrary()
-    // rather than reading google.maps.places directly (that races and yields
-    // "loaded without the Places library"). No `libraries=` param needed.
     script.src =
     `https://maps.googleapis.com/maps/api/js?key=${API_KEY}` +
-    '&v=weekly&loading=async';
+    `&libraries=places&v=weekly&callback=${CALLBACK}`;
     script.async = true;
-    script.defer = true;
     script.onerror = () => {
       // Let the next caller retry rather than caching a permanent failure.
       loadPromise = null;
       reject(new Error('Failed to load the Google Maps script'));
-    };
-    script.onload = () => {
-      const g = (window as any).google;
-      const importLib = g?.maps?.importLibrary;
-      if (typeof importLib === 'function') {
-        // Awaiting guarantees google.maps.places is populated before we resolve.
-        g.maps.
-        importLibrary('places').
-        then(() => resolve(g)).
-        catch((e: unknown) => {
-          loadPromise = null;
-          reject(e instanceof Error ? e : new Error('Places library failed to load'));
-        });
-      } else if (g?.maps?.places) {
-        resolve(g);
-      } else {
-        loadPromise = null;
-        reject(new Error('Google Maps loaded without the Places library'));
-      }
     };
     document.head.appendChild(script);
   });
