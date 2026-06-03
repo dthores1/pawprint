@@ -62,7 +62,7 @@ export function RolesPickerPopover({
         aria-haspopup="listbox"
         aria-expanded={open}
         className={cn(
-          'flex h-11 w-full items-center justify-between gap-2 rounded-lg border border-border bg-white px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent',
+          'flex h-11 w-full items-center justify-between gap-2 rounded-lg border border-border bg-white px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary focus:border-transparent',
           value.length === 0 && 'text-text-secondary'
         )}>
 

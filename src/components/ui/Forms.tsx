@@ -25,7 +25,7 @@ export const Input = forwardRef<
       <input
         type={type}
         className={cn(
-          'block h-11 w-full rounded-lg border border-border bg-white px-3.5 py-2 text-sm placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50',
+          'block h-11 w-full rounded-lg border border-border bg-white px-3.5 py-2 text-sm placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50',
           isDateLike && DATE_NORMALIZE_CLASSES,
           className
         )}
@@ -42,7 +42,7 @@ export const Select = forwardRef<
     return (
       <select
         className={cn(
-          'flex h-11 w-full rounded-lg border border-border bg-white px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50',
+          'flex h-11 w-full rounded-lg border border-border bg-white px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50',
           className
         )}
         ref={ref}
@@ -60,7 +60,7 @@ export const Textarea = forwardRef<
     return (
       <textarea
         className={cn(
-          'flex min-h-[88px] w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50',
+          'flex min-h-[88px] w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50',
           className
         )}
         ref={ref}

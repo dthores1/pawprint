@@ -82,12 +82,16 @@ export function Sidebar() {
   return (
     <aside className="w-64 bg-card border-r border-border h-full flex flex-col hidden md:flex">
       <div className="h-16 flex items-center px-6 border-b border-border">
-        <div className="flex items-center gap-1 text-primary">
+        <Link
+          to="/"
+          aria-label="Go to dashboard"
+          className="flex items-center gap-1 text-primary rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+
           <LogoMark className="w-16 h-14" />
           <span className="font-heading font-bold text-xl tracking-tight">
             Whiskerville
           </span>
-        </div>
+        </Link>
       </div>
 
       <nav className="flex-1 px-4 py-6 space-y-1">

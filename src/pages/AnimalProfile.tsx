@@ -526,23 +526,48 @@ export function AnimalProfile() {
                       </span>
                     }
                   </div>
-                  <p className="text-lg text-text-secondary">
-                    {animalBreedLabel(animal, breeds) || animal.species} •{' '}
-                    {animal.sex} •{' '}
-                    <span className="whitespace-nowrap">
-                      {calculateAge(animal.estimated_birth_date)}
-                    </span>
-                  </p>
-                  {animal.birthdate_source === 'estimated_age' &&
-                  animal.estimated_age_value != null &&
-                  <p className="text-xs text-text-secondary mt-0.5">
-                      Estimated {animal.estimated_age_value}{' '}
-                      {animal.estimated_age_unit}
-                      {animal.estimated_age_as_of ?
-                    ` as of ${formatDate(animal.estimated_age_as_of)}` :
-                    ''}
-                    </p>
-                  }
+                  {/* Two-line subtitle hierarchy:
+                      1. Species (with icon) • Sex — slightly emphasized
+                      2. Breed • Age (est) — lower emphasis
+                      Replaces the redundant Cat pill below + the
+                      "Estimated X years as of …" line, which was confusing
+                      when it contradicted the computed age on the same row. */}
+                  {(() => {
+                    const SpeciesIcon =
+                    animal.species === 'Dog' ?
+                    DogIcon :
+                    animal.species === 'Cat' ?
+                    CatIcon :
+                    PawPrintGlyph;
+                    const breed = animalBreedLabel(animal, breeds);
+                    const ageEstimated =
+                    animal.birthdate_source === 'estimated_birthdate' ||
+                    animal.birthdate_source === 'estimated_age';
+                    const ageText = `${calculateAge(animal.estimated_birth_date)}${
+                    ageEstimated ? ' (est.)' : ''}`;
+
+                    return (
+                      <div className="mt-1 space-y-0.5">
+                        <p className="text-base flex flex-wrap items-center gap-x-2 text-text-primary font-medium">
+                          <span className="inline-flex items-center gap-1.5">
+                            <SpeciesIcon className="w-4 h-4 text-text-secondary" />
+                            {animal.species}
+                          </span>
+                          <span className="text-text-secondary/60">•</span>
+                          <span>{animal.sex}</span>
+                        </p>
+                        <p className="text-sm text-text-secondary">
+                          {breed ?
+                          <>
+                              {breed}{' '}
+                              <span className="text-text-secondary/60">•</span>{' '}
+                            </> :
+                          null}
+                          <span className="whitespace-nowrap">{ageText}</span>
+                        </p>
+                      </div>);
+
+                  })()}
                 </div>
                 <div className="flex flex-wrap gap-2 sm:shrink-0">
                   {animal.status === 'adoptable' && !activeAdoption &&
@@ -597,7 +622,6 @@ export function AnimalProfile() {
                   priority={animal.priority}
                   className="text-sm px-3 py-1" />
                 
-                <SpeciesBadge species={animal.species} showLabel size="md" />
                 <AnimalFlags
                   animal={animal}
                   isFostered={!!activePlacement}

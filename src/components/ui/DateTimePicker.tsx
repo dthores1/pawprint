@@ -23,7 +23,7 @@ interface DateTimePickerProps {
 }
 const DEFAULT_TIME = '09:00';
 const TIME_SELECT_CLASS =
-'flex-1 min-w-0 h-9 rounded-lg border border-border bg-white px-2 text-sm text-center text-text-primary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent cursor-pointer';
+'flex-1 min-w-0 h-9 rounded-lg border border-border bg-white px-2 text-sm text-center text-text-primary focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary focus:border-transparent cursor-pointer';
 
 export function DateTimePicker({
   id,
@@ -86,7 +86,7 @@ export function DateTimePicker({
         aria-invalid={error || undefined}
         aria-required={required || undefined}
         className={cn(
-          'flex h-11 w-full items-center justify-between gap-2 rounded-lg border border-border bg-white px-3.5 py-2 text-sm text-left focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50',
+          'flex h-11 w-full items-center justify-between gap-2 rounded-lg border border-border bg-white px-3.5 py-2 text-sm text-left focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50',
           error && 'border-red-500 focus:ring-red-500',
           className
         )}>
