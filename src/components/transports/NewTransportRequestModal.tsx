@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { FieldError, Select, Textarea, Label } from '../ui/Forms';
 import { DateTimePicker } from '../ui/DateTimePicker';
@@ -9,6 +9,7 @@ import { useWhisker } from '../../context/WhiskerContext';
 import { useAuth } from '../../context/AuthContext';
 import {
   AddressValue,
+  TransportRequest,
   TransportRequestType,
   TransportRequestUrgency } from
 '../../types';
@@ -16,10 +17,28 @@ import {
 interface Props {
   isOpen: boolean;
   onClose: () => void;
+  /**
+   * When supplied, switches the modal to edit mode: form is pre-populated
+   * with the request's current values and Save calls updateTransportRequest
+   * instead of addTransportRequest.
+   */
+  request?: TransportRequest;
 }
-export function NewTransportRequestModal({ isOpen, onClose }: Props) {
-  const { addTransportRequest, animals } = useWhisker();
+
+// `datetime-local` wants `YYYY-MM-DDTHH:mm` in local time, no zone suffix.
+function toLocalInput(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+
+}
+
+export function NewTransportRequestModal({ isOpen, onClose, request }: Props) {
+  const { addTransportRequest, updateTransportRequest, animals } = useWhisker();
   const { currentPersonId } = useAuth();
+  const isEditMode = !!request;
   const [type, setType] = useState<TransportRequestType>('animal');
   const [urgency, setUrgency] = useState<TransportRequestUrgency>('normal');
   const [animalId, setAnimalId] = useState('');
@@ -33,18 +52,43 @@ export function NewTransportRequestModal({ isOpen, onClose }: Props) {
     pickupTime?: string;
   }>({});
   const [notes, setNotes] = useState('');
-  const reset = () => {
-    setType('animal');
-    setUrgency('normal');
-    setAnimalId('');
-    setPickup(null);
-    setDropoff(null);
-    setPickupTime('');
+
+  // Re-seed when opened (or when the editing target changes). In create mode
+  // this resets to blank; in edit mode it loads the current request values.
+  useEffect(() => {
+    if (!isOpen) return;
+    if (request) {
+      setType(request.type);
+      setUrgency(request.urgency);
+      setAnimalId(request.animal_id ?? '');
+      setPickup(
+        request.pickup_address ??
+        (request.pickup_location ?
+        { formatted: request.pickup_location } as AddressValue :
+        null)
+      );
+      setDropoff(
+        request.dropoff_address ??
+        (request.dropoff_location ?
+        { formatted: request.dropoff_location } as AddressValue :
+        null)
+      );
+      setPickupTime(toLocalInput(request.requested_pickup_time));
+      setNotes(request.notes ?? '');
+    } else {
+      setType('animal');
+      setUrgency('normal');
+      setAnimalId('');
+      setPickup(null);
+      setDropoff(null);
+      setPickupTime('');
+      setNotes('');
+    }
     setErrors({});
-    setNotes('');
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, request?.id]);
+
   const handleClose = () => {
-    reset();
     onClose();
   };
   const handlePickupTimeChange = (v: string) => {
@@ -66,26 +110,45 @@ export function NewTransportRequestModal({ isOpen, onClose }: Props) {
     if (!pickupTime) nextErrors.pickupTime = 'Pickup time is required.';
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
-    // Guard against past times. The calendar already blocks past days,
-    // but a same-day time can still slip into the past while the form is open.
+    // Guard against past times — but only on changes. In edit mode, leaving
+    // the original same-day time alone shouldn't trip a "past time" error
+    // just because the form was reopened a few minutes later.
     const pickupDate = new Date(pickupTime);
-    if (pickupDate.getTime() < Date.now()) {
+    const originalIso = request ?
+    new Date(request.requested_pickup_time).toISOString() :
+    null;
+    const changedTime = pickupDate.toISOString() !== originalIso;
+    if (changedTime && pickupDate.getTime() < Date.now()) {
       setErrors({ pickupTime: 'Pickup time must be in the future.' });
       return;
     }
-    addTransportRequest({
-      type,
-      status: 'open',
-      urgency,
-      requested_by_person_id: currentPersonId ?? '',
-      animal_id: animalId || undefined,
-      pickup_location: pickup?.formatted.trim() ?? '',
-      dropoff_location: dropoff?.formatted.trim() ?? '',
-      pickup_address: pickup,
-      dropoff_address: dropoff,
-      requested_pickup_time: new Date(pickupTime).toISOString(),
-      notes: notes.trim() || undefined
-    });
+    if (request) {
+      updateTransportRequest(request.id, {
+        type,
+        urgency,
+        animal_id: animalId || undefined,
+        pickup_location: pickup?.formatted.trim() ?? '',
+        dropoff_location: dropoff?.formatted.trim() ?? '',
+        pickup_address: pickup ?? undefined,
+        dropoff_address: dropoff ?? undefined,
+        requested_pickup_time: pickupDate.toISOString(),
+        notes: notes.trim() || undefined
+      });
+    } else {
+      addTransportRequest({
+        type,
+        status: 'open',
+        urgency,
+        requested_by_person_id: currentPersonId ?? '',
+        animal_id: animalId || undefined,
+        pickup_location: pickup?.formatted.trim() ?? '',
+        dropoff_location: dropoff?.formatted.trim() ?? '',
+        pickup_address: pickup,
+        dropoff_address: dropoff,
+        requested_pickup_time: pickupDate.toISOString(),
+        notes: notes.trim() || undefined
+      });
+    }
     handleClose();
   };
   const showAnimalPicker = type === 'animal';
@@ -93,24 +156,25 @@ export function NewTransportRequestModal({ isOpen, onClose }: Props) {
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title="New Transport Request"
+      title={isEditMode ? 'Edit Transport Request' : 'New Transport Request'}
       className="max-w-2xl"
       footer={
       <div className="flex justify-end gap-3">
           <Button type="button" variant="ghost" onClick={handleClose}>
             Cancel
           </Button>
-          <Button type="submit" form="new-transport-form">
-            Submit Request
+          <Button type="submit" form="transport-request-form">
+            {isEditMode ? 'Save Changes' : 'Submit Request'}
           </Button>
         </div>
       }>
 
       <form
-        id="new-transport-form"
+        id="transport-request-form"
         onSubmit={handleSubmit}
         className="space-y-5"
         noValidate>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label htmlFor="type" required>Type</Label>
@@ -201,8 +265,9 @@ export function NewTransportRequestModal({ isOpen, onClose }: Props) {
             required
             value={pickupTime}
             onChange={handlePickupTimeChange}
-            minDate={new Date()}
+            minDate={isEditMode ? undefined : new Date()}
             error={Boolean(errors.pickupTime)} />
+
           <FieldError>{errors.pickupTime}</FieldError>
         </div>
 

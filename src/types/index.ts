@@ -577,12 +577,16 @@ export interface TransportRequest {
 //     submit time. Even when scope is `all_current_placements`, we resolve
 //     and store the IDs so the request stays accurate if the foster's
 //     placements change later.
+// `expired` is set by a nightly cron when an unclaimed request's end date
+// passes — the request stays in history but never returns to the unclaimed
+// queue. Treat it as terminal alongside `completed` and `canceled`.
 export type SittingRequestStatus =
 'open' |
 'claimed' |
 'in_progress' |
 'completed' |
-'canceled';
+'canceled' |
+'expired';
 
 export type SittingCoverageScope =
 'all_current_placements' |
