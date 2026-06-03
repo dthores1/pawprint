@@ -9,6 +9,7 @@ import {
   ArrowRightIcon,
   AlertCircleIcon,
   MapPinIcon,
+  PencilIcon,
   Trash2Icon } from
 'lucide-react';
 import { AddressDisplay } from '../components/ui/AddressDisplay';
@@ -82,11 +83,30 @@ export function Transports() {
   } = useWhisker();
   const { currentPersonId } = useAuth();
   const [isNewOpen, setIsNewOpen] = useState(false);
+  const [editing, setEditing] = useState<TransportRequest | null>(null);
   const [activeTab, setActiveTab] = useState<
     'open' | 'claimed' | 'completed'>(
     'open');
   const [archiving, setArchiving] = useState<TransportRequest | null>(null);
   const isAdminForArchive = useCanArchive('transport_requests', { id: 'na' });
+
+  // "Cancel till the day of": pickup day is the last day you can cancel.
+  // Compare midnight-of-today against midnight-of-pickup-day so a same-day
+  // pickup is still cancellable until the day rolls over.
+  const startOfToday = new Date(
+    new Date().getFullYear(),
+    new Date().getMonth(),
+    new Date().getDate()
+  ).getTime();
+  const isPickupDayOrLater = (iso: string) => {
+    const d = new Date(iso);
+    const startOfPickup = new Date(
+      d.getFullYear(),
+      d.getMonth(),
+      d.getDate()
+    ).getTime();
+    return startOfPickup >= startOfToday;
+  };
 
   const sorted = [...transportRequests].sort(
     (a, b) =>
@@ -193,11 +213,18 @@ export function Transports() {
           !!currentPersonId &&
           r.requested_by_person_id === currentPersonId &&
           r.status !== 'completed' &&
-          r.status !== 'canceled'
+          r.status !== 'canceled' &&
+          isPickupDayOrLater(r.requested_pickup_time)
           }
           onCancel={() =>
           updateTransportRequest(r.id, { status: 'canceled' })
           }
+          canEdit={
+          !!currentPersonId &&
+          r.requested_by_person_id === currentPersonId &&
+          r.status === 'open'
+          }
+          onEdit={() => setEditing(r)}
           canArchive={
           isAdminForArchive && TRANSPORT_ARCHIVABLE.includes(r.status)
           }
@@ -210,6 +237,14 @@ export function Transports() {
       <NewTransportRequestModal
         isOpen={isNewOpen}
         onClose={() => setIsNewOpen(false)} />
+
+      {editing &&
+      <NewTransportRequestModal
+        isOpen={true}
+        onClose={() => setEditing(null)}
+        request={editing} />
+
+      }
 
       {archiving &&
       <ArchiveConfirmDialog
@@ -234,6 +269,8 @@ interface TransportCardProps {
   onClaim: () => void;
   canCancel: boolean;
   onCancel: () => void;
+  canEdit: boolean;
+  onEdit: () => void;
   canArchive: boolean;
   onArchive: () => void;
 }
@@ -246,6 +283,8 @@ function TransportCard({
   onClaim,
   canCancel,
   onCancel,
+  canEdit,
+  onEdit,
   canArchive,
   onArchive
 }: TransportCardProps) {
@@ -326,6 +365,17 @@ function TransportCard({
           <Button size="sm" onClick={onClaim}>
               Claim Request
             </Button>
+          }
+          {canEdit &&
+          <button
+            type="button"
+            onClick={onEdit}
+            aria-label="Edit request"
+            title="Edit request"
+            className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-background transition-colors">
+
+              <PencilIcon className="w-4 h-4" />
+            </button>
           }
           {canCancel &&
           <Button

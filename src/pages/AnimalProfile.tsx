@@ -88,9 +88,6 @@ export function AnimalProfile() {
   const [activeTab, setActiveTab] = useState<'timeline' | 'medical' | 'photos'>(
     'timeline'
   );
-  const [timelineFilter, setTimelineFilter] = useState<
-    'all' | 'placements' | 'medical' | 'notes'>(
-    'all');
   const [archivingNote, setArchivingNote] = useState<
     {id: string;preview: string;} | null>(
     null);
@@ -187,6 +184,8 @@ export function AnimalProfile() {
     medical?: { id: string };
     /** Cancelled-adoption events opt in for the admin-only Archive control. */
     adoption?: { id: string };
+    /** Non-active placement events opt in for the admin-only Archive control. */
+    placement?: { id: string; fosterName: string };
   };
   const timeline: TimelineEvent[] = [
   {
@@ -214,15 +213,23 @@ export function AnimalProfile() {
   })),
   ...animalPlacements.map((p) => {
     const foster = fosters.find((f) => f.id === p.person_id);
+    const fosterName = foster ?
+    `${foster.first_name} ${foster.last_name}` :
+    'unknown foster';
     return {
       id: p.id,
       date: p.start_date.split('T')[0],
       ts: p.start_date,
       type: 'placement' as const,
       title: `Placed in Foster`,
-      description: `With ${foster?.first_name} ${foster?.last_name}`,
+      description: `With ${fosterName}`,
       icon: HomeIcon,
-      color: 'bg-[#DCEAF7] text-[#356A9A]'
+      color: 'bg-[#DCEAF7] text-[#356A9A]',
+      // Non-active placements opt in for archive — keeps Phase 6 access
+      // working now that the dedicated Placements subtab is gone.
+      placement: p.placement_status !== 'active' ?
+      { id: p.id, fosterName } :
+      undefined
     };
   }),
   ...animalNotes.map((n) => ({
@@ -709,86 +716,53 @@ export function AnimalProfile() {
               </button>
             </div>
 
+            {/* The Add button matches the active tab: each surface owns its
+                own primary action so there's no cross-tab clutter. */}
             <div className="flex gap-2">
-              {activeTab === 'photos' ?
+              {activeTab === 'timeline' &&
+              <Button
+                variant="soft"
+                size="sm"
+                onClick={() => setIsNoteModalOpen(true)}>
+
+                  <FileTextIcon className="w-4 h-4 mr-2" /> Add Note
+                </Button>
+              }
+              {activeTab === 'medical' &&
+              <Button
+                variant="soft"
+                size="sm"
+                onClick={() => setIsMedicalModalOpen(true)}>
+
+                  <SyringeIcon className="w-4 h-4 mr-2" /> Add Medical Record
+                </Button>
+              }
+              {activeTab === 'photos' &&
               <Button
                 variant="soft"
                 size="sm"
                 onClick={() => setIsAddPhotoOpen(true)}>
 
                   <ImageIcon className="w-4 h-4 mr-2" /> Add Photo
-                </Button> :
-
-              <>
-                  <Button
-                  variant="soft"
-                  size="sm"
-                  onClick={() => setIsNoteModalOpen(true)}>
-
-                    <FileTextIcon className="w-4 h-4 mr-2" /> Add Note
-                  </Button>
-                  <Button
-                  variant="soft"
-                  size="sm"
-                  onClick={() => setIsMedicalModalOpen(true)}>
-
-                    <SyringeIcon className="w-4 h-4 mr-2" /> Add Medical Record
-                  </Button>
-                </>
+                </Button>
               }
             </div>
           </div>
 
           {activeTab === 'timeline' &&
           <Card className="overflow-hidden">
-              {/* Filter subtabs — sit inside the card so they read as part of
-                 the timeline, not a separate floating element. */}
-              <div className="flex flex-wrap gap-1 px-3 py-2 border-b border-border bg-background/40">
-                {(
-                [
-                { key: 'all', label: 'All Activity' },
-                { key: 'placements', label: 'Placements' },
-                { key: 'medical', label: 'Medical' },
-                { key: 'notes', label: 'Notes' }] as const).
-                map((f) =>
-                <button
-                  key={f.key}
-                  type="button"
-                  onClick={() => setTimelineFilter(f.key)}
-                  className={`px-3 h-8 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${timelineFilter === f.key ? 'bg-primary/10 text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-background'}`}>
-
-                    {f.label}
-                  </button>
-              )}
-              </div>
-
-              {timelineFilter === 'placements' ?
-            <PlacementTimelineList
-              placements={animalPlacements}
-              fosters={fosters}
-              onArchive={(id, fosterName) =>
-              setArchivingPlacement({ id, fosterName })
-              } /> :
-
-
-            <div className="p-6">
-                  {(() => {
-                const filtered = timeline.filter((e) => {
-                  if (timelineFilter === 'all') return true;
-                  if (timelineFilter === 'medical') return e.type === 'medical';
-                  if (timelineFilter === 'notes') return e.type === 'note';
-                  return true;
-                });
-                if (filtered.length === 0) {
+              <div className="p-6">
+                {(() => {
+                if (timeline.length === 0) {
                   return (
                     <div className="text-center py-6 text-sm text-text-secondary">
-                          No {timelineFilter === 'medical' ? 'medical events' : 'notes'} yet.
+                          No activity yet.
                         </div>);
 
                 }
                 return (
                   <div className="relative border-l-2 border-border ml-4 space-y-8 pb-4">
-                        {filtered.map((event, index) =>
+                        {timeline.map((event, index) =>
                     <motion.div
                       key={`${event.id}-${index}`}
                       initial={{ opacity: 0, x: -20 }}
@@ -863,6 +837,16 @@ export function AnimalProfile() {
                             }} />
 
                           }
+                                {event.placement &&
+                          <PlacementArchiveButton
+                            onClick={() =>
+                            setArchivingPlacement({
+                              id: event.placement!.id,
+                              fosterName: event.placement!.fosterName
+                            })
+                            } />
+
+                          }
                               </div>
                               <p className="text-text-secondary">
                                 {event.description}
@@ -873,8 +857,7 @@ export function AnimalProfile() {
                       </div>);
 
               })()}
-                </div>
-            }
+              </div>
             </Card>
           }
 
@@ -1211,150 +1194,24 @@ function AdoptionArchiveButton({ onClick }: {onClick: () => void;}) {
 
 }
 
-// — Placement Timeline View ————————————————————————————————————
-// Compact, range-based history of an animal's fosters. Each row shows
-// "MMM YYYY – MMM YYYY" (or "MMM YYYY – Present" for the active row) and
-// the foster's name, linked. Newest first.
-function formatPlacementRange(startISO: string, endISO?: string): string {
-  const start = new Date(startISO);
-  const sm = start.toLocaleString('en-US', { month: 'short' });
-  const sy = start.getFullYear();
-  if (!endISO) return `${sm} ${sy} – Present`;
-  const end = new Date(endISO);
-  const em = end.toLocaleString('en-US', { month: 'short' });
-  const ey = end.getFullYear();
-  return sy === ey ? `${sm} – ${em} ${sy}` : `${sm} ${sy} – ${em} ${ey}`;
-}
-// Friendly duration between two dates: "11 days", "6 months", "1 yr 5 mo".
-// `endISO` undefined means "still active" — measured against now.
-function formatPlacementDuration(startISO: string, endISO?: string): string {
-  const start = new Date(startISO);
-  const end = endISO ? new Date(endISO) : new Date();
-  const days = Math.max(
-    1,
-    Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-  );
-  if (days < 30) return `${days} day${days === 1 ? '' : 's'}`;
-  let months =
-  (end.getFullYear() - start.getFullYear()) * 12 +
-  (end.getMonth() - start.getMonth());
-  if (end.getDate() < start.getDate()) months -= 1;
-  months = Math.max(1, months);
-  if (months < 12) return `${months} month${months === 1 ? '' : 's'}`;
-  const years = Math.floor(months / 12);
-  const rem = months % 12;
-  if (rem === 0) return `${years} year${years === 1 ? '' : 's'}`;
-  return `${years} yr ${rem} mo`;
-}
-interface PlacementTimelineListProps {
-  placements: ReturnType<typeof useWhisker>['placements'];
-  fosters: ReturnType<typeof useWhisker>['fosters'];
-  onArchive: (placementId: string, fosterName: string) => void;
-}
-function PlacementTimelineList({
-  placements,
-  fosters,
-  onArchive
-}: PlacementTimelineListProps) {
-  // Admin gate; row id is a sentinel since useCanArchive ignores it for
-  // non-low-risk tables.
+// Placement archive on the timeline. The consuming code only sets
+// `event.placement` for non-active placements, so the status guard is
+// upstream; this button just renders the admin-gated icon.
+function PlacementArchiveButton({ onClick }: {onClick: () => void;}) {
   const canArchive = useCanArchive('foster_placements', { id: 'na' });
-  if (placements.length === 0) {
-    return (
-      <div className="p-10 text-center text-text-secondary">
-        <HomeIcon className="w-10 h-10 mx-auto mb-3 opacity-30" />
-        <p className="font-medium text-text-primary mb-1">
-          No foster history yet
-        </p>
-        <p className="text-sm">
-          When this animal is placed with a foster, the timeline will start here.
-        </p>
-      </div>);
-
-  }
-  // Active first (no end_date), then completed by recency.
-  const sorted = [...placements].sort((a, b) => {
-    if (!a.end_date && b.end_date) return -1;
-    if (a.end_date && !b.end_date) return 1;
-    return new Date(b.start_date).getTime() - new Date(a.start_date).getTime();
-  });
+  if (!canArchive) return null;
   return (
-    <div className="p-6">
-      <div className="relative border-l-2 border-border ml-4 space-y-8 pb-4">
-        {sorted.map((p) => {
-          const foster = fosters.find((f) => f.id === p.person_id);
-          const isActive = p.placement_status === 'active';
-          const fosterName = foster ?
-          `${foster.first_name} ${foster.last_name}` :
-          'unknown foster';
-          return (
-            <div key={p.id} className="relative pl-8 group">
-              <div className="absolute -left-[17px] top-1 w-8 h-8 rounded-full flex items-center justify-center border-4 border-card bg-[#DCEAF7] text-[#356A9A]">
-                <HomeIcon className="w-3.5 h-3.5" />
-              </div>
-              <div>
-                <div className="flex items-baseline gap-2 flex-wrap mb-1">
-                  <span className="text-sm font-semibold text-text-primary tabular-nums">
-                    {formatPlacementRange(p.start_date, p.end_date)}
-                  </span>
-                  <span className="text-xs text-text-secondary tabular-nums">
-                    · {formatPlacementDuration(p.start_date, p.end_date)}
-                  </span>
-                  {canArchive && !isActive &&
-                  <button
-                    type="button"
-                    onClick={() => onArchive(p.id, fosterName)}
-                    aria-label="Archive placement"
-                    title="Archive placement"
-                    className="ml-auto p-1 rounded-md text-text-secondary/60 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-[#9B3A3A] hover:bg-[#F5D7D7]/60 transition-opacity transition-colors">
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Archive placement"
+      className="ml-auto p-1 -mr-1 rounded-md text-text-secondary/60 hover:text-[#9B3A3A] hover:bg-[#F5D7D7]/60 transition-colors">
 
-                      <Trash2Icon className="w-3.5 h-3.5" />
-                    </button>
-                  }
-                </div>
-                <div className="flex items-center gap-2 flex-wrap text-text-secondary">
-                  <span>
-                    Placed with{' '}
-                    {foster ?
-                    <Link
-                      to={`/fosters/${foster.id}`}
-                      className="font-medium text-primary hover:underline">
-                        {foster.first_name} {foster.last_name}
-                      </Link> :
-                    <span className="font-medium text-text-secondary italic">
-                        Unknown foster
-                      </span>
-                    }
-                  </span>
-                  {isActive &&
-                  <span className="text-[10px] uppercase tracking-wide font-bold px-1.5 py-0.5 rounded bg-[#DDEFE2] text-[#3E7B52]">
-                      Active
-                    </span>
-                  }
-                  {p.placement_type && p.placement_type !== 'foster' &&
-                  <span className="text-[10px] uppercase tracking-wide font-bold px-1.5 py-0.5 rounded bg-[#DCEAF7] text-[#356A9A]">
-                      {p.placement_type.replace('_', ' ')}
-                    </span>
-                  }
-                </div>
-                {p.reason_ended &&
-                <p className="text-xs text-text-secondary mt-1">
-                    {p.reason_ended}
-                  </p>
-                }
-                {p.notes &&
-                <p className="text-sm text-text-secondary mt-1 italic">
-                    {p.notes}
-                  </p>
-                }
-              </div>
-            </div>);
-
-        })}
-      </div>
-    </div>);
+      <Trash2Icon className="w-3.5 h-3.5" />
+    </button>);
 
 }
+
 // — Medical History View ————————————————————————————————————
 const PROCEDURE_TYPE_LABELS: Record<string, string> = {
   vaccine: 'Vaccine',

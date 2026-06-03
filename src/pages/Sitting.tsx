@@ -10,6 +10,7 @@ import {
   PillIcon,
   TruckIcon,
   PackageIcon,
+  PencilIcon,
   Trash2Icon } from
 'lucide-react';
 import { cn, animalDisplayName } from '../lib/utils';
@@ -18,21 +19,34 @@ import { SittingRequest, SittingRequestStatus, Animal } from '../types';
 import { ArchiveConfirmDialog } from '../components/archive/ArchiveConfirmDialog';
 import { useCanArchive } from '../components/archive/useCanArchive';
 
-const SITTING_ARCHIVABLE: SittingRequestStatus[] = ['completed', 'canceled'];
+const SITTING_ARCHIVABLE: SittingRequestStatus[] = [
+'completed',
+'canceled',
+'expired'];
+
+// Statuses that mean "this request is no longer active" — same treatment as
+// cancelled across the UI (no edit, no cancel, archivable).
+const SITTING_TERMINAL: SittingRequestStatus[] = [
+'completed',
+'canceled',
+'expired'];
 
 const STATUS_LABEL: Record<SittingRequestStatus, string> = {
   open: 'Unclaimed',
   claimed: 'Claimed',
   in_progress: 'In Progress',
   completed: 'Completed',
-  canceled: 'Canceled'
+  canceled: 'Canceled',
+  expired: 'Expired'
 };
 const STATUS_PILL: Record<SittingRequestStatus, string> = {
   open: 'bg-[#F8E7C8] text-[#A36B00]',
   claimed: 'bg-[#DCEAF7] text-[#356A9A]',
   in_progress: 'bg-[#E8DEEC] text-[#6E4E80]',
   completed: 'bg-[#DDEFE2] text-[#3E7B52]',
-  canceled: 'bg-[#F5D7D7] text-[#9B3A3A]'
+  canceled: 'bg-[#F5D7D7] text-[#9B3A3A]',
+  // Expired reads as muted/neutral — it's history, not a problem.
+  expired: 'bg-background text-text-secondary border border-border'
 };
 
 function formatDateRange(startISO: string, endISO: string) {
@@ -66,10 +80,26 @@ export function Sitting() {
   } = useWhisker();
   const { currentPersonId } = useAuth();
   const [isNewOpen, setIsNewOpen] = useState(false);
+  const [editing, setEditing] = useState<SittingRequest | null>(null);
   const [tab, setTab] = useState<'unclaimed' | 'mine'>('unclaimed');
   const [archiving, setArchiving] = useState<SittingRequest | null>(null);
   // Same admin check on every card — useCanArchive doesn't depend on the row id.
   const isAdminForArchive = useCanArchive('sitting_requests', { id: 'na' });
+
+  // "Cancel till the day of": for sitting requests, the start date is the day
+  // coverage begins. Compare midnight-of-today against midnight-of-start-day
+  // so a same-day start is still cancellable until the day rolls over.
+  const startOfToday = new Date(
+    new Date().getFullYear(),
+    new Date().getMonth(),
+    new Date().getDate()
+  ).getTime();
+  const isStartDayOrLater = (yyyyMmDd: string) => {
+    // start_date is a date-only string; parse as local-midnight.
+    const [y, m, d] = yyyyMmDd.split('-').map(Number);
+    if (!y || !m || !d) return true;
+    return new Date(y, m - 1, d).getTime() >= startOfToday;
+  };
 
   const sorted = [...sittingRequests].sort(
     (a, b) =>
@@ -184,12 +214,18 @@ export function Sitting() {
               canCancel={
               !!currentPersonId &&
               s.requested_by_person_id === currentPersonId &&
-              s.status !== 'completed' &&
-              s.status !== 'canceled'
+              !SITTING_TERMINAL.includes(s.status) &&
+              isStartDayOrLater(s.start_date)
               }
               onCancel={() =>
               updateSittingRequest(s.id, { status: 'canceled' })
               }
+              canEdit={
+              !!currentPersonId &&
+              s.requested_by_person_id === currentPersonId &&
+              s.status === 'open'
+              }
+              onEdit={() => setEditing(s)}
               canArchive={
               isAdminForArchive && SITTING_ARCHIVABLE.includes(s.status)
               }
@@ -203,6 +239,14 @@ export function Sitting() {
       <NewSittingRequestModal
         isOpen={isNewOpen}
         onClose={() => setIsNewOpen(false)} />
+
+      {editing &&
+      <NewSittingRequestModal
+        isOpen={true}
+        onClose={() => setEditing(null)}
+        request={editing} />
+
+      }
 
       {archiving &&
       <ArchiveConfirmDialog
@@ -227,6 +271,8 @@ interface SittingCardProps {
   onAccept: () => void;
   canCancel: boolean;
   onCancel: () => void;
+  canEdit: boolean;
+  onEdit: () => void;
   canArchive: boolean;
   onArchive: () => void;
 }
@@ -239,6 +285,8 @@ function SittingCard({
   onAccept,
   canCancel,
   onCancel,
+  canEdit,
+  onEdit,
   canArchive,
   onArchive
 }: SittingCardProps) {
@@ -330,7 +378,7 @@ function SittingCard({
           }
         </div>
 
-        {(canAccept || canCancel || canArchive) &&
+        {(canAccept || canCancel || canEdit || canArchive) &&
         <div className="shrink-0 flex sm:flex-col items-start sm:items-end gap-2">
             {canAccept &&
           <Button size="sm" onClick={onAccept}>
@@ -347,17 +395,30 @@ function SittingCard({
                 Cancel Request
               </Button>
           }
-            {canArchive &&
-          <button
-            type="button"
-            onClick={onArchive}
-            aria-label="Archive request"
-            title="Archive request"
-            className="p-1.5 rounded-md text-text-secondary hover:text-[#9B3A3A] hover:bg-[#F5D7D7]/60 transition-colors">
+            <div className="flex gap-1">
+              {canEdit &&
+            <button
+              type="button"
+              onClick={onEdit}
+              aria-label="Edit request"
+              title="Edit request"
+              className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-background transition-colors">
 
-                <Trash2Icon className="w-4 h-4" />
-              </button>
-          }
+                  <PencilIcon className="w-4 h-4" />
+                </button>
+            }
+              {canArchive &&
+            <button
+              type="button"
+              onClick={onArchive}
+              aria-label="Archive request"
+              title="Archive request"
+              className="p-1.5 rounded-md text-text-secondary hover:text-[#9B3A3A] hover:bg-[#F5D7D7]/60 transition-colors">
+
+                  <Trash2Icon className="w-4 h-4" />
+                </button>
+            }
+            </div>
           </div>
         }
       </div>
