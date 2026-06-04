@@ -203,26 +203,78 @@ export interface FosterPlacement {
 
 export type ProcedureType =
 'vaccine' |
-'exam' |
 'spay_neuter' |
-'medication' |
-'surgery' |
 'microchip' |
-'deworming' |
-'test';
+'parasite_prevention' |
+'exam' |
+'surgery' |
+'diagnostic_test' |
+'medication' |
+'other';
+
+/**
+ * Structured subtype within a `procedure_type` (e.g. 'rabies' under 'vaccine').
+ * Optional on a record: null means legacy/unstructured (see custom_procedure_name).
+ * The selectable set is gated per type/species/sex in `lib/medicalOptions.ts`.
+ */
+export type Procedure =
+// vaccine
+'rabies' | 'fvrcp' | 'felv' | 'dhpp' | 'bordetella' |
+'leptospirosis' | 'canine_influenza' | 'rhdv2' |
+// spay/neuter
+'spay' | 'neuter' |
+// parasite prevention
+'flea_tick_prevention' | 'heartworm_prevention' | 'deworming' |
+// exam
+'wellness_exam' | 'intake_exam' | 'recheck_exam' | 'sick_exam' |
+// diagnostic test
+'felv_fiv_test' | 'heartworm_test' | 'fecal_test' |
+'bloodwork' | 'urinalysis' | 'xray' | 'ultrasound' |
+// microchip
+'microchip_implant' | 'microchip_scan' |
+// medication
+'antibiotic' | 'pain_medication' | 'anti_inflammatory' | 'sedative' |
+// surgery
+'dental_surgery' | 'mass_removal' | 'wound_repair' |
+'eye_surgery' | 'orthopedic_surgery' |
+// catch-all
+'other';
+
+export type Route =
+'oral' | 'topical' | 'subcutaneous' | 'intramuscular' | 'intravenous' |
+'intranasal' | 'otic' | 'ophthalmic' | 'other';
+
+export type DoseUnit =
+'ml' | 'mg' | 'tablet' | 'capsule' | 'dose' | 'drop' | 'application' | 'other';
 
 export type MedicalStatus =
 'completed' |
 'due' |
 'scheduled' |
 'overdue' |
-'canceled';
+'canceled' |
+'not_applicable';
 
 export interface MedicalRecord {
   id: string;
   animal_id: string;
   procedure_type: ProcedureType;
+  /**
+   * Structured subtype. Null for legacy/unstructured records (their text
+   * lives in custom_procedure_name). When 'other', custom_procedure_name
+   * is required (DB-enforced).
+   */
+  procedure?: Procedure;
+  /**
+   * Legacy display name. Retained NOT NULL for backwards compatibility; the
+   * app keeps it populated with a derived label. New code should prefer
+   * `procedure` / `custom_procedure_name` as the source of truth.
+   */
   procedure_name: string;
+  /** Free-text custom name, used when `procedure === 'other'`. */
+  custom_procedure_name?: string;
+  /** Optional product/treatment brand (e.g. "Revolution Plus"). */
+  product_name?: string;
   performed_date?: string;
   due_date?: string;
   status: MedicalStatus;
@@ -240,6 +292,14 @@ export interface MedicalRecord {
    * mirrors a populated value onto animals.microchip_number on save.
    */
   microchip_number?: string;
+  // Clinical detail (mostly for vaccines / medications).
+  lot_number?: string;
+  manufacturer?: string;
+  dosage?: number;
+  dose_unit?: DoseUnit;
+  route?: Route;
+  body_location?: string;
+  expiration_date?: string;
   notes?: string;
   /**
    * When a recurring procedure (vaccine/exam/surgery/medication) becomes due

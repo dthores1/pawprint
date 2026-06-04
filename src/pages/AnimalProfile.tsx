@@ -53,6 +53,7 @@ import { MedicalKitIcon } from '../components/ui/MedicalKitIcon';
 import { PawPrintIcon as PawPrintGlyph } from '../components/ui/PawPrintIcon';
 import { CatIcon } from '../components/icons/CatIcon';
 import { animalBreedLabel } from '../lib/breedsApi';
+import { PROCEDURE_TYPE_LABELS } from '../lib/medicalOptions';
 import {
   ADOPTION_RETURN_REASON_LABELS,
   isActiveAdoption } from
@@ -378,8 +379,10 @@ export function AnimalProfile() {
   // Readiness Checklist logic
   const hasRabies = animalMedical.some(
     (m) =>
-    m.procedure_name.toLowerCase().includes('rabies') &&
-    m.status === 'completed'
+    m.status === 'completed' && (
+    m.procedure === 'rabies' ||
+    // Legacy fallback for records created before structured procedures.
+    (!m.procedure && m.procedure_name.toLowerCase().includes('rabies')))
   );
   const isSpayed = animalMedical.some(
     (m) => m.procedure_type === 'spay_neuter' && m.status === 'completed'
@@ -1237,16 +1240,6 @@ function PlacementArchiveButton({ onClick }: {onClick: () => void;}) {
 }
 
 // — Medical History View ————————————————————————————————————
-const PROCEDURE_TYPE_LABELS: Record<string, string> = {
-  vaccine: 'Vaccine',
-  exam: 'Exam',
-  spay_neuter: 'Spay/Neuter',
-  medication: 'Medication',
-  surgery: 'Surgery',
-  microchip: 'Microchip',
-  deworming: 'Deworming',
-  test: 'Test'
-};
 const STATUS_TONE: Record<
   string,
   {
