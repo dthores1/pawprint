@@ -7,9 +7,11 @@ import { useWhisker } from '../../context/WhiskerContext';
 import {
   ClinicSlotProcedureType,
   ClinicSlotStatus,
-  ProcedureType } from
+  ProcedureType,
+  Procedure } from
 '../../types';
 import { cn, formatDate } from '../../lib/utils';
+import { deriveProcedureName } from '../../lib/medicalOptions';
 import {
   CheckIcon,
   CheckCircle2Icon,
@@ -61,18 +63,26 @@ const PROCEDURE_ORDER: ClinicSlotProcedureType[] = [
 'other'];
 
 
-// Map a clinic-slot procedure onto the medical record's narrower taxonomy.
-// `dental` has no direct medical analog yet, so it falls under `surgery`.
-const MEDICAL_TYPE: Record<ClinicSlotProcedureType, ProcedureType> = {
-  spay_neuter: 'spay_neuter',
-  vaccines: 'vaccine',
-  dental: 'surgery',
-  exam: 'exam',
-  recheck: 'exam',
-  flea_treatment: 'medication',
-  deworming: 'deworming',
-  microchip: 'microchip',
-  other: 'exam'
+// Map a clinic-slot procedure onto the medical record's structured taxonomy
+// (broad type + subtype). `dental` has no direct medical analog yet, so it
+// falls under `surgery`/`dental_surgery`. `spay_neuter` leaves `procedure`
+// undefined here — it's derived from the animal's sex at creation time.
+// `vaccines` is generic (which vaccine isn't recorded at the slot level), so it
+// stays subtype-less. `other` maps to the `other` type with a null subtype
+// (avoids the procedure='other' ⇒ custom-name-required DB constraint).
+const MEDICAL_MAPPING: Record<
+  ClinicSlotProcedureType,
+  { type: ProcedureType; procedure?: Procedure }> =
+{
+  spay_neuter: { type: 'spay_neuter' },
+  vaccines: { type: 'vaccine' },
+  dental: { type: 'surgery', procedure: 'dental_surgery' },
+  exam: { type: 'exam', procedure: 'wellness_exam' },
+  recheck: { type: 'exam', procedure: 'recheck_exam' },
+  flea_treatment: { type: 'parasite_prevention', procedure: 'flea_tick_prevention' },
+  deworming: { type: 'parasite_prevention', procedure: 'deworming' },
+  microchip: { type: 'microchip', procedure: 'microchip_implant' },
+  other: { type: 'other' }
 };
 
 const ATTENDANCE_TO_SLOT: Record<Attendance, ClinicSlotStatus> = {
@@ -257,19 +267,37 @@ export function ClinicCompletionModal({ isOpen, onClose, clinicEventId }: Props)
         ...st.added];
 
         for (const procType of completedTypes) {
-          const medType = MEDICAL_TYPE[procType];
+          const map = MEDICAL_MAPPING[procType];
+          // Spay/neuter subtype follows the animal's sex.
+          let procedure = map.procedure;
+          if (procType === 'spay_neuter') {
+            const animal = animals.find((a) => a.id === s.animal_id);
+            procedure =
+            animal?.sex === 'Male' ?
+            'neuter' :
+            animal?.sex === 'Female' ?
+            'spay' :
+            undefined;
+          }
+          const procedureName = deriveProcedureName({
+            procedure_type: map.type,
+            procedure
+          });
           const alreadyExists = medicalRecords.some(
             (m) =>
             m.clinic_id === event.id &&
             m.animal_id === s.animal_id &&
-            m.procedure_type === medType &&
-            m.procedure_name === PROCEDURE_LABEL[procType]
+            m.procedure_type === map.type && (
+            procedure ?
+            m.procedure === procedure :
+            m.procedure_name === procedureName)
           );
           if (alreadyExists) continue;
           addMedicalRecord({
             animal_id: s.animal_id,
-            procedure_type: medType,
-            procedure_name: PROCEDURE_LABEL[procType],
+            procedure_type: map.type,
+            procedure,
+            procedure_name: procedureName,
             performed_date: clinicDate,
             status: 'completed',
             provider_contact_id: event.veterinarian_person_id,
