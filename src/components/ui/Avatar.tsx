@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
 import { cn } from '../../lib/utils';
-import { UserIcon, BoneIcon } from 'lucide-react';
+import { UserIcon } from 'lucide-react';
 import { getInitialsColor, getInitials } from '../../lib/colors';
-import { PawPrintIcon } from './PawPrintIcon';
-import { CatIcon } from '../icons/CatIcon';
-import { Species } from '../../types';
+import { speciesIconByName } from '../../lib/speciesIcons';
 interface AvatarProps {
   src?: string;
   alt?: string;
@@ -12,7 +10,7 @@ interface AvatarProps {
   name?: string;
   colorKey?: string;
   type?: 'person' | 'animal';
-  species?: Species;
+  species?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   /**
    * Override the auto-hashed initials color with a fixed tone.
@@ -85,13 +83,10 @@ export function Avatar({
           {fallback ?
           fallback :
           type === 'animal' ?
-          species === 'Dog' ?
-          <BoneIcon className="w-3/4 h-3/4 opacity-75" /> :
-          species === 'Cat' ?
-          <CatIcon className="w-1/2 h-1/2 opacity-50" /> :
-
-          <PawPrintIcon className="w-1/2 h-1/2 opacity-50" /> :
-
+          (() => {
+            const SpeciesGlyph = speciesIconByName(species);
+            return <SpeciesGlyph className="w-1/2 h-1/2 opacity-50" />;
+          })() :
 
           <UserIcon className="w-1/2 h-1/2 opacity-50" />
           }

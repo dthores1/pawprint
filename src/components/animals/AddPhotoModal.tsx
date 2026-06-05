@@ -292,7 +292,6 @@ export function AddPhotoModal({
             <div>
               <Label>Preview</Label>
               <div className="aspect-video w-full overflow-hidden rounded-lg border border-border bg-background">
-                {/* eslint-disable-next-line jsx-a11y/img-redundant-alt */}
                 <img
                   src={src}
                   alt="Photo preview"

@@ -2,6 +2,7 @@ import {
   Animal,
   Breed,
   BreedSpecies,
+  SpeciesCatalog,
   FosterInput,
   FosterPlacement,
   MedicalRecord,
@@ -41,6 +42,20 @@ function seedDateTime(daysFromNow: number, hour: number, minute = 0): string {
   return d.toISOString();
 }
 
+// Global species catalog (mirrors the `species` table seed, migration 0037/0039).
+// Demo mode reads this; production reads the Supabase table.
+export const seedSpecies: SpeciesCatalog[] = [
+{ id: 'sp_cat', name: 'Cat', slug: 'cat', icon_name: 'cat', sort_order: 10, active: true },
+{ id: 'sp_dog', name: 'Dog', slug: 'dog', icon_name: 'dog', sort_order: 20, active: true },
+{ id: 'sp_rabbit', name: 'Rabbit', slug: 'rabbit', icon_name: 'rabbit', sort_order: 30, active: true },
+{ id: 'sp_bird', name: 'Bird', slug: 'bird', icon_name: 'bird', sort_order: 40, active: true },
+{ id: 'sp_reptile', name: 'Reptile', slug: 'reptile', icon_name: 'reptile', sort_order: 50, active: true },
+{ id: 'sp_small_mammal', name: 'Small Mammal', slug: 'small_mammal', icon_name: 'rat', sort_order: 60, active: true },
+{ id: 'sp_farm_animal', name: 'Farm Animal', slug: 'farm_animal', icon_name: 'pig', sort_order: 70, active: true },
+{ id: 'sp_horse', name: 'Horse', slug: 'horse', icon_name: 'horse', sort_order: 80, active: true },
+{ id: 'sp_other', name: 'Other', slug: 'other', icon_name: 'paw-print', sort_order: 999, active: true }];
+
+
 // Global breed catalog (mirrors the `breeds` table seed). Demo mode reads this;
 // production reads the Supabase table.
 const BREED_DATA: [BreedSpecies, string[]][] = [
@@ -70,6 +85,7 @@ export const seedBreeds: Breed[] = BREED_DATA.flatMap(([species, names]) =>
 names.map((name, i) => ({
   id: `br_${species}_${i}`,
   species,
+  species_id: seedSpecies.find((s) => s.slug === species)?.id,
   name,
   active: true
 }))

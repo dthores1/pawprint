@@ -4,6 +4,7 @@ export function rowToBreed(r: any): Breed {
   return {
     id: r.id,
     species: r.species,
+    species_id: r.species_id ?? undefined,
     name: r.name,
     active: r.active ?? true
   };

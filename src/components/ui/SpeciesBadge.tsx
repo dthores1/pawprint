@@ -1,19 +1,17 @@
 import React from 'react';
-import { CatIcon, DogIcon, PawPrintIcon } from 'lucide-react';
-import { Species } from '../../types';
 import { cn } from '../../lib/utils';
-const ICON_MAP = {
-  Dog: DogIcon,
-  Cat: CatIcon,
-  Other: PawPrintIcon
-};
-const COLOR_MAP: Record<Species, string> = {
+import { speciesIconByName } from '../../lib/speciesIcons';
+
+// Dog/Cat keep their established tones; every other species uses a neutral tone
+// (per-species colors can come later via the catalog if desired).
+const COLOR_MAP: Record<string, string> = {
   Dog: 'bg-[#DCEAF7] text-[#356A9A]',
-  Cat: 'bg-[#F3E4D7] text-[#B8632E]',
-  Other: 'bg-[#E5E2DC] text-[#6B6B6B]'
+  Cat: 'bg-[#F3E4D7] text-[#B8632E]'
 };
+const NEUTRAL = 'bg-[#E5E2DC] text-[#6B6B6B]';
+
 interface SpeciesBadgeProps {
-  species: Species;
+  species: string;
   showLabel?: boolean;
   size?: 'sm' | 'md';
   className?: string;
@@ -24,8 +22,8 @@ export function SpeciesBadge({
   size = 'sm',
   className
 }: SpeciesBadgeProps) {
-  const Icon = ICON_MAP[species];
-  const colors = COLOR_MAP[species];
+  const Icon = speciesIconByName(species);
+  const colors = COLOR_MAP[species] ?? NEUTRAL;
   if (!showLabel) {
     // Just the icon in a soft colored circle
     const dim = size === 'md' ? 'w-7 h-7' : 'w-6 h-6';
@@ -40,7 +38,7 @@ export function SpeciesBadge({
         )}
         title={species}
         aria-label={species}>
-        
+
         <Icon className={iconDim} />
       </span>);
 
@@ -57,7 +55,7 @@ export function SpeciesBadge({
         textSize,
         className
       )}>
-      
+
       <Icon className={iconDim} />
       {species}
     </span>);

@@ -11,6 +11,7 @@ import {
   Adoption,
   AdoptionReturnReason,
   Breed,
+  SpeciesCatalog,
   Litter,
   Sex,
   PersonRole,
@@ -37,6 +38,7 @@ import {
 '../types';
 import { supabase } from '../lib/supabase';
 import { rowToBreed } from '../lib/breedsApi';
+import { rowToSpecies } from '../lib/speciesApi';
 import {
   litterToInsert,
   litterUpdateToRow,
@@ -141,6 +143,8 @@ export interface WhiskerContextType {
   adoptionsLoading: boolean;
   /** True while the Supabase-backed people list is being fetched. */
   peopleLoading: boolean;
+  /** Global species catalog (not org-scoped). Active rows, sorted for display. */
+  species: SpeciesCatalog[];
   /** Global breed catalog (not org-scoped). */
   breeds: Breed[];
   products: Product[];
@@ -564,6 +568,28 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     [people]
   );
   const fostersLoading = peopleLoading;
+  // Species — global reference catalog (not org-scoped). Read-only here.
+  const [species, setSpecies] = useState<SpeciesCatalog[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase.
+      from('species').
+      select('*').
+      eq('active', true).
+      order('sort_order', { ascending: true }).
+      order('name', { ascending: true });
+      if (cancelled) return;
+      if (error) {
+        console.error('[species] load failed:', error.message);
+      } else {
+        setSpecies((data ?? []).map(rowToSpecies));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   // Breeds — global reference catalog (not org-scoped). Read-only here.
   const [breeds, setBreeds] = useState<Breed[]>([]);
   useEffect(() => {
@@ -573,6 +599,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       from('breeds').
       select('*').
       eq('active', true).
+      order('sort_order', { ascending: true }).
       order('name', { ascending: true });
       if (cancelled) return;
       if (error) {
@@ -1909,6 +1936,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         littersLoading,
         adoptions,
         adoptionsLoading,
+        species,
         breeds,
         products,
         addProduct,

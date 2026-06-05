@@ -26,7 +26,6 @@ import {
 '../lib/utils';
 import {
   SyringeIcon,
-  DogIcon,
   FileTextIcon,
   HomeIcon,
   HeartIcon,
@@ -51,9 +50,9 @@ import { useCanArchive } from '../components/archive/useCanArchive';
 import { motion } from 'framer-motion';
 import { MedicalKitIcon } from '../components/ui/MedicalKitIcon';
 import { PawPrintIcon as PawPrintGlyph } from '../components/ui/PawPrintIcon';
-import { CatIcon } from '../components/icons/CatIcon';
 import { animalBreedLabel } from '../lib/breedsApi';
 import { PROCEDURE_TYPE_LABELS } from '../lib/medicalOptions';
+import { speciesIconByName } from '../lib/speciesIcons';
 import {
   ADOPTION_RETURN_REASON_LABELS,
   isActiveAdoption } from
@@ -455,7 +454,7 @@ export function AnimalProfile() {
             <img
               src={animal.primary_photo_url}
               alt={animalDisplayName(animal)}
-              className="w-full h-full object-cover"
+              className="absolute inset-0 w-full h-full object-cover"
               onError={() => setHeroImageError(true)} /> :
 
 
@@ -463,13 +462,10 @@ export function AnimalProfile() {
                 {/* Avatar-style fallback — matches the "peach" tone used for
                    requester avatars elsewhere in the app. */}
                 <div className="w-32 h-32 rounded-full bg-[#EBD4C0] text-[#A85A2A] flex items-center justify-center">
-                  {animal.species === 'Dog' ?
-                <DogIcon className="w-14 h-14" /> :
-                animal.species === 'Cat' ?
-                <CatIcon className="w-14 h-14" /> :
-
-                <PawPrintGlyph className="w-14 h-14" />
-                }
+                  {(() => {
+                  const Glyph = speciesIconByName(animal.species);
+                  return <Glyph className="w-14 h-14" />;
+                })()}
                 </div>
               </div>
             }
@@ -536,12 +532,7 @@ export function AnimalProfile() {
                       "Estimated X years as of …" line, which was confusing
                       when it contradicted the computed age on the same row. */}
                   {(() => {
-                    const SpeciesIcon =
-                    animal.species === 'Dog' ?
-                    DogIcon :
-                    animal.species === 'Cat' ?
-                    CatIcon :
-                    PawPrintGlyph;
+                    const SpeciesGlyph = speciesIconByName(animal.species);
                     const breed = animalBreedLabel(animal, breeds);
                     const ageEstimated =
                     animal.birthdate_source === 'estimated_birthdate' ||
@@ -553,7 +544,7 @@ export function AnimalProfile() {
                       <div className="mt-1 space-y-0.5">
                         <p className="text-base flex flex-wrap items-center gap-x-2 text-text-primary font-medium">
                           <span className="inline-flex items-center gap-1.5">
-                            <SpeciesIcon className="w-4 h-4 text-text-secondary" />
+                            <SpeciesGlyph className="w-4 h-4 text-text-secondary" />
                             {animal.species}
                           </span>
                           <span className="text-text-secondary/60">•</span>

@@ -1,4 +1,4 @@
-import { Animal, Breed, Litter, MedicalRecord, Person, Species } from '../types';
+import { Animal, Breed, Litter, MedicalRecord, Person } from '../types';
 
 /** Members of a litter — derived from the shared animals.litter_id. */
 export function litterMembers(animals: Animal[], litterId: string): Animal[] {
@@ -39,7 +39,7 @@ export function litterLabel(litter: Litter, breeds?: Breed[]): string {
 }
 
 /** Species-aware noun for members, e.g. "5 kittens" / "1 puppy". */
-export function memberNoun(species: Species, count: number): string {
+export function memberNoun(species: string, count: number): string {
   const plural = count !== 1;
   if (species === 'Dog') return plural ? 'puppies' : 'puppy';
   if (species === 'Cat') return plural ? 'kittens' : 'kitten';

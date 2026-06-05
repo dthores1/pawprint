@@ -25,8 +25,7 @@ import {
   CheckIcon } from
 'lucide-react';
 import { useWindowRowVirtualizer } from '../lib/useWindowRowVirtualizer';
-import { ENABLED_SPECIES } from '../lib/config';
-import { Person, Species } from '../types';
+import { Person } from '../types';
 import { cn } from '../lib/utils';
 
 type Availability = 'available' | 'full' | 'inactive';
@@ -50,7 +49,8 @@ const AVAILABILITY_ORDER: Record<Availability, number> = {
   inactive: 2
 };
 export function FostersList() {
-  const { fosters, fostersLoading, placements } = useWhisker();
+  const { fosters, fostersLoading, placements, species: speciesCatalog } =
+  useWhisker();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [view, setView] = useState<'table' | 'grid'>('table');
@@ -94,7 +94,7 @@ export function FostersList() {
       }
       if (speciesFilter.length > 0) {
         const prefs = foster.preferred_species ?? [];
-        if (!speciesFilter.some((s) => prefs.includes(s as Species))) {
+        if (!speciesFilter.some((s) => prefs.includes(s))) {
           return false;
         }
       }
@@ -134,7 +134,7 @@ export function FostersList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredFosters, sort, activeCountByFoster]);
 
-  const showSpeciesFilter = ENABLED_SPECIES.length > 1;
+  const showSpeciesFilter = speciesCatalog.length > 1;
   // Virtualized table rows in a self-scrolling container. ~73px per row.
   const tableRows = useWindowRowVirtualizer(sortedFosters.length, 73);
   return (
@@ -225,19 +225,19 @@ export function FostersList() {
         {showSpeciesFilter &&
         <>
             <span className="text-sm text-text-secondary ml-1">Species:</span>
-            {ENABLED_SPECIES.map((s) =>
+            {speciesCatalog.map((sp) =>
           <button
-            key={s}
+            key={sp.id}
             type="button"
-            onClick={() => toggleSpecies(s)}
+            onClick={() => toggleSpecies(sp.name)}
             className={cn(
               'inline-flex items-center h-8 px-3 rounded-full text-sm font-medium border transition-colors',
-              speciesFilter.includes(s) ?
+              speciesFilter.includes(sp.name) ?
               'bg-primary/10 text-primary border-primary/30' :
               'bg-card text-text-secondary border-border hover:bg-background'
             )}>
 
-                {s}
+                {sp.name}
               </button>
           )}
           </>

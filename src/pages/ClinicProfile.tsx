@@ -114,6 +114,18 @@ export function ClinicProfile() {
   const navigate = useNavigate();
 
   const event = clinicEvents.find((e) => e.id === id);
+
+  // Archive permission + per-slot-archive state. These are hooks, so they must
+  // run on every render — i.e. before the early return below, never after it.
+  const canArchiveEvent = useCanArchive(
+    'clinic_events',
+    event ? { id: event.id } : null
+  );
+  const canArchiveSlotPerm = useCanArchive('clinic_slots', { id: 'na' });
+  const [archivingSlot, setArchivingSlot] = useState<
+    {id: string;animalName: string;} | null>(
+    null);
+
   if (!event) {
     return (
       <div className="p-8 text-center text-text-secondary">
@@ -156,17 +168,13 @@ export function ClinicProfile() {
   // remove from active workflows (planning / completed / canceled). The
   // server enforces the same rule; this just hides the button.
   const canArchive =
-  useCanArchive('clinic_events', { id: event.id }) &&
+  canArchiveEvent &&
   event.status !== 'scheduled' &&
   event.status !== 'in_progress';
   // Per-slot archive is admin-only and blocked while the clinic is running.
   // Same gate the server applies; we just hide the icon proactively.
   const canArchiveSlot =
-  useCanArchive('clinic_slots', { id: 'na' }) &&
-  event.status !== 'in_progress';
-  const [archivingSlot, setArchivingSlot] = useState<
-    {id: string;animalName: string;} | null>(
-    null);
+  canArchiveSlotPerm && event.status !== 'in_progress';
 
   const handleAddSlot = (e: React.FormEvent) => {
     e.preventDefault();

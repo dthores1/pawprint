@@ -8,8 +8,9 @@ import { AgeInformationFields, AgeInputMode } from './AgeInformationFields';
 import { BreedCombobox } from './BreedCombobox';
 import { LitterForm } from './LitterForm';
 import { useWhisker } from '../../context/WhiskerContext';
-import { AnimalStatus, Species, Sex, Priority, AgeUnit } from '../../types';
+import { AnimalStatus, Sex, Priority, AgeUnit } from '../../types';
 import { deriveAgeInfo } from '../../lib/age';
+import { breedFieldLabel } from '../../lib/speciesIcons';
 interface AddAnimalModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -21,7 +22,10 @@ const INITIAL = {
   // Operational identifier (e.g. `DanBH-1`). Either name or rescue_id (or both)
   // is required — the DB CHECK enforces it, and so does the submit validator.
   rescue_id: '',
-  species: 'Dog' as Species,
+  // Species name + catalog id. Defaulted to the first catalog species once it
+  // loads (see effect below); both are written on save.
+  species: '',
+  species_id: '',
   sex: 'Unknown' as Sex,
   breed_id: undefined as string | undefined,
   breed_text: undefined as string | undefined,
@@ -91,7 +95,7 @@ export function AddAnimalModal({
   onClose,
   initialMode = 'single'
 }: AddAnimalModalProps) {
-  const { addAnimal } = useWhisker();
+  const { addAnimal, species: speciesCatalog } = useWhisker();
   const [mode, setMode] = useState<AddMode>(initialMode);
   const [formData, setFormData] = useState(INITIAL);
   const [ageMode, setAgeMode] = useState<AgeInputMode>('birthdate');
@@ -102,6 +106,13 @@ export function AddAnimalModal({
   // initial state so the button label is correct before any user interaction.
   const [litterMembersCount, setLitterMembersCount] = useState(2);
   const [litterSubmitting, setLitterSubmitting] = useState(false);
+  // Default to the first catalog species once it loads (and isn't set yet).
+  useEffect(() => {
+    if (formData.species_id || speciesCatalog.length === 0) return;
+    const first = speciesCatalog[0];
+    setFormData((prev) => ({ ...prev, species: first.name, species_id: first.id }));
+  }, [speciesCatalog, formData.species_id]);
+  const selectedSpecies = speciesCatalog.find((s) => s.id === formData.species_id);
   // Open on the requested sub-form each time the modal is shown.
   useEffect(() => {
     if (isOpen) setMode(initialMode);
@@ -132,6 +143,7 @@ export function AddAnimalModal({
       name: formData.name.trim() || undefined,
       rescue_id: formData.rescue_id.trim() || undefined,
       species: formData.species,
+      species_id: formData.species_id || undefined,
       sex: formData.sex,
       breed_id: formData.breed_id,
       breed_text: formData.breed_text,
@@ -292,12 +304,22 @@ export function AddAnimalModal({
               <Select
                 id="species"
                 name="species"
-                value={formData.species}
-                onChange={handleChange}>
+                value={formData.species_id}
+                onChange={(e) => {
+                  const next = speciesCatalog.find((s) => s.id === e.target.value);
+                  setFormData((prev) => ({
+                    ...prev,
+                    species_id: next?.id ?? '',
+                    species: next?.name ?? '',
+                    // Species changed → previously chosen breed no longer applies.
+                    breed_id: undefined,
+                    breed_text: undefined
+                  }));
+                }}>
 
-                <option value="Dog">Dog</option>
-                <option value="Cat">Cat</option>
-                <option value="Other">Other</option>
+                {speciesCatalog.map((s) =>
+                <option key={s.id} value={s.id}>{s.name}</option>
+                )}
               </Select>
             </div>
             <div>
@@ -315,10 +337,10 @@ export function AddAnimalModal({
             </div>
           </div>
           <div>
-            <Label htmlFor="breed">Breed</Label>
+            <Label htmlFor="breed">{breedFieldLabel(selectedSpecies?.slug)}</Label>
             <BreedCombobox
               id="breed"
-              species={formData.species}
+              speciesId={formData.species_id}
               breedId={formData.breed_id}
               breedText={formData.breed_text}
               onChange={(next) =>

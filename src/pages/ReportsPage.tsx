@@ -16,9 +16,6 @@ import {
   Line } from
 'recharts';
 import {
-  CatIcon,
-  DogIcon,
-  PawPrintIcon,
   PieChartIcon,
   BarChart3Icon } from
 'lucide-react';
@@ -36,14 +33,9 @@ import {
   thisYearRange } from
 '../lib/reports';
 import { ADOPTION_STATUS_LABELS, isActiveAdoption } from '../lib/adoptions';
-import { AnimalStatus, Species } from '../types';
+import { AnimalStatus } from '../types';
 import { formatDate } from '../lib/utils';
-
-const SPECIES_ICON: Record<Species, React.ComponentType<{ className?: string }>> = {
-  Dog: DogIcon,
-  Cat: CatIcon,
-  Other: PawPrintIcon
-};
+import { speciesIconByName } from '../lib/speciesIcons';
 
 const STATUS_LABEL: Record<AnimalStatus, string> = {
   intake: 'Intake',
@@ -553,9 +545,7 @@ export function ReportsPage() {
                 <table className="w-full text-left text-sm">
                   <tbody>
                     {completedAdoptions.map(({ adoption, animal }) => {
-                    const Icon = animal ?
-                    SPECIES_ICON[animal.species] :
-                    PawPrintIcon;
+                    const Icon = speciesIconByName(animal?.species);
                     return (
                       <tr
                         key={adoption.id}
