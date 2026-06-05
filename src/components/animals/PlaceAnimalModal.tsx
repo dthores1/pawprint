@@ -119,7 +119,7 @@ export function PlaceAnimalModal({
     return animals.
     filter((a) => !placedIds.has(a.id)).
     filter((a) => a.status !== 'adopted' && a.status !== 'deceased').
-    filter((a) => !filterBySpecies || prefs.includes(a.species)).
+    filter((a) => !filterBySpecies || (prefs as string[]).includes(a.species)).
     filter((a) => {
       if (!q) return true;
       return `${a.name ?? ''} ${a.rescue_id ?? ''} ${a.id}`.

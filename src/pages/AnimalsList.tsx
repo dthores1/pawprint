@@ -21,9 +21,6 @@ import {
   SearchIcon,
   PlusIcon,
   XIcon,
-  CatIcon,
-  DogIcon,
-  PawPrintIcon,
   StarIcon } from
 'lucide-react';
 import {
@@ -33,17 +30,12 @@ import {
   animalShowsRescueIdBadge } from
 '../lib/utils';
 import { animalBreedLabel } from '../lib/breedsApi';
+import { SpeciesIcon } from '../lib/speciesIcons';
 import { isActiveAdoption } from '../lib/adoptions';
 import { motion } from 'framer-motion';
 import { useWindowRowVirtualizer } from '../lib/useWindowRowVirtualizer';
-import { ENABLED_SPECIES } from '../lib/config';
 import { Animal, Person, Species, AnimalStatus, Priority } from '../types';
 import { PawPrintIcon as PawPrintGlyph } from '../components/ui/PawPrintIcon';
-const SPECIES_ICONS = {
-  Dog: <DogIcon className="w-3.5 h-3.5 text-[#356A9A]" />,
-  Cat: <CatIcon className="w-3.5 h-3.5 text-[#B8632E]" />,
-  Other: <PawPrintIcon className="w-3.5 h-3.5 text-text-secondary" />
-};
 const STATUS_LABELS: Record<AnimalStatus, string> = {
   intake: 'Intake',
   medical: 'Medical',
@@ -78,6 +70,7 @@ export function AnimalsList() {
     medicalRecords,
     relationships,
     breeds,
+    species: speciesCatalog,
     adoptions
   } = useWhisker();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -94,8 +87,9 @@ export function AnimalsList() {
   const [statusFilter, setStatusFilter] = useState<string[]>(() =>
   parseParam('status', STATUS_ORDER)
   );
+  // Default to no species filter (show all) so any catalog species is visible.
   const [speciesFilter, setSpeciesFilter] = useState<string[]>(() =>
-  parseParam('species', ENABLED_SPECIES)
+  parseParam('species', [])
   );
   const [priorityFilter, setPriorityFilter] = useState<string[]>(() =>
   parseParam('priority', PRIORITY_ORDER)
@@ -260,12 +254,16 @@ export function AnimalsList() {
   );
   const speciesOptions: FilterOption[] = useMemo(
     () =>
-    ENABLED_SPECIES.map((s) => ({
-      value: s,
-      label: `${s}s`,
-      icon: SPECIES_ICONS[s]
+    speciesCatalog.map((s) => ({
+      value: s.name,
+      label: s.name,
+      icon: (
+        <SpeciesIcon
+          iconName={s.icon_name}
+          className="w-3.5 h-3.5 text-text-secondary" />)
+
     })),
-    []
+    [speciesCatalog]
   );
   // Active filter chips — one per selected value across all filters.
   const activeChips = [
@@ -281,8 +279,12 @@ export function AnimalsList() {
   })),
   ...speciesFilter.map((s) => ({
     key: `species-${s}`,
-    label: `${s}s`,
-    icon: SPECIES_ICONS[s as Species],
+    label: s,
+    icon: (
+      <SpeciesIcon
+        iconName={speciesCatalog.find((sp) => sp.name === s)?.icon_name}
+        className="w-3.5 h-3.5 text-text-secondary" />),
+
     clear: () => setSpeciesFilter((cur) => cur.filter((v) => v !== s))
   }))] as Array<{
     key: string;
@@ -296,7 +298,7 @@ export function AnimalsList() {
     setSpeciesFilter([]);
     setFlagFilters([]);
   };
-  const showSpeciesFilter = ENABLED_SPECIES.length > 1;
+  const showSpeciesFilter = speciesCatalog.length > 1;
   return (
     <div className="space-y-5 pb-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">

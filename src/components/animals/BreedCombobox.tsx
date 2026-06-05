@@ -1,65 +1,64 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { SearchIcon, XIcon, PlusIcon } from 'lucide-react';
 import { Input } from '../ui/Forms';
+import { CalendarPopover } from '../ui/CalendarPopover';
 import { useWhisker } from '../../context/WhiskerContext';
-import { Species } from '../../types';
-import { breedSpeciesKeys } from '../../lib/breedsApi';
+import { breedFieldLabel } from '../../lib/speciesIcons';
 
-// Searchable breed picker filtered by species. Pick a known breed (→ breed_id)
-// or type a custom value (→ breed_text). Rescues use lots of messy values
-// ("Pit mix", "Lab mix"), so custom entry is first-class.
+// Searchable breed picker filtered by species (via the catalog species_id).
+// Pick a known breed (→ breed_id) or type a custom value (→ breed_text).
+// Rescues use lots of messy values ("Pit mix", "Lab mix"), so custom entry is
+// first-class. The result list renders in a portal popover so it's never
+// clipped by the form section's overflow.
 interface BreedComboboxProps {
-  species: Species;
+  /** Catalog species id whose breeds to offer. */
+  speciesId?: string;
   breedId?: string;
   breedText?: string;
   onChange: (next: { breed_id?: string; breed_text?: string }) => void;
   id?: string;
 }
 export function BreedCombobox({
-  species,
+  speciesId,
   breedId,
   breedText,
   onChange,
   id
 }: BreedComboboxProps) {
-  const { breeds } = useWhisker();
+  const { breeds, species: speciesCatalog } = useWhisker();
+  // "Breed" for cat/dog/rabbit, "Type" otherwise — keep the copy in sync.
+  const noun = breedFieldLabel(
+    speciesCatalog.find((s) => s.id === speciesId)?.slug
+  );
+  const nounPlural = `${noun.toLowerCase()}s`;
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
-  const wrapperRef = useRef<HTMLDivElement>(null);
+  const anchorRef = useRef<HTMLDivElement>(null);
+  // Match the popover width to the input so the list aligns under it.
+  const [menuWidth, setMenuWidth] = useState<number>();
+  useLayoutEffect(() => {
+    if (open && anchorRef.current) setMenuWidth(anchorRef.current.offsetWidth);
+  }, [open]);
 
   const selectedBreed = breedId ?
   breeds.find((b) => b.id === breedId) :
   undefined;
   const selectedLabel = breedText ?? selectedBreed?.name;
 
-  const speciesKeys = breedSpeciesKeys(species);
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
+    if (!speciesId) return [];
     return breeds.
-    filter((b) => b.active && speciesKeys.includes(b.species)).
+    filter((b) => b.active && b.species_id === speciesId).
     filter((b) => (q ? b.name.toLowerCase().includes(q) : true)).
     slice(0, 50);
-  }, [breeds, speciesKeys, query]);
+  }, [breeds, speciesId, query]);
 
   const trimmed = query.trim();
   const hasExactMatch = results.some(
     (b) => b.name.toLowerCase() === trimmed.toLowerCase()
   );
   const showCustomOption = trimmed.length > 0 && !hasExactMatch;
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (
-      wrapperRef.current &&
-      !wrapperRef.current.contains(e.target as Node))
-      {
-        setOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
 
   const pickKnown = (bId: string) => {
     onChange({ breed_id: bId, breed_text: undefined });
@@ -93,13 +92,13 @@ export function BreedCombobox({
   }
 
   return (
-    <div className="relative" ref={wrapperRef}>
+    <div className="relative" ref={anchorRef}>
       <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary pointer-events-none" />
       <Input
         id={id}
         type="text"
         autoComplete="off"
-        placeholder="Search breeds…"
+        placeholder={`Search ${nounPlural}…`}
         value={query}
         onChange={(e) => {
           setQuery(e.target.value);
@@ -114,52 +113,49 @@ export function BreedCombobox({
         }}
         className="pl-9" />
 
+      <CalendarPopover
+        anchorRef={anchorRef}
+        open={open}
+        onClose={() => setOpen(false)}
+        padded={false}>
 
-      <AnimatePresence>
-        {open &&
-        <motion.div
-          initial={{ opacity: 0, y: -4 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -4 }}
-          transition={{ duration: 0.15 }}
-          className="absolute z-10 mt-1.5 w-full bg-card border border-border rounded-xl shadow-soft-lg overflow-hidden max-h-72 overflow-y-auto">
-
-            {results.length === 0 && !showCustomOption &&
+        {/* ~6 rows tall, then scroll — keeps the list compact. */}
+        <div style={{ width: menuWidth }} className="max-h-60 overflow-y-auto">
+          {results.length === 0 && !showCustomOption &&
           <div className="p-4 text-sm text-text-secondary text-center">
-                No breeds available.
-              </div>
+              No {nounPlural} available.
+            </div>
           }
-            {results.length > 0 &&
+          {results.length > 0 &&
           <ul className="py-1">
-                {results.map((b) =>
+              {results.map((b) =>
             <li key={b.id}>
-                    <button
+                  <button
                 type="button"
                 onClick={() => pickKnown(b.id)}
                 className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-background cursor-pointer transition-colors">
 
-                      {b.name}
-                    </button>
-                  </li>
+                    {b.name}
+                  </button>
+                </li>
             )}
-              </ul>
+            </ul>
           }
-            {showCustomOption &&
+          {showCustomOption &&
           <button
             type="button"
             onClick={() => pickCustom(trimmed)}
             className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-sm text-primary hover:bg-background border-t border-border cursor-pointer transition-colors">
 
-                <PlusIcon className="w-4 h-4 shrink-0" />
-                <span>
-                  Add custom breed:{' '}
-                  <span className="font-medium">"{trimmed}"</span>
-                </span>
-              </button>
+              <PlusIcon className="w-4 h-4 shrink-0" />
+              <span>
+                Add custom {noun.toLowerCase()}:{' '}
+                <span className="font-medium">"{trimmed}"</span>
+              </span>
+            </button>
           }
-          </motion.div>
-        }
-      </AnimatePresence>
+        </div>
+      </CalendarPopover>
     </div>);
 
 }

@@ -6,7 +6,6 @@ import { Button } from '../ui/Button';
 import { BreedCombobox } from './BreedCombobox';
 import { AnimalSearchPicker } from '../ui/AnimalSearchPicker';
 import { useWhisker } from '../../context/WhiskerContext';
-import { Species } from '../../types';
 import { litterMembers } from '../../lib/litters';
 
 interface EditLitterModalProps {
@@ -22,11 +21,11 @@ export function EditLitterModal({
   onClose,
   litterId
 }: EditLitterModalProps) {
-  const { litters, animals, updateLitter } = useWhisker();
+  const { litters, animals, updateLitter, species: speciesCatalog } = useWhisker();
   const litter = litters.find((l) => l.id === litterId);
 
   const [name, setName] = useState('');
-  const [species, setSpecies] = useState<Species>('Cat');
+  const [species, setSpecies] = useState<string>('Cat');
   const [breedId, setBreedId] = useState<string | undefined>();
   const [breedText, setBreedText] = useState<string | undefined>();
   const [estimatedBirthDate, setEstimatedBirthDate] = useState('');
@@ -110,21 +109,21 @@ export function EditLitterModal({
               id="litter_edit_species"
               value={species}
               onChange={(e) => {
-                setSpecies(e.target.value as Species);
+                setSpecies(e.target.value);
                 setBreedId(undefined);
                 setBreedText(undefined);
               }}>
 
-              <option value="Dog">Dog</option>
-              <option value="Cat">Cat</option>
-              <option value="Other">Other</option>
+              {speciesCatalog.map((s) =>
+              <option key={s.id} value={s.name}>{s.name}</option>
+              )}
             </Select>
           </div>
           <div>
             <Label htmlFor="litter_edit_breed">Breed</Label>
             <BreedCombobox
               id="litter_edit_breed"
-              species={species}
+              speciesId={speciesCatalog.find((s) => s.name === species)?.id}
               breedId={breedId}
               breedText={breedText}
               onChange={(next) => {

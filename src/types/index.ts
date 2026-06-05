@@ -34,8 +34,24 @@ export interface AnimalActionItem {
   completion_note?: string;
 }
 
+/**
+ * Legacy species union, still the type of the `animals.species` text column
+ * during the catalog migration. Being phased out in favor of the `species`
+ * catalog table + `animals.species_id` (see SpeciesCatalog / migration 0040).
+ */
 export type Species = 'Dog' | 'Cat' | 'Other';
 export type Sex = 'Male' | 'Female' | 'Unknown';
+
+/** A row from the global `species` catalog (migration 0037). Shared across
+ *  orgs; the app reads it to drive species pickers and (later) per-org config. */
+export interface SpeciesCatalog {
+  id: string;
+  name: string;
+  slug: string;
+  icon_name?: string;
+  sort_order: number;
+  active: boolean;
+}
 
 /** How `estimated_birth_date` was derived. */
 export type BirthdateSource =
@@ -57,7 +73,16 @@ export interface Animal {
    * Unique within an organization (partial unique index, NULL allowed).
    */
   rescue_id?: string;
-  species: Species;
+  /**
+   * Species display name (= the catalog `name`, e.g. "Dog", "Rabbit"). Now a
+   * free string sourced from the `species` catalog rather than the old
+   * Dog/Cat/Other union, since any catalog species is selectable. `species_id`
+   * is the authoritative reference; this stays in sync for back-compat.
+   */
+  species: string;
+  /** FK into the global `species` catalog (migration 0040). Written alongside
+   *  the legacy `species` text until that column is retired. */
+  species_id?: string;
   sex: Sex;
   /**
    * Canonical date used to compute current age everywhere. Always set — when
@@ -122,12 +147,17 @@ export interface Animal {
   updated_at: string;
 }
 
-// Breed reference catalog (global, shared across orgs). `species` is lowercase
-// and includes rabbit/bird/other, unlike the app's TitleCase `Species`.
-export type BreedSpecies = 'dog' | 'cat' | 'rabbit' | 'bird' | 'other';
+// Breed reference catalog (global, shared across orgs). `species` is the legacy
+// lowercase slug; `species_id` (migration 0037) is the catalog FK and the
+// preferred key for filtering breeds by species.
+export type BreedSpecies =
+'dog' | 'cat' | 'rabbit' | 'bird' |
+'reptile' | 'small_mammal' | 'farm_animal' | 'horse' | 'other';
 export interface Breed {
   id: string;
   species: BreedSpecies;
+  /** FK into the `species` catalog. Preferred over the `species` slug. */
+  species_id?: string;
   name: string;
   active: boolean;
 }
@@ -175,7 +205,8 @@ export interface FosterInput {
   address_latitude?: number;
   address_longitude?: number;
   max_capacity: number;
-  preferred_species: Species[];
+  /** Catalog species names this foster accepts (was the Dog/Cat/Other union). */
+  preferred_species: string[];
   notes: string;
   active: boolean;
   photo_url?: string;
@@ -387,7 +418,8 @@ export interface Adoption {
 export interface Litter {
   id: string;
   name?: string;
-  species: Species;
+  /** Catalog species name (was the Dog/Cat/Other union). */
+  species: string;
   breed_id?: string;
   breed_text?: string;
   estimated_birth_date?: string;
@@ -496,7 +528,7 @@ export interface Person {
   address_longitude?: number;
   // — Foster-specific (meaningful when roles includes 'foster_parent') —
   max_capacity?: number;
-  preferred_species?: Species[];
+  preferred_species?: string[];
 }
 
 // Simplified five-state lifecycle. Fulfillment details (pickup vs. shipping)

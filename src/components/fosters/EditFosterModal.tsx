@@ -5,7 +5,7 @@ import { Button } from '../ui/Button';
 import { RolesMultiSelect } from '../ui/RolesMultiSelect';
 import { AddressAutocomplete } from '../ui/AddressAutocomplete';
 import { useWhisker } from '../../context/WhiskerContext';
-import { AddressValue, Person, PersonRole, Species } from '../../types';
+import { AddressValue, Person, PersonRole } from '../../types';
 import { personToAddressValue } from '../../lib/address';
 interface EditFosterModalProps {
   isOpen: boolean;
@@ -21,7 +21,7 @@ type FosterForm = {
   address: AddressValue | null;
   // `''` lets the user clear the field while typing; coerced to a number on submit.
   max_capacity: number | '';
-  preferred_species: Species[];
+  preferred_species: string[];
   notes: string;
   active: boolean;
   roles: PersonRole[];
@@ -74,7 +74,7 @@ export function EditFosterModal({
   onClose,
   foster
 }: EditFosterModalProps) {
-  const { updateFoster } = useWhisker();
+  const { updateFoster, species: speciesCatalog } = useWhisker();
   const [formData, setFormData] = useState<FosterForm>(() => fromFoster(foster));
   const [errors, setErrors] = useState<FormErrors>({});
   // Re-seed when the modal opens (or the foster changes) so edits start fresh.
@@ -133,7 +133,7 @@ export function EditFosterModal({
       setErrors((prev) => ({ ...prev, [fieldName]: undefined }));
     }
   };
-  const toggleSpecies = (species: Species) => {
+  const toggleSpecies = (species: string) => {
     setFormData((prev) => {
       const current = prev.preferred_species;
       return {
@@ -255,15 +255,15 @@ export function EditFosterModal({
           </div>
           <div>
             <Label>Preferred Species</Label>
-            <div className="flex gap-2 mt-1">
-              {(['Dog', 'Cat', 'Other'] as Species[]).map((species) =>
+            <div className="flex flex-wrap gap-2 mt-1">
+              {speciesCatalog.map((s) =>
               <button
-                key={species}
+                key={s.id}
                 type="button"
-                onClick={() => toggleSpecies(species)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${formData.preferred_species.includes(species) ? 'bg-primary text-white border-primary' : 'bg-background text-text-secondary border-border hover:border-primary/50'}`}>
+                onClick={() => toggleSpecies(s.name)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${formData.preferred_species.includes(s.name) ? 'bg-primary text-white border-primary' : 'bg-background text-text-secondary border-border hover:border-primary/50'}`}>
 
-                  {species}
+                  {s.name}
                 </button>
               )}
             </div>

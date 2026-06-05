@@ -28,6 +28,7 @@ import { legacyRoleFor } from '../lib/peopleApi';
 import {
   seedAnimals,
   seedBreeds,
+  seedSpecies,
   seedPlacements,
   seedMedicalRecords,
   seedNotes,
@@ -154,6 +155,7 @@ export function DemoWhiskerProvider({
     littersLoading: false,
     adoptions,
     adoptionsLoading: false,
+    species: seedSpecies,
     breeds: seedBreeds,
     products,
     supplyRequests,

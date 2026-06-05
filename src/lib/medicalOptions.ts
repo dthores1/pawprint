@@ -157,11 +157,14 @@ export function getProcedureOptions({
   sex
 }: {
   procedureType: ProcedureType;
-  species?: Species | null;
+  species?: string | null;
   sex?: Sex | null;
 }): Option<Procedure>[] {
   if (procedureType === 'vaccine') {
-    return VACCINE_OPTIONS_BY_SPECIES[species ?? 'Other'] ?? VACCINE_OPTIONS_BY_SPECIES.Other;
+    // species is a free catalog name now; unknown species fall back to Other.
+    return (
+      VACCINE_OPTIONS_BY_SPECIES[(species ?? 'Other') as Species] ??
+      VACCINE_OPTIONS_BY_SPECIES.Other);
   }
 
   if (procedureType === 'spay_neuter') {
@@ -189,7 +192,7 @@ export function getDefaultProcedure({
   sex
 }: {
   procedureType: ProcedureType;
-  species?: Species | null;
+  species?: string | null;
   sex?: Sex | null;
 }): Procedure | '' {
   const options = getProcedureOptions({ procedureType, species, sex });

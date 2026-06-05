@@ -8,7 +8,7 @@ import {
   PackageOpenIcon,
   TruckIcon,
   HeartHandshakeIcon,
-  StethoscopeIcon,
+  HospitalIcon,
   BuildingIcon,
   BarChart3Icon,
   Trash2Icon,
@@ -40,7 +40,7 @@ export function Sidebar() {
   },
   {
     to: '/clinics',
-    icon: StethoscopeIcon,
+    icon: HospitalIcon,
     label: 'Clinics'
   },
   {

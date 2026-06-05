@@ -6,7 +6,7 @@ import { FormSection } from '../ui/FormSection';
 import { AgeInformationFields, AgeInputMode } from './AgeInformationFields';
 import { BreedCombobox } from './BreedCombobox';
 import { useWhisker } from '../../context/WhiskerContext';
-import { Species, Sex, AgeUnit } from '../../types';
+import { Sex, AgeUnit } from '../../types';
 import { deriveAgeInfo } from '../../lib/age';
 
 interface LitterFormProps {
@@ -29,7 +29,7 @@ const today = () => new Date().toISOString().split('T')[0];
 
 // Species → the friendly noun used for the per-member add button and the
 // auto-generated placeholder names ("Puppy 1", "Kitten 2", …).
-function memberNoun(species: Species): string {
+function memberNoun(species: string): string {
   if (species === 'Dog') return 'Puppy';
   if (species === 'Cat') return 'Kitten';
   return 'Animal';
@@ -47,10 +47,10 @@ export function LitterForm({
   onMembersCountChange,
   onSubmittingChange
 }: LitterFormProps) {
-  const { addLitter } = useWhisker();
+  const { addLitter, species: speciesCatalog } = useWhisker();
   // Shared, litter-wide fields.
   const [litterName, setLitterName] = useState('');
-  const [species, setSpecies] = useState<Species>('Dog');
+  const [species, setSpecies] = useState<string>('Dog');
   const [breedId, setBreedId] = useState<string | undefined>(undefined);
   const [breedText, setBreedText] = useState<string | undefined>(undefined);
   const [birthdate, setBirthdate] = useState('');
@@ -151,22 +151,22 @@ export function LitterForm({
               id="litter_species"
               value={species}
               onChange={(e) => {
-                setSpecies(e.target.value as Species);
+                setSpecies(e.target.value);
                 // Breeds are species-specific; reset so they can't mismatch.
                 setBreedId(undefined);
                 setBreedText(undefined);
               }}>
 
-              <option value="Dog">Dog</option>
-              <option value="Cat">Cat</option>
-              <option value="Other">Other</option>
+              {speciesCatalog.map((s) =>
+              <option key={s.id} value={s.name}>{s.name}</option>
+              )}
             </Select>
           </div>
           <div>
             <Label htmlFor="litter_breed">Breed</Label>
             <BreedCombobox
               id="litter_breed"
-              species={species}
+              speciesId={speciesCatalog.find((s) => s.name === species)?.id}
               breedId={breedId}
               breedText={breedText}
               onChange={(next) => {

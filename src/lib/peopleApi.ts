@@ -1,4 +1,4 @@
-import { Person, PersonRole, Species } from '../types';
+import { Person, PersonRole } from '../types';
 
 // The legacy `people.role` column is NOT NULL and only allows these four — note
 // 'foster_parent' is NOT valid there (it lives only in `roles[]`). Derive a safe
@@ -41,7 +41,7 @@ export function rowToPerson(r: any): Person {
     r.address_longitude != null ? Number(r.address_longitude) : undefined,
     max_capacity: r.max_capacity ?? undefined,
     preferred_species:
-    (r.preferred_species ?? undefined) as Species[] | undefined
+    (r.preferred_species ?? undefined) as string[] | undefined
   };
 }
 

@@ -8,9 +8,10 @@ import { Button } from '../ui/Button';
 import { AgeInformationFields, AgeInputMode } from './AgeInformationFields';
 import { BreedCombobox } from './BreedCombobox';
 import { useWhisker } from '../../context/WhiskerContext';
-import { AnimalStatus, Priority, Species, Sex, AgeUnit } from '../../types';
+import { AnimalStatus, Priority, Sex, AgeUnit } from '../../types';
 import { deriveAgeInfo } from '../../lib/age';
 import { animalDisplayName } from '../../lib/utils';
+import { breedFieldLabel } from '../../lib/speciesIcons';
 
 function isValidUrl(value: string): boolean {
   if (!value.trim()) return true;
@@ -59,14 +60,16 @@ export function ChangeStatusModal({
   onClose,
   animalId
 }: ChangeStatusModalProps) {
-  const { animals, updateAnimal, deleteAnimal, addNote } = useWhisker();
+  const { animals, updateAnimal, deleteAnimal, addNote, species: speciesCatalog } =
+  useWhisker();
   const navigate = useNavigate();
   const animal = animals.find((a) => a.id === animalId);
 
   const [name, setName] = useState('');
   const [rescueId, setRescueId] = useState('');
   const [nameError, setNameError] = useState<string | undefined>();
-  const [species, setSpecies] = useState<Species>('Dog');
+  const [species, setSpecies] = useState<string>('');
+  const [speciesId, setSpeciesId] = useState<string>('');
   const [sex, setSex] = useState<Sex>('Unknown');
   const [breedId, setBreedId] = useState<string | undefined>();
   const [breedText, setBreedText] = useState<string | undefined>();
@@ -100,6 +103,13 @@ export function ChangeStatusModal({
     setRescueId(animal.rescue_id ?? '');
     setNameError(undefined);
     setSpecies(animal.species);
+    // Prefer the stored species_id; fall back to matching the legacy name for
+    // any row that predates the species_id backfill.
+    setSpeciesId(
+      animal.species_id ??
+      speciesCatalog.find((s) => s.name === animal.species)?.id ??
+      ''
+    );
     setSex(animal.sex);
     setBreedId(animal.breed_id);
     setBreedText(animal.breed_text);
@@ -197,6 +207,7 @@ export function ChangeStatusModal({
       name: name.trim() || undefined,
       rescue_id: rescueId.trim() || undefined,
       species,
+      species_id: speciesId || undefined,
       sex,
       breed_id: breedId,
       breed_text: breedText,
@@ -319,12 +330,19 @@ export function ChangeStatusModal({
               <Label htmlFor="edit_species" required>Species</Label>
               <Select
                 id="edit_species"
-                value={species}
-                onChange={(e) => setSpecies(e.target.value as Species)}>
+                value={speciesId}
+                onChange={(e) => {
+                  const next = speciesCatalog.find((s) => s.id === e.target.value);
+                  setSpeciesId(next?.id ?? '');
+                  setSpecies(next?.name ?? '');
+                  // Species changed → clear the now-mismatched breed.
+                  setBreedId(undefined);
+                  setBreedText(undefined);
+                }}>
 
-                <option value="Dog">Dog</option>
-                <option value="Cat">Cat</option>
-                <option value="Other">Other</option>
+                {speciesCatalog.map((s) =>
+                <option key={s.id} value={s.id}>{s.name}</option>
+                )}
               </Select>
             </div>
             <div>
@@ -341,10 +359,14 @@ export function ChangeStatusModal({
             </div>
           </div>
           <div>
-            <Label htmlFor="edit_breed">Breed</Label>
+            <Label htmlFor="edit_breed">
+              {breedFieldLabel(
+                speciesCatalog.find((s) => s.id === speciesId)?.slug
+              )}
+            </Label>
             <BreedCombobox
               id="edit_breed"
-              species={species}
+              speciesId={speciesId}
               breedId={breedId}
               breedText={breedText}
               onChange={(next) => {
