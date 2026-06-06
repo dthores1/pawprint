@@ -915,11 +915,15 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     }
     setLitters((cur) => [rowToLitter(litter), ...cur]);
     // 2) Create a member animal each, stamped with shared metadata + litter_id.
+    // Resolve the catalog species_id from the litter's species name so members
+    // match single-add animals (and stay valid for a future NOT NULL).
+    const sharedSpeciesId = species.find((s) => s.name === shared.species)?.id;
     const rows = members.map((m) =>
     animalToInsert(
       {
         name: m.name,
         species: shared.species,
+        species_id: sharedSpeciesId,
         sex: m.sex,
         breed_id: shared.breed_id,
         breed_text: shared.breed_text,

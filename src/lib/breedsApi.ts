@@ -1,4 +1,4 @@
-import { Animal, Breed, BreedSpecies, Species } from '../types';
+import { Animal, Breed } from '../types';
 
 export function rowToBreed(r: any): Breed {
   return {
@@ -8,14 +8,6 @@ export function rowToBreed(r: any): Breed {
     name: r.name,
     active: r.active ?? true
   };
-}
-
-// The app's Species is TitleCase (Dog/Cat/Other); breeds.species is lowercase
-// and finer-grained. 'Other' maps to the non-dog/cat catalogs.
-export function breedSpeciesKeys(species: Species): BreedSpecies[] {
-  if (species === 'Dog') return ['dog'];
-  if (species === 'Cat') return ['cat'];
-  return ['rabbit', 'bird', 'other'];
 }
 
 /** Display label for an animal's breed: free text, else the catalog name. */
