@@ -42,7 +42,12 @@ export const Select = forwardRef<
     return (
       <select
         className={cn(
-          'flex h-11 w-full rounded-lg border border-border bg-white px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50',
+          'flex h-11 w-full appearance-none rounded-lg border border-border bg-white py-2 pl-3.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50',
+          // Custom chevron, inset from the right edge (the native one sits flush
+          // against the border and looks cramped). Quotes/spaces are URL-encoded
+          // so the data URI stays a valid unquoted CSS url() token.
+          'bg-no-repeat bg-[length:1.1rem_1.1rem] bg-[position:right_0.7rem_center]',
+          'bg-[url(data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2024%2024%27%20fill=%27none%27%20stroke=%27%236B6B6B%27%20stroke-width=%272%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%3E%3Cpath%20d=%27M6%209l6%206%206-6%27/%3E%3C/svg%3E)]',
           className
         )}
         ref={ref}

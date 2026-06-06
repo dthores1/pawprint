@@ -162,6 +162,28 @@ export interface Breed {
   active: boolean;
 }
 
+// Per-org enablement layer over the global catalogs (migration 0042).
+/** Which catalog species an org accepts (one row per org+species). */
+export interface OrganizationSpecies {
+  id: string;
+  organization_id: string;
+  species_id: string;
+  is_enabled: boolean;
+  is_default: boolean;
+  sort_order: number;
+}
+/**
+ * Per-org breed restriction (opt-in). No rows for a species → all of that
+ * species' breeds are allowed; rows present → only those breeds are allowed.
+ */
+export interface OrganizationBreed {
+  id: string;
+  organization_id: string;
+  breed_id: string;
+  is_enabled: boolean;
+  sort_order: number;
+}
+
 export type PhotoCategory =
 'intake' |
 'medical' |

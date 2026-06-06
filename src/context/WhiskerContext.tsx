@@ -12,6 +12,8 @@ import {
   AdoptionReturnReason,
   Breed,
   SpeciesCatalog,
+  OrganizationSpecies,
+  OrganizationBreed,
   Litter,
   Sex,
   PersonRole,
@@ -39,6 +41,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { rowToBreed } from '../lib/breedsApi';
 import { rowToSpecies } from '../lib/speciesApi';
+import { rowToOrgSpecies, rowToOrgBreed } from '../lib/organizationCatalogApi';
 import {
   litterToInsert,
   litterUpdateToRow,
@@ -147,6 +150,16 @@ export interface WhiskerContextType {
   species: SpeciesCatalog[];
   /** Global breed catalog (not org-scoped). */
   breeds: Breed[];
+  /** Per-org species enablement (migration 0042). */
+  organizationSpecies: OrganizationSpecies[];
+  /** Per-org breed restriction (opt-in; empty for a species → all allowed). */
+  organizationBreeds: OrganizationBreed[];
+  /** Enable/disable a species for the current org (upserts the org_species row). */
+  setSpeciesEnabled: (speciesId: string, enabled: boolean) => void;
+  /** Mark a species as the org's default (and ensure it's enabled). */
+  setDefaultSpecies: (speciesId: string) => void;
+  /** Replace a species' accepted-breed allowlist ([] clears = all allowed). */
+  setAllowedBreeds: (speciesId: string, breedIds: string[]) => void;
   products: Product[];
   addProduct: (product: Omit<Product, 'id'>) => void;
   updateProduct: (id: string, updates: Partial<Product>) => void;
@@ -697,6 +710,136 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   useEffect(() => {
     loadCoordination();
   }, [loadCoordination]);
+
+  // Per-org species/breed enablement (migration 0042). Org-scoped, no is_deleted
+  // column, so loaded separately from loadCoordination.
+  const [organizationSpecies, setOrganizationSpecies] = useState<
+    OrganizationSpecies[]>(
+    []);
+  const [organizationBreeds, setOrganizationBreeds] = useState<
+    OrganizationBreed[]>(
+    []);
+  const loadOrgCatalog = useCallback(async () => {
+    if (!orgId) {
+      setOrganizationSpecies([]);
+      setOrganizationBreeds([]);
+      return;
+    }
+    const [os, ob] = await Promise.all([
+    supabase.from('organization_species').select('*').eq('organization_id', orgId),
+    supabase.from('organization_breeds').select('*').eq('organization_id', orgId)]
+    );
+    if (os.error) console.error('[organization_species] load failed:', os.error.message);
+    else setOrganizationSpecies((os.data ?? []).map(rowToOrgSpecies));
+    if (ob.error) console.error('[organization_breeds] load failed:', ob.error.message);
+    else setOrganizationBreeds((ob.data ?? []).map(rowToOrgBreed));
+  }, [orgId]);
+  useEffect(() => {
+    loadOrgCatalog();
+  }, [loadOrgCatalog]);
+
+  const setSpeciesEnabled = async (speciesId: string, enabled: boolean) => {
+    if (!orgId) return;
+    // Optimistic: update existing row, or add a temp one if none exists yet.
+    setOrganizationSpecies((prev) => {
+      if (prev.some((r) => r.species_id === speciesId)) {
+        return prev.map((r) =>
+        r.species_id === speciesId ?
+        { ...r, is_enabled: enabled, is_default: enabled ? r.is_default : false } :
+        r
+        );
+      }
+      return [
+      ...prev,
+      {
+        id: `tmp-${speciesId}`,
+        organization_id: orgId,
+        species_id: speciesId,
+        is_enabled: enabled,
+        is_default: false,
+        sort_order: 0
+      }];
+
+    });
+    const payload: Record<string, any> = {
+      organization_id: orgId,
+      species_id: speciesId,
+      is_enabled: enabled
+    };
+    if (!enabled) payload.is_default = false; // can't be default if disabled
+    const { error } = await supabase.
+    from('organization_species').
+    upsert(payload, { onConflict: 'organization_id,species_id' });
+    if (error) console.error('[organization_species] update failed:', error.message);
+    loadOrgCatalog(); // reconcile (real id / server state)
+  };
+
+  const setDefaultSpecies = async (speciesId: string) => {
+    if (!orgId) return;
+    setOrganizationSpecies((prev) =>
+    prev.map((r) => ({
+      ...r,
+      is_default: r.species_id === speciesId,
+      is_enabled: r.species_id === speciesId ? true : r.is_enabled
+    }))
+    );
+    const clear = await supabase.
+    from('organization_species').
+    update({ is_default: false }).
+    eq('organization_id', orgId).
+    neq('species_id', speciesId);
+    const set = await supabase.
+    from('organization_species').
+    update({ is_default: true, is_enabled: true }).
+    eq('organization_id', orgId).
+    eq('species_id', speciesId);
+    if (clear.error || set.error) {
+      console.error('[organization_species] set default failed');
+      loadOrgCatalog();
+    }
+  };
+
+  // Set the per-species breed allowlist (opt-in narrowing). breedIds is the full
+  // accepted set for that species; an empty array clears the restriction (= all
+  // of that species' breeds allowed). Replaces the species' org_breeds rows.
+  const setAllowedBreeds = async (speciesId: string, breedIds: string[]) => {
+    if (!orgId) return;
+    const speciesBreedIds = new Set(
+      breeds.filter((b) => b.species_id === speciesId).map((b) => b.id)
+    );
+    setOrganizationBreeds((prev) => [
+    ...prev.filter((r) => !speciesBreedIds.has(r.breed_id)),
+    ...breedIds.map((bid) => ({
+      id: `tmp-${bid}`,
+      organization_id: orgId,
+      breed_id: bid,
+      is_enabled: true,
+      sort_order: 0
+    }))]
+    );
+    if (speciesBreedIds.size) {
+      const del = await supabase.
+      from('organization_breeds').
+      delete().
+      eq('organization_id', orgId).
+      in('breed_id', [...speciesBreedIds]);
+      if (del.error) console.error('[organization_breeds] clear failed:', del.error.message);
+    }
+    if (breedIds.length) {
+      const ins = await supabase.
+      from('organization_breeds').
+      insert(
+        breedIds.map((bid) => ({
+          organization_id: orgId,
+          breed_id: bid,
+          is_enabled: true
+        }))
+      );
+      if (ins.error) console.error('[organization_breeds] insert failed:', ins.error.message);
+    }
+    loadOrgCatalog();
+  };
+
   const addAnimal = async (
   animal: Omit<Animal, 'id' | 'created_at' | 'updated_at'>) =>
   {
@@ -1938,6 +2081,11 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         adoptionsLoading,
         species,
         breeds,
+        organizationSpecies,
+        organizationBreeds,
+        setSpeciesEnabled,
+        setDefaultSpecies,
+        setAllowedBreeds,
         products,
         addProduct,
         updateProduct,

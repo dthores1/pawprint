@@ -114,6 +114,7 @@ export function AgeInformationFields({
           <DatePicker
           id="estimated_birthdate"
           required
+          yearNavigation
           value={birthdate}
           max={asOfDate}
           onChange={handleBirthdate} />
