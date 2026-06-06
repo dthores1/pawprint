@@ -10,7 +10,6 @@ typeof v === 'string' && UUID_RE.test(v);
 const WRITABLE_COLUMNS = [
 'name',
 'rescue_id',
-'species',
 'species_id',
 'sex',
 'breed_id',
@@ -75,7 +74,10 @@ export function rowToAnimal(r: any): Animal {
     id: r.id,
     name: r.name ?? undefined,
     rescue_id: r.rescue_id ?? undefined,
-    species: r.species,
+    // Display name is derived from species_id via the catalog in WhiskerContext;
+    // the legacy `species` text column is retired (migration 0044), so it may be
+    // absent here. '' is a transient placeholder until enrichment fills it.
+    species: r.species ?? '',
     species_id: r.species_id ?? undefined,
     sex: r.sex,
     estimated_birth_date: r.estimated_birth_date ?? '',

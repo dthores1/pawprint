@@ -105,7 +105,7 @@ names.map((name, i) => ({
 }))
 );
 
-export const seedAnimals: Animal[] = [
+const SEED_ANIMALS_RAW: Animal[] = [
 {
   id: 'a1',
   name: 'Biscuit',
@@ -331,6 +331,13 @@ export const seedAnimals: Animal[] = [
   created_at: '2025-10-10T10:00:00Z',
   updated_at: '2025-10-15T10:00:00Z'
 }];
+
+// Stamp species_id from the species name so demo animals match the real model
+// (production sets species_id from the DB and derives the display name from it).
+export const seedAnimals: Animal[] = SEED_ANIMALS_RAW.map((a) => ({
+  ...a,
+  species_id: a.species_id ?? seedSpecies.find((s) => s.name === a.species)?.id
+}));
 
 
 // Fosters are people with the 'foster_parent' role. These literals carry the

@@ -2064,10 +2064,20 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     return (data ?? []) as ArchivedRecord[];
   };
 
+  // The `animals.species` text column is retired (migration 0044); the species
+  // display name is derived here from species_id via the catalog so every
+  // `animal.species` read keeps working.
+  const enrichedAnimals = useMemo(() => {
+    const nameById = new Map(species.map((s) => [s.id, s.name]));
+    return animals.map((a) =>
+    a.species_id ? { ...a, species: nameById.get(a.species_id) ?? a.species } : a
+    );
+  }, [animals, species]);
+
   return (
     <WhiskerContext.Provider
       value={{
-        animals,
+        animals: enrichedAnimals,
         animalsLoading,
         fosters,
         fostersLoading,

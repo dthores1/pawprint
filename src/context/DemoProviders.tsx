@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { AuthContext, AuthContextType, Org } from './AuthContext';
 import { WhiskerContext, WhiskerContextType } from './WhiskerContext';
 import {
@@ -137,6 +137,13 @@ export function DemoWhiskerProvider({
   const [organizationBreeds, setOrganizationBreeds] = useState(
     seedOrganizationBreeds
   );
+  // Mirror production: derive the species display name from species_id.
+  const enrichedAnimals = useMemo(() => {
+    const nameById = new Map(seedSpecies.map((s) => [s.id, s.name]));
+    return animals.map((a) =>
+    a.species_id ? { ...a, species: nameById.get(a.species_id) ?? a.species } : a
+    );
+  }, [animals]);
 
   const now = () => new Date().toISOString();
 
@@ -181,7 +188,7 @@ export function DemoWhiskerProvider({
   );
 
   const value: WhiskerContextType = {
-    animals,
+    animals: enrichedAnimals,
     animalsLoading: false,
     fosters,
     fostersLoading: false,
