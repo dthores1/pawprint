@@ -6,6 +6,7 @@ import { RolesMultiSelect } from '../ui/RolesMultiSelect';
 import { AddressAutocomplete } from '../ui/AddressAutocomplete';
 import { useWhisker } from '../../context/WhiskerContext';
 import { AddressValue, PersonRole } from '../../types';
+import { enabledSpeciesList } from '../../lib/orgCatalog';
 interface AddFosterModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -66,7 +67,9 @@ function validateForm(formData: FosterForm): FormErrors {
   return nextErrors;
 }
 export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
-  const { addFoster, species: speciesCatalog } = useWhisker();
+  const { addFoster, species: speciesCatalog, organizationSpecies } =
+  useWhisker();
+  const enabledSpecies = enabledSpeciesList(speciesCatalog, organizationSpecies);
   const [formData, setFormData] = useState(INITIAL_FORM);
   const [errors, setErrors] = useState<FormErrors>({});
   const handleClose = () => {
@@ -277,7 +280,7 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
           <div>
             <Label>Preferred Species</Label>
             <div className="flex flex-wrap gap-2 mt-1">
-              {speciesCatalog.map((s) =>
+              {enabledSpecies.map((s) =>
               <button
                 key={s.id}
                 type="button"

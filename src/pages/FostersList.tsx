@@ -26,6 +26,7 @@ import {
 'lucide-react';
 import { useWindowRowVirtualizer } from '../lib/useWindowRowVirtualizer';
 import { Person } from '../types';
+import { enabledSpeciesList } from '../lib/orgCatalog';
 import { cn } from '../lib/utils';
 
 type Availability = 'available' | 'full' | 'inactive';
@@ -49,8 +50,10 @@ const AVAILABILITY_ORDER: Record<Availability, number> = {
   inactive: 2
 };
 export function FostersList() {
-  const { fosters, fostersLoading, placements, species: speciesCatalog } =
+  const { fosters, fostersLoading, placements, species: speciesCatalog,
+    organizationSpecies } =
   useWhisker();
+  const enabledSpecies = enabledSpeciesList(speciesCatalog, organizationSpecies);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [view, setView] = useState<'table' | 'grid'>('table');
@@ -134,7 +137,7 @@ export function FostersList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredFosters, sort, activeCountByFoster]);
 
-  const showSpeciesFilter = speciesCatalog.length > 1;
+  const showSpeciesFilter = enabledSpecies.length > 1;
   // Virtualized table rows in a self-scrolling container. ~73px per row.
   const tableRows = useWindowRowVirtualizer(sortedFosters.length, 73);
   return (
@@ -225,7 +228,7 @@ export function FostersList() {
         {showSpeciesFilter &&
         <>
             <span className="text-sm text-text-secondary ml-1">Species:</span>
-            {speciesCatalog.map((sp) =>
+            {enabledSpecies.map((sp) =>
           <button
             key={sp.id}
             type="button"

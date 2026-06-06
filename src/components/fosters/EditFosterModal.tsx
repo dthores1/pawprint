@@ -6,6 +6,7 @@ import { RolesMultiSelect } from '../ui/RolesMultiSelect';
 import { AddressAutocomplete } from '../ui/AddressAutocomplete';
 import { useWhisker } from '../../context/WhiskerContext';
 import { AddressValue, Person, PersonRole } from '../../types';
+import { enabledSpeciesList } from '../../lib/orgCatalog';
 import { personToAddressValue } from '../../lib/address';
 interface EditFosterModalProps {
   isOpen: boolean;
@@ -74,7 +75,8 @@ export function EditFosterModal({
   onClose,
   foster
 }: EditFosterModalProps) {
-  const { updateFoster, species: speciesCatalog } = useWhisker();
+  const { updateFoster, species: speciesCatalog, organizationSpecies } =
+  useWhisker();
   const [formData, setFormData] = useState<FosterForm>(() => fromFoster(foster));
   const [errors, setErrors] = useState<FormErrors>({});
   // Re-seed when the modal opens (or the foster changes) so edits start fresh.
@@ -256,7 +258,17 @@ export function EditFosterModal({
           <div>
             <Label>Preferred Species</Label>
             <div className="flex flex-wrap gap-2 mt-1">
-              {speciesCatalog.map((s) =>
+              {[
+              ...enabledSpeciesList(speciesCatalog, organizationSpecies),
+              // keep any already-selected species that's since been disabled
+              ...speciesCatalog.filter(
+                (s) =>
+                formData.preferred_species.includes(s.name) &&
+                !enabledSpeciesList(speciesCatalog, organizationSpecies).some(
+                  (e) => e.id === s.id
+                )
+              )].
+              map((s) =>
               <button
                 key={s.id}
                 type="button"

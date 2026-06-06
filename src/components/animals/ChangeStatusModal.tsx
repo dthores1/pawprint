@@ -12,6 +12,7 @@ import { AnimalStatus, Priority, Sex, AgeUnit } from '../../types';
 import { deriveAgeInfo } from '../../lib/age';
 import { animalDisplayName } from '../../lib/utils';
 import { breedFieldLabel } from '../../lib/speciesIcons';
+import { enabledSpeciesList } from '../../lib/orgCatalog';
 
 function isValidUrl(value: string): boolean {
   if (!value.trim()) return true;
@@ -60,8 +61,14 @@ export function ChangeStatusModal({
   onClose,
   animalId
 }: ChangeStatusModalProps) {
-  const { animals, updateAnimal, deleteAnimal, addNote, species: speciesCatalog } =
-  useWhisker();
+  const {
+    animals,
+    updateAnimal,
+    deleteAnimal,
+    addNote,
+    species: speciesCatalog,
+    organizationSpecies
+  } = useWhisker();
   const navigate = useNavigate();
   const animal = animals.find((a) => a.id === animalId);
 
@@ -340,9 +347,19 @@ export function ChangeStatusModal({
                   setBreedText(undefined);
                 }}>
 
-                {speciesCatalog.map((s) =>
-                <option key={s.id} value={s.id}>{s.name}</option>
-                )}
+                {(() => {
+                  // Org-enabled species, plus the animal's current species even
+                  // if it's since been disabled (so editing never drops it).
+                  const enabled = enabledSpeciesList(speciesCatalog, organizationSpecies);
+                  const cur = speciesCatalog.find((s) => s.id === speciesId);
+                  const opts =
+                  cur && !enabled.some((s) => s.id === cur.id) ?
+                  [cur, ...enabled] :
+                  enabled;
+                  return opts.map((s) =>
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                  );
+                })()}
               </Select>
             </div>
             <div>

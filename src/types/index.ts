@@ -74,14 +74,13 @@ export interface Animal {
    */
   rescue_id?: string;
   /**
-   * Species display name (= the catalog `name`, e.g. "Dog", "Rabbit"). Now a
-   * free string sourced from the `species` catalog rather than the old
-   * Dog/Cat/Other union, since any catalog species is selectable. `species_id`
-   * is the authoritative reference; this stays in sync for back-compat.
+   * Species display name (e.g. "Dog", "Rabbit"). DERIVED at load time from
+   * `species_id` via the species catalog (WhiskerContext) — the legacy
+   * `animals.species` text column was dropped (migration 0044). Read-only for
+   * display; writes go through `species_id`.
    */
   species: string;
-  /** FK into the global `species` catalog (migration 0040). Written alongside
-   *  the legacy `species` text until that column is retired. */
+  /** FK into the global `species` catalog — the authoritative species reference. */
   species_id?: string;
   sex: Sex;
   /**

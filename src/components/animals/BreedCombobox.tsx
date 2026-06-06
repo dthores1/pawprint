@@ -4,6 +4,7 @@ import { Input } from '../ui/Forms';
 import { CalendarPopover } from '../ui/CalendarPopover';
 import { useWhisker } from '../../context/WhiskerContext';
 import { breedFieldLabel } from '../../lib/speciesIcons';
+import { acceptedBreeds } from '../../lib/orgCatalog';
 
 // Searchable breed picker filtered by species (via the catalog species_id).
 // Pick a known breed (→ breed_id) or type a custom value (→ breed_text).
@@ -25,7 +26,7 @@ export function BreedCombobox({
   onChange,
   id
 }: BreedComboboxProps) {
-  const { breeds, species: speciesCatalog } = useWhisker();
+  const { breeds, species: speciesCatalog, organizationBreeds } = useWhisker();
   // "Breed" for cat/dog/rabbit, "Type" otherwise — keep the copy in sync.
   const noun = breedFieldLabel(
     speciesCatalog.find((s) => s.id === speciesId)?.slug
@@ -48,11 +49,11 @@ export function BreedCombobox({
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!speciesId) return [];
-    return breeds.
-    filter((b) => b.active && b.species_id === speciesId).
+    // Only breeds the org accepts for this species (org_breeds restriction).
+    return acceptedBreeds(speciesId, breeds, organizationBreeds).
     filter((b) => (q ? b.name.toLowerCase().includes(q) : true)).
     slice(0, 50);
-  }, [breeds, speciesId, query]);
+  }, [breeds, organizationBreeds, speciesId, query]);
 
   const trimmed = query.trim();
   const hasExactMatch = results.some(
