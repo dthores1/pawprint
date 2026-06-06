@@ -29,6 +29,8 @@ import {
   seedAnimals,
   seedBreeds,
   seedSpecies,
+  seedOrganizationSpecies,
+  seedOrganizationBreeds,
   seedPlacements,
   seedMedicalRecords,
   seedNotes,
@@ -129,7 +131,47 @@ export function DemoWhiskerProvider({
     ClinicSlotProcedure[]>(
     seedClinicSlotProcedures);
 
+  const [organizationSpecies, setOrganizationSpecies] = useState(
+    seedOrganizationSpecies
+  );
+  const [organizationBreeds, setOrganizationBreeds] = useState(
+    seedOrganizationBreeds
+  );
+
   const now = () => new Date().toISOString();
+
+  const setAllowedBreeds = (speciesId: string, breedIds: string[]) => {
+    const sb = new Set(
+      seedBreeds.filter((b) => b.species_id === speciesId).map((b) => b.id)
+    );
+    setOrganizationBreeds((prev) => [
+    ...prev.filter((r) => !sb.has(r.breed_id)),
+    ...breedIds.map((bid) => ({
+      id: `ob_${bid}`,
+      organization_id: 'demo-org',
+      breed_id: bid,
+      is_enabled: true,
+      sort_order: 0
+    }))]
+    );
+  };
+
+  const setSpeciesEnabled = (speciesId: string, enabled: boolean) =>
+  setOrganizationSpecies((prev) =>
+  prev.map((r) =>
+  r.species_id === speciesId ?
+  { ...r, is_enabled: enabled, is_default: enabled ? r.is_default : false } :
+  r
+  )
+  );
+  const setDefaultSpecies = (speciesId: string) =>
+  setOrganizationSpecies((prev) =>
+  prev.map((r) => ({
+    ...r,
+    is_default: r.species_id === speciesId,
+    is_enabled: r.species_id === speciesId ? true : r.is_enabled
+  }))
+  );
 
   const updateAnimal = (id: string, updates: Partial<Animal>) =>
   setAnimals((prev) =>
@@ -157,6 +199,11 @@ export function DemoWhiskerProvider({
     adoptionsLoading: false,
     species: seedSpecies,
     breeds: seedBreeds,
+    organizationSpecies,
+    organizationBreeds,
+    setSpeciesEnabled,
+    setDefaultSpecies,
+    setAllowedBreeds,
     products,
     supplyRequests,
     supplyRequestItems,

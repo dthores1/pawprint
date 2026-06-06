@@ -20,6 +20,13 @@ interface DatePickerProps {
   /** Inclusive bounds, `yyyy-MM-dd`. */
   min?: string;
   max?: string;
+  /**
+   * Show month + year dropdowns in the calendar header for fast jumps across
+   * many years (e.g. Birthdate). Without it, navigation is arrow-only — fine
+   * for near-term dates like Intake Date. The selectable year range is derived
+   * from `min`/`max` when present, otherwise defaults to the last ~40 years.
+   */
+  yearNavigation?: boolean;
   className?: string;
   /**
    * Marks the field as required for assistive tech (`aria-required`). The
@@ -39,6 +46,7 @@ export function DatePicker({
   align,
   min,
   max,
+  yearNavigation,
   className,
   required
 }: DatePickerProps) {
@@ -52,6 +60,12 @@ export function DatePicker({
   const disabledMatchers: Matcher[] = [];
   if (minDate) disabledMatchers.push({ before: minDate });
   if (maxDate) disabledMatchers.push({ after: maxDate });
+
+  // Year-dropdown bounds: honor min/max if given, else span the last ~40 years
+  // up to today (covers any realistic animal/person birthdate).
+  const navEnd = maxDate ?? new Date();
+  const navStart =
+  minDate ?? new Date(navEnd.getFullYear() - 40, 0, 1);
 
   // Offer a one-click "Today" shortcut, unless today falls outside min/max.
   const todayStr = format(new Date(), 'yyyy-MM-dd');
@@ -100,6 +114,9 @@ export function DatePicker({
         <DayPicker
           className="pp-calendar"
           mode="single"
+          captionLayout={yearNavigation ? 'dropdown' : 'label'}
+          startMonth={yearNavigation ? navStart : undefined}
+          endMonth={yearNavigation ? navEnd : undefined}
           selected={valid ? parsed : undefined}
           defaultMonth={valid ? parsed : undefined}
           onSelect={handleSelect}

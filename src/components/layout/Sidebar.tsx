@@ -12,6 +12,7 @@ import {
   BuildingIcon,
   BarChart3Icon,
   Trash2Icon,
+  SettingsIcon,
   UserCircleIcon,
   LogOutIcon } from
 'lucide-react';
@@ -126,6 +127,20 @@ export function Sidebar() {
             </p>
           </div>
         }
+        <NavLink
+          to="/settings"
+          className={({ isActive }) =>
+          cn(
+            'flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm font-semibold transition-colors',
+            isActive ?
+            'bg-primary/10 text-primary' :
+            'text-text-primary/80 hover:bg-background hover:text-text-primary'
+          )
+          }>
+
+          <SettingsIcon className="w-5 h-5" />
+          Settings
+        </NavLink>
         {user && currentPersonId ?
         <Link
           to={`/contacts/${currentPersonId}`}

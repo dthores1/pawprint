@@ -23,6 +23,7 @@ import { Login } from './pages/Login';
 import { NoOrganizationScreen } from './pages/Onboarding';
 import { AcceptInvitePage } from './pages/AcceptInvitePage';
 import { OrganizationPage } from './pages/OrganizationPage';
+import { Settings } from './pages/Settings';
 import { ReportsPage } from './pages/ReportsPage';
 import { RecycleBin } from './pages/RecycleBin';
 import { LegalPage } from './pages/LegalPage';
@@ -72,6 +73,7 @@ function AppRoutes() {
         <Route path="contacts" element={<Contacts />} />
         <Route path="contacts/:id" element={<ContactProfile />} />
         <Route path="organization" element={<OrganizationPage />} />
+        <Route path="settings" element={<Settings />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="recycle-bin" element={<RecycleBin />} />
       </Route>

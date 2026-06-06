@@ -77,3 +77,26 @@
 .pp-calendar .rdp-chevron {
   fill: #2E6F68;
 }
+/* Month/year dropdowns (captionLayout="dropdown") — styled to look like the
+   app's other select controls. The native <select> sits transparent on top of
+   the visible label, so we theme the label as a soft, clickable pill. */
+.pp-calendar .rdp-dropdowns {
+  gap: 0.375rem;
+}
+.pp-calendar .rdp-caption_label {
+  font-family: 'Nunito Sans', sans-serif;
+  font-weight: 700;
+  color: #2B2B2B;
+  gap: 0.25rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 0.5rem;
+  border: 1px solid #DDD9D1;
+  background-color: #FFFFFF;
+}
+.pp-calendar .rdp-dropdown_root:hover .rdp-caption_label {
+  background-color: #F1EEE8;
+}
+.pp-calendar .rdp-dropdown_root .rdp-chevron {
+  width: 0.85rem;
+  height: 0.85rem;
+}

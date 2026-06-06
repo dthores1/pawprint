@@ -3,6 +3,8 @@ import {
   Breed,
   BreedSpecies,
   SpeciesCatalog,
+  OrganizationSpecies,
+  OrganizationBreed,
   FosterInput,
   FosterPlacement,
   MedicalRecord,
@@ -55,6 +57,18 @@ export const seedSpecies: SpeciesCatalog[] = [
 { id: 'sp_horse', name: 'Horse', slug: 'horse', icon_name: 'horse', sort_order: 80, active: true },
 { id: 'sp_other', name: 'Other', slug: 'other', icon_name: 'paw-print', sort_order: 999, active: true }];
 
+
+// Per-org enablement (migration 0042) for demo mode: every species enabled,
+// none defaulted, no breed restrictions.
+export const seedOrganizationSpecies: OrganizationSpecies[] = seedSpecies.map((s) => ({
+  id: `os_${s.slug}`,
+  organization_id: 'demo-org',
+  species_id: s.id,
+  is_enabled: true,
+  is_default: false,
+  sort_order: s.sort_order
+}));
+export const seedOrganizationBreeds: OrganizationBreed[] = [];
 
 // Global breed catalog (mirrors the `breeds` table seed). Demo mode reads this;
 // production reads the Supabase table.
