@@ -31,6 +31,7 @@ import {
 '../lib/utils';
 import { animalBreedLabel } from '../lib/breedsApi';
 import { SpeciesIcon } from '../lib/speciesIcons';
+import { enabledSpeciesList } from '../lib/orgCatalog';
 import { isActiveAdoption } from '../lib/adoptions';
 import { motion } from 'framer-motion';
 import { useWindowRowVirtualizer } from '../lib/useWindowRowVirtualizer';
@@ -71,6 +72,7 @@ export function AnimalsList() {
     relationships,
     breeds,
     species: speciesCatalog,
+    organizationSpecies,
     adoptions
   } = useWhisker();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -252,9 +254,13 @@ export function AnimalsList() {
     })),
     []
   );
+  const enabledSpecies = useMemo(
+    () => enabledSpeciesList(speciesCatalog, organizationSpecies),
+    [speciesCatalog, organizationSpecies]
+  );
   const speciesOptions: FilterOption[] = useMemo(
     () =>
-    speciesCatalog.map((s) => ({
+    enabledSpecies.map((s) => ({
       value: s.name,
       label: s.name,
       icon: (
@@ -263,7 +269,7 @@ export function AnimalsList() {
           className="w-3.5 h-3.5 text-text-secondary" />)
 
     })),
-    [speciesCatalog]
+    [enabledSpecies]
   );
   // Active filter chips — one per selected value across all filters.
   const activeChips = [
@@ -298,7 +304,7 @@ export function AnimalsList() {
     setSpeciesFilter([]);
     setFlagFilters([]);
   };
-  const showSpeciesFilter = speciesCatalog.length > 1;
+  const showSpeciesFilter = enabledSpecies.length > 1;
   return (
     <div className="space-y-5 pb-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">

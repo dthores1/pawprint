@@ -7,6 +7,7 @@ import { BreedCombobox } from './BreedCombobox';
 import { AnimalSearchPicker } from '../ui/AnimalSearchPicker';
 import { useWhisker } from '../../context/WhiskerContext';
 import { litterMembers } from '../../lib/litters';
+import { enabledSpeciesList } from '../../lib/orgCatalog';
 
 interface EditLitterModalProps {
   isOpen: boolean;
@@ -21,7 +22,8 @@ export function EditLitterModal({
   onClose,
   litterId
 }: EditLitterModalProps) {
-  const { litters, animals, updateLitter, species: speciesCatalog } = useWhisker();
+  const { litters, animals, updateLitter, species: speciesCatalog,
+    organizationSpecies } = useWhisker();
   const litter = litters.find((l) => l.id === litterId);
 
   const [name, setName] = useState('');
@@ -114,9 +116,18 @@ export function EditLitterModal({
                 setBreedText(undefined);
               }}>
 
-              {speciesCatalog.map((s) =>
-              <option key={s.id} value={s.name}>{s.name}</option>
-              )}
+              {(() => {
+                // Enabled species, plus the litter's current species if it's
+                // since been disabled (so editing never drops it).
+                const enabled = enabledSpeciesList(speciesCatalog, organizationSpecies);
+                const opts =
+                species && !enabled.some((s) => s.name === species) ?
+                [...enabled, ...speciesCatalog.filter((s) => s.name === species)] :
+                enabled;
+                return opts.map((s) =>
+                <option key={s.id} value={s.name}>{s.name}</option>
+                );
+              })()}
             </Select>
           </div>
           <div>

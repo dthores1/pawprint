@@ -8,6 +8,7 @@ import { BreedCombobox } from './BreedCombobox';
 import { useWhisker } from '../../context/WhiskerContext';
 import { Sex, AgeUnit } from '../../types';
 import { deriveAgeInfo } from '../../lib/age';
+import { enabledSpeciesList, defaultSpeciesId } from '../../lib/orgCatalog';
 
 interface LitterFormProps {
   onClose: () => void;
@@ -47,7 +48,9 @@ export function LitterForm({
   onMembersCountChange,
   onSubmittingChange
 }: LitterFormProps) {
-  const { addLitter, species: speciesCatalog } = useWhisker();
+  const { addLitter, species: speciesCatalog, organizationSpecies } =
+  useWhisker();
+  const enabledSpecies = enabledSpeciesList(speciesCatalog, organizationSpecies);
   // Shared, litter-wide fields.
   const [litterName, setLitterName] = useState('');
   const [species, setSpecies] = useState<string>('Dog');
@@ -71,6 +74,16 @@ export function LitterForm({
     intake_source?: string;
   }>({});
   const [submitting, setSubmitting] = useState(false);
+
+  // Default the litter species to the org's default (or first enabled), and
+  // correct it if the current value isn't an accepted species.
+  useEffect(() => {
+    const enabled = enabledSpeciesList(speciesCatalog, organizationSpecies);
+    if (enabled.length === 0 || enabled.some((s) => s.name === species)) return;
+    const defId = defaultSpeciesId(speciesCatalog, organizationSpecies);
+    const pick = enabled.find((s) => s.id === defId) ?? enabled[0];
+    setSpecies(pick.name);
+  }, [speciesCatalog, organizationSpecies, species]);
 
   // Mirror the two pieces of state that the parent's sticky submit button needs.
   useEffect(() => {
@@ -157,7 +170,7 @@ export function LitterForm({
                 setBreedText(undefined);
               }}>
 
-              {speciesCatalog.map((s) =>
+              {enabledSpecies.map((s) =>
               <option key={s.id} value={s.name}>{s.name}</option>
               )}
             </Select>

@@ -11,6 +11,7 @@ import { useWhisker } from '../../context/WhiskerContext';
 import { AnimalStatus, Sex, Priority, AgeUnit } from '../../types';
 import { deriveAgeInfo } from '../../lib/age';
 import { breedFieldLabel } from '../../lib/speciesIcons';
+import { enabledSpeciesList, defaultSpeciesId } from '../../lib/orgCatalog';
 interface AddAnimalModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -95,7 +96,9 @@ export function AddAnimalModal({
   onClose,
   initialMode = 'single'
 }: AddAnimalModalProps) {
-  const { addAnimal, species: speciesCatalog } = useWhisker();
+  const { addAnimal, species: speciesCatalog, organizationSpecies } =
+  useWhisker();
+  const enabledSpecies = enabledSpeciesList(speciesCatalog, organizationSpecies);
   const [mode, setMode] = useState<AddMode>(initialMode);
   const [formData, setFormData] = useState(INITIAL);
   const [ageMode, setAgeMode] = useState<AgeInputMode>('birthdate');
@@ -106,12 +109,15 @@ export function AddAnimalModal({
   // initial state so the button label is correct before any user interaction.
   const [litterMembersCount, setLitterMembersCount] = useState(2);
   const [litterSubmitting, setLitterSubmitting] = useState(false);
-  // Default to the first catalog species once it loads (and isn't set yet).
+  // Default to the org's default species (or first enabled) once loaded.
   useEffect(() => {
-    if (formData.species_id || speciesCatalog.length === 0) return;
-    const first = speciesCatalog[0];
-    setFormData((prev) => ({ ...prev, species: first.name, species_id: first.id }));
-  }, [speciesCatalog, formData.species_id]);
+    if (formData.species_id) return;
+    const enabled = enabledSpeciesList(speciesCatalog, organizationSpecies);
+    if (enabled.length === 0) return;
+    const defId = defaultSpeciesId(speciesCatalog, organizationSpecies);
+    const pick = enabled.find((s) => s.id === defId) ?? enabled[0];
+    setFormData((prev) => ({ ...prev, species: pick.name, species_id: pick.id }));
+  }, [speciesCatalog, organizationSpecies, formData.species_id]);
   const selectedSpecies = speciesCatalog.find((s) => s.id === formData.species_id);
   // Open on the requested sub-form each time the modal is shown.
   useEffect(() => {
@@ -299,6 +305,9 @@ export function AddAnimalModal({
             both.
           </p>
           <div className="grid grid-cols-2 gap-4">
+            {/* Species picker is hidden when the org only accepts one species —
+                it's auto-selected (see default effect). */}
+            {enabledSpecies.length > 1 &&
             <div>
               <Label htmlFor="species" required>Species</Label>
               <Select
@@ -317,11 +326,12 @@ export function AddAnimalModal({
                   }));
                 }}>
 
-                {speciesCatalog.map((s) =>
+                {enabledSpecies.map((s) =>
                 <option key={s.id} value={s.id}>{s.name}</option>
                 )}
               </Select>
             </div>
+            }
             <div>
               <Label htmlFor="sex" required>Sex</Label>
               <Select
