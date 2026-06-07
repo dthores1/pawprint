@@ -59,7 +59,7 @@ Two more Animal fields worth calling out:
 
 - **Fosters are `people`, not a separate table.** A foster is a `Person` whose `roles` include `'foster_parent'`, carrying foster-specific fields (`max_capacity`, `preferred_species`, `address`). The `fosters` collection is a derived view (`people.filter(roles.includes('foster_parent'))`); the Add/Edit Foster forms write a `people` row (legacy `role` set to `'volunteer'`). The old `foster_parents` table is retired — see migration `0012`.
 - **`FosterPlacement`** — links one animal to one foster (`person_id` → `people`) with a `start_date`, optional `end_date`, `placement_status` (`active` / `completed` / `interrupted`), `placement_type` (`foster` / `medical_foster` / `trial_adoption`), and optional `reason_ended`. An animal is considered "in foster" if any placement with `placement_status: 'active'` exists. The Placement Timeline on the Animal Profile renders this history as a date-range stack.
-- **`MedicalRecord`** — procedure log with `procedure_type`, `procedure_name`, `status` (`completed` / `due` / `scheduled` / `overdue` / `canceled`), `performed_date` and/or `due_date`, `notes`, and an optional `next_due_date` for recurring procedures (vaccine/exam/surgery/medication) — e.g. a rabies booster due in a year. The Add Medical modal only prompts for next-due on those types, via a relative interval (in N days/weeks/months/years) or an exact date. **Attribution** uses paired lookup-or-free-text fields: **Performed by** is either a known contact (`provider_contact_id` → `people`) or a free-text `provider_name`; **Facility / Event** is either a scheduled clinic (`clinic_id` → `clinic_events`) or a free-text `facility_name`. Each pair is mutually exclusive (picking a contact/clinic clears the free-text, and vice versa). FKs are `ON DELETE SET NULL` so removing a contact or clinic never deletes medical history.
+- **`MedicalRecord`** — procedure log with `procedure_type`, `procedure_name`, `status` (`completed` / `due` / `scheduled` / `overdue` / `cancelled`), `performed_date` and/or `due_date`, `notes`, and an optional `next_due_date` for recurring procedures (vaccine/exam/surgery/medication) — e.g. a rabies booster due in a year. The Add Medical modal only prompts for next-due on those types, via a relative interval (in N days/weeks/months/years) or an exact date. **Attribution** uses paired lookup-or-free-text fields: **Performed by** is either a known contact (`provider_contact_id` → `people`) or a free-text `provider_name`; **Facility / Event** is either a scheduled clinic (`clinic_id` → `clinic_events`) or a free-text `facility_name`. Each pair is mutually exclusive (picking a contact/clinic clears the free-text, and vice versa). FKs are `ON DELETE SET NULL` so removing a contact or clinic never deletes medical history.
 - **`AnimalNote`** — timestamped free-text note with a `note_type` (`behavior` / `medical` / `foster_update` / `adoption` / `general`).
 - **`AnimalActionItem`** — a tracked "next step" with `description`, elevated `priority`, and `status` (`open` / `completed` / `cancelled`). Replaces the old `action_needed` field so completions are kept in history. At most one `open` per animal. See §4.
 - **`Adoption`** — the operational adoption workflow record (one row per adoption attempt; at most one *active* per animal). `status` runs `inquiry` → `application_submitted` → `meet_and_greet` → `pending_paperwork` → `ready_for_placement`, then a terminal state: `completed` (finalized — sets the animal to `adopted`, stamps `adopted_by_id` / `adopted_at`, closes any active placement), `cancelled` (abandoned), or **`returned`** (a completed adoption reversed because the adopter returned the animal — see §8). Started via **Start Adoption** on the Animal Profile; advanced/completed through the `AdoptionPanel`.
@@ -261,7 +261,7 @@ A request can have many items. Each item is for the same request — multi-anima
 | `ready_for_pickup` | Ready for Pickup | Available at the rescue. |
 | `delivered` | Delivered | Handed off to the requester. |
 | `completed` | Completed | Closed out. |
-| `canceled` | Canceled | Soft exit at any point. |
+| `cancelled` | Cancelled | Soft exit at any point. |
 
 `SupplyRequestPriority` is `normal | urgent | critical`, orthogonal to status (same pattern as animals — see §3).
 
@@ -269,7 +269,7 @@ A request can have many items. Each item is for the same request — multi-anima
 
 ### Surfaces
 
-- **Supplies page (`/supplies`)** — tabbed list of Active vs. Completed/Canceled requests. Each row leads with the requester avatar (rendered in a consistent peach tone using the `Avatar` `tone="peach"` variant) and the animal avatar; the line-item summary, requested date, and status pill sit to the right. When no specific animal is set, a "General supplies" placeholder fills the animal slot so the row stays visually balanced.
+- **Supplies page (`/supplies`)** — tabbed list of Active vs. Completed/Cancelled requests. Each row leads with the requester avatar (rendered in a consistent peach tone using the `Avatar` `tone="peach"` variant) and the animal avatar; the line-item summary, requested date, and status pill sit to the right. When no specific animal is set, a "General supplies" placeholder fills the animal slot so the row stays visually balanced.
 - **Request detail modal** — opened by clicking any row. Shows requester + animal, a **current-status pill** with a colored dot, a **History** list derived from `created_at`, `approved_by_person_id`, `fulfilled_date`, `fulfilled_by_person_id`, and `updated_at`, the line items as a table, and quick-advance / cancel buttons. The presentation is deliberately soft — no horizontal lifecycle stepper, no progress bar. Status feels like a current moment + a short paper trail, not a corporate workflow.
 - **New request modal** — "Requesting as" (read-only current user) + priority + per-item cards. Each item card has a product dropdown (with an "Other" custom-item option), quantity + unit (unit is a dropdown of common units; auto-fills from the product's `default_unit` when a catalog product is selected), and optional notes. A dashed "+ Add another item" CTA appends a card. A clickable bookmark icon at the bottom toggles "Save as common request" for a future templates feature (carries a `TODO(persistence)`). The "For Animal" picker was intentionally removed — supplies rarely map 1:1 to a single animal — and the staff-only "Create request on behalf of…" lookup is stubbed in code comments.
 - **Dashboard widget** — three soft counts on the dashboard: Urgent requests, Pending review (submitted + reviewing), Awaiting delivery (approved + ordered + ready_for_pickup). Each row links to `/supplies`.
@@ -290,7 +290,7 @@ These three features are most common at TNR-focused orgs (e.g. Alley Cat Project
 Volunteers ferry animals or supplies. The list view leads with **subject → destination**, the date in human terms ("Tomorrow @ 9:00 AM", "Mon · 9:00 AM", or a calendar date past a week out), and the requester. Open requests show a **Claim Request** button that assigns the current user as the volunteer and flips status to `claimed`.
 
 **Type:** `animal | supplies | medical | emergency` — drives whether the form shows the optional animal picker.
-**Status:** `open | claimed | in_progress | completed | canceled`.
+**Status:** `open | claimed | in_progress | completed | cancelled`.
 **Urgency:** `normal | urgent | critical` — same orthogonal pattern as animals (§3). Urgency only renders as a pill when non-normal.
 
 **Optional links:** `animal_id`, `clinic_event_id`, and `supply_request_id` are all nullable so a transport can target whichever thing is being moved. Clinic-tied transports are how a Saturday clinic gets cats from foster homes to the vet.
@@ -303,7 +303,7 @@ Short-term foster coverage. A foster who's traveling or otherwise unavailable re
 
 **Fields surfaced as sitter requirements** (chips on the card): `medication_required`, `supplies_included`, `transport_needed`. Sitters know up front what they're signing up for.
 
-**Status:** `open | claimed | in_progress | completed | canceled`. Open requests show **Accept Sitting Request**, which sets `sitter_person_id` and moves to `claimed`.
+**Status:** `open | claimed | in_progress | completed | cancelled`. Open requests show **Accept Sitting Request**, which sets `sitter_person_id` and moves to `claimed`.
 
 **Tabs:** the page splits into **Unclaimed** (everyone can pick from these) and **My Requests** (requests I submitted or am sitting). The Dashboard also carries a Sitting Requests widget showing unclaimed coverage at a glance.
 
@@ -318,9 +318,9 @@ The most operationally complex of the three. TNR orgs run periodic clinics (typi
 - `contact_person_id` — org-side point of contact (vet tech, clinic admin); may be the same as the vet, or different.
 - `transport_coordinator_person_id` / `intake_coordinator_person_id` — internal roles for the day.
 - `slot_capacity` — hard cap that drives the capacity bar on cards.
-- `status` — `planning | scheduled | in_progress | completed | canceled`.
+- `status` — `planning | scheduled | in_progress | completed | cancelled`.
 
-**`ClinicSlot`** is one animal's appointment at a clinic, with its own `status` (`reserved | confirmed | completed | no_show | canceled`) and optional notes. Slots are added inline in the **Clinic Detail modal** — pick an animal from a search picker that excludes anyone already on this clinic's roster, then select one or more procedures.
+**`ClinicSlot`** is one animal's appointment at a clinic, with its own `status` (`reserved | confirmed | completed | no_show | cancelled`) and optional notes. Slots are added inline in the **Clinic Detail modal** — pick an animal from a search picker that excludes anyone already on this clinic's roster, then select one or more procedures.
 
 **`ClinicSlotProcedure`** is a child of `ClinicSlot`: an animal almost always gets several procedures in one visit (e.g. spay/neuter **+** vaccines **+** flea treatment), so procedures are rows, not a single field. Each has a `procedure_type` (`spay_neuter | vaccines | dental | exam | recheck | flea_treatment | deworming | microchip | other`) and a `completed` flag for per-procedure progress. In the Clinic Detail modal, procedures render as chips on each slot: click a chip to toggle done, `×` to remove it, `+ Add` to attach another. (Replaced the old single `clinic_slots.procedure_type` column.)
 

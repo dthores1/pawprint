@@ -18,14 +18,14 @@ const EVENT_STATUS_LABEL: Record<ClinicEventStatus, string> = {
   scheduled: 'Scheduled',
   in_progress: 'In Progress',
   completed: 'Completed',
-  canceled: 'Canceled'
+  cancelled: 'Cancelled'
 };
 const EVENT_STATUS_PILL: Record<ClinicEventStatus, string> = {
   planning: 'bg-[#F8E7C8] text-[#A36B00]',
   scheduled: 'bg-[#DCEAF7] text-[#356A9A]',
   in_progress: 'bg-[#E8DEEC] text-[#6E4E80]',
   completed: 'bg-[#DDEFE2] text-[#3E7B52]',
-  canceled: 'bg-[#F5D7D7] text-[#9B3A3A]'
+  cancelled: 'bg-[#F5D7D7] text-[#9B3A3A]'
 };
 
 export function Clinics() {
@@ -42,12 +42,12 @@ export function Clinics() {
     return {
       upcoming: sorted.filter(
         (e) =>
-        new Date(e.date_time).getTime() >= now && e.status !== 'canceled'
+        new Date(e.date_time).getTime() >= now && e.status !== 'cancelled'
       ),
       past: sorted.
       filter(
         (e) =>
-        new Date(e.date_time).getTime() < now || e.status === 'canceled'
+        new Date(e.date_time).getTime() < now || e.status === 'cancelled'
       ).
       reverse()
     };
@@ -119,7 +119,7 @@ export function Clinics() {
           const slotsForEvent = clinicSlots.filter(
             (s) =>
             s.clinic_event_id === e.id &&
-            s.status !== 'canceled'
+            s.status !== 'cancelled'
           );
           return (
             <ClinicEventCard

@@ -460,7 +460,7 @@ export function ReportsPage() {
     const now = Date.now();
     return clinicEvents.
     filter(
-      (e) => new Date(e.date_time).getTime() >= now && e.status !== 'canceled'
+      (e) => new Date(e.date_time).getTime() >= now && e.status !== 'cancelled'
     ).
     sort(
       (a, b) =>
@@ -471,7 +471,7 @@ export function ReportsPage() {
       const filled = clinicSlots.filter(
         (s) =>
         s.clinic_event_id === e.id &&
-        s.status !== 'canceled' &&
+        s.status !== 'cancelled' &&
         s.status !== 'no_show'
       ).length;
       return { event: e, filled, capacity: e.slot_capacity };

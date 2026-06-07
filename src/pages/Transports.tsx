@@ -24,21 +24,21 @@ import {
 import { ArchiveConfirmDialog } from '../components/archive/ArchiveConfirmDialog';
 import { useCanArchive } from '../components/archive/useCanArchive';
 
-const TRANSPORT_ARCHIVABLE: TransportRequestStatus[] = ['completed', 'canceled'];
+const TRANSPORT_ARCHIVABLE: TransportRequestStatus[] = ['completed', 'cancelled'];
 
 const STATUS_LABEL: Record<TransportRequestStatus, string> = {
   open: 'Open',
   claimed: 'Claimed',
   in_progress: 'In Progress',
   completed: 'Completed',
-  canceled: 'Canceled'
+  cancelled: 'Cancelled'
 };
 const STATUS_PILL: Record<TransportRequestStatus, string> = {
   open: 'bg-[#F8E7C8] text-[#A36B00]',
   claimed: 'bg-[#DCEAF7] text-[#356A9A]',
   in_progress: 'bg-[#E8DEEC] text-[#6E4E80]',
   completed: 'bg-[#DDEFE2] text-[#3E7B52]',
-  canceled: 'bg-[#F5D7D7] text-[#9B3A3A]'
+  cancelled: 'bg-[#F5D7D7] text-[#9B3A3A]'
 };
 const TYPE_LABEL: Record<TransportRequestType, string> = {
   animal: 'Animal',
@@ -119,7 +119,7 @@ export function Transports() {
       (r) => r.status === 'claimed' || r.status === 'in_progress'
     ),
     completed: sorted.filter(
-      (r) => r.status === 'completed' || r.status === 'canceled'
+      (r) => r.status === 'completed' || r.status === 'cancelled'
     )
   };
   const display = grouped[activeTab];
@@ -213,11 +213,11 @@ export function Transports() {
           !!currentPersonId &&
           r.requested_by_person_id === currentPersonId &&
           r.status !== 'completed' &&
-          r.status !== 'canceled' &&
+          r.status !== 'cancelled' &&
           isPickupDayOrLater(r.requested_pickup_time)
           }
           onCancel={() =>
-          updateTransportRequest(r.id, { status: 'canceled' })
+          updateTransportRequest(r.id, { status: 'cancelled' })
           }
           canEdit={
           !!currentPersonId &&
@@ -296,7 +296,7 @@ function TransportCard({
   const handleCancel = () => {
     if (
     window.confirm(
-      'Cancel this transport request? It will be marked as canceled for everyone.'
+      'Cancel this transport request? It will be marked as cancelled for everyone.'
     ))
     {
       onCancel();

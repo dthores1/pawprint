@@ -142,7 +142,7 @@ export function Dashboard() {
   const upcomingClinics = clinicEvents.
   filter(
     (e) =>
-    new Date(e.date_time).getTime() >= now && e.status !== 'canceled'
+    new Date(e.date_time).getTime() >= now && e.status !== 'cancelled'
   ).
   sort(
     (a, b) =>
@@ -377,7 +377,7 @@ export function Dashboard() {
                   const slotsFilled = clinicSlots.filter(
                     (s) =>
                     s.clinic_event_id === e.id &&
-                    s.status !== 'canceled'
+                    s.status !== 'cancelled'
                   ).length;
                   const vet = e.veterinarian_person_id ?
                   people.find((p) => p.id === e.veterinarian_person_id) :

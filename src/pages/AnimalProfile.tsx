@@ -1339,9 +1339,9 @@ const STATUS_TONE: Record<
     wrap: 'bg-[#F5D7D7] text-[#9B3A3A]',
     label: 'Overdue'
   },
-  canceled: {
+  cancelled: {
     wrap: 'bg-background text-text-secondary border border-border',
-    label: 'Canceled'
+    label: 'Cancelled'
   }
 };
 interface MedicalHistoryViewProps {
@@ -1381,7 +1381,7 @@ function MedicalHistoryView({
     new Date(b.performed_date || 0).getTime() -
     new Date(a.performed_date || 0).getTime()
   );
-  const other = records.filter((r) => r.status === 'canceled');
+  const other = records.filter((r) => r.status === 'cancelled');
   // Sort upcoming by soonest due
   upcoming.sort(
     (a, b) =>
@@ -1491,7 +1491,7 @@ function MedicalGroup({
       </div>
       <div className="divide-y divide-border">
         {records.map((r) => {
-          const tone = STATUS_TONE[r.status] || STATUS_TONE.canceled;
+          const tone = STATUS_TONE[r.status] || STATUS_TONE.cancelled;
           const dateLabel = r.performed_date ?
           formatDate(r.performed_date) :
           r.due_date ?
@@ -1504,7 +1504,7 @@ function MedicalGroup({
           'Was due' :
           'Due';
           // A scheduled/due row whose due_date has passed reads as "unresolved"
-          // — flagged inline so the user can mark it completed or canceled
+          // — flagged inline so the user can mark it completed or cancelled
           // without wading into the modal first.
           const today = format(new Date(), 'yyyy-MM-dd');
           const isPastDue =
@@ -1512,7 +1512,7 @@ function MedicalGroup({
           !!r.due_date &&
           r.due_date < today;
           const canMarkComplete =
-          r.status !== 'completed' && r.status !== 'canceled';
+          r.status !== 'completed' && r.status !== 'cancelled';
           return (
             <div
               key={r.id}

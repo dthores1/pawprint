@@ -30,12 +30,12 @@ Set up before running the tests:
 5. The org has at least one **Sitting Request** in each of these states:
    - Open
    - Completed
-   - Canceled
+   - Cancelled
    The completed one should have at least one placement attached.
 6. The org has at least one **Transport Request** in each of these states:
    - Open
    - Completed
-   - Canceled
+   - Cancelled
 
 Browser tips:
 - Keep the browser console open. Errors raised by the server show up as red toasts in the UI, but the console has the full message.
@@ -139,12 +139,12 @@ The trash icon sits in the **Supply Request Detail Modal** — open a request by
 
 ## Sitting requests
 
-The trash icon sits on the right side of each sitting request **card** on the Sitting page. Admins only, and only when the request is completed or canceled.
+The trash icon sits on the right side of each sitting request **card** on the Sitting page. Admins only, and only when the request is completed or cancelled.
 
 | ID | Title | Role | Preconditions | Steps | Expected |
 |---|---|---|---|---|---|
 | SIT-01 | Archive a completed sitting request | Admin | A completed sitting request with at least one placement | 1. Open the Sitting page. 2. Find the completed request card. 3. Click the trash icon in the card's action area. 4. Confirm. | Card disappears from the list. |
-| SIT-02 | Archive a canceled sitting request | Admin | A canceled sitting request | 1. Find the canceled request. 2. Trash → Confirm. | Card disappears. |
+| SIT-02 | Archive a cancelled sitting request | Admin | A cancelled sitting request | 1. Find the cancelled request. 2. Trash → Confirm. | Card disappears. |
 | SIT-03 | Open sitting request cannot be archived | Admin | An open sitting request | 1. Look at the open request card. | No trash icon visible. (The Claim / Cancel buttons may still be present.) |
 | SIT-04 | Member cannot archive sitting requests | Member | A completed sitting request | 1. Sign in as Member. 2. Open the Sitting page (Mine tab if needed). | No trash icon on the card. |
 | SIT-05 | Cascade: placements archived with parent | Admin | The completed request from SIT-01 (with placements) | 1. Run SIT-01. 2. Open Recycle Bin. | One row with type **Sitting request**. The sitting placement rows do NOT appear as their own rows (cascade child hiding). |
@@ -155,12 +155,12 @@ The trash icon sits on the right side of each sitting request **card** on the Si
 
 ## Transport requests
 
-The trash icon sits on each transport request **card** on the Transports page (use the **Completed** tab to find archivable rows). Admins only, and only when the request is completed or canceled.
+The trash icon sits on each transport request **card** on the Transports page (use the **Completed** tab to find archivable rows). Admins only, and only when the request is completed or cancelled.
 
 | ID | Title | Role | Preconditions | Steps | Expected |
 |---|---|---|---|---|---|
 | TRP-01 | Archive a completed transport | Admin | A completed transport request | 1. Open Transports. 2. Switch to the **Completed** tab. 3. Find the completed row. 4. Click the trash icon. 5. Confirm. | Card disappears from the list. |
-| TRP-02 | Archive a canceled transport | Admin | A canceled transport (also lives in the Completed tab) | 1. In the Completed tab, find the canceled row. 2. Trash → Confirm. | Card disappears. |
+| TRP-02 | Archive a cancelled transport | Admin | A cancelled transport (also lives in the Completed tab) | 1. In the Completed tab, find the cancelled row. 2. Trash → Confirm. | Card disappears. |
 | TRP-03 | Open transport cannot be archived | Admin | An open transport | 1. Switch to the **Open** tab. 2. Look at any open card. | No trash icon visible. |
 | TRP-04 | Claimed transport cannot be archived | Admin | A claimed / in-progress transport | 1. Switch to **Claimed / In Progress**. 2. Look at the card. | No trash icon visible. |
 | TRP-05 | Member cannot archive transports | Member | A completed transport | 1. Sign in as Member. 2. Open Transports → Completed. | No trash icons on any card. |
@@ -243,7 +243,7 @@ update supply_request_items
 Clinics introduce a three-level hierarchy: **Clinic event → Clinic slot → Procedure**. All three are admin-only to archive. Status blockers and cascade rules live in `supabase/migrations/0027_archive_phase5_clinics.sql`.
 
 Status rules:
-- A **clinic event** is archivable only when its status is **Planning**, **Completed**, or **Canceled**. The trash icon is hidden (and the server would reject a direct call) for **Scheduled** and **In Progress**.
+- A **clinic event** is archivable only when its status is **Planning**, **Completed**, or **Cancelled**. The trash icon is hidden (and the server would reject a direct call) for **Scheduled** and **In Progress**.
 - A **clinic slot** (and a procedure within a slot) is blocked while the parent clinic is **In Progress**. Otherwise admins may archive.
 
 Cascade:
@@ -265,11 +265,11 @@ UI surfaces:
 | CLIN-03 | Archive a Completed clinic | Admin | A clinic event with status **Completed** that has at least one slot whose procedures generated medical records during clinic completion | 1. Open the completed clinic. 2. Click the header trash icon. 3. Confirm. | Clinic disappears from the active list. The user is navigated to `/clinics`. The Recycle Bin shows one **Clinic event** row for it. |
 | CLIN-04 | Completed clinic preserves medical records | Admin | The clinic archived in CLIN-03; you know an animal whose medical history was populated from that clinic | 1. Open the animal profile referenced in CLIN-03. 2. Scroll to the **Medical History** card. | The medical records created from that clinic are STILL present (not archived). They still link to the (now-archived) clinic — only the clinic / slots / procedures cascade; medical records do not. |
 | CLIN-05 | SQL spot-check medical records survive | Admin with SQL access | The clinic archived in CLIN-03, and an animal id from CLIN-04 | 1. In the Supabase SQL editor:<br/>`select id, is_deleted, clinic_id from medical_records where animal_id = '<animal_id>' and clinic_id = '<clinic_id>';` | Rows are returned. Every row shows `is_deleted = false` and `clinic_id` still points to the archived clinic. (No cascade from `clinic_events` → `medical_records`.) |
-| CLIN-06 | Archive a Canceled clinic | Admin | A clinic event with status **Canceled** | 1. Open the canceled clinic. 2. Click the header trash icon. 3. Confirm. | Clinic disappears from the active list. User is navigated to `/clinics`. Bin shows a **Clinic event** row. |
+| CLIN-06 | Archive a Cancelled clinic | Admin | A clinic event with status **Cancelled** | 1. Open the cancelled clinic. 2. Click the header trash icon. 3. Confirm. | Clinic disappears from the active list. User is navigated to `/clinics`. Bin shows a **Clinic event** row. |
 | CLIN-07 | Scheduled clinic has no archive icon | Admin | A clinic event with status **Scheduled** | 1. Open the scheduled clinic. 2. Inspect the header (next to **Edit**). | The trash icon does NOT render. (The **Edit** button is visible; **Complete Clinic** appears as well because the clinic is Scheduled.) |
 | CLIN-08 | In Progress clinic has no archive icon | Admin | A clinic event with status **In Progress** | 1. Open the in-progress clinic. 2. Inspect the header. | The trash icon does NOT render. |
 | CLIN-09 | Server rejects direct archive of Scheduled / In Progress clinic | Admin with SQL access | A clinic in Scheduled or In Progress status | 1. In the Supabase SQL editor: `select archive_record('clinic_events', '<id>');` | Server raises: *"clinic must be in Planning, Completed, or Cancelled before archiving (currently \<status\>)"*. |
-| CLIN-10 | Member sees no archive icons anywhere on clinic | Member | A clinic event in any archivable status (Planning / Completed / Canceled) with at least one slot | 1. Sign in as Member. 2. Open the clinic. 3. Inspect the header AND each slot row. | No trash icon appears in the header. No trash icon appears on any slot row. (Edit / status / procedure controls may still be visible per their own role rules.) |
+| CLIN-10 | Member sees no archive icons anywhere on clinic | Member | A clinic event in any archivable status (Planning / Completed / Cancelled) with at least one slot | 1. Sign in as Member. 2. Open the clinic. 3. Inspect the header AND each slot row. | No trash icon appears in the header. No trash icon appears on any slot row. (Edit / status / procedure controls may still be visible per their own role rules.) |
 | CLIN-11 | Restore clinic — slots and procedures come back together | Admin | The clinic from CLIN-01 is in the Recycle Bin | 1. Open Recycle Bin. 2. Click the restore icon on the clinic row. 3. Open `/clinics/:id` for that clinic. | Clinic reappears in the active list. On its profile, all of the slots that were on it before archiving are back, and each slot has all its procedures back. |
 
 ### Clinic slots
@@ -280,7 +280,7 @@ UI surfaces:
 | CLIN-SLOT-02 | Slot archive cascades its procedures | Admin | The slot archived in CLIN-SLOT-01 had two or more procedures | 1. Open Recycle Bin. | One row with type **Clinic slot** appears for that slot. The individual procedures on it do NOT show as their own rows (cascade-child hiding). |
 | CLIN-SLOT-03 | Slot archive icon hidden while clinic is In Progress | Admin | A clinic with status **In Progress** that has at least one slot | 1. Open the in-progress clinic. 2. Inspect the slot row. | The trash icon at the right end of the slot row does NOT render. (The status `<select>` and procedure chips remain.) |
 | CLIN-SLOT-04 | Server rejects slot archive while clinic is In Progress | Admin with SQL access | A slot whose parent clinic is **In Progress** | 1. In the Supabase SQL editor: `select archive_record('clinic_slots', '<slot_id>');` | Server raises: *"cannot archive while the clinic is in progress"*. |
-| CLIN-SLOT-05 | Member sees no slot archive icon | Member | A clinic in Planning / Completed / Canceled with at least one slot | 1. Sign in as Member. 2. Open the clinic. 3. Inspect every slot row. | The trash icon does NOT render on any slot row, regardless of clinic status. |
+| CLIN-SLOT-05 | Member sees no slot archive icon | Member | A clinic in Planning / Completed / Cancelled with at least one slot | 1. Sign in as Member. 2. Open the clinic. 3. Inspect every slot row. | The trash icon does NOT render on any slot row, regardless of clinic status. |
 | CLIN-SLOT-06 | Restore an independently-archived slot | Admin | A slot was archived alone (not as part of a clinic cascade); the parent clinic is still active | 1. Open Recycle Bin. 2. Click restore on the **Clinic slot** row. 3. Open the parent clinic at `/clinics/:id`. | Slot reappears in the Slots list with all of its procedures back. (Procedures share the slot's `deleted_at`, so they cascade-restore.) |
 | CLIN-SLOT-07 | Restoring parent clinic does not restore independently-archived child slot | Admin | A clinic that was archived; before archiving the clinic, one of its slots had already been archived on its own (different `deleted_at`) | 1. Restore the clinic from the Recycle Bin. 2. Open the clinic. | The slots that were cascaded with the clinic are back. The slot that was archived independently earlier (with a different `deleted_at`) stays archived — it remains in the Recycle Bin as its own **Clinic slot** row and must be restored separately. |
 
@@ -296,7 +296,7 @@ UI surfaces:
   - `supabase/migrations/0024_archive_support.sql` — adds the `is_deleted` / `deleted_at` / `deleted_by` columns across every supported table, and the `archive_record` / `restore_record` / `list_archived` server functions. Phase 1 wires only `animal_notes`.
   - `supabase/migrations/0025_archive_phase2_photos_actions.sql` — adds `created_by` to `animal_photos` and `animal_action_items`, extends the creator-or-admin rule to these two tables.
   - `supabase/migrations/0026_archive_phase4_requests.sql` — adds status blockers + parent→child cascade for supply / sitting / transport requests, and the 7-day cap + cascade-child hiding in `list_archived`.
-  - `supabase/migrations/0027_archive_phase5_clinics.sql` — adds status blockers for clinic events (Planning / Completed / Canceled only) and slots/procedures (blocked while parent clinic is In Progress), the two-level cascade on clinic event archive, the one-level cascade on slot archive, matching-`deleted_at` cascade restore, and cascade-child hiding for `clinic_slots` and `clinic_slot_procedures` in `list_archived`.
+  - `supabase/migrations/0027_archive_phase5_clinics.sql` — adds status blockers for clinic events (Planning / Completed / Cancelled only) and slots/procedures (blocked while parent clinic is In Progress), the two-level cascade on clinic event archive, the one-level cascade on slot archive, matching-`deleted_at` cascade restore, and cascade-child hiding for `clinic_slots` and `clinic_slot_procedures` in `list_archived`.
   - `supabase/migrations/0028_archive_tighten_supply_blocker.sql` — tightens the supply-request rule so only **Cancelled** and **Denied** are archivable. Fulfilled is now audit history.
   - `supabase/migrations/0029_archive_phase6_adoptions_placements_relationships.sql` — adds status blockers for adoptions (only `cancelled`) and foster_placements (block `active`); relationships are admin-only with no blockers.
   - `supabase/migrations/0030_archive_phase7_animals_people_litters.sql` — adds cross-table blockers for animals (foster placement / relationships / adoption / clinic slot / sitting / transport / supply / status=adopted), people (foster placement / adoption / sitting / transport / supply), and litters (active animals linked). No cascade for these — sub-records remain in place when the parent is archived.
@@ -361,8 +361,8 @@ The trash icon sits in the **AnimalProfile** hero header (route `/animals/:id`) 
 | ANIMAL-04 | Blocker: active relationships exist | Admin | An animal with at least one non-archived `animal_relationships` row referencing it (either direction — e.g. it's the mother of another animal, or is bonded with another) | 1. Open the animal profile as Admin. 2. Click the trash icon. 3. Confirm. | Dialog raises the exact error *"cannot archive: animal has active relationships — remove them from the Relationships card first"*. Animal is not archived. |
 | ANIMAL-05 | Blocker: pending adoption | Admin | An animal with an `adoptions` row whose status is anything other than `completed` / `cancelled` / `returned` (e.g. `inquiry`, `submitted`, `approved`) | 1. Open the animal profile as Admin. 2. Click trash → Confirm. | Dialog raises the exact error *"cannot archive: animal has a pending adoption — cancel it first"*. Animal is not archived. |
 | ANIMAL-06 | Blocker: status = adopted | Admin | An animal whose status is `adopted` (tracked-history record) | 1. Open the animal profile as Admin. 2. Click trash → Confirm. | Dialog raises the exact error *"cannot archive an adopted animal — this record is tracked history"*. Animal is not archived and remains in the Animals list (under whatever filter shows adopted records). |
-| ANIMAL-07 | Blocker: upcoming clinic slot | Admin | An animal with a `clinic_slots` row whose parent `clinic_events.status` is not `completed` / `canceled`, and whose own `status` is not `canceled` / `no_show` (e.g. a scheduled clinic with this animal slotted in) | 1. Open the animal profile as Admin. 2. Click trash → Confirm. | Dialog raises the exact error *"cannot archive: animal has an upcoming clinic slot — remove the slot or cancel the clinic first"*. Animal is not archived. |
-| ANIMAL-08 | Blocker: open transport request | Admin | An animal that's the subject of a `transport_requests` row whose status is not `completed` / `canceled` (e.g. an open or claimed transport) | 1. Open the animal profile as Admin. 2. Click trash → Confirm. | Dialog raises the exact error *"cannot archive: animal has an active transport request"*. Animal is not archived. |
+| ANIMAL-07 | Blocker: upcoming clinic slot | Admin | An animal with a `clinic_slots` row whose parent `clinic_events.status` is not `completed` / `cancelled`, and whose own `status` is not `cancelled` / `no_show` (e.g. a scheduled clinic with this animal slotted in) | 1. Open the animal profile as Admin. 2. Click trash → Confirm. | Dialog raises the exact error *"cannot archive: animal has an upcoming clinic slot — remove the slot or cancel the clinic first"*. Animal is not archived. |
+| ANIMAL-08 | Blocker: open transport request | Admin | An animal that's the subject of a `transport_requests` row whose status is not `completed` / `cancelled` (e.g. an open or claimed transport) | 1. Open the animal profile as Admin. 2. Click trash → Confirm. | Dialog raises the exact error *"cannot archive: animal has an active transport request"*. Animal is not archived. |
 | ANIMAL-09 | Member sees no trash icon on any animal | Member | Any animal in the org, in any status | 1. Sign in as Member. 2. Open `/animals/:id` for any animal. 3. Inspect the hero header. | No trash icon renders next to **Edit**. (The **Edit** button itself may still be visible per its own role rules.) |
 
 ### People (contacts and fosters)
@@ -375,7 +375,7 @@ The same `people` row is editable from two profile pages — **ContactProfile** 
 | PERSON-02 | Archive a foster from FosterProfile | Admin | A foster (a `people` row whose `roles` include `foster_parent`) whose foster placements are ALL `completed` / `interrupted` (no `active` placement), and who has no in-flight adoption / sitting / transport / supply involvement | 1. Open `/fosters/:id` for that foster as Admin. 2. Click the trash icon next to **Edit** in the profile header. 3. Confirm. | Dialog closes. User is redirected to `/fosters`. The foster no longer appears in the Fosters list. Recycle Bin shows one **Person** row. |
 | PERSON-03 | Blocker: active foster placement as foster | Admin | A person who is the foster on at least one `foster_placements` row with `placement_status = 'active'` | 1. Open `/fosters/:id` (or `/contacts/:id`) for that person as Admin. 2. Click trash → Confirm. | Dialog raises the exact error *"cannot archive: person is the foster on an active placement"*. Person is not archived. |
 | PERSON-04 | Blocker: pending adoption as adopter | Admin | A person who is the `adopter_id` on an `adoptions` row whose status is not `completed` / `cancelled` / `returned` | 1. Open `/contacts/:id` for that person as Admin. 2. Click trash → Confirm. | Dialog raises the exact error *"cannot archive: person is the adopter on a pending adoption"*. Person is not archived. |
-| PERSON-05 | Blocker: active sitting request as sitter | Admin | A person who is the `sitter_person_id` (or `requested_by_person_id`) on a `sitting_requests` row whose status is not `completed` / `canceled` | 1. Open the person's profile as Admin. 2. Click trash → Confirm. | Dialog raises the exact error *"cannot archive: person is on an active sitting request"*. Person is not archived. |
+| PERSON-05 | Blocker: active sitting request as sitter | Admin | A person who is the `sitter_person_id` (or `requested_by_person_id`) on a `sitting_requests` row whose status is not `completed` / `cancelled` | 1. Open the person's profile as Admin. 2. Click trash → Confirm. | Dialog raises the exact error *"cannot archive: person is on an active sitting request"*. Person is not archived. |
 | PERSON-06 | Blocker: open supply request as requester | Admin | A person who is the `requester_person_id` on a `supply_requests` row whose status is not `fulfilled` / `cancelled` / `denied` | 1. Open the person's profile as Admin. 2. Click trash → Confirm. | Dialog raises the exact error *"cannot archive: person has an open supply request"*. Person is not archived. |
 | PERSON-07 | Member sees no trash icon on a person profile | Member | Any contact and any foster in the org | 1. Sign in as Member. 2. Open `/contacts/:id` for a contact. 3. Inspect the header. 4. Open `/fosters/:id` for a foster. 5. Inspect the header. | No trash icon renders next to **Edit** on either profile, regardless of the person's role or activity. |
 

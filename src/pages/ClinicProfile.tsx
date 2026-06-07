@@ -62,28 +62,28 @@ const SLOT_STATUS_LABEL: Record<ClinicSlotStatus, string> = {
   confirmed: 'Confirmed',
   completed: 'Completed',
   no_show: 'No-show',
-  canceled: 'Canceled'
+  cancelled: 'Cancelled'
 };
 const SLOT_STATUS_PILL: Record<ClinicSlotStatus, string> = {
   reserved: 'bg-[#E5E2DC] text-[#6B6B6B]',
   confirmed: 'bg-[#DCEAF7] text-[#356A9A]',
   completed: 'bg-[#DDEFE2] text-[#3E7B52]',
   no_show: 'bg-[#F5D7D7] text-[#9B3A3A]',
-  canceled: 'bg-background text-text-secondary border border-border'
+  cancelled: 'bg-background text-text-secondary border border-border'
 };
 const EVENT_STATUS_LABEL: Record<ClinicEventStatus, string> = {
   planning: 'Planning',
   scheduled: 'Scheduled',
   in_progress: 'In Progress',
   completed: 'Completed',
-  canceled: 'Canceled'
+  cancelled: 'Cancelled'
 };
 const EVENT_STATUS_PILL: Record<ClinicEventStatus, string> = {
   planning: 'bg-[#F8E7C8] text-[#A36B00]',
   scheduled: 'bg-[#DCEAF7] text-[#356A9A]',
   in_progress: 'bg-[#E8DEEC] text-[#6E4E80]',
   completed: 'bg-[#DDEFE2] text-[#3E7B52]',
-  canceled: 'bg-[#F5D7D7] text-[#9B3A3A]'
+  cancelled: 'bg-[#F5D7D7] text-[#9B3A3A]'
 };
 
 export function ClinicProfile() {
@@ -136,7 +136,7 @@ export function ClinicProfile() {
 
   const slots = clinicSlots.filter((s) => s.clinic_event_id === event.id);
   const filled = slots.filter(
-    (s) => s.status !== 'canceled' && s.status !== 'no_show'
+    (s) => s.status !== 'cancelled' && s.status !== 'no_show'
   ).length;
   const percentFilled = Math.min(
     100,
@@ -157,7 +157,7 @@ export function ClinicProfile() {
   undefined;
 
   const animalsAvailable = animals.filter(
-    (a) => !slots.some((s) => s.animal_id === a.id && s.status !== 'canceled')
+    (a) => !slots.some((s) => s.animal_id === a.id && s.status !== 'cancelled')
   );
 
   const canComplete =
@@ -165,7 +165,7 @@ export function ClinicProfile() {
   slots.length > 0;
 
   // Clinic archives are admin-only and gated to states where it's safe to
-  // remove from active workflows (planning / completed / canceled). The
+  // remove from active workflows (planning / completed / cancelled). The
   // server enforces the same rule; this just hides the button.
   const canArchive =
   canArchiveEvent &&

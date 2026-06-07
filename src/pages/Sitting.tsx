@@ -21,14 +21,14 @@ import { useCanArchive } from '../components/archive/useCanArchive';
 
 const SITTING_ARCHIVABLE: SittingRequestStatus[] = [
 'completed',
-'canceled',
+'cancelled',
 'expired'];
 
 // Statuses that mean "this request is no longer active" — same treatment as
 // cancelled across the UI (no edit, no cancel, archivable).
 const SITTING_TERMINAL: SittingRequestStatus[] = [
 'completed',
-'canceled',
+'cancelled',
 'expired'];
 
 const STATUS_LABEL: Record<SittingRequestStatus, string> = {
@@ -36,7 +36,7 @@ const STATUS_LABEL: Record<SittingRequestStatus, string> = {
   claimed: 'Claimed',
   in_progress: 'In Progress',
   completed: 'Completed',
-  canceled: 'Canceled',
+  cancelled: 'Cancelled',
   expired: 'Expired'
 };
 const STATUS_PILL: Record<SittingRequestStatus, string> = {
@@ -44,7 +44,7 @@ const STATUS_PILL: Record<SittingRequestStatus, string> = {
   claimed: 'bg-[#DCEAF7] text-[#356A9A]',
   in_progress: 'bg-[#E8DEEC] text-[#6E4E80]',
   completed: 'bg-[#DDEFE2] text-[#3E7B52]',
-  canceled: 'bg-[#F5D7D7] text-[#9B3A3A]',
+  cancelled: 'bg-[#F5D7D7] text-[#9B3A3A]',
   // Expired reads as muted/neutral — it's history, not a problem.
   expired: 'bg-background text-text-secondary border border-border'
 };
@@ -218,7 +218,7 @@ export function Sitting() {
               isStartDayOrLater(s.start_date)
               }
               onCancel={() =>
-              updateSittingRequest(s.id, { status: 'canceled' })
+              updateSittingRequest(s.id, { status: 'cancelled' })
               }
               canEdit={
               !!currentPersonId &&
@@ -293,7 +293,7 @@ function SittingCard({
   const handleCancel = () => {
     if (
     window.confirm(
-      'Cancel this sitting request? It will be marked as canceled for everyone.'
+      'Cancel this sitting request? It will be marked as cancelled for everyone.'
     ))
     {
       onCancel();

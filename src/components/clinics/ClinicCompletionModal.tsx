@@ -29,7 +29,7 @@ interface Props {
   clinicEventId: string | null;
 }
 
-type Attendance = 'attended' | 'no_show' | 'canceled';
+type Attendance = 'attended' | 'no_show' | 'cancelled';
 
 interface PerSlotState {
   attendance: Attendance;
@@ -88,7 +88,7 @@ const MEDICAL_MAPPING: Record<
 const ATTENDANCE_TO_SLOT: Record<Attendance, ClinicSlotStatus> = {
   attended: 'completed',
   no_show: 'no_show',
-  canceled: 'canceled'
+  cancelled: 'cancelled'
 };
 
 type Step = 1 | 2 | 3;
@@ -141,7 +141,7 @@ export function ClinicCompletionModal({ isOpen, onClose, clinicEventId }: Props)
       }
       const attendance: Attendance =
       s.status === 'no_show' ? 'no_show' :
-      s.status === 'canceled' ? 'canceled' :
+      s.status === 'cancelled' ? 'cancelled' :
       'attended';
       next[s.id] = {
         attendance,
@@ -189,7 +189,7 @@ export function ClinicCompletionModal({ isOpen, onClose, clinicEventId }: Props)
 
   const attendingSlots = slots.filter((s) => state[s.id]?.attendance === 'attended');
   const noShowSlots = slots.filter((s) => state[s.id]?.attendance === 'no_show');
-  const canceledSlots = slots.filter((s) => state[s.id]?.attendance === 'canceled');
+  const cancelledSlots = slots.filter((s) => state[s.id]?.attendance === 'cancelled');
 
   // Summary numbers for step 3.
   const totalCompletedProcedures = attendingSlots.reduce((sum, s) => {
@@ -216,7 +216,7 @@ export function ClinicCompletionModal({ isOpen, onClose, clinicEventId }: Props)
   const allNoShow =
   slots.length > 0 &&
   attendingSlots.length === 0 &&
-  canceledSlots.length === 0;
+  cancelledSlots.length === 0;
   const blocksStep1 = hasNoAnimals || allNoShow && !overrideAllNoShow;
 
   const handleComplete = async () => {
@@ -412,7 +412,7 @@ export function ClinicCompletionModal({ isOpen, onClose, clinicEventId }: Props)
         <Step3
           attendingSlots={attendingSlots}
           noShowSlots={noShowSlots}
-          canceledSlots={canceledSlots}
+          cancelledSlots={cancelledSlots}
           attendingWithoutProcedures={attendingWithoutProcedures}
           recordsToCreate={recordsToCreate}
           animals={animals}
@@ -592,8 +592,8 @@ function Step1({
                   label="No-show" />
 
                   <AttendancePill
-                  active={st.attendance === 'canceled'}
-                  onClick={() => setSlot(s.id, { attendance: 'canceled' })}
+                  active={st.attendance === 'cancelled'}
+                  onClick={() => setSlot(s.id, { attendance: 'cancelled' })}
                   tone="gray"
                   icon={CalendarOffIcon}
                   label="Cancelled" />
@@ -786,7 +786,7 @@ function Step2({
 function Step3({
   attendingSlots,
   noShowSlots,
-  canceledSlots,
+  cancelledSlots,
   attendingWithoutProcedures,
   recordsToCreate,
   animals,
@@ -795,7 +795,7 @@ function Step3({
 }: {
   attendingSlots: {id: string;animal_id: string;}[];
   noShowSlots: {id: string;animal_id: string;}[];
-  canceledSlots: {id: string;animal_id: string;}[];
+  cancelledSlots: {id: string;animal_id: string;}[];
   attendingWithoutProcedures: {id: string;animal_id: string;}[];
   recordsToCreate: number;
   animals: any[];
@@ -815,7 +815,7 @@ function Step3({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <StatTile label="Attended" value={attendingSlots.length} tone="green" />
         <StatTile label="No-show" value={noShowSlots.length} tone="red" />
-        <StatTile label="Cancelled" value={canceledSlots.length} tone="gray" />
+        <StatTile label="Cancelled" value={cancelledSlots.length} tone="gray" />
         <StatTile label="Records to create" value={recordsToCreate} tone="primary" />
       </div>
 
@@ -887,7 +887,7 @@ function Step3({
         </div>
       }
 
-      {(noShowSlots.length > 0 || canceledSlots.length > 0) &&
+      {(noShowSlots.length > 0 || cancelledSlots.length > 0) &&
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {noShowSlots.length > 0 &&
         <NameList
@@ -896,10 +896,10 @@ function Step3({
           animals={animals} />
 
         }
-          {canceledSlots.length > 0 &&
+          {cancelledSlots.length > 0 &&
         <NameList
           label="Cancelled"
-          slots={canceledSlots}
+          slots={cancelledSlots}
           animals={animals} />
 
         }

@@ -199,7 +199,7 @@ export function SupplyRequests() {
             'border-transparent text-text-secondary hover:text-text-primary'
           )}>
 
-          Completed & Canceled
+          Completed & Cancelled
         </button>
         <button
           onClick={() => setActiveTab('common')}
