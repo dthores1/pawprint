@@ -31,6 +31,8 @@ import {
   seedSpecies,
   seedOrganizationSpecies,
   seedOrganizationBreeds,
+  seedTraits,
+  seedAnimalTraits,
   seedPlacements,
   seedMedicalRecords,
   seedNotes,
@@ -147,6 +149,42 @@ export function DemoWhiskerProvider({
 
   const now = () => new Date().toISOString();
 
+  const [traits, setTraits] = useState(seedTraits);
+  const addTrait = (t: {
+    name: string;
+    description?: string;
+    species_id?: string;
+    active?: boolean;
+  }) =>
+  setTraits((prev) => [
+  ...prev,
+  {
+    id: `tr_new_${prev.length}`,
+    organization_id: 'demo-org',
+    name: t.name,
+    description: t.description,
+    species_id: t.species_id,
+    active: t.active ?? true,
+    created_at: now(),
+    updated_at: now()
+  }]
+  );
+  const updateTrait = (id: string, updates: Partial<(typeof seedTraits)[number]>) =>
+  setTraits((prev) =>
+  prev.map((t) => t.id === id ? { ...t, ...updates, updated_at: now() } : t)
+  );
+  const [animalTraits, setAnimalTraits_] = useState(seedAnimalTraits);
+  const setAnimalTraits = (animalId: string, traitIds: string[]) =>
+  setAnimalTraits_((prev) => [
+  ...prev.filter((t) => t.animal_id !== animalId),
+  ...traitIds.map((tid, i) => ({
+    id: `at_${animalId}_${i}`,
+    organization_id: 'demo-org',
+    animal_id: animalId,
+    trait_id: tid
+  }))]
+  );
+
   const setAllowedBreeds = (speciesId: string, breedIds: string[]) => {
     const sb = new Set(
       seedBreeds.filter((b) => b.species_id === speciesId).map((b) => b.id)
@@ -230,6 +268,11 @@ export function DemoWhiskerProvider({
     setSpeciesEnabled,
     setDefaultSpecies,
     setAllowedBreeds,
+    traits,
+    animalTraits,
+    setAnimalTraits,
+    addTrait,
+    updateTrait,
     products,
     supplyRequests,
     supplyRequestItems,

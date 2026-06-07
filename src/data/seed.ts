@@ -5,6 +5,8 @@ import {
   SpeciesCatalog,
   OrganizationSpecies,
   OrganizationBreed,
+  Trait,
+  AnimalTrait,
   FosterInput,
   FosterPlacement,
   MedicalRecord,
@@ -69,6 +71,45 @@ export const seedOrganizationSpecies: OrganizationSpecies[] = seedSpecies.map((s
   sort_order: s.sort_order
 }));
 export const seedOrganizationBreeds: OrganizationBreed[] = [];
+
+// Per-org trait definitions (mirrors the migration 0045 default seed).
+const TRAIT_DEFAULTS: [string, string | null][] = [
+['Affectionate', null], ['Playful', null], ['Shy', null], ['Independent', null],
+['High Energy', null], ['Low Energy', null], ['Dog Friendly', null],
+['Cat Friendly', null], ['Kid Friendly', null], ['Senior Friendly', null],
+['Food Motivated', null], ['Needs Quiet Home', null],
+['Needs Experienced Adopter', null], ['Bonded Pair', null], ['Special Needs', null],
+['House Trained', 'dog'], ['Crate Trained', 'dog'], ['Leash Trained', 'dog'],
+['Litter Box Trained', 'cat']];
+
+export const seedTraits: Trait[] = TRAIT_DEFAULTS.map(([name, slug], i) => ({
+  id: `tr_${i}`,
+  organization_id: 'demo-org',
+  name,
+  species_id: slug ? seedSpecies.find((s) => s.slug === slug)?.id : undefined,
+  active: true,
+  created_at: '2024-01-01T00:00:00Z',
+  updated_at: '2024-01-01T00:00:00Z'
+}));
+
+// Demo assignments — a1 gets enough to show the "+N" overflow.
+export const seedAnimalTraits: AnimalTrait[] = (() => {
+  const idByName = (n: string) => seedTraits.find((t) => t.name === n)!.id;
+  const assign = (animalId: string, names: string[]): AnimalTrait[] =>
+  names.map((n, i) => ({
+    id: `at_${animalId}_${i}`,
+    organization_id: 'demo-org',
+    animal_id: animalId,
+    trait_id: idByName(n)
+  }));
+  return [
+  ...assign('a1', [
+  'Playful', 'Affectionate', 'Dog Friendly', 'Kid Friendly', 'High Energy',
+  'Food Motivated', 'Needs Quiet Home']
+  ),
+  ...assign('a2', ['Shy', 'Low Energy'])];
+
+})();
 
 // Global breed catalog (mirrors the `breeds` table seed). Demo mode reads this;
 // production reads the Supabase table.

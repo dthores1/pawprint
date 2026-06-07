@@ -1,17 +1,20 @@
-import React from 'react';
-import { XIcon } from 'lucide-react';
+import React, { useState } from 'react';
+import { XIcon, PlusIcon, PencilIcon } from 'lucide-react';
 import { useWhisker } from '../context/WhiskerContext';
+import { useAuth } from '../context/AuthContext';
 import { Card } from '../components/ui/Card';
 import { Select } from '../components/ui/Forms';
+import { Button } from '../components/ui/Button';
+import { TraitFormModal } from '../components/settings/TraitFormModal';
 import { SpeciesIcon } from '../lib/speciesIcons';
 import { cn } from '../lib/utils';
+import { Trait } from '../types';
 
-// Organization settings. Two sections:
+// Organization settings:
 //  - Accepted Animal Types → organization_species (enable/disable + default)
 //  - Accepted Breeds → organization_breeds (opt-in: restrict a species to a
 //    subset of breeds; no rows for a species = all breeds accepted)
-// Both flow through to the species/breed pickers once Phase 5 (tenant-aware
-// filtering) lands.
+//  - Traits → per-org trait definitions (admin-managed)
 export function Settings() {
   const {
     species,
@@ -20,8 +23,16 @@ export function Settings() {
     organizationBreeds,
     setSpeciesEnabled,
     setDefaultSpecies,
-    setAllowedBreeds
+    setAllowedBreeds,
+    traits,
+    updateTrait
   } = useWhisker();
+  const { currentOrg } = useAuth();
+  const isAdmin =
+  currentOrg?.role === 'owner' || currentOrg?.role === 'admin';
+  const [traitForm, setTraitForm] = useState<{ open: boolean; trait?: Trait }>({
+    open: false
+  });
 
   const rowFor = (id: string) =>
   organizationSpecies.find((r) => r.species_id === id);
@@ -238,6 +249,94 @@ export function Settings() {
           </ul>
         }
       </Card>
+
+      {/* Traits — admin-managed trait definitions. */}
+      {isAdmin &&
+      <Card className="p-0 overflow-hidden">
+          <div className="p-5 border-b border-border flex items-start justify-between gap-3">
+            <div>
+              <h2 className="font-heading font-semibold text-lg text-text-primary">
+                Traits
+              </h2>
+              <p className="text-sm text-text-secondary mt-1">
+                Behavioral and placement labels you can assign to animals.
+                Deactivate (rather than delete) to keep history intact.
+              </p>
+            </div>
+            <Button
+            size="sm"
+            onClick={() => setTraitForm({ open: true })}
+            className="shrink-0">
+
+              <PlusIcon className="w-4 h-4 mr-1.5" /> New trait
+            </Button>
+          </div>
+          <ul className="divide-y divide-border max-h-[28rem] overflow-y-auto">
+            {[...traits].
+          sort((a, b) => a.name.localeCompare(b.name)).
+          map((t) => {
+            const scope = t.species_id ?
+            species.find((s) => s.id === t.species_id)?.name ?? 'Species' :
+            'All species';
+            return (
+              <li
+                key={t.id}
+                className="flex items-center justify-between gap-4 px-5 py-3">
+
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                      className={cn(
+                        'font-medium',
+                        t.active ?
+                        'text-text-primary' :
+                        'text-text-secondary line-through'
+                      )}>
+
+                        {t.name}
+                      </span>
+                      <span className="text-xs text-text-secondary bg-background border border-border rounded-md px-1.5 py-0.5">
+                        {scope}
+                      </span>
+                      {!t.active &&
+                    <span className="text-xs text-text-secondary">Inactive</span>
+                    }
+                    </div>
+                    {t.description &&
+                  <p className="text-xs text-text-secondary mt-0.5 truncate">
+                        {t.description}
+                      </p>
+                  }
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <button
+                    type="button"
+                    onClick={() => updateTrait(t.id, { active: !t.active })}
+                    className="text-xs font-medium text-text-secondary hover:text-primary transition-colors">
+
+                      {t.active ? 'Deactivate' : 'Reactivate'}
+                    </button>
+                    <button
+                    type="button"
+                    aria-label={`Edit ${t.name}`}
+                    onClick={() => setTraitForm({ open: true, trait: t })}
+                    className="p-1 rounded-md text-text-secondary hover:text-text-primary hover:bg-background transition-colors">
+
+                      <PencilIcon className="w-4 h-4" />
+                    </button>
+                  </div>
+                </li>);
+
+          })}
+          </ul>
+        </Card>
+      }
+
+      <TraitFormModal
+        isOpen={traitForm.open}
+        onClose={() => setTraitForm({ open: false })}
+        trait={traitForm.trait} />
+
     </div>);
 
 }

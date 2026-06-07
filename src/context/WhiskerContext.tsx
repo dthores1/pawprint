@@ -14,6 +14,8 @@ import {
   SpeciesCatalog,
   OrganizationSpecies,
   OrganizationBreed,
+  Trait,
+  AnimalTrait,
   Litter,
   Sex,
   PersonRole,
@@ -42,6 +44,12 @@ import { supabase } from '../lib/supabase';
 import { rowToBreed } from '../lib/breedsApi';
 import { rowToSpecies } from '../lib/speciesApi';
 import { rowToOrgSpecies, rowToOrgBreed } from '../lib/organizationCatalogApi';
+import {
+  rowToTrait,
+  rowToAnimalTrait,
+  traitToInsert,
+  traitUpdateToRow } from
+'../lib/traitsApi';
 import {
   litterToInsert,
   litterUpdateToRow,
@@ -205,6 +213,21 @@ export interface WhiskerContextType {
   setDefaultSpecies: (speciesId: string) => void;
   /** Replace a species' accepted-breed allowlist ([] clears = all allowed). */
   setAllowedBreeds: (speciesId: string, breedIds: string[]) => void;
+  /** Per-org trait definitions (migration 0045). */
+  traits: Trait[];
+  /** Animal↔trait assignments for the org. */
+  animalTraits: AnimalTrait[];
+  /** Replace an animal's assigned traits (diffs add/remove animal_traits rows). */
+  setAnimalTraits: (animalId: string, traitIds: string[]) => void;
+  /** Create a trait definition for the org (Settings). */
+  addTrait: (trait: {
+    name: string;
+    description?: string;
+    species_id?: string;
+    active?: boolean;
+  }) => void;
+  /** Edit a trait definition (name/description/species/active). */
+  updateTrait: (id: string, updates: Partial<Trait>) => void;
   products: Product[];
   addProduct: (product: Omit<Product, 'id'>) => void;
   updateProduct: (id: string, updates: Partial<Product>) => void;
@@ -975,20 +998,30 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   const [organizationBreeds, setOrganizationBreeds] = useState<
     OrganizationBreed[]>(
     []);
+  const [traits, setTraits] = useState<Trait[]>([]);
+  const [animalTraits, setAnimalTraits_] = useState<AnimalTrait[]>([]);
   const loadOrgCatalog = useCallback(async () => {
     if (!orgId) {
       setOrganizationSpecies([]);
       setOrganizationBreeds([]);
+      setTraits([]);
+      setAnimalTraits_([]);
       return;
     }
-    const [os, ob] = await Promise.all([
+    const [os, ob, tr, at] = await Promise.all([
     supabase.from('organization_species').select('*').eq('organization_id', orgId),
-    supabase.from('organization_breeds').select('*').eq('organization_id', orgId)]
+    supabase.from('organization_breeds').select('*').eq('organization_id', orgId),
+    supabase.from('traits').select('*').eq('organization_id', orgId),
+    supabase.from('animal_traits').select('*').eq('organization_id', orgId)]
     );
     if (os.error) console.error('[organization_species] load failed:', os.error.message);
     else setOrganizationSpecies((os.data ?? []).map(rowToOrgSpecies));
     if (ob.error) console.error('[organization_breeds] load failed:', ob.error.message);
     else setOrganizationBreeds((ob.data ?? []).map(rowToOrgBreed));
+    if (tr.error) console.error('[traits] load failed:', tr.error.message);
+    else setTraits((tr.data ?? []).map(rowToTrait));
+    if (at.error) console.error('[animal_traits] load failed:', at.error.message);
+    else setAnimalTraits_((at.data ?? []).map(rowToAnimalTrait));
   }, [orgId]);
   useEffect(() => {
     loadOrgCatalog();
@@ -1094,6 +1127,83 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       if (ins.error) console.error('[organization_breeds] insert failed:', ins.error.message);
     }
     loadOrgCatalog();
+  };
+
+  // Replace an animal's assigned traits with `traitIds` (diff add/remove).
+  const setAnimalTraits = async (animalId: string, traitIds: string[]) => {
+    if (!orgId) return;
+    const current = animalTraits.filter((t) => t.animal_id === animalId);
+    const currentIds = new Set(current.map((t) => t.trait_id));
+    const nextIds = new Set(traitIds);
+    const toAdd = traitIds.filter((id) => !currentIds.has(id));
+    const toRemove = current.filter((t) => !nextIds.has(t.trait_id));
+    if (toAdd.length === 0 && toRemove.length === 0) return;
+    // Optimistic: replace this animal's rows with the new set.
+    setAnimalTraits_((prev) => [
+    ...prev.filter((t) => t.animal_id !== animalId),
+    ...traitIds.map((tid) => ({
+      id: `tmp-${animalId}-${tid}`,
+      organization_id: orgId,
+      animal_id: animalId,
+      trait_id: tid
+    }))]
+    );
+    if (toRemove.length) {
+      const del = await supabase.
+      from('animal_traits').
+      delete().
+      eq('animal_id', animalId).
+      in('trait_id', toRemove.map((t) => t.trait_id));
+      if (del.error) console.error('[animal_traits] remove failed:', del.error.message);
+    }
+    if (toAdd.length) {
+      const ins = await supabase.
+      from('animal_traits').
+      insert(
+        toAdd.map((tid) => ({
+          organization_id: orgId,
+          animal_id: animalId,
+          trait_id: tid
+        }))
+      );
+      if (ins.error) console.error('[animal_traits] add failed:', ins.error.message);
+    }
+    loadOrgCatalog(); // reconcile real ids
+  };
+
+  const addTrait: WhiskerContextType['addTrait'] = async (trait) => {
+    if (!orgId) return;
+    const { data, error } = await supabase.
+    from('traits').
+    insert(traitToInsert(trait, orgId)).
+    select('*').
+    single();
+    if (error) {
+      console.error('[traits] create failed:', error.message);
+      return;
+    }
+    if (data) setTraits((prev) => [...prev, rowToTrait(data)]);
+  };
+  const updateTrait = (id: string, updates: Partial<Trait>) => {
+    setTraits((prev) =>
+    prev.map((t) =>
+    t.id === id ?
+    { ...t, ...updates, updated_at: new Date().toISOString() } :
+    t
+    )
+    );
+    const row = traitUpdateToRow(updates);
+    if (Object.keys(row).length === 0) return;
+    supabase.
+    from('traits').
+    update(row).
+    eq('id', id).
+    then(({ error }) => {
+      if (error) {
+        console.error('[traits] update failed:', error.message);
+        loadOrgCatalog();
+      }
+    });
   };
 
   const addAnimal = async (
@@ -2389,6 +2499,11 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         setSpeciesEnabled,
         setDefaultSpecies,
         setAllowedBreeds,
+        traits,
+        animalTraits,
+        setAnimalTraits,
+        addTrait,
+        updateTrait,
         products,
         addProduct,
         updateProduct,
