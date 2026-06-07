@@ -1,13 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { Modal } from '../ui/Modal';
-import { Input, Select, Textarea, Label } from '../ui/Forms';
+import { Select, Textarea, Label } from '../ui/Forms';
 import { Button } from '../ui/Button';
-import { Avatar } from '../ui/Avatar';
-import { SpeciesBadge } from '../ui/SpeciesBadge';
+import { AnimalSearchPicker } from '../ui/AnimalSearchPicker';
 import { useWhisker } from '../../context/WhiskerContext';
-import { AnimalRelationship, Animal } from '../../types';
-import { SearchIcon, XIcon } from 'lucide-react';
-import { animalDisplayName, animalShowsRescueIdBadge } from '../../lib/utils';
+import { AnimalRelationship } from '../../types';
+import { animalDisplayName } from '../../lib/utils';
 interface AddRelationshipModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -44,50 +42,67 @@ export function AddRelationshipModal({
   animalId
 }: AddRelationshipModalProps) {
   // Index so a deceased/adopted relative can still be picked.
-  const { animalsIndex: animals, relationships, addRelationship } = useWhisker();
-  const [search, setSearch] = useState('');
-  const [selectedAnimal, setSelectedAnimal] = useState<Animal | null>(null);
+  const {
+    animalsIndex: animals,
+    relationships,
+    litters,
+    addRelationship,
+    updateAnimal
+  } = useWhisker();
+  const [selectedId, setSelectedId] = useState('');
   const [type, setType] =
   useState<AnimalRelationship['relationship_type']>('sibling');
   const [notes, setNotes] = useState('');
-  // Filter out the current animal and any animals it is already related to
-  const availableAnimals = useMemo(() => {
-    const relatedIds = new Set(
-      relationships.
-      filter(
-        (r) => r.animal_id === animalId || r.related_animal_id === animalId
-      ).
-      map((r) =>
-      r.animal_id === animalId ? r.related_animal_id : r.animal_id
-      )
+  // When relating a sibling that's already in a litter, prefer adding this
+  // animal to that litter (litter membership *is* the sibling link) rather than
+  // creating a duplicate explicit relationship. Checked by default.
+  const [addToLitter, setAddToLitter] = useState(true);
+  const selectedAnimal = animals.find((a) => a.id === selectedId) ?? null;
+  // Hide the current animal and any animals it is already related to.
+  const excludeIds = useMemo(() => {
+    const ids = relationships.
+    filter((r) => r.animal_id === animalId || r.related_animal_id === animalId).
+    map((r) =>
+    r.animal_id === animalId ? r.related_animal_id : r.animal_id
     );
-    const q = search.toLowerCase();
-    return animals.filter((a) => {
-      if (a.id === animalId || relatedIds.has(a.id)) return false;
-      const hay =
-      `${a.name ?? ''} ${a.rescue_id ?? ''} ${a.id}`.toLowerCase();
-      return hay.includes(q);
-    });
-  }, [animals, relationships, animalId, search]);
+    return [animalId, ...ids];
+  }, [relationships, animalId]);
   const reset = () => {
-    setSearch('');
-    setSelectedAnimal(null);
+    setSelectedId('');
     setType('sibling');
     setNotes('');
+    setAddToLitter(true);
   };
   const handleClose = () => {
     reset();
     onClose();
   };
+  // Sibling-of-a-littered-animal → offer to add this animal to that litter.
+  const currentAnimal = animals.find((a) => a.id === animalId);
+  const selectedLitter =
+  selectedAnimal?.litter_id ?
+  litters.find((l) => l.id === selectedAnimal.litter_id) :
+  undefined;
+  const showLitterOption = type === 'sibling' && !!selectedAnimal?.litter_id;
+  const litterName = selectedLitter?.name?.trim() || 'their litter';
+  const willMoveLitter =
+  showLitterOption &&
+  !!currentAnimal?.litter_id &&
+  currentAnimal.litter_id !== selectedAnimal?.litter_id;
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedAnimal) return;
-    addRelationship({
-      animal_id: animalId,
-      related_animal_id: selectedAnimal.id,
-      relationship_type: type,
-      notes: notes.trim() || undefined
-    });
+    if (showLitterOption && addToLitter && selectedAnimal.litter_id) {
+      // Litter membership satisfies the sibling link — no relationship row.
+      updateAnimal(animalId, { litter_id: selectedAnimal.litter_id });
+    } else {
+      addRelationship({
+        animal_id: animalId,
+        related_animal_id: selectedAnimal.id,
+        relationship_type: type,
+        notes: notes.trim() || undefined
+      });
+    }
     handleClose();
   };
   return (
@@ -104,7 +119,7 @@ export function AddRelationshipModal({
           type="submit"
           form="add-relationship-form"
           disabled={!selectedAnimal}>
-            Save Relationship
+            {showLitterOption && addToLitter ? 'Add to Litter' : 'Save Relationship'}
           </Button>
         </div>
       }>
@@ -115,88 +130,13 @@ export function AddRelationshipModal({
         className="space-y-5">
         <div>
           <Label required>Related Animal</Label>
-          {selectedAnimal ?
-          <div className="flex items-center justify-between p-3 rounded-lg border border-primary bg-primary/5">
-              <div className="flex items-center gap-3">
-                <Avatar
-                src={selectedAnimal.primary_photo_url}
-                type="animal"
-                size="sm" />
-              
-                <div>
-                  <p className="font-medium text-text-primary">
-                    {selectedAnimal.name}
-                  </p>
-                  <p className="text-xs text-text-secondary font-mono">
-                    #{selectedAnimal.id}
-                  </p>
-                </div>
-              </div>
-              <button
-              type="button"
-              onClick={() => setSelectedAnimal(null)}
-              className="p-1.5 text-text-secondary hover:text-text-primary hover:bg-background rounded-md transition-colors">
-              
-                <XIcon className="w-4 h-4" />
-              </button>
-            </div> :
+          <AnimalSearchPicker
+            animals={animals}
+            value={selectedId}
+            onChange={setSelectedId}
+            excludeIds={excludeIds}
+            placeholder="Search by name or ID..." />
 
-          <div className="space-y-3">
-              <div className="relative">
-                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
-                <Input
-                placeholder="Search by name or ID..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-                autoFocus />
-              
-              </div>
-              <div className="max-h-48 overflow-y-auto border border-border rounded-lg divide-y divide-border">
-                {availableAnimals.length === 0 ?
-              <div className="p-4 text-center text-sm text-text-secondary">
-                    No animals found.
-                  </div> :
-
-              availableAnimals.slice(0, 20).map((animal) =>
-              <button
-                key={animal.id}
-                type="button"
-                onClick={() => setSelectedAnimal(animal)}
-                className="w-full flex items-center gap-3 p-3 hover:bg-background transition-colors text-left">
-                
-                      <div className="relative shrink-0">
-                        <Avatar
-                    src={animal.primary_photo_url}
-                    type="animal"
-                    size="sm" />
-                  
-                        <div className="absolute -bottom-1 -right-1 ring-2 ring-card rounded-full">
-                          <SpeciesBadge species={animal.species} />
-                        </div>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-text-primary truncate">
-                          {animalDisplayName(animal)}
-                        </p>
-                        {animalShowsRescueIdBadge(animal) ?
-                    <p className="text-xs text-text-secondary font-mono">
-                            {animal.rescue_id}
-                          </p> :
-                    animal.rescue_id ?
-                    null :
-
-                    <p className="text-xs text-text-secondary font-mono">
-                            #{animal.id}
-                          </p>
-                    }
-                      </div>
-                    </button>
-              )
-              }
-              </div>
-            </div>
-          }
         </div>
 
         <div>
@@ -217,16 +157,41 @@ export function AddRelationshipModal({
           </Select>
         </div>
 
+        {!(showLitterOption && addToLitter) &&
         <div>
-          <Label htmlFor="notes">Notes (optional)</Label>
-          <Textarea
+            <Label htmlFor="notes">Notes (optional)</Label>
+            <Textarea
             id="notes"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="e.g., Must be adopted together..."
             disabled={!selectedAnimal} />
-          
-        </div>
+
+          </div>
+        }
+
+        {showLitterOption &&
+        <label className="flex items-start gap-2.5 rounded-lg border border-border bg-background/50 p-3 cursor-pointer">
+            <input
+            type="checkbox"
+            checked={addToLitter}
+            onChange={(e) => setAddToLitter(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary" />
+
+            <span className="text-sm text-text-primary">
+              Add{' '}
+              <span className="font-medium">
+                {currentAnimal ? animalDisplayName(currentAnimal) : 'this animal'}
+              </span>{' '}
+              to <span className="font-medium">{litterName}</span>
+              <span className="block text-xs text-text-secondary mt-0.5">
+                {willMoveLitter ?
+              `Moves them from their current litter — littermates become siblings automatically.` :
+              `Littermates are siblings automatically, so no separate relationship is needed.`}
+              </span>
+            </span>
+          </label>
+        }
       </form>
     </Modal>);
 

@@ -118,7 +118,7 @@ export function rowToAnimal(r: any): Animal {
 export const ANIMAL_INDEX_COLUMNS =
 'id,organization_id,name,rescue_id,microchip_number,species_id,status,priority,' +
 'sex,estimated_birth_date,primary_photo_url,is_on_hold,has_behavior_concern,' +
-'has_medical_concern,current_foster_id,adopted_by_id,created_at,updated_at';
+'has_medical_concern,current_foster_id,adopted_by_id,litter_id,created_at,updated_at';
 
 // Read an entire org-scoped table in 1000-row `.range()` pages, concatenating
 // until a short page signals the end. Bypasses the PostgREST max-rows cap
