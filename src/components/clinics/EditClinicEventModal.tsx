@@ -13,14 +13,14 @@ const STATUS_LABEL: Record<ClinicEventStatus, string> = {
   scheduled: 'Scheduled',
   in_progress: 'In Progress',
   completed: 'Completed',
-  canceled: 'Canceled'
+  cancelled: 'Cancelled'
 };
 const STATUS_ORDER: ClinicEventStatus[] = [
 'planning',
 'scheduled',
 'in_progress',
 'completed',
-'canceled'];
+'cancelled'];
 
 
 interface Props {

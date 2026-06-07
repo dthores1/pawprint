@@ -324,7 +324,7 @@ export type MedicalStatus =
 'due' |
 'scheduled' |
 'overdue' |
-'canceled' |
+'cancelled' |
 'not_applicable';
 
 export interface MedicalRecord {
@@ -671,7 +671,7 @@ export type TransportRequestStatus =
 'claimed' |
 'in_progress' |
 'completed' |
-'canceled';
+'cancelled';
 
 export type TransportRequestUrgency = 'normal' | 'urgent' | 'critical';
 
@@ -712,13 +712,13 @@ export interface TransportRequest {
 //     placements change later.
 // `expired` is set by a nightly cron when an unclaimed request's end date
 // passes — the request stays in history but never returns to the unclaimed
-// queue. Treat it as terminal alongside `completed` and `canceled`.
+// queue. Treat it as terminal alongside `completed` and `cancelled`.
 export type SittingRequestStatus =
 'open' |
 'claimed' |
 'in_progress' |
 'completed' |
-'canceled' |
+'cancelled' |
 'expired';
 
 export type SittingCoverageScope =
@@ -756,7 +756,7 @@ export type ClinicEventStatus =
 'scheduled' |
 'in_progress' |
 'completed' |
-'canceled';
+'cancelled';
 
 export interface ClinicEvent {
   id: string;
@@ -797,7 +797,7 @@ export type ClinicSlotStatus =
 'confirmed' |
 'completed' |
 'no_show' |
-'canceled';
+'cancelled';
 
 export interface ClinicSlot {
   id: string;

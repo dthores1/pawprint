@@ -62,14 +62,14 @@ const RECURRING_TYPES = new Set<ProcedureType>([
 'medication']
 );
 // Procedure types that should never have more than one active record per
-// animal — duplicates are blocked unless the existing one is canceled.
+// animal — duplicates are blocked unless the existing one is cancelled.
 const UNIQUE_TYPES = new Set<ProcedureType>(['spay_neuter', 'microchip']);
 const STATUS_LABELS: Record<MedicalStatus, string> = {
   completed: 'completed',
   due: 'due',
   scheduled: 'scheduled',
   overdue: 'overdue',
-  canceled: 'canceled',
+  cancelled: 'cancelled',
   not_applicable: 'not applicable'
 };
 const AGE_UNITS: AgeUnit[] = ['days', 'weeks', 'months', 'years'];
@@ -256,7 +256,7 @@ export function AddMedicalModal({
   formData.status === 'completed' ? formData.performed_date : formData.due_date;
   const showNextDue = RECURRING_TYPES.has(formData.procedure_type) && !!baseDate;
 
-  // Duplicate detection — at most one non-canceled spay/neuter or microchip
+  // Duplicate detection — at most one non-cancelled spay/neuter or microchip
   // record per animal. In edit mode we exclude the current record itself so
   // the user can keep editing the existing row without tripping the warning.
   const conflictingRecord = useMemo(() => {
@@ -265,7 +265,7 @@ export function AddMedicalModal({
       (m) =>
       m.animal_id === animalId &&
       m.procedure_type === formData.procedure_type &&
-      m.status !== 'canceled' &&
+      m.status !== 'cancelled' &&
       m.id !== record?.id
     );
   }, [animalId, formData.procedure_type, medicalRecords, record?.id]);
@@ -468,7 +468,7 @@ export function AddMedicalModal({
               <option value="scheduled">Scheduled</option>
               <option value="due">Due</option>
               {isEditMode && <option value="overdue">Overdue</option>}
-              {isEditMode && <option value="canceled">Canceled</option>}
+              {isEditMode && <option value="cancelled">Cancelled</option>}
               {isEditMode &&
               <option value="not_applicable">Not applicable</option>}
             </Select>
