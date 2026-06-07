@@ -36,8 +36,8 @@ const STATUS_COLORS: Record<SupplyRequestStatus, string> = {
 export function SupplyRequests() {
   const {
     supplyRequests,
-    people,
-    animals,
+    peopleIndex: people,
+    animalsIndex: animals,
     supplyRequestItems,
     products,
     addSupplyRequest,

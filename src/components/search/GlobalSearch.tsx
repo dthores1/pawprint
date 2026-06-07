@@ -28,8 +28,21 @@ export function GlobalSearch({
   className
 }: GlobalSearchProps) {
   const navigate = useNavigate();
-  const { animals, fosters, people, medicalRecords, placements, actionItems } =
-  useWhisker();
+  // Use the lightweight indexes so search reaches historical animals and
+  // inactive contacts (the heavy `animals`/`people` collections are scoped by
+  // default). Fosters are derived from the people index the same way the
+  // context derives them from `people`.
+  const {
+    animalsIndex: animals,
+    peopleIndex: people,
+    medicalRecords,
+    placements,
+    actionItems
+  } = useWhisker();
+  const fosters = useMemo(
+    () => people.filter((p) => p.roles.includes('foster_parent')),
+    [people]
+  );
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);

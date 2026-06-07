@@ -20,7 +20,13 @@ export function StartAdoptionModal({
   onClose,
   animalId
 }: StartAdoptionModalProps) {
-  const { animals, people, placements, addPerson, addAdoption } = useWhisker();
+  const {
+    animals,
+    peopleIndex: people,
+    placements,
+    addPerson,
+    addAdoption
+  } = useWhisker();
   const animal = animals.find((a) => a.id === animalId);
   // The animal's current foster (if any) — used for the "foster failure"
   // shortcut that prefills the adopter with the foster they're already living with.

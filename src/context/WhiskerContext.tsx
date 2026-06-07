@@ -58,8 +58,14 @@ import { useAuth } from './AuthContext';
 import {
   rowToAnimal,
   animalToInsert,
-  animalUpdateToRow } from
+  animalUpdateToRow,
+  fetchAllPages,
+  ANIMAL_INDEX_COLUMNS } from
 '../lib/animalsApi';
+import {
+  IN_CARE_STATUSES,
+  HISTORICAL_STATUSES } from
+'../lib/animalStatus';
 import { rowToNote, noteToInsert } from '../lib/notesApi';
 import {
   rowToActionItem,
@@ -84,7 +90,8 @@ import {
   rowToPerson,
   personToInsert,
   personUpdateToRow,
-  legacyRoleFor } from
+  legacyRoleFor,
+  PEOPLE_INDEX_COLUMNS } from
 '../lib/peopleApi';
 import {
   rowToPhoto,
@@ -126,9 +133,28 @@ import {
   clinicSlotProcedureUpdateToRow } from
 '../lib/clinicApi';
 export interface WhiskerContextType {
+  /**
+   * Heavy full rows loaded so far. Starts IN-CARE ONLY; grows on demand via
+   * ensureHistoricalLoaded / ensureAnimal. Do NOT assume this equals "in care" —
+   * filter by status for the subset you need.
+   */
   animals: Animal[];
   /** True while the Supabase-backed animals list is being fetched. */
   animalsLoading: boolean;
+  /**
+   * Lightweight slim-projection index of EVERY animal (incl. historical), for
+   * search / pickers / name-resolution. Use this (not `animals`) wherever you
+   * only need to look up or list an animal's name/species/photo/status.
+   */
+  animalsIndex: Animal[];
+  /** True while the all-animals index is being fetched. */
+  animalsIndexLoading: boolean;
+  /** True once historical full rows have been merged into `animals`. */
+  historicalLoaded: boolean;
+  /** Merge historical full rows into `animals` (idempotent). */
+  ensureHistoricalLoaded: () => Promise<void>;
+  /** Fetch one full row by id (any status), merging it into `animals`. */
+  ensureAnimal: (id: string) => Promise<Animal | null>;
   /** Fosters are `people` whose roles include 'foster_parent' (derived view). */
   fosters: Person[];
   /** True while the Supabase-backed people list is being fetched. */
@@ -139,7 +165,26 @@ export interface WhiskerContextType {
   actionItems: AnimalActionItem[];
   relationships: AnimalRelationship[];
   photos: AnimalPhoto[];
+  /**
+   * Heavy full rows loaded so far. Starts ACTIVE ONLY (+ self/account records);
+   * grows on demand via ensureInactiveLoaded / ensurePerson. Do NOT assume this
+   * equals "active" — filter by `active` for the subset you need.
+   */
   people: Person[];
+  /**
+   * Lightweight slim-projection index of EVERY contact (incl. inactive), for
+   * search / pickers / name-resolution. Use this (not `people`) wherever you
+   * only need to look up or list a person's name/photo/role/status.
+   */
+  peopleIndex: Person[];
+  /** True while the all-people index is being fetched. */
+  peopleIndexLoading: boolean;
+  /** True once inactive full rows have been merged into `people`. */
+  inactiveLoaded: boolean;
+  /** Merge inactive full rows into `people` (idempotent). */
+  ensureInactiveLoaded: () => Promise<void>;
+  /** Fetch one full row by id (any active state), merging it into `people`. */
+  ensurePerson: (id: string) => Promise<Person | null>;
   litters: Litter[];
   littersLoading: boolean;
   adoptions: Adoption[];
@@ -342,30 +387,126 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   // remain on seed for now until they're ported.
   const { currentOrg, user } = useAuth();
   const orgId = currentOrg?.id ?? null;
+  // `animals` holds the heavy full rows we've loaded so far. It starts as
+  // IN-CARE ONLY (the operational default) and grows on demand when historical
+  // rows are requested (ensureHistoricalLoaded) or a single historical animal
+  // is opened (ensureAnimal). Consumers must therefore filter for the subset
+  // they want rather than assume `animals` equals "in care".
   const [animals, setAnimals] = useState<Animal[]>([]);
   const [animalsLoading, setAnimalsLoading] = useState(false);
+  const [historicalLoaded, setHistoricalLoaded] = useState(false);
   const loadAnimals = useCallback(async () => {
     if (!orgId) {
       setAnimals([]);
+      setHistoricalLoaded(false);
       return;
     }
     setAnimalsLoading(true);
-    const { data, error } = await supabase.
+    setHistoricalLoaded(false);
+    const { data, error } = await fetchAllPages((from, to) =>
+    supabase.
     from('animals').
     select('*').
     eq('organization_id', orgId).
     eq('is_deleted', false).
-    order('updated_at', { ascending: false });
+    in('status', IN_CARE_STATUSES).
+    order('updated_at', { ascending: false }).
+    range(from, to)
+    );
     if (error) {
       console.error('[animals] load failed:', error.message);
     } else {
-      setAnimals((data ?? []).map(rowToAnimal));
+      setAnimals(data.map(rowToAnimal));
     }
     setAnimalsLoading(false);
   }, [orgId]);
   useEffect(() => {
     loadAnimals();
   }, [loadAnimals]);
+
+  // Lightweight all-animals index (slim projection, every status incl.
+  // historical). Powers global search, animal pickers, and name/photo/status
+  // resolution across coordination pages without loading heavy historical rows.
+  const [animalsIndex, setAnimalsIndex] = useState<Animal[]>([]);
+  const [animalsIndexLoading, setAnimalsIndexLoading] = useState(false);
+  const loadAnimalsIndex = useCallback(async () => {
+    if (!orgId) {
+      setAnimalsIndex([]);
+      return;
+    }
+    setAnimalsIndexLoading(true);
+    const { data, error } = await fetchAllPages((from, to) =>
+    supabase.
+    from('animals').
+    select(ANIMAL_INDEX_COLUMNS).
+    eq('organization_id', orgId).
+    eq('is_deleted', false).
+    order('updated_at', { ascending: false }).
+    range(from, to)
+    );
+    if (error) {
+      console.error('[animals] index load failed:', error.message);
+    } else {
+      setAnimalsIndex(data.map(rowToAnimal));
+    }
+    setAnimalsIndexLoading(false);
+  }, [orgId]);
+  useEffect(() => {
+    loadAnimalsIndex();
+  }, [loadAnimalsIndex]);
+
+  // Pull historical full rows into `animals` (idempotent). Drives the Animals
+  // page "Show Historical Animals" toggle and the Reports page.
+  const ensureHistoricalLoaded = useCallback(async () => {
+    if (!orgId || historicalLoaded) return;
+    const { data, error } = await fetchAllPages((from, to) =>
+    supabase.
+    from('animals').
+    select('*').
+    eq('organization_id', orgId).
+    eq('is_deleted', false).
+    in('status', HISTORICAL_STATUSES).
+    order('updated_at', { ascending: false }).
+    range(from, to)
+    );
+    if (error) {
+      console.error('[animals] historical load failed:', error.message);
+      return;
+    }
+    const historical = data.map(rowToAnimal);
+    setAnimals((cur) => {
+      const have = new Set(cur.map((a) => a.id));
+      return [...cur, ...historical.filter((a) => !have.has(a.id))];
+    });
+    setHistoricalLoaded(true);
+  }, [orgId, historicalLoaded]);
+
+  // Fetch one full row by id (any status) and merge into `animals` if missing.
+  // Lets AnimalProfile resolve a historical animal that isn't in the in-care
+  // default load. Returns the animal, or null if not found.
+  const ensureAnimal = useCallback(
+    async (id: string): Promise<Animal | null> => {
+      if (!orgId) return null;
+      const existing = animals.find((a) => a.id === id);
+      if (existing) return existing;
+      const { data, error } = await supabase.
+      from('animals').
+      select('*').
+      eq('organization_id', orgId).
+      eq('id', id).
+      maybeSingle();
+      if (error || !data) {
+        if (error) console.error('[animals] fetch by id failed:', error.message);
+        return null;
+      }
+      const animal = rowToAnimal(data);
+      setAnimals((cur) =>
+      cur.some((a) => a.id === animal.id) ? cur : [...cur, animal]
+      );
+      return animal;
+    },
+    [orgId, animals]
+  );
   // Notes — Supabase-backed, org-scoped.
   const [notes, setNotes] = useState<AnimalNote[]>([]);
   const currentUserLite = user ?
@@ -551,36 +692,151 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     loadPhotos();
   }, [loadPhotos]);
   // People (contacts) — Supabase-backed, org-scoped.
+  // `people` holds the heavy full rows loaded so far. It starts ACTIVE ONLY
+  // (plus self/account records, which must always load for attribution even if
+  // inactive) and grows on demand via ensureInactiveLoaded / ensurePerson.
+  // Consumers must filter for the subset they want rather than assume `people`
+  // equals "active".
   const [people, setPeople] = useState<Person[]>([]);
   const [peopleLoading, setPeopleLoading] = useState(false);
+  const [inactiveLoaded, setInactiveLoaded] = useState(false);
   const loadPeople = useCallback(async () => {
     if (!orgId) {
       setPeople([]);
+      setInactiveLoaded(false);
       return;
     }
     setPeopleLoading(true);
-    const { data, error } = await supabase.
+    setInactiveLoaded(false);
+    const { data, error } = await fetchAllPages((from, to) =>
+    supabase.
     from('people').
     select('*').
     eq('organization_id', orgId).
     eq('is_deleted', false).
-    order('last_name', { ascending: true });
+    // Active contacts + self/account records (user_id set) — the latter must
+    // always be present so "requested by"/greeting attribution resolves.
+    or('active.eq.true,user_id.not.is.null').
+    order('last_name', { ascending: true }).
+    range(from, to)
+    );
     if (error) {
       console.error('[people] load failed:', error.message);
     } else {
-      setPeople((data ?? []).map(rowToPerson));
+      setPeople(data.map(rowToPerson));
     }
     setPeopleLoading(false);
   }, [orgId]);
   useEffect(() => {
     loadPeople();
   }, [loadPeople]);
+
+  // Lightweight all-people index (slim projection, active + inactive). Powers
+  // global search, person pickers' selected-value display, and name/photo
+  // resolution for historical references to a now-inactive contact.
+  const [peopleIndex, setPeopleIndex] = useState<Person[]>([]);
+  const [peopleIndexLoading, setPeopleIndexLoading] = useState(false);
+  const loadPeopleIndex = useCallback(async () => {
+    if (!orgId) {
+      setPeopleIndex([]);
+      return;
+    }
+    setPeopleIndexLoading(true);
+    const { data, error } = await fetchAllPages((from, to) =>
+    supabase.
+    from('people').
+    select(PEOPLE_INDEX_COLUMNS).
+    eq('organization_id', orgId).
+    eq('is_deleted', false).
+    order('last_name', { ascending: true }).
+    range(from, to)
+    );
+    if (error) {
+      console.error('[people] index load failed:', error.message);
+    } else {
+      setPeopleIndex(data.map(rowToPerson));
+    }
+    setPeopleIndexLoading(false);
+  }, [orgId]);
+  useEffect(() => {
+    loadPeopleIndex();
+  }, [loadPeopleIndex]);
+
+  // Pull inactive full rows into `people` (idempotent). Drives the Contacts
+  // "Show Inactive" toggle, the Fosters list, and the Reports page.
+  const ensureInactiveLoaded = useCallback(async () => {
+    if (!orgId || inactiveLoaded) return;
+    const { data, error } = await fetchAllPages((from, to) =>
+      supabase.
+      from('people').
+      select('*').
+      eq('organization_id', orgId).
+      eq('is_deleted', false).
+      eq('active', false).
+      order('last_name', { ascending: true }).
+      range(from, to)
+    );
+
+    if (error) {
+      console.error('[people] inactive load failed:', error.message);
+      return;
+    }
+
+    const inactive = data.map(rowToPerson);
+
+    setPeople((cur) => {
+      const have = new Set(cur.map((p) => p.id));
+      return [...cur, ...inactive.filter((p) => !have.has(p.id))];
+    });
+
+    setInactiveLoaded(true);
+  }, [orgId, inactiveLoaded]);
+
+  // Fetch one full row by id (any active state) and merge into `people` if
+  // missing. Lets ContactProfile / FosterProfile resolve an inactive person
+  // that isn't in the active default load. Returns the person, or null.
+  const ensurePerson = useCallback(
+    async (id: string): Promise<Person | null> => {
+      if (!orgId) return null;
+      const existing = people.find((p) => p.id === id);
+      if (existing) return existing;
+      const { data, error } = await supabase.
+      from('people').
+      select('*').
+      eq('organization_id', orgId).
+      eq('id', id).
+      maybeSingle();
+      if (error || !data) {
+        if (error) console.error('[people] fetch by id failed:', error.message);
+        return null;
+      }
+      const person = rowToPerson(data);
+      setPeople((cur) =>
+      cur.some((p) => p.id === person.id) ? cur : [...cur, person]
+      );
+      return person;
+    },
+    [orgId, people]
+  );
+
   // Fosters are a derived view of people (those with the 'foster_parent' role).
+  // Active by default (mirrors `people`); inactive fosters appear once
+  // ensureInactiveLoaded has run.
   const fosters = useMemo(
     () => people.filter((p) => p.roles.includes('foster_parent')),
     [people]
   );
   const fostersLoading = peopleLoading;
+  // Merge the freshest full rows from `people` over the slim index so optimistic
+  // adds/edits show in search/pickers immediately; deletes are mirrored at the
+  // delete sites.
+  const mergedPeopleIndex = useMemo(() => {
+    const freshById = new Map(people.map((p) => [p.id, p]));
+    const indexIds = new Set(peopleIndex.map((p) => p.id));
+    const merged = peopleIndex.map((p) => freshById.get(p.id) ?? p);
+    for (const p of people) if (!indexIds.has(p.id)) merged.push(p);
+    return merged;
+  }, [peopleIndex, people]);
   // Species — global reference catalog (not org-scoped). Read-only here.
   const [species, setSpecies] = useState<SpeciesCatalog[]>([]);
   useEffect(() => {
@@ -883,7 +1139,9 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   };
   const deleteAnimal = (id: string) => {
     const prev = animals;
+    const prevIndex = animalsIndex;
     setAnimals((cur) => cur.filter((a) => a.id !== id));
+    setAnimalsIndex((cur) => cur.filter((a) => a.id !== id));
     supabase.
     from('animals').
     delete().
@@ -892,6 +1150,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       if (error) {
         console.error('[animals] delete failed:', error.message);
         setAnimals(prev); // restore
+        setAnimalsIndex(prevIndex);
       }
     });
   };
@@ -2014,12 +2273,18 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
 
   const removeLocalById = (table: ArchiveTable, id: string) => {
     switch (table) {
-      case 'animals': setAnimals((p) => p.filter((r) => r.id !== id)); break;
+      case 'animals':
+        setAnimals((p) => p.filter((r) => r.id !== id));
+        setAnimalsIndex((p) => p.filter((r) => r.id !== id));
+        break;
       case 'animal_notes': setNotes((p) => p.filter((r) => r.id !== id)); break;
       case 'animal_photos': setPhotos((p) => p.filter((r) => r.id !== id)); break;
       case 'animal_action_items': setActionItems((p) => p.filter((r) => r.id !== id)); break;
       case 'animal_relationships': setRelationships((p) => p.filter((r) => r.id !== id)); break;
-      case 'people': setPeople((p) => p.filter((r) => r.id !== id)); break;
+      case 'people':
+        setPeople((p) => p.filter((r) => r.id !== id));
+        setPeopleIndex((p) => p.filter((r) => r.id !== id));
+        break;
       case 'medical_records': setMedicalRecords((p) => p.filter((r) => r.id !== id)); break;
       case 'foster_placements': setPlacements((p) => p.filter((r) => r.id !== id)); break;
       case 'litters': setLitters((p) => p.filter((r) => r.id !== id)); break;
@@ -2073,12 +2338,31 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     a.species_id ? { ...a, species: nameById.get(a.species_id) ?? a.species } : a
     );
   }, [animals, species]);
+  const enrichedAnimalsIndex = useMemo(() => {
+    const nameById = new Map(species.map((s) => [s.id, s.name]));
+    const enrich = (a: Animal) =>
+    a.species_id ? { ...a, species: nameById.get(a.species_id) ?? a.species } : a;
+    // Overlay the freshest full rows from `animals` so optimistic adds/edits
+    // (rename, status change, brand-new animals) show in search/pickers
+    // immediately, rather than the stale once-loaded index snapshot. Deletes
+    // are mirrored into `animalsIndex` at the delete sites.
+    const freshById = new Map(animals.map((a) => [a.id, a]));
+    const indexIds = new Set(animalsIndex.map((a) => a.id));
+    const merged = animalsIndex.map((a) => freshById.get(a.id) ?? a);
+    for (const a of animals) if (!indexIds.has(a.id)) merged.push(a);
+    return merged.map(enrich);
+  }, [animalsIndex, animals, species]);
 
   return (
     <WhiskerContext.Provider
       value={{
         animals: enrichedAnimals,
         animalsLoading,
+        animalsIndex: enrichedAnimalsIndex,
+        animalsIndexLoading,
+        historicalLoaded,
+        ensureHistoricalLoaded,
+        ensureAnimal,
         fosters,
         fostersLoading,
         placements,
@@ -2088,6 +2372,11 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         relationships,
         photos,
         people,
+        peopleIndex: mergedPeopleIndex,
+        peopleIndexLoading,
+        inactiveLoaded,
+        ensureInactiveLoaded,
+        ensurePerson,
         peopleLoading,
         litters,
         littersLoading,

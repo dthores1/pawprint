@@ -110,6 +110,39 @@ export function rowToAnimal(r: any): Animal {
   };
 }
 
+// Slim column projection for the all-animals index (search / pickers /
+// name-resolution). Kept lightweight so loading every animal (incl. historical)
+// stays cheap even at 20k+ rows; the heavy full rows stay scoped to in-care.
+// `rowToAnimal` is fully defensive, so a row with only these columns maps to a
+// valid Animal (absent fields fall back to their defaults).
+export const ANIMAL_INDEX_COLUMNS =
+'id,organization_id,name,rescue_id,microchip_number,species_id,status,priority,' +
+'sex,estimated_birth_date,primary_photo_url,is_on_hold,has_behavior_concern,' +
+'has_medical_concern,current_foster_id,adopted_by_id,created_at,updated_at';
+
+// Read an entire org-scoped table in 1000-row `.range()` pages, concatenating
+// until a short page signals the end. Bypasses the PostgREST max-rows cap
+// (default 1000) so large collections never silently truncate. The caller
+// supplies a builder that applies its own filters/order to a fresh query for
+// each page (Supabase query builders aren't reusable once awaited).
+export async function fetchAllPages<T>(
+buildQuery: (from: number, to: number) =>
+PromiseLike<{data: T[] | null;error: any;}>)
+: Promise<{data: T[];error: any;}> {
+  const PAGE = 1000;
+  const all: T[] = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await buildQuery(from, from + PAGE - 1);
+    if (error) return { data: all, error };
+    const rows = data ?? [];
+    all.push(...rows);
+    if (rows.length < PAGE) break;
+    from += PAGE;
+  }
+  return { data: all, error: null };
+}
+
 function normalizeColumn(col: string, value: any): any {
   if (DATE_COLUMNS.has(col) && value === '') return null;
   if (NULLABLE_TEXT_COLUMNS.has(col)) {

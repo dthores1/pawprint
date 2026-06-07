@@ -33,7 +33,8 @@ import {
 
 export function LitterProfile() {
   const { id } = useParams<{ id: string }>();
-  const { litters, animals, fosters, breeds } = useWhisker();
+  // Index so litter members who aged out of care still show in the roster.
+  const { litters, animalsIndex: animals, fosters, breeds } = useWhisker();
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);

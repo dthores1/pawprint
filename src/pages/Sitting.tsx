@@ -73,8 +73,8 @@ export function Sitting() {
     sittingRequests,
     sittingRequestPlacements,
     placements,
-    animals,
-    people,
+    animalsIndex: animals,
+    peopleIndex: people,
     acceptSittingRequest,
     updateSittingRequest
   } = useWhisker();

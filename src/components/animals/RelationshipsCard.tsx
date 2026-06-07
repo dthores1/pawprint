@@ -32,7 +32,8 @@ interface GroupedRelationships {
   bondedWith: RelEntry[];
 }
 export function RelationshipsCard({ animalId }: RelationshipsCardProps) {
-  const { relationships, animals } = useWhisker();
+  // Index so a historical relative's name/photo still resolves.
+  const { relationships, animalsIndex: animals } = useWhisker();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [archiving, setArchiving] = useState<
     {id: string;label: string;animalName: string;} | null>(

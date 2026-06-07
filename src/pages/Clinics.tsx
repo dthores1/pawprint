@@ -29,7 +29,7 @@ const EVENT_STATUS_PILL: Record<ClinicEventStatus, string> = {
 };
 
 export function Clinics() {
-  const { clinicEvents, clinicSlots, people } = useWhisker();
+  const { clinicEvents, clinicSlots, peopleIndex: people } = useWhisker();
   const [isNewOpen, setIsNewOpen] = useState(false);
   const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
 

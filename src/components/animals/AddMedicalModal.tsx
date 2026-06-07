@@ -170,7 +170,7 @@ export function AddMedicalModal({
     addMedicalRecord,
     updateMedicalRecord,
     updateAnimal,
-    people,
+    peopleIndex: people,
     clinicEvents,
     medicalRecords
   } = useWhisker();

@@ -98,7 +98,7 @@ export function ClinicCompletionModal({ isOpen, onClose, clinicEventId }: Props)
     clinicEvents,
     clinicSlots,
     clinicSlotProcedures,
-    animals,
+    animalsIndex: animals,
     people,
     medicalRecords,
     updateClinicEvent,

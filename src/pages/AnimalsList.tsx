@@ -1,10 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useWhisker } from '../context/WhiskerContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Forms';
-import { StatusBadge, PriorityBadge } from '../components/ui/Badge';
+import { StatusBadge } from '../components/ui/Badge';
 import { SpeciesBadge } from '../components/ui/SpeciesBadge';
 import { Avatar } from '../components/ui/Avatar';
 import { FilterOption } from '../components/ui/FilterDropdown';
@@ -35,17 +35,12 @@ import { enabledSpeciesList } from '../lib/orgCatalog';
 import { isActiveAdoption } from '../lib/adoptions';
 import { motion } from 'framer-motion';
 import { useWindowRowVirtualizer } from '../lib/useWindowRowVirtualizer';
-import { Animal, Person, Species, AnimalStatus, Priority } from '../types';
+import { Animal, Person, AnimalStatus } from '../types';
 import { PawPrintIcon as PawPrintGlyph } from '../components/ui/PawPrintIcon';
-const STATUS_LABELS: Record<AnimalStatus, string> = {
-  intake: 'Intake',
-  medical: 'Medical',
-  adoptable: 'Adoptable',
-  adopted: 'Adopted',
-  released: 'Released',
-  hospice: 'Hospice',
-  deceased: 'Deceased'
-};
+import { STATUS_LABELS, IN_CARE_STATUSES } from '../lib/animalStatus';
+// Stable string[] view of the in-care statuses for membership checks (module
+// scope so it doesn't re-create each render and churn the filter memo).
+const IN_CARE_SET: string[] = IN_CARE_STATUSES;
 // Boolean condition/placement filters (AND-combined with each other and the
 // dropdown filters). "Fostered" is derived from an active placement.
 const FLAG_FILTERS = [
@@ -53,19 +48,14 @@ const FLAG_FILTERS = [
 { key: 'on_hold', label: 'On Hold' },
 { key: 'behavior', label: 'Behavior Concern' },
 { key: 'medical', label: 'Medical Concern' }];
-const PRIORITY_LABELS: Record<Priority, string> = {
-  normal: 'Normal',
-  needs_attention: 'Needs Attention',
-  urgent: 'Urgent',
-  critical: 'Critical'
-};
-// Lifecycle / severity orderings used when sorting those columns.
+// Lifecycle ordering used when sorting the status column.
 const STATUS_ORDER = Object.keys(STATUS_LABELS) as AnimalStatus[];
-const PRIORITY_ORDER = Object.keys(PRIORITY_LABELS) as Priority[];
 export function AnimalsList() {
   const {
     animals,
     animalsLoading,
+    ensureHistoricalLoaded,
+    historicalLoaded,
     placements,
     fosters,
     medicalRecords,
@@ -78,7 +68,7 @@ export function AnimalsList() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [view, setView] = useState<'animals' | 'litters'>('animals');
   const [searchParams] = useSearchParams();
-  // Initialize filters from the URL (e.g. /animals?priority=urgent,critical),
+  // Initialize filters from the URL (e.g. /animals?status=intake,medical),
   // keeping only values that match a known option.
   const parseParam = (key: string, allowed: readonly string[]) =>
   (searchParams.get(key) ?? '').
@@ -93,12 +83,29 @@ export function AnimalsList() {
   const [speciesFilter, setSpeciesFilter] = useState<string[]>(() =>
   parseParam('species', [])
   );
-  const [priorityFilter, setPriorityFilter] = useState<string[]>(() =>
-  parseParam('priority', PRIORITY_ORDER)
-  );
   const [flagFilters, setFlagFilters] = useState<string[]>(() =>
   parseParam('flags', FLAG_FILTERS.map((f) => f.key))
   );
+  // "Show Historical Animals" — off by default, so the list shows only
+  // animals currently in the rescue's care (intake/medical/adoptable/hospice).
+  // Turning it on pulls the historical full rows into the shared collection.
+  // Deep links that pre-select a historical status auto-enable it.
+  const [includeHistorical, setIncludeHistorical] = useState<boolean>(() =>
+  parseParam('status', STATUS_ORDER).some((s) => !IN_CARE_SET.includes(s))
+  );
+  // Load historical rows whenever they're wanted — covers both the toggle and a
+  // deep link that starts with `includeHistorical` true. Idempotent in context.
+  useEffect(() => {
+    if (includeHistorical && !historicalLoaded) ensureHistoricalLoaded();
+  }, [includeHistorical, historicalLoaded, ensureHistoricalLoaded]);
+  const historicalLoading = includeHistorical && !historicalLoaded;
+  const toggleHistorical = (next: boolean) => {
+    setIncludeHistorical(next);
+    // Drop any historical status selections so the chips/filter stay coherent.
+    if (!next) {
+      setStatusFilter((cur) => cur.filter((s) => IN_CARE_SET.includes(s)));
+    }
+  };
   const toggleFlag = (key: string) =>
   setFlagFilters((cur) =>
   cur.includes(key) ? cur.filter((v) => v !== key) : [...cur, key]
@@ -168,12 +175,15 @@ export function AnimalsList() {
       (animal.rescue_id ?? '').toLowerCase().includes(q) ||
       animal.id.toLowerCase().includes(q) ||
       !!animal.microchip_number && animal.microchip_number.includes(searchQuery);
+      // Default view is in-care only. `animals` may also hold historical rows
+      // (loaded by the toggle, or merged when a historical profile was opened),
+      // so gate explicitly rather than relying on the collection's contents.
+      const matchesInCare =
+      includeHistorical || IN_CARE_SET.includes(animal.status);
       const matchesStatus =
       statusFilter.length === 0 || statusFilter.includes(animal.status);
       const matchesSpecies =
       speciesFilter.length === 0 || speciesFilter.includes(animal.species);
-      const matchesPriority =
-      priorityFilter.length === 0 || priorityFilter.includes(animal.priority);
       const matchesFlags = flagFilters.every((f) => {
         switch (f) {
           case 'fostered':
@@ -190,18 +200,18 @@ export function AnimalsList() {
       });
       return (
         matchesSearch &&
+        matchesInCare &&
         matchesStatus &&
         matchesSpecies &&
-        matchesPriority &&
         matchesFlags);
 
     });
   }, [
   animals,
   searchQuery,
+  includeHistorical,
   statusFilter,
   speciesFilter,
-  priorityFilter,
   flagFilters,
   fosterByAnimal]
   );
@@ -214,8 +224,6 @@ export function AnimalsList() {
           return animalDisplayName(a).toLowerCase();
         case 'status':
           return STATUS_ORDER.indexOf(a.status);
-        case 'priority':
-          return PRIORITY_ORDER.indexOf(a.priority);
         case 'age':
           return a.estimated_birth_date ?
           Date.now() - new Date(a.estimated_birth_date).getTime() :
@@ -237,22 +245,17 @@ export function AnimalsList() {
 
   // Virtualized table rows in a self-scrolling container. ~73px per row.
   const tableRows = useWindowRowVirtualizer(sortedAnimals.length, 73);
-  // Filter option lists
+  // Filter option lists. Status options follow the historical toggle: in-care
+  // statuses only by default, all 7 once historical animals are included.
   const statusOptions: FilterOption[] = useMemo(
     () =>
-    (Object.keys(STATUS_LABELS) as AnimalStatus[]).map((s) => ({
+    (includeHistorical ?
+    (Object.keys(STATUS_LABELS) as AnimalStatus[]) :
+    (IN_CARE_STATUSES as AnimalStatus[])).map((s) => ({
       value: s,
       label: STATUS_LABELS[s]
     })),
-    []
-  );
-  const priorityOptions: FilterOption[] = useMemo(
-    () =>
-    (Object.keys(PRIORITY_LABELS) as Priority[]).map((p) => ({
-      value: p,
-      label: PRIORITY_LABELS[p]
-    })),
-    []
+    [includeHistorical]
   );
   const enabledSpecies = useMemo(
     () => enabledSpeciesList(speciesCatalog, organizationSpecies),
@@ -278,11 +281,6 @@ export function AnimalsList() {
     label: STATUS_LABELS[s as AnimalStatus],
     clear: () => setStatusFilter((cur) => cur.filter((v) => v !== s))
   })),
-  ...priorityFilter.map((p) => ({
-    key: `priority-${p}`,
-    label: PRIORITY_LABELS[p as Priority],
-    clear: () => setPriorityFilter((cur) => cur.filter((v) => v !== p))
-  })),
   ...speciesFilter.map((s) => ({
     key: `species-${s}`,
     label: s,
@@ -300,7 +298,6 @@ export function AnimalsList() {
   }>;
   const clearAll = () => {
     setStatusFilter([]);
-    setPriorityFilter([]);
     setSpeciesFilter([]);
     setFlagFilters([]);
   };
@@ -313,7 +310,7 @@ export function AnimalsList() {
             Animals
           </h1>
           <p className="text-text-secondary">
-            Manage all animals in the rescue's care.
+            Track animals from intake through adoption.
           </p>
         </div>
         <Button onClick={() => setIsAddModalOpen(true)} className="gap-2">
@@ -373,12 +370,6 @@ export function AnimalsList() {
           options={statusOptions}
           onChange={setStatusFilter} />
 
-        <MultiFilterDropdown
-          label="Priority"
-          values={priorityFilter}
-          options={priorityOptions}
-          onChange={setPriorityFilter} />
-
         {showSpeciesFilter &&
         <MultiFilterDropdown
           label="Species"
@@ -403,6 +394,23 @@ export function AnimalsList() {
             {f.label}
           </button>
         )}
+
+        {/* Show Historical Animals — expands the dataset to adopted/
+            released/deceased animals. Off by default. */}
+        <label
+          className="ml-auto inline-flex items-center gap-2.5 h-9 px-3 rounded-lg text-sm font-medium border border-border bg-card cursor-pointer select-none hover:bg-background transition-colors">
+
+          <input
+            type="checkbox"
+            checked={includeHistorical}
+            onChange={(e) => toggleHistorical(e.target.checked)}
+            className="h-4 w-4 rounded border-border text-primary focus:ring-primary/40 cursor-pointer" />
+
+          <span className="text-text-secondary">Show Historical Animals</span>
+          {historicalLoading &&
+          <PawPrintGlyph className="w-3.5 h-3.5 text-text-secondary/50 animate-pulse" />
+          }
+        </label>
       </div>
 
       {/* Active filter chips */}
@@ -458,7 +466,6 @@ export function AnimalsList() {
               <tr className="border-b border-border bg-background text-sm font-medium text-text-secondary">
                 <SortableHeader label="Animal" sortKey="name" sort={sort} onSort={onSort} />
                 <SortableHeader label="Status" sortKey="status" sort={sort} onSort={onSort} />
-                <SortableHeader label="Priority" sortKey="priority" sort={sort} onSort={onSort} />
                 <SortableHeader label="Age & Sex" sortKey="age" sort={sort} onSort={onSort} />
                 <SortableHeader label="Current Foster" sortKey="foster" sort={sort} onSort={onSort} />
                 <SortableHeader label="Next Medical" sortKey="medical" sort={sort} onSort={onSort} />
@@ -468,7 +475,7 @@ export function AnimalsList() {
               {animalsLoading && animals.length === 0 ?
               <tr>
                   <td
-                  colSpan={6}
+                  colSpan={5}
                   className="py-12 text-center text-text-secondary">
 
                     <div className="flex flex-col items-center gap-3">
@@ -480,7 +487,7 @@ export function AnimalsList() {
               sortedAnimals.length === 0 ?
               <tr>
                   <td
-                  colSpan={6}
+                  colSpan={5}
                   className="py-12 text-center text-text-secondary">
 
                     <div className="flex flex-col items-center gap-3">
@@ -494,7 +501,7 @@ export function AnimalsList() {
                   {tableRows.paddingTop > 0 &&
                 <tr aria-hidden="true">
                       <td
-                    colSpan={6}
+                    colSpan={5}
                     style={{ height: tableRows.paddingTop, padding: 0, border: 0 }} />
 
                     </tr>
@@ -571,9 +578,6 @@ export function AnimalsList() {
                         </div>
                       </td>
                       <td className="py-4 px-6">
-                        <PriorityBadge priority={animal.priority} />
-                      </td>
-                      <td className="py-4 px-6">
                         <p className="text-sm text-text-primary">
                           {calculateAge(animal.estimated_birth_date)}
                         </p>
@@ -615,7 +619,7 @@ export function AnimalsList() {
                   {tableRows.paddingBottom > 0 &&
                 <tr aria-hidden="true">
                       <td
-                    colSpan={6}
+                    colSpan={5}
                     style={{ height: tableRows.paddingBottom, padding: 0, border: 0 }} />
 
                     </tr>
