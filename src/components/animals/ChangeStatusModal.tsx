@@ -7,6 +7,7 @@ import { FormSection } from '../ui/FormSection';
 import { Button } from '../ui/Button';
 import { AgeInformationFields, AgeInputMode } from './AgeInformationFields';
 import { BreedCombobox } from './BreedCombobox';
+import { TraitMultiSelect } from './TraitMultiSelect';
 import { useWhisker } from '../../context/WhiskerContext';
 import { AnimalStatus, Priority, Sex, AgeUnit } from '../../types';
 import { deriveAgeInfo } from '../../lib/age';
@@ -67,7 +68,9 @@ export function ChangeStatusModal({
     deleteAnimal,
     addNote,
     species: speciesCatalog,
-    organizationSpecies
+    organizationSpecies,
+    animalTraits,
+    setAnimalTraits
   } = useWhisker();
   const navigate = useNavigate();
   const animal = animals.find((a) => a.id === animalId);
@@ -99,6 +102,9 @@ export function ChangeStatusModal({
   const [photoError, setPhotoError] = useState<string | undefined>();
   const [reason, setReason] = useState('');
   const [internalNotes, setInternalNotes] = useState('');
+  const [traitIds, setTraitIds] = useState<string[]>([]);
+  // At-open trait selection (stable ordering snapshot for TraitMultiSelect).
+  const [initialTraitIds, setInitialTraitIds] = useState<string[]>([]);
 
   // Hydrate from the animal each time the modal opens, so external updates
   // are reflected and the user always starts from the current state. We
@@ -120,6 +126,11 @@ export function ChangeStatusModal({
     setSex(animal.sex);
     setBreedId(animal.breed_id);
     setBreedText(animal.breed_text);
+    const currentTraits = animalTraits.
+    filter((at) => at.animal_id === animal.id).
+    map((at) => at.trait_id);
+    setTraitIds(currentTraits);
+    setInitialTraitIds(currentTraits);
     if (animal.birthdate_source === 'estimated_age') {
       setAgeMode('age');
       setBirthdate('');
@@ -150,6 +161,9 @@ export function ChangeStatusModal({
     setPhotoError(undefined);
     setReason('');
     setInternalNotes(animal.internal_notes ?? '');
+    // Snapshot from the animal at open; collections (animalTraits/speciesCatalog)
+    // intentionally excluded from deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, animal]);
 
   if (!animal) return null;
@@ -235,6 +249,8 @@ export function ChangeStatusModal({
       description: description.trim(),
       internal_notes: internalNotes.trim() || undefined
     });
+
+    setAnimalTraits(animalId, traitIds);
 
     // A filled timeline note always logs; field changes are prepended for context.
     if (reason.trim()) {
@@ -540,6 +556,21 @@ export function ChangeStatusModal({
               </div>
             </div>
           </div>
+        </FormSection>
+
+        {/* Traits — expanded by default if the animal already has some. The key
+            forces a remount once the hydrated selection is known so defaultOpen
+            reflects it. */}
+        <FormSection
+          key={`traits-${animalId}-${initialTraitIds.length > 0}`}
+          title="Traits"
+          collapsible
+          defaultOpen={initialTraitIds.length > 0}>
+          <TraitMultiSelect
+            speciesId={speciesId || undefined}
+            selectedIds={traitIds}
+            initialSelectedIds={initialTraitIds}
+            onChange={setTraitIds} />
         </FormSection>
 
         {/* Notes & Activity */}

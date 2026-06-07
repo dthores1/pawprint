@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useWhisker } from '../context/WhiskerContext';
 import { Card } from '../components/ui/Card';
@@ -41,13 +41,31 @@ import { STATUS_LABELS, IN_CARE_STATUSES } from '../lib/animalStatus';
 // Stable string[] view of the in-care statuses for membership checks (module
 // scope so it doesn't re-create each render and churn the filter memo).
 const IN_CARE_SET: string[] = IN_CARE_STATUSES;
-// Boolean condition/placement filters (AND-combined with each other and the
-// dropdown filters). "Fostered" is derived from an active placement.
-const FLAG_FILTERS = [
-{ key: 'fostered', label: 'Fostered' },
-{ key: 'on_hold', label: 'On Hold' },
-{ key: 'behavior', label: 'Behavior Concern' },
-{ key: 'medical', label: 'Medical Concern' }];
+// "Fostered" stays a quick toggle pill (derived from an active placement).
+const FLAG_FILTERS = [{ key: 'fostered', label: 'Fostered' }];
+// On Hold / Behavior / Medical are consolidated into one "Special Conditions"
+// dropdown (match ALL selected).
+const SPECIAL_CONDITIONS: FilterOption[] = [
+{ value: 'on_hold', label: 'On Hold' },
+{ value: 'behavior', label: 'Behavior Concern' },
+{ value: 'medical', label: 'Medical Concern' }];
+// Age groups computed from estimated_birth_date (match ANY — groups are
+// mutually exclusive per animal).
+const AGE_GROUPS: FilterOption[] = [
+{ value: 'baby', label: 'Baby (< 1 year)' },
+{ value: 'adult', label: 'Adult (1–7 years)' },
+{ value: 'senior', label: 'Senior (7+ years)' }];
+function ageGroupOf(
+ebd: string | undefined)
+: 'baby' | 'adult' | 'senior' | undefined {
+  if (!ebd) return undefined;
+  const t = new Date(ebd).getTime();
+  if (Number.isNaN(t)) return undefined;
+  const years = (Date.now() - t) / (365.25 * 24 * 60 * 60 * 1000);
+  if (years < 1) return 'baby';
+  if (years < 7) return 'adult';
+  return 'senior';
+}
 // Lifecycle ordering used when sorting the status column.
 const STATUS_ORDER = Object.keys(STATUS_LABELS) as AnimalStatus[];
 export function AnimalsList() {
@@ -63,6 +81,8 @@ export function AnimalsList() {
     breeds,
     species: speciesCatalog,
     organizationSpecies,
+    traits,
+    animalTraits,
     adoptions
   } = useWhisker();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -86,6 +106,20 @@ export function AnimalsList() {
   const [flagFilters, setFlagFilters] = useState<string[]>(() =>
   parseParam('flags', FLAG_FILTERS.map((f) => f.key))
   );
+  const [specialConditions, setSpecialConditions] = useState<string[]>([]);
+  const [ageGroups, setAgeGroups] = useState<string[]>([]);
+  // Trait filter — match ALL selected traits (launch behavior).
+  const [traitFilter, setTraitFilter] = useState<string[]>([]);
+  // animal_id → set of its trait ids, for fast filter lookups.
+  const traitIdsByAnimal = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    for (const at of animalTraits) {
+      const set = m.get(at.animal_id) ?? new Set<string>();
+      set.add(at.trait_id);
+      m.set(at.animal_id, set);
+    }
+    return m;
+  }, [animalTraits]);
   // "Show Historical Animals" — off by default, so the list shows only
   // animals currently in the rescue's care (intake/medical/adoptable/hospice).
   // Turning it on pulls the historical full rows into the shared collection.
@@ -167,9 +201,11 @@ export function AnimalsList() {
     r.relationship_type === 'bonded_pair' && (
     r.animal_id === animalId || r.related_animal_id === animalId)
   );
-  const filteredAnimals = useMemo(() => {
-    const q = searchQuery.toLowerCase();
-    return animals.filter((animal) => {
+  // Every filter EXCEPT species. Split out so the species pool (used to decide
+  // whether to even show the Species filter) reflects all other active filters.
+  const matchesAllButSpecies = useCallback(
+    (animal: Animal) => {
+      const q = searchQuery.toLowerCase();
       const matchesSearch =
       (animal.name ?? '').toLowerCase().includes(q) ||
       (animal.rescue_id ?? '').toLowerCase().includes(q) ||
@@ -182,12 +218,12 @@ export function AnimalsList() {
       includeHistorical || IN_CARE_SET.includes(animal.status);
       const matchesStatus =
       statusFilter.length === 0 || statusFilter.includes(animal.status);
-      const matchesSpecies =
-      speciesFilter.length === 0 || speciesFilter.includes(animal.species);
-      const matchesFlags = flagFilters.every((f) => {
-        switch (f) {
-          case 'fostered':
-            return fosterByAnimal.get(animal.id) != null;
+      const matchesFostered =
+      !flagFilters.includes('fostered') ||
+      fosterByAnimal.get(animal.id) != null;
+      // Special conditions — match ALL selected.
+      const matchesConditions = specialConditions.every((c) => {
+        switch (c) {
           case 'on_hold':
             return !!animal.is_on_hold;
           case 'behavior':
@@ -198,22 +234,51 @@ export function AnimalsList() {
             return true;
         }
       });
+      // Age group — match ANY selected (groups are mutually exclusive).
+      const matchesAge =
+      ageGroups.length === 0 ||
+      ageGroups.includes(ageGroupOf(animal.estimated_birth_date) ?? '');
+      // Match ALL selected traits.
+      const animalTraitSet = traitIdsByAnimal.get(animal.id);
+      const matchesTraits =
+      traitFilter.length === 0 ||
+      traitFilter.every((tid) => animalTraitSet?.has(tid));
       return (
         matchesSearch &&
         matchesInCare &&
         matchesStatus &&
-        matchesSpecies &&
-        matchesFlags);
+        matchesFostered &&
+        matchesConditions &&
+        matchesAge &&
+        matchesTraits);
 
-    });
-  }, [
-  animals,
-  searchQuery,
-  includeHistorical,
-  statusFilter,
-  speciesFilter,
-  flagFilters,
-  fosterByAnimal]
+    },
+    [
+    searchQuery,
+    includeHistorical,
+    statusFilter,
+    flagFilters,
+    specialConditions,
+    ageGroups,
+    traitFilter,
+    traitIdsByAnimal,
+    fosterByAnimal]
+  );
+  const speciesPool = useMemo(
+    () => animals.filter(matchesAllButSpecies),
+    [animals, matchesAllButSpecies]
+  );
+  const filteredAnimals = useMemo(
+    () =>
+    speciesPool.filter(
+      (a) => speciesFilter.length === 0 || speciesFilter.includes(a.species)
+    ),
+    [speciesPool, speciesFilter]
+  );
+  // Distinct species present in the (non-species-filtered) result set.
+  const distinctSpeciesInPool = useMemo(
+    () => new Set(speciesPool.map((a) => a.species)).size,
+    [speciesPool]
   );
 
   const sortedAnimals = useMemo(() => {
@@ -274,6 +339,14 @@ export function AnimalsList() {
     })),
     [enabledSpecies]
   );
+  const traitOptions: FilterOption[] = useMemo(
+    () =>
+    traits.
+    filter((t) => t.active).
+    sort((a, b) => a.name.localeCompare(b.name)).
+    map((t) => ({ value: t.id, label: t.name })),
+    [traits]
+  );
   // Active filter chips — one per selected value across all filters.
   const activeChips = [
   ...statusFilter.map((s) => ({
@@ -290,6 +363,21 @@ export function AnimalsList() {
         className="w-3.5 h-3.5 text-text-secondary" />),
 
     clear: () => setSpeciesFilter((cur) => cur.filter((v) => v !== s))
+  })),
+  ...traitFilter.map((id) => ({
+    key: `trait-${id}`,
+    label: traits.find((t) => t.id === id)?.name ?? 'Trait',
+    clear: () => setTraitFilter((cur) => cur.filter((v) => v !== id))
+  })),
+  ...specialConditions.map((c) => ({
+    key: `cond-${c}`,
+    label: SPECIAL_CONDITIONS.find((o) => o.value === c)?.label ?? c,
+    clear: () => setSpecialConditions((cur) => cur.filter((v) => v !== c))
+  })),
+  ...ageGroups.map((g) => ({
+    key: `age-${g}`,
+    label: AGE_GROUPS.find((o) => o.value === g)?.label ?? g,
+    clear: () => setAgeGroups((cur) => cur.filter((v) => v !== g))
   }))] as Array<{
     key: string;
     label: string;
@@ -300,8 +388,14 @@ export function AnimalsList() {
     setStatusFilter([]);
     setSpeciesFilter([]);
     setFlagFilters([]);
+    setTraitFilter([]);
+    setSpecialConditions([]);
+    setAgeGroups([]);
   };
-  const showSpeciesFilter = enabledSpecies.length > 1;
+  // Only worth showing when the org accepts multiple species AND the results
+  // actually span more than one species.
+  const showSpeciesFilter = enabledSpecies.length > 1 && distinctSpeciesInPool > 1;
+  const showTraitFilter = traitOptions.length > 0;
   return (
     <div className="space-y-5 pb-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -378,6 +472,25 @@ export function AnimalsList() {
           onChange={setSpeciesFilter} />
 
         }
+        {showTraitFilter &&
+        <MultiFilterDropdown
+          label="Traits"
+          values={traitFilter}
+          options={traitOptions}
+          onChange={setTraitFilter} />
+
+        }
+        <MultiFilterDropdown
+          label="Special Conditions"
+          values={specialConditions}
+          options={SPECIAL_CONDITIONS}
+          onChange={setSpecialConditions} />
+
+        <MultiFilterDropdown
+          label="Age Group"
+          values={ageGroups}
+          options={AGE_GROUPS}
+          onChange={setAgeGroups} />
 
         <span className="w-px h-6 bg-border mx-1" aria-hidden="true" />
         {FLAG_FILTERS.map((f) =>

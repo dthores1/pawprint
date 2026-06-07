@@ -233,7 +233,9 @@ export interface WhiskerContextType {
   updateProduct: (id: string, updates: Partial<Product>) => void;
   supplyRequests: SupplyRequest[];
   supplyRequestItems: SupplyRequestItem[];
-  addAnimal: (animal: Omit<Animal, 'id' | 'created_at' | 'updated_at'>) => void;
+  addAnimal: (
+  animal: Omit<Animal, 'id' | 'created_at' | 'updated_at'>)
+  => Promise<Animal | undefined>;
   updateAnimal: (id: string, updates: Partial<Animal>) => void;
   deleteAnimal: (id: string) => void;
   /**
@@ -1207,11 +1209,11 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   };
 
   const addAnimal = async (
-  animal: Omit<Animal, 'id' | 'created_at' | 'updated_at'>) =>
-  {
+  animal: Omit<Animal, 'id' | 'created_at' | 'updated_at'>)
+  : Promise<Animal | undefined> => {
     if (!orgId) {
       console.error('[animals] cannot create — no current organization');
-      return;
+      return undefined;
     }
     const { data, error } = await supabase.
     from('animals').
@@ -1220,9 +1222,12 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     single();
     if (error) {
       console.error('[animals] create failed:', error.message);
-      return;
+      return undefined;
     }
-    if (data) setAnimals((prev) => [rowToAnimal(data), ...prev]);
+    if (!data) return undefined;
+    const created = rowToAnimal(data);
+    setAnimals((prev) => [created, ...prev]);
+    return created;
   };
   const updateAnimal = (id: string, updates: Partial<Animal>) => {
     // Optimistic local update so the UI responds immediately…

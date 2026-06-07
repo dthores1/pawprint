@@ -6,6 +6,7 @@ import { Button } from '../ui/Button';
 import { FormSection } from '../ui/FormSection';
 import { AgeInformationFields, AgeInputMode } from './AgeInformationFields';
 import { BreedCombobox } from './BreedCombobox';
+import { TraitMultiSelect } from './TraitMultiSelect';
 import { LitterForm } from './LitterForm';
 import { useWhisker } from '../../context/WhiskerContext';
 import { AnimalStatus, Sex, Priority, AgeUnit } from '../../types';
@@ -96,8 +97,9 @@ export function AddAnimalModal({
   onClose,
   initialMode = 'single'
 }: AddAnimalModalProps) {
-  const { addAnimal, species: speciesCatalog, organizationSpecies } =
+  const { addAnimal, setAnimalTraits, species: speciesCatalog, organizationSpecies } =
   useWhisker();
+  const [traitIds, setTraitIds] = useState<string[]>([]);
   const enabledSpecies = enabledSpeciesList(speciesCatalog, organizationSpecies);
   const [mode, setMode] = useState<AddMode>(initialMode);
   const [formData, setFormData] = useState(INITIAL);
@@ -125,6 +127,7 @@ export function AddAnimalModal({
   }, [isOpen, initialMode]);
   const handleClose = () => {
     setFormData(INITIAL);
+    setTraitIds([]);
     setAgeMode('birthdate');
     setErrors({});
     setMode(initialMode);
@@ -134,7 +137,7 @@ export function AddAnimalModal({
   };
   // Estimated age means "current age", so anchor it to today — not intake.
   const asOf = new Date().toISOString().split('T')[0];
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const nextErrors = validateForm(formData, ageMode);
     setErrors(nextErrors);
@@ -145,7 +148,7 @@ export function AddAnimalModal({
       ageUnit: formData.ageUnit,
       asOf
     });
-    addAnimal({
+    const created = await addAnimal({
       name: formData.name.trim() || undefined,
       rescue_id: formData.rescue_id.trim() || undefined,
       species: formData.species,
@@ -166,6 +169,10 @@ export function AddAnimalModal({
       estimated_age_unit: ageInfo.estimated_age_unit,
       estimated_age_as_of: ageInfo.estimated_age_as_of
     });
+    // Assign any chosen traits once the animal row exists.
+    if (created && traitIds.length > 0) {
+      setAnimalTraits(created.id, traitIds);
+    }
     handleClose();
   };
   const handleChange = (
@@ -451,6 +458,17 @@ export function AddAnimalModal({
               Initial observations or intake information.
             </p>
           </div>
+        </FormSection>
+
+        {/* — Traits (optional, collapsed by default) — */}
+        <FormSection title="Traits" collapsible defaultOpen={false}>
+          <p className="text-xs text-text-secondary -mt-1 mb-2">
+            Optional — usually added after the animal has been assessed.
+          </p>
+          <TraitMultiSelect
+            speciesId={formData.species_id || undefined}
+            selectedIds={traitIds}
+            onChange={setTraitIds} />
         </FormSection>
 
         <p className="text-xs text-text-secondary">

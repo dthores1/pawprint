@@ -282,11 +282,16 @@ export function DemoWhiskerProvider({
     clinicEvents,
     clinicSlots,
 
-    addAnimal: (animal) =>
-    setAnimals((prev) => [
-    { ...animal, id: `a${generateId()}`, created_at: now(), updated_at: now() },
-    ...prev]
-    ),
+    addAnimal: async (animal) => {
+      const created = {
+        ...animal,
+        id: `a${generateId()}`,
+        created_at: now(),
+        updated_at: now()
+      };
+      setAnimals((prev) => [created, ...prev]);
+      return created;
+    },
     updateAnimal,
     deleteAnimal: (id) =>
     setAnimals((prev) => prev.filter((a) => a.id !== id)),
