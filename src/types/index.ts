@@ -183,6 +183,26 @@ export interface OrganizationBreed {
   sort_order: number;
 }
 
+// Per-org behavioral/personality labels (migration 0045). `species_id` null
+// means the trait applies to all species; set scopes it to one species.
+export interface Trait {
+  id: string;
+  organization_id: string;
+  name: string;
+  description?: string;
+  species_id?: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+/** Junction: a trait assigned to an animal. */
+export interface AnimalTrait {
+  id: string;
+  organization_id: string;
+  animal_id: string;
+  trait_id: string;
+}
+
 export type PhotoCategory =
 'intake' |
 'medical' |

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { MedicalRecord } from '../types';
+import { MedicalRecord, Trait } from '../types';
 import { useWhisker } from '../context/WhiskerContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -10,6 +10,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { AddMedicalModal } from '../components/animals/AddMedicalModal';
 import { AddNoteModal } from '../components/animals/AddNoteModal';
 import { ChangeStatusModal } from '../components/animals/ChangeStatusModal';
+import { EditTraitsModal } from '../components/animals/EditTraitsModal';
 import { PlaceAnimalModal } from '../components/animals/PlaceAnimalModal';
 import { StartAdoptionModal } from '../components/animals/StartAdoptionModal';
 import { AdoptionReturnModal } from '../components/animals/AdoptionReturnModal';
@@ -42,6 +43,7 @@ import {
   CameraIcon,
   Trash2Icon,
   PencilIcon,
+  TagIcon,
   CheckIcon } from
 'lucide-react';
 import { format } from 'date-fns';
@@ -74,9 +76,12 @@ export function AnimalProfile() {
     actionItems,
     photos,
     breeds,
+    traits,
+    animalTraits,
     addPhoto,
     updateMedicalRecord
   } = useWhisker();
+  const [isTraitsModalOpen, setIsTraitsModalOpen] = useState(false);
   const [isMedicalModalOpen, setIsMedicalModalOpen] = useState(false);
   const [editingMedical, setEditingMedical] = useState<MedicalRecord | null>(
     null
@@ -160,6 +165,11 @@ export function AnimalProfile() {
     if (heroFileInputRef.current) heroFileInputRef.current.value = '';
   };
   // Derived data
+  const animalTraitList = animalTraits.
+  filter((at) => at.animal_id === animal.id).
+  map((at) => traits.find((t) => t.id === at.trait_id)).
+  filter((t): t is Trait => !!t && t.active).
+  sort((a, b) => a.name.localeCompare(b.name));
   const animalPlacements = placements.filter((p) => p.animal_id === animal.id);
   const activePlacement = animalPlacements.find(
     (p) => p.placement_status === 'active'
@@ -630,6 +640,44 @@ export function AnimalProfile() {
                 </div>
               </div>
 
+              {/* Traits — full-width row under the name/breed line (cap 6 + "+N").
+                  The whole row is the click target to open the trait editor. */}
+              {animalTraitList.length > 0 ?
+              <button
+                type="button"
+                onClick={() => setIsTraitsModalOpen(true)}
+                aria-label="Edit traits"
+                className="group w-full text-left flex items-start gap-2 mb-4">
+
+                  <TagIcon className="w-4 h-4 text-text-secondary mt-1 shrink-0" />
+                  <div className="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
+                    {animalTraitList.slice(0, 6).map((t) =>
+                  <span
+                    key={t.id}
+                    title={t.description || undefined}
+                    className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/20 transition-colors group-hover:bg-primary/20">
+
+                        {t.name}
+                      </span>
+                  )}
+                    {animalTraitList.length > 6 &&
+                  <span className="text-xs font-medium text-text-secondary self-center">
+                        +{animalTraitList.length - 6}
+                      </span>
+                  }
+                  </div>
+                </button> :
+
+              <button
+                type="button"
+                onClick={() => setIsTraitsModalOpen(true)}
+                className="flex items-center gap-2 mb-4 text-xs font-medium text-primary hover:underline">
+
+                  <TagIcon className="w-4 h-4 shrink-0" />
+                  + Add traits
+                </button>
+              }
+
               <div className="flex flex-wrap gap-2 mb-6">
                 <StatusBadge
                   status={animal.status}
@@ -650,10 +698,6 @@ export function AnimalProfile() {
                   </span>
                 }
               </div>
-
-              <p className="text-text-primary mb-6 max-w-2xl leading-relaxed">
-                {animal.description}
-              </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-6 border-t border-border">
@@ -709,6 +753,19 @@ export function AnimalProfile() {
                   }
                 </div>
               </div>
+              {animal.description &&
+              <div className="flex items-start gap-3 sm:col-span-2">
+                  <div className="p-2 bg-background text-text-secondary rounded-lg shrink-0">
+                    <FileTextIcon className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm text-text-secondary">Description</p>
+                    <p className="font-medium text-text-primary leading-relaxed">
+                      {animal.description}
+                    </p>
+                  </div>
+                </div>
+              }
             </div>
           </div>
         </div>
@@ -1047,6 +1104,11 @@ export function AnimalProfile() {
         isOpen={isStatusModalOpen}
         onClose={() => setIsStatusModalOpen(false)}
         animalId={animal.id} />
+
+      <EditTraitsModal
+        isOpen={isTraitsModalOpen}
+        onClose={() => setIsTraitsModalOpen(false)}
+        animal={animal} />
 
       <PlaceAnimalModal
         isOpen={isPlaceModalOpen}
