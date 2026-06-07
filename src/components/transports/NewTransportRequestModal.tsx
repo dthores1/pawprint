@@ -36,7 +36,11 @@ function toLocalInput(iso: string): string {
 }
 
 export function NewTransportRequestModal({ isOpen, onClose, request }: Props) {
-  const { addTransportRequest, updateTransportRequest, animals } = useWhisker();
+  const {
+    addTransportRequest,
+    updateTransportRequest,
+    animalsIndex: animals
+  } = useWhisker();
   const { currentPersonId } = useAuth();
   const isEditMode = !!request;
   const [type, setType] = useState<TransportRequestType>('animal');

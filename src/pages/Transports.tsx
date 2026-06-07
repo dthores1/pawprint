@@ -76,8 +76,8 @@ function formatPickupTime(iso: string): string {
 export function Transports() {
   const {
     transportRequests,
-    people,
-    animals,
+    peopleIndex: people,
+    animalsIndex: animals,
     claimTransportRequest,
     updateTransportRequest
   } = useWhisker();

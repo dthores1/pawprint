@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useWhisker } from '../context/WhiskerContext';
 import { Card } from '../components/ui/Card';
@@ -51,7 +51,7 @@ const AVAILABILITY_ORDER: Record<Availability, number> = {
 };
 export function FostersList() {
   const { fosters, fostersLoading, placements, species: speciesCatalog,
-    organizationSpecies } =
+    organizationSpecies, ensureInactiveLoaded, inactiveLoaded } =
   useWhisker();
   const enabledSpecies = enabledSpeciesList(speciesCatalog, organizationSpecies);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -59,7 +59,12 @@ export function FostersList() {
   const [view, setView] = useState<'table' | 'grid'>('table');
   const [speciesFilter, setSpeciesFilter] = useState<string[]>([]);
   const [hasCapacityOnly, setHasCapacityOnly] = useState(false);
-  const [activeOnly, setActiveOnly] = useState(false);
+  // Default to active-only — inactive fosters (derived from inactive `people`)
+  // aren't retrieved upfront. Unchecking "Active" pulls them in on demand.
+  const [activeOnly, setActiveOnly] = useState(true);
+  useEffect(() => {
+    if (!activeOnly && !inactiveLoaded) ensureInactiveLoaded();
+  }, [activeOnly, inactiveLoaded, ensureInactiveLoaded]);
   const [sort, setSort] = useState<SortState | null>(null);
   const onSort = (key: string) => setSort((cur) => nextSort(cur, key));
 

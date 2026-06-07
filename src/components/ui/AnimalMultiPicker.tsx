@@ -4,8 +4,13 @@ import { SearchIcon, XIcon } from 'lucide-react';
 import { Input } from './Forms';
 import { Avatar } from './Avatar';
 import { SpeciesBadge } from './SpeciesBadge';
+import { StatusBadge } from './Badge';
 import { Animal } from '../../types';
-import { animalDisplayName, animalShowsRescueIdBadge } from '../../lib/utils';
+import {
+  animalDisplayName,
+  animalShowsRescueIdBadge,
+  calculateAge } from
+'../../lib/utils';
 
 // Multi-select typeahead — used by the Sitting Request form when the
 // foster wants to scope coverage to specific animals.
@@ -79,14 +84,14 @@ export function AnimalMultiPicker({
           {selectedAnimals.map((a) =>
         <span
           key={a.id}
-          className="inline-flex items-center gap-2 pl-1 pr-2 py-1 rounded-full bg-primary/5 border border-primary/30 text-sm">
+          className="inline-flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-full bg-primary/5 border border-primary/30 text-sm">
 
               <Avatar
             src={a.primary_photo_url}
             type="animal"
             species={a.species}
             size="sm"
-            className="w-6 h-6" />
+            className="w-5 h-5" />
 
               <span className="font-medium text-text-primary">
                 {animalDisplayName(a)}
@@ -156,22 +161,24 @@ export function AnimalMultiPicker({
                             <SpeciesBadge species={a.species} />
                           </div>
                         </div>
-                        <div className="min-w-0">
-                          <p className="font-medium text-text-primary truncate text-sm">
-                            {animalDisplayName(a)}
+                        <div className="min-w-0 flex-1">
+                          <p className="flex items-baseline gap-1.5 min-w-0">
+                            <span className="font-medium text-text-primary truncate text-sm">
+                              {animalDisplayName(a)}
+                            </span>
+                            {animalShowsRescueIdBadge(a) &&
+                      <span className="text-xs text-text-secondary font-mono truncate shrink-0">
+                                {a.rescue_id}
+                              </span>
+                      }
                           </p>
-                          {animalShowsRescueIdBadge(a) ?
-                    <p className="text-xs text-text-secondary font-mono">
-                              {a.rescue_id}
-                            </p> :
-                    a.rescue_id ?
-                    null :
-
-                    <p className="text-xs text-text-secondary font-mono">
-                              #{a.id}
-                            </p>
-                    }
+                          <div className="mt-0.5">
+                            <StatusBadge status={a.status} />
+                          </div>
                         </div>
+                        <span className="text-xs text-text-secondary whitespace-nowrap shrink-0">
+                          {a.sex} • {calculateAge(a.estimated_birth_date)}
+                        </span>
                       </button>
                     </li>
               )}

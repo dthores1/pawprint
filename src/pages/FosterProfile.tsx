@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useWhisker } from '../context/WhiskerContext';
 import { Card } from '../components/ui/Card';
@@ -31,7 +31,14 @@ export function FosterProfile() {
   const { id } = useParams<{
     id: string;
   }>();
-  const { fosters, placements, animals } = useWhisker();
+  // Index so past placements of now-historical animals still resolve.
+  const {
+    fosters,
+    fostersLoading,
+    ensurePerson,
+    placements,
+    animalsIndex: animals
+  } = useWhisker();
   const [isPlaceModalOpen, setIsPlaceModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
@@ -45,7 +52,25 @@ export function FosterProfile() {
   const isSelf = !!currentPersonId && currentPersonId === id;
   const canArchive = canArchiveBase && !isSelf;
   const foster = fosters.find((f) => f.id === id);
+  // The default load is active-only, so an inactive foster's profile won't be
+  // present — fetch the person by id on demand (it joins `fosters` once merged,
+  // if they have the foster_parent role). `resolved` separates loading from 404.
+  const [resolved, setResolved] = useState(false);
+  useEffect(() => {
+    if (!id || foster) return;
+    setResolved(false);
+    let cancelled = false;
+    ensurePerson(id).finally(() => {
+      if (!cancelled) setResolved(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, foster, ensurePerson]);
   if (!foster) {
+    if (fostersLoading || !resolved) {
+      return <div className="p-8 text-center text-text-secondary">Loading…</div>;
+    }
     return <div className="p-8 text-center">Foster not found.</div>;
   }
   const fosterPlacements = placements.filter(

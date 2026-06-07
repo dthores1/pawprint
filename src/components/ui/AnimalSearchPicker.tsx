@@ -6,7 +6,11 @@ import { SpeciesBadge } from './SpeciesBadge';
 import { StatusBadge } from './Badge';
 import { CalendarPopover } from './CalendarPopover';
 import { Animal } from '../../types';
-import { animalDisplayName, animalShowsRescueIdBadge } from '../../lib/utils';
+import {
+  animalDisplayName,
+  animalShowsRescueIdBadge,
+  calculateAge } from
+'../../lib/utils';
 
 // Single-select typeahead for picking one animal. Same UX shape as the
 // foster picker in PlaceAnimalModal — we use it across the new coordination
@@ -155,19 +159,24 @@ export function AnimalSearchPicker({
                         <SpeciesBadge species={a.species} />
                       </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="font-medium text-text-primary truncate text-sm">
-                        {animalDisplayName(a)}
-                      </p>
-                      <div className="flex items-center gap-2 mt-0.5 min-w-0">
-                        <StatusBadge status={a.status} />
+                    <div className="min-w-0 flex-1">
+                      <p className="flex items-baseline gap-1.5 min-w-0">
+                        <span className="font-medium text-text-primary truncate text-sm">
+                          {animalDisplayName(a)}
+                        </span>
                         {animalShowsRescueIdBadge(a) &&
-                    <span className="text-xs text-text-secondary font-mono truncate">
+                    <span className="text-xs text-text-secondary font-mono truncate shrink-0">
                             {a.rescue_id}
                           </span>
                     }
+                      </p>
+                      <div className="mt-0.5">
+                        <StatusBadge status={a.status} />
                       </div>
                     </div>
+                    <span className="text-xs text-text-secondary whitespace-nowrap shrink-0">
+                      {a.sex} • {calculateAge(a.estimated_birth_date)}
+                    </span>
                   </button>
                 </li>
             )}

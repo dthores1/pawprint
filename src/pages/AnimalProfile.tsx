@@ -63,9 +63,11 @@ export function AnimalProfile() {
   }>();
   const {
     animals,
+    animalsLoading,
+    ensureAnimal,
     placements,
     fosters,
-    people,
+    peopleIndex: people,
     adoptions,
     medicalRecords,
     notes,
@@ -114,7 +116,28 @@ export function AnimalProfile() {
     setHeroImageError(false);
   }, [id]);
   const animal = animals.find((a) => a.id === id);
+  // The default `animals` load is in-care only, so a historical animal's profile
+  // won't be present — fetch it by id on demand and merge it in. `resolved`
+  // tracks whether that fetch has finished (so we can tell "still loading" from
+  // a genuine 404).
+  const [resolved, setResolved] = useState(false);
+  useEffect(() => {
+    if (!id || animal) return;
+    setResolved(false);
+    let cancelled = false;
+    ensureAnimal(id).finally(() => {
+      if (!cancelled) setResolved(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, animal, ensureAnimal]);
   if (!animal) {
+    // Wait for the initial in-care load and the by-id fallback before deciding
+    // the animal truly doesn't exist.
+    if (animalsLoading || !resolved) {
+      return <div className="p-8 text-center text-text-secondary">Loading…</div>;
+    }
     return <div className="p-8 text-center">Animal not found.</div>;
   }
   // Profile-image upload from the hero (LinkedIn/Twitter-style). Uploads the
@@ -1375,7 +1398,7 @@ function MedicalGroup({
   onEdit,
   onComplete
 }: MedicalGroupProps) {
-  const { people, clinicEvents } = useWhisker();
+  const { peopleIndex: people, clinicEvents } = useWhisker();
   const toneColor = {
     urgent: 'text-status-urgent-text',
     info: 'text-primary',

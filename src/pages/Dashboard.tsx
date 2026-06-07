@@ -102,14 +102,9 @@ export function Dashboard() {
   const needsActionTotal = highPriorityAnimals.length + overdueMedical.length;
   const hasMoreNeedsAction =
   needsActionTotal > shownHighPriority.length + shownOverdue.length;
-  // "Review All" filters /animals by the priorities present in the list.
-  const needsActionPriorities = Array.from(
-    new Set(highPriorityAnimals.map((a) => a.priority))
-  );
-  const reviewAllTo =
-  needsActionPriorities.length > 0 ?
-  `/animals?priority=${needsActionPriorities.join(',')}` :
-  '/animals';
+  // "Review All" opens the (in-care) Animals list; the Priority filter was
+  // removed from that page, so sort by the Priority column to triage there.
+  const reviewAllTo = '/animals';
   const upcomingMedical = medicalRecords.
   filter(
     (m) =>

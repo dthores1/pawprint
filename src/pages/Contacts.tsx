@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useWhisker } from '../context/WhiskerContext';
 import { Card } from '../components/ui/Card';
@@ -40,7 +40,8 @@ const ACTIVE_BADGE = {
   }
 };
 export function Contacts() {
-  const { people, peopleLoading } = useWhisker();
+  const { people, peopleLoading, ensureInactiveLoaded, inactiveLoaded } =
+  useWhisker();
   const [searchParams] = useSearchParams();
   // Allow deep-linking to a contact, e.g. /contacts?q=Jane Doe (used by the
   // "Adopted By" link on an animal profile).
@@ -53,9 +54,21 @@ export function Contacts() {
   const [editingPerson, setEditingPerson] = useState<Person | null>(null);
   const [sort, setSort] = useState<SortState | null>(null);
   const onSort = (key: string) => setSort((cur) => nextSort(cur, key));
+  // "Show Inactive Contacts" — off by default, so the directory shows only
+  // active contacts. Turning it on pulls the inactive full rows into the shared
+  // collection. (Inactive contacts aren't retrieved upfront.)
+  const [showInactive, setShowInactive] = useState(false);
+  useEffect(() => {
+    if (showInactive && !inactiveLoaded) ensureInactiveLoaded();
+  }, [showInactive, inactiveLoaded, ensureInactiveLoaded]);
+  const inactiveLoading = showInactive && !inactiveLoaded;
   // Account/self records (linked to an app user) are identity rows, not
-  // directory contacts — keep them out.
-  const directory = useMemo(() => people.filter((p) => !p.user_id), [people]);
+  // directory contacts — keep them out. Gate by `active` explicitly (rather
+  // than rely on what's loaded, since ensurePerson may merge an inactive row).
+  const directory = useMemo(
+    () => people.filter((p) => !p.user_id && (showInactive || p.active)),
+    [people, showInactive]
+  );
 
   const filteredPeople = useMemo(() => {
     const q = searchQuery.toLowerCase();
@@ -157,6 +170,18 @@ export function Contacts() {
           )}
         </div>
         <div className="flex items-center gap-3 shrink-0">
+          <label className="inline-flex items-center gap-2 h-9 px-3 rounded-lg text-sm font-medium border border-border bg-card cursor-pointer select-none hover:bg-background transition-colors">
+            <input
+              type="checkbox"
+              checked={showInactive}
+              onChange={(e) => setShowInactive(e.target.checked)}
+              className="h-4 w-4 rounded border-border text-primary focus:ring-primary/40 cursor-pointer" />
+
+            <span className="text-text-secondary">Show Inactive</span>
+            {inactiveLoading &&
+            <span className="w-3.5 h-3.5 rounded-full border-2 border-text-secondary/30 border-t-text-secondary animate-spin" />
+            }
+          </label>
           <span className="text-xs text-text-secondary">
             {filteredPeople.length} of {directory.length} contacts
           </span>

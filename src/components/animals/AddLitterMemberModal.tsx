@@ -19,7 +19,8 @@ export function AddLitterMemberModal({
   onClose,
   litterId
 }: AddLitterMemberModalProps) {
-  const { litters, animals, addAnimal, breeds } = useWhisker();
+  // Index so the existing-member count includes any who aged out of care.
+  const { litters, animalsIndex: animals, addAnimal, breeds } = useWhisker();
   const litter = litters.find((l) => l.id === litterId);
 
   const [name, setName] = useState('');

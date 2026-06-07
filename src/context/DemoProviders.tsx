@@ -190,6 +190,15 @@ export function DemoWhiskerProvider({
   const value: WhiskerContextType = {
     animals: enrichedAnimals,
     animalsLoading: false,
+    // Demo holds every animal in memory already, so the index is the same set
+    // and historical data is always "loaded" — the in-care default still works
+    // because AnimalsList filters by status, not by what's been fetched.
+    animalsIndex: enrichedAnimals,
+    animalsIndexLoading: false,
+    historicalLoaded: true,
+    ensureHistoricalLoaded: async () => {},
+    ensureAnimal: async (id: string) =>
+    enrichedAnimals.find((a) => a.id === id) ?? null,
     fosters,
     fostersLoading: false,
     placements,
@@ -199,6 +208,16 @@ export function DemoWhiskerProvider({
     relationships,
     photos,
     people,
+    // Demo holds every contact in memory, so the index is the same set and
+    // inactive data is always "loaded" — the active-only default still works
+    // because the Contacts/Fosters pages filter by `active`, not by what's
+    // been fetched.
+    peopleIndex: people,
+    peopleIndexLoading: false,
+    inactiveLoaded: true,
+    ensureInactiveLoaded: async () => {},
+    ensurePerson: async (id: string) =>
+    people.find((p) => p.id === id) ?? null,
     peopleLoading: false,
     litters,
     littersLoading: false,

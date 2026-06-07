@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
-import { Outlet, NavLink } from 'react-router-dom';
-import { Sidebar } from './Sidebar';
+import { useState } from 'react';
+import { Outlet, NavLink, Link } from 'react-router-dom';
+import { Sidebar, navItems } from './Sidebar';
 import { DemoBanner } from './DemoBanner';
 import { isDemoMode } from '../../lib/appMode';
-import { MenuIcon } from 'lucide-react';
+import { LogOutIcon, MenuIcon, SettingsIcon, UserCircleIcon } from 'lucide-react';
 import { LogoMark } from '../ui/Logo';
+import { useAuth } from '../../context/AuthContext';
+import { cn } from '../../lib/utils';
 export function AppShell() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { user, currentOrg, currentPersonId, signOut } = useAuth();
   return (
     <div className="flex flex-col h-screen w-full bg-background overflow-hidden">
       {isDemoMode && <DemoBanner />}
@@ -32,44 +35,13 @@ export function AppShell() {
 
         {/* Mobile Nav Dropdown */}
         {mobileMenuOpen &&
-        <div className="md:hidden bg-card border-b border-border px-4 py-2 space-y-1 absolute top-16 left-0 right-0 z-40 shadow-soft">
-            {[
-          {
-            to: '/',
-            label: 'Dashboard'
-          },
-          {
-            to: '/animals',
-            label: 'Animals'
-          },
-          {
-            to: '/fosters',
-            label: 'Foster Parents'
-          },
-          {
-            to: '/clinics',
-            label: 'Clinics'
-          },
-          {
-            to: '/transports',
-            label: 'Transports'
-          },
-          {
-            to: '/sitting',
-            label: 'Sitting'
-          },
-          {
-            to: '/supplies',
-            label: 'Supplies'
-          },
-          {
-            to: '/contacts',
-            label: 'Contacts'
-          }].
-          map((item) =>
+        <div className="md:hidden bg-card border-b border-border px-4 py-2 absolute top-16 left-0 right-0 z-40 shadow-soft max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain">
+          <nav className="space-y-1 pb-2">
+            {navItems.map((item) =>
           <NavLink
             key={item.to}
             to={item.to}
+            end={item.end}
             onClick={() => setMobileMenuOpen(false)}
             className={({ isActive }) =>
             `block px-3 py-2 rounded-lg text-sm font-medium ${isActive ? 'bg-primary/10 text-primary' : 'text-text-secondary'}`
@@ -78,6 +50,62 @@ export function AppShell() {
                 {item.label}
               </NavLink>
           )}
+          </nav>
+          <div className="border-t border-border pt-2 pb-3 space-y-1">
+            {currentOrg &&
+            <div className="px-3 py-1">
+                <p className="text-xs uppercase tracking-wider text-text-secondary">
+                  Organization
+                </p>
+                <p className="text-sm font-semibold text-text-primary truncate">
+                  {currentOrg.name}
+                </p>
+              </div>
+            }
+            <NavLink
+              to="/settings"
+              onClick={() => setMobileMenuOpen(false)}
+              className={({ isActive }) =>
+              cn(
+                'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                isActive ?
+                'bg-primary/10 text-primary' :
+                'text-text-secondary hover:bg-background hover:text-text-primary'
+              )
+              }>
+              
+              <SettingsIcon className="w-4 h-4" />
+              Settings
+            </NavLink>
+            {user && currentPersonId ?
+            <Link
+              to={`/contacts/${currentPersonId}`}
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-text-secondary hover:bg-background hover:text-text-primary transition-colors"
+              title={user.email}>
+              
+                <UserCircleIcon className="w-4 h-4" />
+                <span className="truncate">My profile</span>
+              </Link> :
+            user ?
+            <p className="px-3 py-2 text-xs text-text-secondary truncate" title={user.email}>
+                {user.email}
+              </p> :
+            null
+            }
+            {!isDemoMode &&
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                signOut();
+              }}
+              className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm font-medium text-text-secondary hover:bg-background hover:text-text-primary transition-colors">
+              
+                <LogOutIcon className="w-4 h-4" />
+                Sign out
+              </button>
+            }
+          </div>
           </div>
         }
 

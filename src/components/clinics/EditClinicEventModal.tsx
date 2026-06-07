@@ -80,7 +80,7 @@ function validateForm(form: ClinicForm): FormErrors {
 }
 
 export function EditClinicEventModal({ isOpen, onClose, event }: Props) {
-  const { updateClinicEvent, people } = useWhisker();
+  const { updateClinicEvent, peopleIndex: people } = useWhisker();
   const [form, setForm] = useState<ClinicForm>(() => fromEvent(event));
   const [errors, setErrors] = useState<FormErrors>({});
 

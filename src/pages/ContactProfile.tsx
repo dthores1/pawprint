@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useWhisker } from '../context/WhiskerContext';
 import { ArchiveConfirmDialog } from '../components/archive/ArchiveConfirmDialog';
@@ -33,7 +33,14 @@ const humanizeRole = (r: PersonRole) => r.replace(/_/g, ' ');
 
 export function ContactProfile() {
   const { id } = useParams<{ id: string }>();
-  const { people, animals, placements } = useWhisker();
+  // Index so a contact's adopted (historical) animals still appear.
+  const {
+    people,
+    peopleLoading,
+    ensurePerson,
+    animalsIndex: animals,
+    placements
+  } = useWhisker();
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
@@ -46,7 +53,25 @@ export function ContactProfile() {
   const canArchive = canArchiveBase && !isSelf;
 
   const person = people.find((p) => p.id === id);
+  // The default load is active-only, so an inactive contact's profile won't be
+  // present — fetch it by id on demand and merge it in. `resolved` distinguishes
+  // "still loading" from a genuine 404.
+  const [resolved, setResolved] = useState(false);
+  useEffect(() => {
+    if (!id || person) return;
+    setResolved(false);
+    let cancelled = false;
+    ensurePerson(id).finally(() => {
+      if (!cancelled) setResolved(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, person, ensurePerson]);
   if (!person) {
+    if (peopleLoading || !resolved) {
+      return <div className="p-8 text-center text-text-secondary">Loading…</div>;
+    }
     return <div className="p-8 text-center">Contact not found.</div>;
   }
 

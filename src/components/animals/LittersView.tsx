@@ -26,8 +26,15 @@ import {
 '../../lib/litters';
 
 export function LittersView() {
-  const { litters, littersLoading, animals, fosters, medicalRecords, breeds } =
-  useWhisker();
+  // Index so litter rosters/mother lookups include members who aged out of care.
+  const {
+    litters,
+    littersLoading,
+    animalsIndex: animals,
+    fosters,
+    medicalRecords,
+    breeds
+  } = useWhisker();
   const [editLitterId, setEditLitterId] = useState<string | null>(null);
   const [addMemberLitterId, setAddMemberLitterId] = useState<string | null>(
     null

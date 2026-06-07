@@ -62,7 +62,7 @@ export function SupplyRequestDetailModal({
     supplyRequests,
     supplyRequestItems,
     products,
-    people,
+    peopleIndex: people,
     updateSupplyRequest
   } = useWhisker();
   const { currentPersonId } = useAuth();

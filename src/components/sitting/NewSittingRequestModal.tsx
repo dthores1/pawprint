@@ -28,7 +28,7 @@ export function NewSittingRequestModal({ isOpen, onClose, request }: Props) {
     updateSittingRequest,
     sittingRequestPlacements,
     placements,
-    animals
+    animalsIndex: animals
   } = useWhisker();
   const { currentPersonId } = useAuth();
   const isEditMode = !!request;

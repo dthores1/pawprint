@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   BarChart,
@@ -212,6 +212,8 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 export function ReportsPage() {
   const {
     animals,
+    ensureHistoricalLoaded,
+    ensureInactiveLoaded,
     adoptions,
     fosters,
     placements,
@@ -222,6 +224,14 @@ export function ReportsPage() {
     supplyRequestItems,
     products
   } = useWhisker();
+
+  // Reports must cover everything, but the default loads are scoped (animals =
+  // in-care, people = active) — pull the historical animals and inactive
+  // contacts in on mount.
+  useEffect(() => {
+    ensureHistoricalLoaded();
+    ensureInactiveLoaded();
+  }, [ensureHistoricalLoaded, ensureInactiveLoaded]);
 
   const [preset, setPreset] = useState<RangePreset>('month');
   const [range, setRange] = useState<DateRange>(thisMonthRange);

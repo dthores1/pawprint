@@ -43,7 +43,8 @@ export function AddRelationshipModal({
   onClose,
   animalId
 }: AddRelationshipModalProps) {
-  const { animals, relationships, addRelationship } = useWhisker();
+  // Index so a deceased/adopted relative can still be picked.
+  const { animalsIndex: animals, relationships, addRelationship } = useWhisker();
   const [search, setSearch] = useState('');
   const [selectedAnimal, setSelectedAnimal] = useState<Animal | null>(null);
   const [type, setType] =

@@ -1,4 +1,3 @@
-import React from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import {
   LayoutDashboardIcon,
@@ -20,65 +19,67 @@ import { cn } from '../../lib/utils';
 import { LogoMark } from '../ui/Logo';
 import { useAuth } from '../../context/AuthContext';
 import { isDemoMode } from '../../lib/appMode';
+
+export const navItems = [
+{
+  to: '/',
+  icon: LayoutDashboardIcon,
+  label: 'Dashboard',
+  end: true
+},
+{
+  to: '/animals',
+  icon: PawPrintIcon,
+  label: 'Animals'
+},
+{
+  to: '/fosters',
+  icon: HomeIcon,
+  label: 'Foster Parents'
+},
+{
+  to: '/clinics',
+  icon: HospitalIcon,
+  label: 'Clinics'
+},
+{
+  to: '/transports',
+  icon: TruckIcon,
+  label: 'Transport Requests'
+},
+{
+  to: '/sitting',
+  icon: HeartHandshakeIcon,
+  label: 'Sitting Requests'
+},
+{
+  to: '/supplies',
+  icon: PackageOpenIcon,
+  label: 'Supply Requests'
+},
+{
+  to: '/contacts',
+  icon: UsersIcon,
+  label: 'Contacts'
+},
+{
+  to: '/reports',
+  icon: BarChart3Icon,
+  label: 'Reports'
+},
+{
+  to: '/organization',
+  icon: BuildingIcon,
+  label: 'Members'
+},
+{
+  to: '/recycle-bin',
+  icon: Trash2Icon,
+  label: 'Recycle Bin'
+}];
+
 export function Sidebar() {
   const { user, currentOrg, currentPersonId, signOut } = useAuth();
-  const navItems = [
-  {
-    to: '/',
-    icon: LayoutDashboardIcon,
-    label: 'Dashboard',
-    end: true
-  },
-  {
-    to: '/animals',
-    icon: PawPrintIcon,
-    label: 'Animals'
-  },
-  {
-    to: '/fosters',
-    icon: HomeIcon,
-    label: 'Foster Parents'
-  },
-  {
-    to: '/clinics',
-    icon: HospitalIcon,
-    label: 'Clinics'
-  },
-  {
-    to: '/transports',
-    icon: TruckIcon,
-    label: 'Transport Requests'
-  },
-  {
-    to: '/sitting',
-    icon: HeartHandshakeIcon,
-    label: 'Sitting Requests'
-  },
-  {
-    to: '/supplies',
-    icon: PackageOpenIcon,
-    label: 'Supply Requests'
-  },
-  {
-    to: '/contacts',
-    icon: UsersIcon,
-    label: 'Contacts'
-  },
-  {
-    to: '/reports',
-    icon: BarChart3Icon,
-    label: 'Reports'
-  },
-  {
-    to: '/organization',
-    icon: BuildingIcon,
-    label: 'Members'
-  },
-  {
-    to: '/recycle-bin',
-    icon: Trash2Icon,
-    label: 'Recycle Bin'
-  }];
 
   return (
     <aside className="w-64 bg-card border-r border-border h-full flex flex-col hidden md:flex">

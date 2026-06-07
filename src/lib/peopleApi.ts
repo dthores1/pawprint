@@ -72,6 +72,15 @@ const PERSON_COLUMNS = [
 'preferred_species'] as
 const;
 
+// Slim column projection for the all-people index (search / pickers /
+// name-resolution). Lightweight so loading every contact (incl. inactive) stays
+// cheap; the heavy full rows (addresses, foster capacity, etc.) stay scoped to
+// active. `rowToPerson` is defensive, so a row with only these columns maps to a
+// valid Person (absent fields fall back to their defaults).
+export const PEOPLE_INDEX_COLUMNS =
+'id,organization_id,first_name,last_name,email,phone,roles,role,' +
+'organization_name,photo_url,active,user_id,created_at';
+
 function normalize(v: any): any {
   return typeof v === 'string' && v === '' ? null : v;
 }

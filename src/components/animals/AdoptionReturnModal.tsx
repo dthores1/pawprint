@@ -36,7 +36,7 @@ export function AdoptionReturnModal({
 }: AdoptionReturnModalProps) {
   const {
     animals,
-    people,
+    peopleIndex: people,
     adoptions,
     returnAdoption,
     recordAdoptionReturn
