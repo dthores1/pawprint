@@ -27,7 +27,7 @@ export function PlaceAnimalModal({
   animalId,
   fosterId
 }: PlaceAnimalModalProps) {
-  const { fosters, placements, animals, placeAnimal, reassignFoster } =
+  const { fosters, people, placements, animals, placeAnimal, reassignFoster } =
   useWhisker();
   const mode: 'animal' | 'foster' = fosterId ? 'foster' : 'animal';
   // The searched/selected counterpart id (a foster in animal mode, an animal in
@@ -52,8 +52,13 @@ export function PlaceAnimalModal({
   const anchorFoster = fosterId ?
   fosters.find((f) => f.id === fosterId) :
   undefined;
+  // Animal mode lets you pick ANY active contact (not just existing fosters), so
+  // resolve the selection from `people`. A non-foster is granted the
+  // foster_parent role on placement (handled in the context's placeAnimal).
   const selectedFoster =
-  mode === 'animal' ? fosters.find((f) => f.id === selectedId) : undefined;
+  mode === 'animal' ? people.find((p) => p.id === selectedId) : undefined;
+  const selectedIsFoster =
+  !!selectedFoster?.roles.includes('foster_parent');
   const selectedAnimal =
   mode === 'foster' ? animals.find((a) => a.id === selectedId) : undefined;
 
@@ -85,24 +90,41 @@ export function PlaceAnimalModal({
   anchorFosterActive >= (anchorFoster.max_capacity ?? 0) :
   false;
 
-  // Foster results (animal mode): active fosters, excluding the current one.
+  // Foster results (animal mode): active foster parents, excluding the current
+  // one. Shown first — they're the primary, expected choice.
   const fosterResults = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return fosters.
-    filter((f) => f.active).
-    filter((f) => !currentFoster || f.id !== currentFoster.id).
-    filter((f) => {
-      if (!q) return true;
-      const hay = `${f.first_name} ${f.last_name} ${f.email}`.toLowerCase();
-      return hay.includes(q);
-    }).
+    return people.
+    filter((p) => p.active && p.roles.includes('foster_parent')).
+    filter((p) => !currentFoster || p.id !== currentFoster.id).
+    filter(
+      (p) =>
+      !q ||
+      `${p.first_name} ${p.last_name} ${p.email}`.toLowerCase().includes(q)
+    ).
     map((f) => {
       const active = getActivePlacementsCount(f.id);
       const isFull = active >= (f.max_capacity ?? 0);
       return { foster: f, active, isFull };
     }).
     sort((a, b) => Number(a.isFull) - Number(b.isFull));
-  }, [fosters, placements, query, currentFoster]);
+  }, [people, placements, query, currentFoster]);
+
+  // Other contacts (animal mode): active people who aren't foster parents yet.
+  // Selecting one promotes them to foster parent on placement. Account
+  // self-records (user_id set) are hidden, matching the Contacts directory.
+  const otherContactResults = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return people.
+    filter((p) => p.active && !p.roles.includes('foster_parent') && !p.user_id).
+    filter((p) => !currentFoster || p.id !== currentFoster.id).
+    filter(
+      (p) =>
+      !q ||
+      `${p.first_name} ${p.last_name} ${p.email}`.toLowerCase().includes(q)
+    ).
+    slice(0, 12);
+  }, [people, query, currentFoster]);
 
   // Animal results (foster mode): animals not already in an active placement and
   // not in a terminal status — i.e. those actually available to be placed.
@@ -294,8 +316,10 @@ export function PlaceAnimalModal({
                     {selectedFoster.first_name} {selectedFoster.last_name}
                   </p>
                   <p className="text-xs text-text-secondary truncate">
-                    {getActivePlacementsCount(selectedFoster.id)} of{' '}
-                    {selectedFoster.max_capacity ?? 0} spots filled
+                    {selectedIsFoster ?
+                    `${getActivePlacementsCount(selectedFoster.id)} of ${
+                    selectedFoster.max_capacity ?? 0} spots filled` :
+                    'Will be added as a foster parent'}
                   </p>
                 </div>
               </div>
@@ -365,49 +389,100 @@ export function PlaceAnimalModal({
                 transition={{ duration: 0.15 }}
                 className="absolute z-10 mt-1.5 w-full bg-card border border-border rounded-xl shadow-soft-lg overflow-hidden max-h-72 overflow-y-auto">
 
-                    {/* Foster results (animal mode) */}
+                    {/* Foster + contact results (animal mode), split into two
+                         sections. Empty sections are omitted. */}
                     {mode === 'animal' && (
-                  fosterResults.length === 0 ?
+                  fosterResults.length === 0 &&
+                  otherContactResults.length === 0 ?
                   <div className="p-4 text-sm text-text-secondary text-center">
-                          No foster parents match "{query}".
+                          {query ?
+                    `No contacts match "${query}".` :
+                    'No contacts available.'}
                         </div> :
 
-                  <ul className="py-1">
-                          {fosterResults.map(({ foster, active, isFull }) =>
-                    <li key={foster.id}>
-                              <button
-                        type="button"
-                        onClick={() => handleSelectFoster(foster.id)}
-                        className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-background cursor-pointer">
+                  <>
+                          {fosterResults.length > 0 &&
+                    <>
+                              <div className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-text-secondary bg-background border-b border-border sticky top-0 z-10">
+                                Foster Parents
+                              </div>
+                              <ul className="py-1">
+                                {fosterResults.map(({ foster, active, isFull }) =>
+                        <li key={foster.id}>
+                                    <button
+                            type="button"
+                            onClick={() => handleSelectFoster(foster.id)}
+                            className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-background cursor-pointer">
 
-                                <div className="flex items-center gap-3 min-w-0">
-                                  <Avatar
-                            src={foster.photo_url}
-                            name={`${foster.first_name} ${foster.last_name}`}
-                            colorKey={foster.id}
-                            size="sm" />
+                                      <div className="flex items-center gap-3 min-w-0">
+                                        <Avatar
+                                src={foster.photo_url}
+                                name={`${foster.first_name} ${foster.last_name}`}
+                                colorKey={foster.id}
+                                size="sm" />
 
-                                  <div className="min-w-0">
-                                    <p className="font-medium text-text-primary truncate text-sm">
-                                      {foster.first_name} {foster.last_name}
-                                    </p>
-                                    <p className="text-xs text-text-secondary truncate">
-                                      {(foster.preferred_species ?? []).join(', ')} ·{' '}
-                                      {active}/{foster.max_capacity ?? 0} in care
-                                    </p>
-                                  </div>
-                                </div>
-                                <span
-                          className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${isFull ? 'bg-status-medical-bg text-status-medical-text' : 'bg-[#DDEFE2] text-[#3E7B52]'}`}>
+                                        <div className="min-w-0">
+                                          <p className="font-medium text-text-primary truncate text-sm">
+                                            {foster.first_name} {foster.last_name}
+                                          </p>
+                                          <p className="text-xs text-text-secondary truncate">
+                                            {(foster.preferred_species ?? []).join(', ')} ·{' '}
+                                            {active}/{foster.max_capacity ?? 0} in care
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <span
+                              className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${isFull ? 'bg-status-medical-bg text-status-medical-text' : 'bg-[#DDEFE2] text-[#3E7B52]'}`}>
 
-                                  {isFull ?
-                          'At capacity' :
-                          `${(foster.max_capacity ?? 0) - active} open`}
-                                </span>
-                              </button>
-                            </li>
-                    )}
-                        </ul>)
+                                        {isFull ?
+                              'At capacity' :
+                              `${(foster.max_capacity ?? 0) - active} open`}
+                                      </span>
+                                    </button>
+                                  </li>
+                        )}
+                              </ul>
+                            </>
+                    }
+                          {otherContactResults.length > 0 &&
+                    <>
+                              <div className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-text-secondary bg-background border-b border-border sticky top-0 z-10">
+                                Other Contacts
+                              </div>
+                              <ul className="py-1">
+                                {otherContactResults.map((contact) =>
+                        <li key={contact.id}>
+                                    <button
+                            type="button"
+                            onClick={() => handleSelectFoster(contact.id)}
+                            className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-background cursor-pointer">
+
+                                      <div className="flex items-center gap-3 min-w-0">
+                                        <Avatar
+                                src={contact.photo_url}
+                                name={`${contact.first_name} ${contact.last_name}`}
+                                colorKey={contact.id}
+                                size="sm" />
+
+                                        <div className="min-w-0">
+                                          <p className="font-medium text-text-primary truncate text-sm">
+                                            {contact.first_name} {contact.last_name}
+                                          </p>
+                                          <p className="text-xs text-text-secondary truncate">
+                                            {contact.organization_name || contact.email}
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <span className="shrink-0 text-xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                                        + Foster
+                                      </span>
+                                    </button>
+                                  </li>
+                        )}
+                              </ul>
+                            </>
+                    }
+                        </>)
                   }
 
                     {/* Animal results (foster mode) */}

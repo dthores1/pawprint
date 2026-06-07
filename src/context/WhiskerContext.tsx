@@ -1866,6 +1866,15 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       }
     });
   };
+  // Placing an animal with someone makes them a foster parent — the "Place in
+  // Foster" picker lets you choose any contact, so add the role on placement if
+  // they don't already have it (idempotent; mirrors ensureAdopterRole).
+  const ensureFosterRole = (personId: string) => {
+    const person = people.find((p) => p.id === personId);
+    if (!person || person.roles.includes('foster_parent')) return;
+    const nextRoles: PersonRole[] = [...person.roles, 'foster_parent'];
+    updatePerson(personId, { roles: nextRoles, role: legacyRoleFor(nextRoles) });
+  };
   const placeAnimal = async (
   animal_id: string,
   person_id: string,
@@ -1898,6 +1907,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       return;
     }
     if (data) setPlacements((prev) => [rowToPlacement(data), ...prev]);
+    ensureFosterRole(person_id);
     // Fostered is derived from the active placement; only sync the cache here.
     // Lifecycle status is left untouched (an animal can be in foster at any stage).
     updateAnimal(animal_id, {
@@ -1970,6 +1980,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       );
       return data ? [rowToPlacement(data), ...closed] : closed;
     });
+    ensureFosterRole(new_person_id);
     // Only the denormalized cache changes; lifecycle status is independent.
     updateAnimal(animal_id, {
       current_foster_id: new_person_id

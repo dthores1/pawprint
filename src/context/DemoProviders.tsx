@@ -653,6 +653,14 @@ export function DemoWhiskerProvider({
       },
       ...prev]
       );
+      // Placing with someone makes them a foster parent (mirror live context).
+      setPeople((prev) =>
+      prev.map((p) =>
+      p.id === person_id && !p.roles.includes('foster_parent') ?
+      { ...p, roles: ['foster_parent', ...p.roles] } :
+      p
+      )
+      );
       // Fostered is derived from the active placement; lifecycle status is left alone.
       updateAnimal(animal_id, {
         current_foster_id: person_id
@@ -689,6 +697,13 @@ export function DemoWhiskerProvider({
         ...closed];
 
       });
+      setPeople((prev) =>
+      prev.map((p) =>
+      p.id === new_person_id && !p.roles.includes('foster_parent') ?
+      { ...p, roles: ['foster_parent', ...p.roles] } :
+      p
+      )
+      );
       updateAnimal(animal_id, {
         current_foster_id: new_person_id
       });
