@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useWhisker } from '../context/WhiskerContext';
 import { ArchiveConfirmDialog } from '../components/archive/ArchiveConfirmDialog';
@@ -25,6 +25,7 @@ import {
   HeartIcon,
   Edit2Icon,
   Trash2Icon,
+  CameraIcon,
   CheckCircle2Icon } from
 'lucide-react';
 import { PersonRole } from '../types';
@@ -39,9 +40,12 @@ export function ContactProfile() {
     peopleLoading,
     ensurePerson,
     animalsIndex: animals,
-    placements
+    placements,
+    uploadPersonPhoto
   } = useWhisker();
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const navigate = useNavigate();
@@ -81,6 +85,17 @@ export function ContactProfile() {
     (p) => p.person_id === person.id && p.placement_status === 'active'
   );
   const cap = person.max_capacity ?? 0;
+
+  const handlePhotoUpload = async (
+  e: React.ChangeEvent<HTMLInputElement>) =>
+  {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoUploading(true);
+    await uploadPersonPhoto(person.id, file);
+    setPhotoUploading(false);
+    if (photoInputRef.current) photoInputRef.current.value = '';
+  };
 
   return (
     <div className="space-y-6 pb-12">
@@ -123,13 +138,47 @@ export function ContactProfile() {
         <div className="space-y-6">
           <Card className="p-6">
             <div className="flex flex-col items-center text-center mb-6">
-              <Avatar
-                src={person.photo_url}
-                name={`${person.first_name} ${person.last_name}`}
-                colorKey={person.id}
-                type="person"
-                size="xl"
-                className="mb-4" />
+              <div className="relative mb-4">
+                <Avatar
+                  src={person.photo_url}
+                  name={`${person.first_name} ${person.last_name}`}
+                  colorKey={person.id}
+                  type="person"
+                  size="xl" />
+
+                {isSelf &&
+                <>
+                    {/* Hover-to-change avatar — only on your own profile. */}
+                    <button
+                    type="button"
+                    onClick={() => photoInputRef.current?.click()}
+                    disabled={photoUploading}
+                    aria-label={
+                    person.photo_url ?
+                    'Change profile photo' :
+                    'Upload profile photo'
+                    }
+                    className={`absolute inset-0 rounded-full flex flex-col items-center justify-center gap-0.5 text-white transition-all focus:outline-none ${
+                    photoUploading ?
+                    'bg-black/50 opacity-100' :
+                    'bg-black/0 opacity-0 hover:bg-black/45 hover:opacity-100 focus-visible:bg-black/45 focus-visible:opacity-100'}`
+                    }>
+
+                      <CameraIcon className="w-6 h-6" />
+                      <span className="text-[11px] font-medium leading-tight">
+                        {photoUploading ? 'Uploading…' : 'Change'}
+                      </span>
+                    </button>
+                    <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handlePhotoUpload} />
+
+                  </>
+                }
+              </div>
 
               <h1 className="text-2xl font-heading font-bold text-text-primary">
                 {person.first_name} {person.last_name}

@@ -451,6 +451,13 @@ export function DemoWhiskerProvider({
     setPeople((prev) =>
     prev.map((p) => p.id === id ? { ...p, ...updates } : p)
     ),
+    // No Storage in demo — preview the chosen file via an object URL.
+    uploadPersonPhoto: async (personId, file) => {
+      const url = URL.createObjectURL(file);
+      setPeople((prev) =>
+      prev.map((p) => p.id === personId ? { ...p, photo_url: url } : p)
+      );
+    },
 
     // — Adoptions —
     addAdoption: async ({ animal_id, adopter_id, notes }) => {

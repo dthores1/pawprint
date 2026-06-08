@@ -273,6 +273,12 @@ export interface WhiskerContextType {
   person: Omit<Person, 'id' | 'created_at'>)
   => Promise<Person | undefined>;
   updatePerson: (id: string, updates: Partial<Person>) => void;
+  /**
+   * Upload a profile photo for a person to Storage and set their `photo_url`.
+   * Used by a signed-in user to set/replace their own avatar (email/password
+   * accounts have no provider photo; Google ones are a one-time snapshot).
+   */
+  uploadPersonPhoto: (personId: string, file: File) => Promise<void>;
   // — Adoptions (operational workflow) —
   addAdoption: (
   input: { animal_id: string; adopter_id: string; notes?: string })
@@ -1584,6 +1590,48 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       }
     });
   };
+  // Upload a person's avatar to the public `animal-photos` bucket (reusing the
+  // same storage + RLS as animal photos) and persist the resulting URL onto
+  // their `people.photo_url`. Path is org-scoped so storage RLS lets any org
+  // member write it: <org>/people/<person>/<uuid>.<ext>.
+  const uploadPersonPhoto = async (
+  personId: string,
+  file: File)
+  : Promise<void> => {
+    if (!orgId) {
+      console.error('[people] cannot upload photo — no current organization');
+      return;
+    }
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+    const path = `${orgId}/people/${personId}/${crypto.randomUUID()}.${ext}`;
+    const { error: upErr } = await supabase.storage.
+    from('animal-photos').
+    upload(path, file, { upsert: false });
+    if (upErr) {
+      console.error('[people] photo upload failed:', upErr.message);
+      return;
+    }
+    const publicUrl = supabase.storage.
+    from('animal-photos').
+    getPublicUrl(path).data.publicUrl;
+    // Best-effort: remove the previously uploaded object (only if it lived in
+    // our bucket) so replacing a photo doesn't orphan storage. External URLs
+    // (e.g. a Google avatar) are left untouched.
+    const marker = '/animal-photos/';
+    const prevUrl = people.find((p) => p.id === personId)?.photo_url;
+    if (prevUrl && prevUrl.includes(marker)) {
+      const prevPath = prevUrl.split(marker)[1];
+      if (prevPath) {
+        void supabase.storage.
+        from('animal-photos').
+        remove([prevPath]).
+        then(({ error }) => {
+          if (error) console.error('[people] old photo remove failed:', error.message);
+        });
+      }
+    }
+    updatePerson(personId, { photo_url: publicUrl });
+  };
   // — Adoptions —————————————————————————————————————————————————————
   const ensureAdopterRole = (personId: string) => {
     const person = people.find((p) => p.id === personId);
@@ -2543,6 +2591,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         updatePlacement,
         addPerson,
         updatePerson,
+        uploadPersonPhoto,
         addAdoption,
         updateAdoption,
         setAdoptionStatus,
