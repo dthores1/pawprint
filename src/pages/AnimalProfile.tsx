@@ -186,10 +186,20 @@ export function AnimalProfile() {
   // cancelled, returned — are history).
   const activeAdoption = animalAdoptions.find(isActiveAdoption);
   const animalMedical = medicalRecords.filter((m) => m.animal_id === animal.id);
-  const upcomingMedical = animalMedical.filter(
-    (m) =>
-    m.status === 'due' || m.status === 'scheduled' || m.status === 'overdue'
-  );
+  // Soonest-first by due date (records missing a due date sort last).
+  const byDueDate = (
+  a: (typeof animalMedical)[number],
+  b: (typeof animalMedical)[number]) =>
+  new Date(a.due_date || '9999-12-31').getTime() -
+  new Date(b.due_date || '9999-12-31').getTime();
+  // Overdue is its own branch and takes priority in the "Next Medical" summary.
+  const overdueMedical = animalMedical.
+  filter((m) => m.status === 'overdue').
+  sort(byDueDate);
+  // Upcoming = due/scheduled (not yet overdue).
+  const upcomingMedical = animalMedical.
+  filter((m) => m.status === 'due' || m.status === 'scheduled').
+  sort(byDueDate);
   const animalNotes = notes.filter((n) => n.animal_id === animal.id);
   const animalActionItems = actionItems.filter(
     (a) => a.animal_id === animal.id
@@ -743,10 +753,26 @@ export function AnimalProfile() {
                 </div>
                 <div>
                   <p className="text-sm text-text-secondary">Next Medical</p>
-                  {upcomingMedical.length > 0 ?
-                  <p className="font-medium text-status-urgent-text">
-                      {upcomingMedical[0].procedure_name} (
-                      {formatDate(upcomingMedical[0].due_date!)})
+                  {animalMedical.length === 0 ?
+                  <p className="font-medium text-text-secondary">
+                      No medical history yet
+                    </p> :
+                  overdueMedical.length > 0 ?
+                  <p className="font-medium text-status-urgent-text flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                      <span>
+                        {overdueMedical[0].procedure_name}
+                        {overdueMedical[0].due_date &&
+                      ` (${formatDate(overdueMedical[0].due_date)})`}
+                      </span>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-[#F5D7D7] text-[#9B3A3A]">
+                        Overdue
+                      </span>
+                    </p> :
+                  upcomingMedical.length > 0 ?
+                  <p className="font-medium text-text-primary">
+                      {upcomingMedical[0].procedure_name}
+                      {upcomingMedical[0].due_date &&
+                    ` (${formatDate(upcomingMedical[0].due_date)})`}
                     </p> :
 
                   <p className="font-medium text-text-primary">Up to date</p>

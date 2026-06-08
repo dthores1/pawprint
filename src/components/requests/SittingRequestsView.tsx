@@ -1,23 +1,22 @@
 import React, { useState } from 'react';
-import { useWhisker } from '../context/WhiskerContext';
-import { Card } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
-import { Avatar } from '../components/ui/Avatar';
-import { NewSittingRequestModal } from '../components/sitting/NewSittingRequestModal';
+import { useWhisker } from '../../context/WhiskerContext';
+import { Card } from '../ui/Card';
+import { Button } from '../ui/Button';
+import { Avatar } from '../ui/Avatar';
+import { NewSittingRequestModal } from '../sitting/NewSittingRequestModal';
 import {
   HeartHandshakeIcon,
-  PlusIcon,
   PillIcon,
   TruckIcon,
   PackageIcon,
   PencilIcon,
   Trash2Icon } from
 'lucide-react';
-import { cn, animalDisplayName } from '../lib/utils';
-import { useAuth } from '../context/AuthContext';
-import { SittingRequest, SittingRequestStatus, Animal } from '../types';
-import { ArchiveConfirmDialog } from '../components/archive/ArchiveConfirmDialog';
-import { useCanArchive } from '../components/archive/useCanArchive';
+import { cn, animalDisplayName } from '../../lib/utils';
+import { useAuth } from '../../context/AuthContext';
+import { SittingRequest, SittingRequestStatus, Animal } from '../../types';
+import { ArchiveConfirmDialog } from '../archive/ArchiveConfirmDialog';
+import { useCanArchive } from '../archive/useCanArchive';
 
 const SITTING_ARCHIVABLE: SittingRequestStatus[] = [
 'completed',
@@ -68,7 +67,7 @@ function formatDateRange(startISO: string, endISO: string) {
   return `${startStr} – ${endStr}`;
 }
 
-export function Sitting() {
+export function SittingRequestsView() {
   const {
     sittingRequests,
     sittingRequestPlacements,
@@ -79,7 +78,6 @@ export function Sitting() {
     updateSittingRequest
   } = useWhisker();
   const { currentPersonId } = useAuth();
-  const [isNewOpen, setIsNewOpen] = useState(false);
   const [editing, setEditing] = useState<SittingRequest | null>(null);
   const [tab, setTab] = useState<'unclaimed' | 'mine'>('unclaimed');
   const [archiving, setArchiving] = useState<SittingRequest | null>(null);
@@ -129,23 +127,7 @@ export function Sitting() {
   };
 
   return (
-    <div className="space-y-6 pb-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-heading font-bold text-text-primary flex items-center gap-3">
-            <HeartHandshakeIcon className="w-8 h-8 text-primary" />
-            Sitting Requests
-          </h1>
-          <p className="text-text-secondary mt-1">
-            Need temporary coverage? Find a sitter from inside the org.
-          </p>
-        </div>
-        <Button onClick={() => setIsNewOpen(true)} className="gap-2">
-          <PlusIcon className="w-4 h-4" />
-          New Sitting Request
-        </Button>
-      </div>
-
+    <div className="space-y-6">
       <div className="flex gap-2 border-b border-border">
         <button
           onClick={() => setTab('unclaimed')}
@@ -235,10 +217,6 @@ export function Sitting() {
         })}
         </div>
       }
-
-      <NewSittingRequestModal
-        isOpen={isNewOpen}
-        onClose={() => setIsNewOpen(false)} />
 
       {editing &&
       <NewSittingRequestModal

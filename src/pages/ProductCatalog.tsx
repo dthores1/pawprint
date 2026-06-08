@@ -50,7 +50,7 @@ export function ProductCatalog() {
   return (
     <div className="space-y-6 pb-8">
       <Link
-        to="/supplies"
+        to="/requests"
         className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-text-primary transition-colors">
 
         <ArrowLeftIcon className="w-4 h-4" /> Back to Supply Requests

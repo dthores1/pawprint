@@ -749,7 +749,7 @@ export function ReportsPage() {
                 return (
                   <Link
                     key={e.id}
-                    to="/clinics"
+                    to="/medical"
                     className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border hover:bg-background transition-colors">
 
                       <div className="min-w-0">

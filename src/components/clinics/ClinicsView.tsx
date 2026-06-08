@@ -1,17 +1,10 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useWhisker } from '../context/WhiskerContext';
-import { Card } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
-import { NewClinicEventModal } from '../components/clinics/NewClinicEventModal';
-import {
-  StethoscopeIcon,
-  PlusIcon,
-  MapPinIcon,
-  UserIcon } from
-'lucide-react';
-import { cn } from '../lib/utils';
-import { ClinicEvent, ClinicEventStatus } from '../types';
+import { useWhisker } from '../../context/WhiskerContext';
+import { Card } from '../ui/Card';
+import { StethoscopeIcon, MapPinIcon, UserIcon } from 'lucide-react';
+import { cn } from '../../lib/utils';
+import { ClinicEvent, ClinicEventStatus } from '../../types';
 
 const EVENT_STATUS_LABEL: Record<ClinicEventStatus, string> = {
   planning: 'Planning',
@@ -28,9 +21,8 @@ const EVENT_STATUS_PILL: Record<ClinicEventStatus, string> = {
   cancelled: 'bg-[#F5D7D7] text-[#9B3A3A]'
 };
 
-export function Clinics() {
+export function ClinicsView() {
   const { clinicEvents, clinicSlots, peopleIndex: people } = useWhisker();
-  const [isNewOpen, setIsNewOpen] = useState(false);
   const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
 
   const now = Date.now();
@@ -56,23 +48,7 @@ export function Clinics() {
   const display = tab === 'upcoming' ? upcoming : past;
 
   return (
-    <div className="space-y-6 pb-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-heading font-bold text-text-primary flex items-center gap-3">
-            <StethoscopeIcon className="w-8 h-8 text-primary" />
-            Clinics
-          </h1>
-          <p className="text-text-secondary mt-1">
-            Plan spay/neuter and vaccine clinics. Assign cats to slots.
-          </p>
-        </div>
-        <Button onClick={() => setIsNewOpen(true)} className="gap-2">
-          <PlusIcon className="w-4 h-4" />
-          New Clinic
-        </Button>
-      </div>
-
+    <div className="space-y-6">
       <div className="flex gap-2 border-b border-border">
         <button
           onClick={() => setTab('upcoming')}
@@ -132,11 +108,6 @@ export function Clinics() {
         })}
         </div>
       }
-
-      <NewClinicEventModal
-        isOpen={isNewOpen}
-        onClose={() => setIsNewOpen(false)} />
-
     </div>);
 
 }
