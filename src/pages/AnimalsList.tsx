@@ -21,9 +21,12 @@ import {
   SearchIcon,
   PlusIcon,
   XIcon,
-  StarIcon } from
+  StarIcon,
+  SlidersHorizontalIcon,
+  ChevronDownIcon } from
 'lucide-react';
 import {
+  cn,
   calculateAge,
   formatDate,
   animalDisplayName,
@@ -35,6 +38,8 @@ import { enabledSpeciesList } from '../lib/orgCatalog';
 import { isActiveAdoption } from '../lib/adoptions';
 import { motion } from 'framer-motion';
 import { useWindowRowVirtualizer } from '../lib/useWindowRowVirtualizer';
+import { useIsMobile } from '../lib/useIsMobile';
+import { VirtualizedGrid } from '../components/ui/VirtualizedGrid';
 import { Animal, Person, AnimalStatus } from '../types';
 import { PawPrintIcon as PawPrintGlyph } from '../components/ui/PawPrintIcon';
 import { STATUS_LABELS, IN_CARE_STATUSES } from '../lib/animalStatus';
@@ -87,6 +92,10 @@ export function AnimalsList() {
   } = useWhisker();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [view, setView] = useState<'animals' | 'litters'>('animals');
+  const isMobile = useIsMobile();
+  // On phones the filter controls collapse behind a "Filters" toggle (closed by
+  // default) to keep the list above the fold; they're always shown at md+.
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [searchParams] = useSearchParams();
   // Initialize filters from the URL (e.g. /animals?status=intake,medical),
   // keeping only values that match a known option.
@@ -201,6 +210,107 @@ export function AnimalsList() {
     r.relationship_type === 'bonded_pair' && (
     r.animal_id === animalId || r.related_animal_id === animalId)
   );
+  // Mobile card for one animal — same data as a desktop table row, stacked so
+  // it never needs horizontal scroll.
+  const renderAnimalCard = (animal: Animal) => {
+    const foster = getActiveFoster(animal.id);
+    const nextMedical = getNextMedical(animal.id);
+    const bonded = isBondedPair(animal.id);
+    return (
+      <Card className="p-4">
+        <div className="flex items-start gap-3">
+          <Link to={`/animals/${animal.id}`} className="relative shrink-0">
+            <Avatar
+              src={animal.primary_photo_url}
+              type="animal"
+              species={animal.species} />
+
+            <div className="absolute -bottom-1 -right-1 ring-2 ring-card rounded-full">
+              <SpeciesBadge species={animal.species} />
+            </div>
+          </Link>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-2">
+              <Link
+                to={`/animals/${animal.id}`}
+                className={`min-w-0 truncate ${animal.name ? 'font-semibold text-text-primary' : 'font-mono text-sm font-semibold text-text-primary'}`}>
+
+                {animalDisplayName(animal)}
+              </Link>
+              <div className="shrink-0">
+                <StatusBadge status={animal.status} />
+              </div>
+            </div>
+            {animalShowsRescueIdBadge(animal) &&
+            <span className="block mt-0.5 font-mono text-[11px] text-text-secondary">
+                {animal.rescue_id}
+              </span>
+            }
+            <p className="text-xs text-text-secondary mt-0.5">
+              {animalBreedLabel(animal, breeds) || animal.species}
+            </p>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
+              {bonded &&
+              <span
+                className="inline-flex items-center gap-1 text-[12px] font-medium text-[#6B5B8C]"
+                title="This animal is part of a bonded pair">
+
+                  <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  className="w-3.5 h-3.5"
+                  fill="currentColor"
+                  aria-hidden="true">
+
+                    <path d="m20.726,18.629c.283.486.39,1.062.3,1.623l-.197,1.225c-.235,1.462-1.48,2.524-2.962,2.524h-4.867c-.552,0-1-.448-1-1s.448-1,1-1h4.867c.494,0,.909-.354.987-.841l.197-1.224c.017-.106-.002-.209-.054-.3-1.015-1.745-1.069-2.172-1.095-2.377-.14-1.106-.662-1.792-1.747-2.295-.059-.027-1.905-.963-2.604-.963-.798,0-1.256.22-1.261.222-3.025,1.781-5.918,4.108-6.257,8.849-.038.527-.477.929-.997.929-.024,0-.048,0-.072-.002-.551-.04-.966-.518-.926-1.069.409-5.711,4.11-8.589,7.29-10.458.061-.033.292-.152.673-.262v-.209c0-1.256.772-2.495,1.867-2.942.543-.222,1.133.221,1.133.807v2.405c.726.237,1.996.878,1.996.878,1.693.784,2.666,2.083,2.891,3.858h0s.107.364.839,1.622Zm.774-12.629h-.227c-.829,0-1.609-.365-2.14-1.002l-.229-.275c-.912-1.094-2.251-1.722-3.676-1.722h-1.227V.865c0-.586-.59-1.029-1.133-.807-1.095.447-1.867,1.686-1.867,2.942v.706l-2.57,3.998c-.924,1.438-2.497,2.296-4.206,2.296H1c-.552,0-1,.448-1,1s.448,1,1,1h3.224c2.393,0,4.595-1.202,5.889-3.215l2.433-3.785h2.681c.829,0,1.609.365,2.14,1.002l.229.275c.912,1.094,2.251,1.722,3.676,1.722h.227c.276,0,.5.224.5.5v.5c0,1.068-.575,2.064-1.5,2.599-.478.276-.642.888-.365,1.366.186.321.521.5.867.5.17,0,.342-.043.5-.134,1.542-.892,2.5-2.551,2.5-4.331v-.5c0-1.378-1.122-2.5-2.5-2.5Z" />
+                  </svg>
+                  Bonded Pair
+                </span>
+              }
+              {pendingAdoptionAnimalIds.has(animal.id) &&
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#B4641E]">
+                  <StarIcon className="w-3 h-3 fill-[#B4641E]" />
+                  Pending Adoption
+                </span>
+              }
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 space-y-1.5 border-t border-border pt-3 text-sm">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-text-secondary shrink-0">Age &amp; Sex</span>
+            <span className="text-text-primary text-right truncate">
+              {calculateAge(animal.estimated_birth_date)} · {animal.sex}
+            </span>
+          </div>
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-text-secondary shrink-0">Current Foster</span>
+            {foster ?
+            <Link
+              to={`/fosters/${foster.id}`}
+              className="text-primary text-right truncate hover:underline">
+
+                {foster.first_name} {foster.last_name}
+              </Link> :
+
+            <span className="text-text-secondary text-right">—</span>
+            }
+          </div>
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-text-secondary shrink-0">Next Medical</span>
+            {nextMedical ?
+            <span className="text-text-primary text-right truncate">
+                {nextMedical.procedure_name} ({formatDate(nextMedical.due_date!)})
+              </span> :
+
+            <span className="text-text-secondary text-right">Up to date</span>
+            }
+          </div>
+        </div>
+      </Card>);
+
+  };
   // Every filter EXCEPT species. Split out so the species pool (used to decide
   // whether to even show the Species filter) reflects all other active filters.
   const matchesAllButSpecies = useCallback(
@@ -308,8 +418,9 @@ export function AnimalsList() {
     return sortItems(filteredAnimals, getValue, sort.dir);
   }, [filteredAnimals, sort, fosterByAnimal, nextMedicalByAnimal]);
 
-  // Virtualized table rows in a self-scrolling container. ~73px per row.
-  const tableRows = useWindowRowVirtualizer(sortedAnimals.length, 73);
+  // Virtualized table rows in a self-scrolling container (~73px/row). The mobile
+  // card layout uses VirtualizedGrid instead, so this is desktop-only.
+  const rows = useWindowRowVirtualizer(sortedAnimals.length, 73);
   // Filter option lists. Status options follow the historical toggle: in-care
   // statuses only by default, all 7 once historical animals are included.
   const statusOptions: FilterOption[] = useMemo(
@@ -396,6 +507,15 @@ export function AnimalsList() {
   // actually span more than one species.
   const showSpeciesFilter = enabledSpecies.length > 1 && distinctSpeciesInPool > 1;
   const showTraitFilter = traitOptions.length > 0;
+  // Count of active filter selections — shown on the mobile "Filters" toggle so
+  // a collapsed panel still signals that filters are applied.
+  const activeFilterCount =
+  activeChips.length + flagFilters.length + (includeHistorical ? 1 : 0);
+  // Larger, full-width filter triggers on phones; compact inline at md+.
+  // `!h-12` overrides the dropdown's built-in `h-9` (the project's `cn` doesn't
+  // tailwind-merge, so a plain `h-12` wouldn't reliably win).
+  const filterTriggerClass =
+  'w-full md:w-auto !h-12 md:!h-9 text-base md:text-sm justify-between md:justify-start';
   return (
     <div className="space-y-5 pb-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -456,20 +576,52 @@ export function AnimalsList() {
         }
       </div>
 
-      {/* Compact filter row */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Mobile: collapse the filters behind a toggle (closed by default). */}
+      <button
+        type="button"
+        onClick={() => setFiltersOpen((o) => !o)}
+        className="md:hidden inline-flex items-center justify-between w-full h-12 px-4 rounded-xl text-base font-medium border border-border bg-card hover:bg-background transition-colors">
+
+        <span className="inline-flex items-center gap-2 text-text-primary">
+          <SlidersHorizontalIcon className="w-5 h-5 text-text-secondary" />
+          Filters
+          {activeFilterCount > 0 &&
+          <span className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-primary text-white text-xs font-semibold">
+              {activeFilterCount}
+            </span>
+          }
+        </span>
+        <ChevronDownIcon
+          className={cn(
+            'w-5 h-5 text-text-secondary transition-transform',
+            filtersOpen && 'rotate-180'
+          )} />
+
+      </button>
+
+      {/* Filter controls — stacked + larger on phones, compact inline at md+. */}
+      <div
+        className={cn(
+          'flex-col gap-2 md:flex md:flex-row md:flex-wrap md:items-center',
+          filtersOpen ? 'flex' : 'hidden'
+        )}>
+
         <MultiFilterDropdown
           label="Status"
           values={statusFilter}
           options={statusOptions}
-          onChange={setStatusFilter} />
+          onChange={setStatusFilter}
+          className="w-full md:w-auto"
+          triggerClassName={filterTriggerClass} />
 
         {showSpeciesFilter &&
         <MultiFilterDropdown
           label="Species"
           values={speciesFilter}
           options={speciesOptions}
-          onChange={setSpeciesFilter} />
+          onChange={setSpeciesFilter}
+          className="w-full md:w-auto"
+          triggerClassName={filterTriggerClass} />
 
         }
         {showTraitFilter &&
@@ -477,32 +629,42 @@ export function AnimalsList() {
           label="Traits"
           values={traitFilter}
           options={traitOptions}
-          onChange={setTraitFilter} />
+          onChange={setTraitFilter}
+          className="w-full md:w-auto"
+          triggerClassName={filterTriggerClass} />
 
         }
         <MultiFilterDropdown
           label="Special Conditions"
           values={specialConditions}
           options={SPECIAL_CONDITIONS}
-          onChange={setSpecialConditions} />
+          onChange={setSpecialConditions}
+          className="w-full md:w-auto"
+          triggerClassName={filterTriggerClass} />
 
         <MultiFilterDropdown
           label="Age Group"
           values={ageGroups}
           options={AGE_GROUPS}
-          onChange={setAgeGroups} />
+          onChange={setAgeGroups}
+          className="w-full md:w-auto"
+          triggerClassName={filterTriggerClass} />
 
-        <span className="w-px h-6 bg-border mx-1" aria-hidden="true" />
+        <span
+          className="hidden md:inline-block w-px h-6 bg-border mx-1"
+          aria-hidden="true" />
+
         {FLAG_FILTERS.map((f) =>
         <button
           key={f.key}
           type="button"
           onClick={() => toggleFlag(f.key)}
-          className={`inline-flex items-center h-9 px-3 rounded-lg text-sm font-medium border transition-colors ${
-          flagFilters.includes(f.key) ?
-          'bg-primary/10 text-primary border-primary/30' :
-          'bg-card text-text-secondary border-border hover:bg-background'}`
-          }>
+          className={cn(
+            'inline-flex items-center justify-center w-full md:w-auto h-12 md:h-9 px-3 rounded-lg text-base md:text-sm font-medium border transition-colors',
+            flagFilters.includes(f.key) ?
+            'bg-primary/10 text-primary border-primary/30' :
+            'bg-card text-text-secondary border-border hover:bg-background'
+          )}>
 
             {f.label}
           </button>
@@ -510,8 +672,7 @@ export function AnimalsList() {
 
         {/* Show Historical Animals — expands the dataset to adopted/
             released/deceased animals. Off by default. */}
-        <label
-          className="ml-auto inline-flex items-center gap-2.5 h-9 px-3 rounded-lg text-sm font-medium border border-border bg-card cursor-pointer select-none hover:bg-background transition-colors">
+        <label className="md:ml-auto inline-flex items-center justify-center md:justify-start gap-2.5 w-full md:w-auto h-12 md:h-9 px-3 rounded-lg text-base md:text-sm font-medium border border-border bg-card cursor-pointer select-none hover:bg-background transition-colors">
 
           <input
             type="checkbox"
@@ -569,77 +730,79 @@ export function AnimalsList() {
         </motion.div>
       }
 
+      {animalsLoading && animals.length === 0 ?
+      <Card className="py-12 text-center text-text-secondary">
+          <div className="flex flex-col items-center gap-3">
+            <PawPrintGlyph className="w-10 h-10 text-text-secondary/30 animate-pulse" />
+            <p>Loading animals…</p>
+          </div>
+        </Card> :
+      sortedAnimals.length === 0 ?
+      <Card className="py-12 text-center text-text-secondary">
+          <div className="flex flex-col items-center gap-3">
+            <PawPrintGlyph className="w-10 h-10 text-text-secondary/30" />
+            <p>No animals found matching your filters.</p>
+          </div>
+        </Card> :
+      isMobile ?
+      // Mobile: a single-column virtualized card list (the table needs
+      // horizontal scroll on narrow screens).
+      <VirtualizedGrid
+        items={sortedAnimals}
+        columns={1}
+        gap={12}
+        estimateRowHeight={172}
+        getKey={(a) => a.id}
+        renderItem={(a) => renderAnimalCard(a)} /> :
+
+
+      // Desktop: virtualized table.
       <Card className="overflow-hidden">
-        <div
-          ref={tableRows.scrollRef}
+          <div
+          ref={rows.scrollRef}
           className="overflow-auto"
           style={{ maxHeight: '70vh' }}>
-          <table className="w-full text-left border-collapse">
-            <thead className="sticky top-0 z-10">
-              <tr className="border-b border-border bg-background text-sm font-medium text-text-secondary">
-                <SortableHeader label="Animal" sortKey="name" sort={sort} onSort={onSort} />
-                <SortableHeader label="Status" sortKey="status" sort={sort} onSort={onSort} />
-                <SortableHeader label="Age & Sex" sortKey="age" sort={sort} onSort={onSort} />
-                <SortableHeader label="Current Foster" sortKey="foster" sort={sort} onSort={onSort} />
-                <SortableHeader label="Next Medical" sortKey="medical" sort={sort} onSort={onSort} />
-              </tr>
-            </thead>
-            <tbody>
-              {animalsLoading && animals.length === 0 ?
-              <tr>
-                  <td
+
+            <table className="w-full text-left border-collapse">
+              <thead className="sticky top-0 z-10">
+                <tr className="border-b border-border bg-background text-sm font-medium text-text-secondary">
+                  <SortableHeader label="Animal" sortKey="name" sort={sort} onSort={onSort} />
+                  <SortableHeader label="Status" sortKey="status" sort={sort} onSort={onSort} />
+                  <SortableHeader label="Age & Sex" sortKey="age" sort={sort} onSort={onSort} />
+                  <SortableHeader label="Current Foster" sortKey="foster" sort={sort} onSort={onSort} />
+                  <SortableHeader label="Next Medical" sortKey="medical" sort={sort} onSort={onSort} />
+                </tr>
+              </thead>
+              <tbody>
+                {rows.paddingTop > 0 &&
+              <tr aria-hidden="true">
+                    <td
                   colSpan={5}
-                  className="py-12 text-center text-text-secondary">
+                  style={{ height: rows.paddingTop, padding: 0, border: 0 }} />
 
-                    <div className="flex flex-col items-center gap-3">
-                      <PawPrintGlyph className="w-10 h-10 text-text-secondary/30 animate-pulse" />
-                      <p>Loading animals…</p>
-                    </div>
-                  </td>
-                </tr> :
-              sortedAnimals.length === 0 ?
-              <tr>
-                  <td
-                  colSpan={5}
-                  className="py-12 text-center text-text-secondary">
-
-                    <div className="flex flex-col items-center gap-3">
-                      <PawPrintGlyph className="w-10 h-10 text-text-secondary/30" />
-                      <p>No animals found matching your filters.</p>
-                    </div>
-                  </td>
-                </tr> :
-
-              <>
-                  {tableRows.paddingTop > 0 &&
-                <tr aria-hidden="true">
-                      <td
-                    colSpan={5}
-                    style={{ height: tableRows.paddingTop, padding: 0, border: 0 }} />
-
-                    </tr>
-                }
-                  {tableRows.virtualRows.map((vr) => {
-                  const animal = sortedAnimals[vr.index];
-                  const foster = getActiveFoster(animal.id);
-                  const nextMedical = getNextMedical(animal.id);
-                  const bonded = isBondedPair(animal.id);
-                  return (
-                    <tr
-                      key={animal.id}
-                      className="border-b border-border hover:bg-background/60 transition-colors group">
+                  </tr>
+              }
+                {rows.virtualRows.map((vr) => {
+                const animal = sortedAnimals[vr.index];
+                const foster = getActiveFoster(animal.id);
+                const nextMedical = getNextMedical(animal.id);
+                const bonded = isBondedPair(animal.id);
+                return (
+                  <tr
+                    key={animal.id}
+                    className="border-b border-border hover:bg-background/60 transition-colors group">
 
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-4">
                           <Link
                           to={`/animals/${animal.id}`}
                           className="relative shrink-0">
-                          
+
                             <Avatar
                             src={animal.primary_photo_url}
                             type="animal"
                             species={animal.species} />
-                          
+
                             <div className="absolute -bottom-1 -right-1 ring-2 ring-card rounded-full">
                               <SpeciesBadge species={animal.species} />
                             </div>
@@ -660,14 +823,14 @@ export function AnimalsList() {
                           <span
                             className="inline-flex items-center gap-1.5 mt-0.5 text-[12.5px] font-medium text-[#6B5B8C]"
                             title="This animal is part of a bonded pair">
-                            
+
                                 <svg
                               xmlns="http://www.w3.org/2000/svg"
                               viewBox="0 0 24 24"
                               className="w-3.5 h-3.5"
                               fill="currentColor"
                               aria-hidden="true">
-                              
+
                                   <path d="m20.726,18.629c.283.486.39,1.062.3,1.623l-.197,1.225c-.235,1.462-1.48,2.524-2.962,2.524h-4.867c-.552,0-1-.448-1-1s.448-1,1-1h4.867c.494,0,.909-.354.987-.841l.197-1.224c.017-.106-.002-.209-.054-.3-1.015-1.745-1.069-2.172-1.095-2.377-.14-1.106-.662-1.792-1.747-2.295-.059-.027-1.905-.963-2.604-.963-.798,0-1.256.22-1.261.222-3.025,1.781-5.918,4.108-6.257,8.849-.038.527-.477.929-.997.929-.024,0-.048,0-.072-.002-.551-.04-.966-.518-.926-1.069.409-5.711,4.11-8.589,7.29-10.458.061-.033.292-.152.673-.262v-.209c0-1.256.772-2.495,1.867-2.942.543-.222,1.133.221,1.133.807v2.405c.726.237,1.996.878,1.996.878,1.693.784,2.666,2.083,2.891,3.858h0s.107.364.839,1.622Zm.774-12.629h-.227c-.829,0-1.609-.365-2.14-1.002l-.229-.275c-.912-1.094-2.251-1.722-3.676-1.722h-1.227V.865c0-.586-.59-1.029-1.133-.807-1.095.447-1.867,1.686-1.867,2.942v.706l-2.57,3.998c-.924,1.438-2.497,2.296-4.206,2.296H1c-.552,0-1,.448-1,1s.448,1,1,1h3.224c2.393,0,4.595-1.202,5.889-3.215l2.433-3.785h2.681c.829,0,1.609.365,2.14,1.002l.229.275c.912,1.094,2.251,1.722,3.676,1.722h.227c.276,0,.5.224.5.5v.5c0,1.068-.575,2.064-1.5,2.599-.478.276-.642.888-.365,1.366.186.321.521.5.867.5.17,0,.342-.043.5-.134,1.542-.892,2.5-2.551,2.5-4.331v-.5c0-1.378-1.122-2.5-2.5-2.5Z" />
                                 </svg>
                                 Bonded Pair
@@ -683,11 +846,11 @@ export function AnimalsList() {
                         <div className="flex flex-col items-start gap-1">
                           <StatusBadge status={animal.status} />
                           {pendingAdoptionAnimalIds.has(animal.id) &&
-                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#B4641E]">
-                              <StarIcon className="w-3 h-3 fill-[#B4641E]" />
-                              Pending Adoption
-                            </span>
-                          }
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#B4641E]">
+                                <StarIcon className="w-3 h-3 fill-[#B4641E]" />
+                                Pending Adoption
+                              </span>
+                        }
                         </div>
                       </td>
                       <td className="py-4 px-6">
@@ -703,7 +866,7 @@ export function AnimalsList() {
                       <Link
                         to={`/fosters/${foster.id}`}
                         className="text-sm text-primary hover:underline">
-                        
+
                             {foster.first_name} {foster.last_name}
                           </Link> :
 
@@ -728,21 +891,20 @@ export function AnimalsList() {
                       </td>
                     </tr>);
 
-                })}
-                  {tableRows.paddingBottom > 0 &&
-                <tr aria-hidden="true">
-                      <td
-                    colSpan={5}
-                    style={{ height: tableRows.paddingBottom, padding: 0, border: 0 }} />
+              })}
+                {rows.paddingBottom > 0 &&
+              <tr aria-hidden="true">
+                    <td
+                  colSpan={5}
+                  style={{ height: rows.paddingBottom, padding: 0, border: 0 }} />
 
-                    </tr>
-                }
-                </>
+                  </tr>
               }
-            </tbody>
-          </table>
-        </div>
-      </Card>
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      }
       </>
       }
 

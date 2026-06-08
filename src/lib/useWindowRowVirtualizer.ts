@@ -23,5 +23,15 @@ export function useWindowRowVirtualizer(count: number, rowHeight: number) {
   total - virtualRows[virtualRows.length - 1].end :
   0;
 
-  return { scrollRef, virtualRows, paddingTop, paddingBottom };
+  // `measureElement` lets a caller opt into dynamic row measurement for
+  // variable-height items (e.g. mobile cards): attach it as a `ref` along with
+  // `data-index={vr.index}` and the virtualizer re-measures actual heights
+  // instead of trusting the fixed `rowHeight` estimate.
+  return {
+    scrollRef,
+    virtualRows,
+    paddingTop,
+    paddingBottom,
+    measureElement: virtualizer.measureElement
+  };
 }

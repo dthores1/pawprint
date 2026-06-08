@@ -11,6 +11,8 @@ interface MultiFilterDropdownProps {
   options: FilterOption[];
   onChange: (values: string[]) => void;
   className?: string;
+  /** Extra classes merged into the trigger button (e.g. full-width on mobile). */
+  triggerClassName?: string;
   align?: 'left' | 'right';
   /** Text shown in the trigger when nothing is selected. */
   allLabel?: string;
@@ -25,6 +27,7 @@ export function MultiFilterDropdown({
   options,
   onChange,
   className,
+  triggerClassName,
   align = 'left',
   allLabel = 'All'
 }: MultiFilterDropdownProps) {
@@ -67,16 +70,19 @@ export function MultiFilterDropdown({
           'inline-flex items-center gap-2 h-9 px-3 rounded-lg text-sm font-medium border transition-colors',
           isActive ?
           'bg-primary/10 text-primary border-primary/30' :
-          'bg-card text-text-primary border-border hover:bg-background'
+          'bg-card text-text-primary border-border hover:bg-background',
+          triggerClassName
         )}>
 
-        <span className="text-text-secondary font-normal">{label}:</span>
-        <span className="flex items-center gap-1.5">
-          {single?.icon}
-          {summary}
+        <span className="flex items-center gap-2 min-w-0">
+          <span className="text-text-secondary font-normal">{label}:</span>
+          <span className="flex items-center gap-1.5 truncate">
+            {single?.icon}
+            {summary}
+          </span>
         </span>
         <ChevronDownIcon
-          className={cn('w-3.5 h-3.5 transition-transform', open && 'rotate-180')} />
+          className={cn('w-3.5 h-3.5 shrink-0 transition-transform', open && 'rotate-180')} />
 
       </button>
 
