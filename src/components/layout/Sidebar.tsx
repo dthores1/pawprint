@@ -4,10 +4,8 @@ import {
   PawPrintIcon,
   HomeIcon,
   UsersIcon,
-  PackageOpenIcon,
-  TruckIcon,
-  HeartHandshakeIcon,
-  HospitalIcon,
+  StethoscopeIcon,
+  InboxIcon,
   BuildingIcon,
   BarChart3Icon,
   Trash2Icon,
@@ -38,24 +36,14 @@ export const navItems = [
   label: 'Foster Parents'
 },
 {
-  to: '/clinics',
-  icon: HospitalIcon,
-  label: 'Clinics'
+  to: '/medical',
+  icon: StethoscopeIcon,
+  label: 'Medical'
 },
 {
-  to: '/transports',
-  icon: TruckIcon,
-  label: 'Transport Requests'
-},
-{
-  to: '/sitting',
-  icon: HeartHandshakeIcon,
-  label: 'Sitting Requests'
-},
-{
-  to: '/supplies',
-  icon: PackageOpenIcon,
-  label: 'Supply Requests'
+  to: '/requests',
+  icon: InboxIcon,
+  label: 'Requests'
 },
 {
   to: '/contacts',

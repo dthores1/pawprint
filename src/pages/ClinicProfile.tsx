@@ -129,7 +129,7 @@ export function ClinicProfile() {
   if (!event) {
     return (
       <div className="p-8 text-center text-text-secondary">
-        Clinic not found. <Link to="/clinics" className="text-primary">Back to Clinics</Link>
+        Clinic not found. <Link to="/medical" className="text-primary">Back to Clinics</Link>
       </div>);
 
   }
@@ -209,7 +209,7 @@ export function ClinicProfile() {
     <div className="space-y-6 pb-12">
       <div className="flex items-center justify-between gap-3">
         <Link
-          to="/clinics"
+          to="/medical"
           className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-text-primary transition-colors">
 
           <ArrowLeftIcon className="w-4 h-4" /> Back to Clinics
@@ -552,7 +552,7 @@ export function ClinicProfile() {
         id={event.id}
         typeLabel="clinic"
         entityLabel={`${formatDate(event.date_time)} clinic`}
-        onArchived={() => navigate('/clinics')} />
+        onArchived={() => navigate("/medical")} />
 
       }
       {archivingSlot &&

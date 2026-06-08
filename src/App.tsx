@@ -13,11 +13,9 @@ import { FostersList } from './pages/FostersList';
 import { FosterProfile } from './pages/FosterProfile';
 import { Contacts } from './pages/Contacts';
 import { ContactProfile } from './pages/ContactProfile';
-import { SupplyRequests } from './pages/SupplyRequests';
+import { Requests } from './pages/Requests';
 import { ProductCatalog } from './pages/ProductCatalog';
-import { Transports } from './pages/Transports';
-import { Sitting } from './pages/Sitting';
-import { Clinics } from './pages/Clinics';
+import { Medical } from './pages/Medical';
 import { ClinicProfile } from './pages/ClinicProfile';
 import { Login } from './pages/Login';
 import { NoOrganizationScreen } from './pages/Onboarding';
@@ -64,12 +62,20 @@ function AppRoutes() {
         <Route path="litters/:id" element={<LitterProfile />} />
         <Route path="fosters" element={<FostersList />} />
         <Route path="fosters/:id" element={<FosterProfile />} />
-        <Route path="supplies" element={<SupplyRequests />} />
+        <Route path="requests" element={<Requests />} />
         <Route path="supplies/catalog" element={<ProductCatalog />} />
-        <Route path="transports" element={<Transports />} />
-        <Route path="sitting" element={<Sitting />} />
-        <Route path="clinics" element={<Clinics />} />
+        <Route path="medical" element={<Medical />} />
         <Route path="clinics/:id" element={<ClinicProfile />} />
+        {/* Legacy paths — redirect to the consolidated Medical / Requests
+            pages so old links and bookmarks keep working. */}
+        <Route path="clinics" element={<Navigate to="/medical" replace />} />
+        <Route path="supplies" element={<Navigate to="/requests" replace />} />
+        <Route
+          path="transports"
+          element={<Navigate to="/requests?tab=transport" replace />} />
+        <Route
+          path="sitting"
+          element={<Navigate to="/requests?tab=sitting" replace />} />
         <Route path="contacts" element={<Contacts />} />
         <Route path="contacts/:id" element={<ContactProfile />} />
         <Route path="organization" element={<OrganizationPage />} />

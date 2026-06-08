@@ -360,7 +360,7 @@ export function Dashboard() {
                 Clinics
               </h2>
               <Link
-                to="/clinics"
+                to="/medical"
                 className="text-sm font-medium text-primary hover:underline">
 
                 View all
@@ -401,7 +401,7 @@ export function Dashboard() {
                   return (
                     <Link
                       key={e.id}
-                      to="/clinics"
+                      to="/medical"
                       className="block p-4 hover:bg-background transition-colors">
 
                         <div className="flex items-start justify-between gap-3 mb-2">
@@ -571,7 +571,7 @@ export function Dashboard() {
                 Supply Requests
               </h2>
               <Link
-                to="/supplies"
+                to="/requests"
                 className="text-sm font-medium text-primary hover:underline">
 
                 View all
@@ -580,7 +580,7 @@ export function Dashboard() {
             <Card className="p-4">
               <div className="space-y-3">
                 <Link
-                  to="/supplies?filter=urgent"
+                  to="/requests"
                   className="flex items-center justify-between p-3 rounded-lg bg-background hover:bg-background/80 transition-colors group">
 
                   <div className="flex items-center gap-3">
@@ -594,7 +594,7 @@ export function Dashboard() {
                   </span>
                 </Link>
                 <Link
-                  to="/supplies?filter=pending"
+                  to="/requests"
                   className="flex items-center justify-between p-3 rounded-lg bg-background hover:bg-background/80 transition-colors group">
 
                   <div className="flex items-center gap-3">
@@ -608,7 +608,7 @@ export function Dashboard() {
                   </span>
                 </Link>
                 <Link
-                  to="/supplies?filter=delivery"
+                  to="/requests"
                   className="flex items-center justify-between p-3 rounded-lg bg-background hover:bg-background/80 transition-colors group">
 
                   <div className="flex items-center gap-3">
@@ -633,7 +633,7 @@ export function Dashboard() {
                 Sitting Requests
               </h2>
               <Link
-                to="/sitting"
+                to="/requests?tab=sitting"
                 className="text-sm font-medium text-primary hover:underline">
 
                 View all
@@ -678,7 +678,7 @@ export function Dashboard() {
                   return (
                     <Link
                       key={s.id}
-                      to="/sitting"
+                      to="/requests?tab=sitting"
                       className="flex items-center gap-3 p-4 hover:bg-background transition-colors">
 
                         <Avatar

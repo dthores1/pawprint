@@ -1,28 +1,27 @@
-import React, { useState } from 'react';
-import { useWhisker } from '../context/WhiskerContext';
-import { Card } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
-import { NewTransportRequestModal } from '../components/transports/NewTransportRequestModal';
+import { useState } from 'react';
+import { useWhisker } from '../../context/WhiskerContext';
+import { Card } from '../ui/Card';
+import { Button } from '../ui/Button';
+import { NewTransportRequestModal } from '../transports/NewTransportRequestModal';
 import {
   TruckIcon,
-  PlusIcon,
   ArrowRightIcon,
   AlertCircleIcon,
   MapPinIcon,
   PencilIcon,
   Trash2Icon } from
 'lucide-react';
-import { AddressDisplay } from '../components/ui/AddressDisplay';
-import { cn } from '../lib/utils';
-import { useAuth } from '../context/AuthContext';
+import { AddressDisplay } from '../ui/AddressDisplay';
+import { cn } from '../../lib/utils';
+import { useAuth } from '../../context/AuthContext';
 import {
   TransportRequest,
   TransportRequestStatus,
   TransportRequestType,
   TransportRequestUrgency } from
-'../types';
-import { ArchiveConfirmDialog } from '../components/archive/ArchiveConfirmDialog';
-import { useCanArchive } from '../components/archive/useCanArchive';
+'../../types';
+import { ArchiveConfirmDialog } from '../archive/ArchiveConfirmDialog';
+import { useCanArchive } from '../archive/useCanArchive';
 
 const TRANSPORT_ARCHIVABLE: TransportRequestStatus[] = ['completed', 'cancelled'];
 
@@ -73,7 +72,7 @@ function formatPickupTime(iso: string): string {
   return `${d.toLocaleString('en-US', { month: 'short', day: 'numeric' })} · ${time}`;
 }
 
-export function Transports() {
+export function TransportsView() {
   const {
     transportRequests,
     peopleIndex: people,
@@ -82,7 +81,6 @@ export function Transports() {
     updateTransportRequest
   } = useWhisker();
   const { currentPersonId } = useAuth();
-  const [isNewOpen, setIsNewOpen] = useState(false);
   const [editing, setEditing] = useState<TransportRequest | null>(null);
   const [activeTab, setActiveTab] = useState<
     'open' | 'claimed' | 'completed'>(
@@ -125,23 +123,7 @@ export function Transports() {
   const display = grouped[activeTab];
 
   return (
-    <div className="space-y-6 pb-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-heading font-bold text-text-primary flex items-center gap-3">
-            <TruckIcon className="w-8 h-8 text-primary" />
-            Transportation Requests
-          </h1>
-          <p className="text-text-secondary mt-1">
-            Help move animals and supplies where they need to go.
-          </p>
-        </div>
-        <Button onClick={() => setIsNewOpen(true)} className="gap-2">
-          <PlusIcon className="w-4 h-4" />
-          New Transport Request
-        </Button>
-      </div>
-
+    <div className="space-y-6">
       <div className="flex gap-2 border-b border-border">
         {(
         [
@@ -233,10 +215,6 @@ export function Transports() {
         )}
         </div>
       }
-
-      <NewTransportRequestModal
-        isOpen={isNewOpen}
-        onClose={() => setIsNewOpen(false)} />
 
       {editing &&
       <NewTransportRequestModal

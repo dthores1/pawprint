@@ -1,23 +1,20 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useWhisker } from '../context/WhiskerContext';
-import { Card } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
-import { Avatar } from '../components/ui/Avatar';
-import { SupplyRequestDetailModal } from '../components/supplies/SupplyRequestDetailModal';
-import { NewSupplyRequestModal } from '../components/supplies/NewSupplyRequestModal';
+import { useState } from 'react';
+import { useWhisker } from '../../context/WhiskerContext';
+import { Card } from '../ui/Card';
+import { Button } from '../ui/Button';
+import { Avatar } from '../ui/Avatar';
+import { SupplyRequestDetailModal } from '../supplies/SupplyRequestDetailModal';
 import {
   PackageOpenIcon,
-  PlusIcon,
   AlertCircleIcon,
   RepeatIcon,
   Trash2Icon,
   BookmarkIcon,
   PackageIcon } from
 'lucide-react';
-import { formatDate, cn, animalDisplayName } from '../lib/utils';
-import { useAuth } from '../context/AuthContext';
-import { SupplyRequest, SupplyRequestStatus } from '../types';
+import { formatDate, cn, animalDisplayName } from '../../lib/utils';
+import { useAuth } from '../../context/AuthContext';
+import { SupplyRequest, SupplyRequestStatus } from '../../types';
 import { motion } from 'framer-motion';
 const STATUS_LABELS: Record<SupplyRequestStatus, string> = {
   submitted: 'Submitted',
@@ -33,7 +30,7 @@ const STATUS_COLORS: Record<SupplyRequestStatus, string> = {
   cancelled: 'bg-[#F5D7D7] text-[#9B3A3A]',
   denied: 'bg-[#F5D7D7] text-[#9B3A3A]'
 };
-export function SupplyRequests() {
+export function SupplyRequestsView() {
   const {
     supplyRequests,
     peopleIndex: people,
@@ -45,7 +42,6 @@ export function SupplyRequests() {
     updateSupplyRequest
   } = useWhisker();
   const { currentPersonId } = useAuth();
-  const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(
     null
   );
@@ -153,31 +149,7 @@ export function SupplyRequests() {
     }
   };
   return (
-    <div className="space-y-6 pb-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-heading font-bold text-text-primary flex items-center gap-3">
-            <PackageOpenIcon className="w-8 h-8 text-[#D98C5F]" />
-            Supply Requests
-          </h1>
-          <p className="text-text-secondary mt-1">
-            Keep fosters stocked and animals cared for.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Link to="/supplies/catalog">
-            <Button variant="soft" className="gap-2">
-              <PackageIcon className="w-4 h-4" />
-              Manage Product Options
-            </Button>
-          </Link>
-          <Button onClick={() => setIsNewModalOpen(true)} className="gap-2">
-            <PlusIcon className="w-4 h-4" />
-            Request Supplies
-          </Button>
-        </div>
-      </div>
-
+    <div className="space-y-6">
       <div className="flex gap-2 border-b border-border">
         <button
           onClick={() => setActiveTab('active')}
@@ -187,7 +159,7 @@ export function SupplyRequests() {
             'border-primary text-primary' :
             'border-transparent text-text-secondary hover:text-text-primary'
           )}>
-          
+
           Active Requests ({activeRequests.length})
         </button>
         <button
@@ -322,7 +294,7 @@ export function SupplyRequests() {
               transition={{
                 duration: 0.2
               }}>
-              
+
                 <Card
                 className={cn(
                   'p-5 hover:border-primary/30 transition-colors cursor-pointer group',
@@ -334,7 +306,7 @@ export function SupplyRequests() {
                   ''
                 )}
                 onClick={() => setSelectedRequestId(request.id)}>
-                
+
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex items-center gap-6 flex-1">
                       {/* Requester */}
@@ -349,7 +321,7 @@ export function SupplyRequests() {
                         }
                         tone="peach"
                         className="w-12 h-12 text-[15px]" />
-                      
+
                         <p className="font-medium text-text-primary group-hover:text-primary transition-colors">
                           {requester?.first_name} {requester?.last_name}
                         </p>
@@ -365,7 +337,7 @@ export function SupplyRequests() {
                           name={animal.name ?? undefined}
                           species={animal.species}
                           className="w-12 h-12 text-[15px]" />
-                        
+
                             <p className="font-medium text-text-primary">
                               {animalDisplayName(animal)}
                             </p>
@@ -401,7 +373,7 @@ export function SupplyRequests() {
                           'px-2.5 py-1 rounded-full text-xs font-medium',
                           STATUS_COLORS[request.status]
                         )}>
-                        
+
                           {STATUS_LABELS[request.status]}
                         </span>
                         {request.priority !== 'normal' &&
@@ -423,16 +395,11 @@ export function SupplyRequests() {
         </div>
       }
 
-      <NewSupplyRequestModal
-        isOpen={isNewModalOpen}
-        onClose={() => setIsNewModalOpen(false)} />
-      
-
       <SupplyRequestDetailModal
         isOpen={!!selectedRequestId}
         onClose={() => setSelectedRequestId(null)}
         requestId={selectedRequestId} />
-      
+
     </div>);
 
 }
