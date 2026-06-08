@@ -40,6 +40,8 @@ import { motion } from 'framer-motion';
 import { useWindowRowVirtualizer } from '../lib/useWindowRowVirtualizer';
 import { useIsMobile } from '../lib/useIsMobile';
 import { VirtualizedGrid } from '../components/ui/VirtualizedGrid';
+import { ExportButton } from '../components/ui/ExportButton';
+import { CsvColumn } from '../lib/csv';
 import { Animal, Person, AnimalStatus } from '../types';
 import { PawPrintIcon as PawPrintGlyph } from '../components/ui/PawPrintIcon';
 import { STATUS_LABELS, IN_CARE_STATUSES } from '../lib/animalStatus';
@@ -76,6 +78,7 @@ const STATUS_ORDER = Object.keys(STATUS_LABELS) as AnimalStatus[];
 export function AnimalsList() {
   const {
     animals,
+    animalsIndex,
     animalsLoading,
     ensureHistoricalLoaded,
     historicalLoaded,
@@ -516,6 +519,31 @@ export function AnimalsList() {
   // tailwind-merge, so a plain `h-12` wouldn't reliably win).
   const filterTriggerClass =
   'w-full md:w-auto !h-12 md:!h-9 text-base md:text-sm justify-between md:justify-start';
+
+  // CSV export columns for the current animals view (resolvers already in scope).
+  const animalCsvColumns: CsvColumn<Animal>[] = [
+  { header: 'Name', value: (a) => animalDisplayName(a) },
+  { header: 'Rescue ID', value: (a) => a.rescue_id },
+  { header: 'Species', value: (a) => a.species },
+  { header: 'Breed', value: (a) => animalBreedLabel(a, breeds) },
+  { header: 'Sex', value: (a) => a.sex },
+  { header: 'Date of Birth', value: (a) => a.estimated_birth_date },
+  { header: 'Age', value: (a) => calculateAge(a.estimated_birth_date) },
+  { header: 'Status', value: (a) => STATUS_LABELS[a.status] },
+  { header: 'Microchip', value: (a) => a.microchip_number },
+  {
+    header: 'Current Foster',
+    value: (a) => {
+      const f = fosterByAnimal.get(a.id);
+      return f ? `${f.first_name} ${f.last_name}` : '';
+    }
+  },
+  { header: 'Intake Date', value: (a) => a.intake_date },
+  { header: 'Intake Source', value: (a) => a.intake_source },
+  { header: 'On Hold', value: (a) => !!a.is_on_hold },
+  { header: 'Behavior Concern', value: (a) => !!a.has_behavior_concern },
+  { header: 'Medical Concern', value: (a) => !!a.has_medical_concern },
+  { header: 'Created At', value: (a) => a.created_at }];
   return (
     <div className="space-y-5 pb-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -527,10 +555,24 @@ export function AnimalsList() {
             Track animals from intake through adoption.
           </p>
         </div>
-        <Button onClick={() => setIsAddModalOpen(true)} className="gap-2">
-          <PlusIcon className="w-4 h-4" />
-          {view === 'litters' ? 'Add Litter' : 'Add Animal'}
-        </Button>
+        <div className="flex items-center gap-2">
+          {view === 'animals' &&
+          <ExportButton
+            entityLabel="Animals"
+            noun="animals"
+            filenameBase="animals"
+            columns={animalCsvColumns}
+            current={sortedAnimals}
+            allRows={animals}
+            allCount={animalsIndex.length}
+            allComplete={historicalLoaded}
+            ensureAllLoaded={ensureHistoricalLoaded} />
+          }
+          <Button onClick={() => setIsAddModalOpen(true)} className="gap-2">
+            <PlusIcon className="w-4 h-4" />
+            {view === 'litters' ? 'Add Litter' : 'Add Animal'}
+          </Button>
+        </div>
       </div>
 
       {/* Animals | Litters tabs */}

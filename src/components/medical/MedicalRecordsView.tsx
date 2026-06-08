@@ -23,6 +23,8 @@ import {
   PROCEDURE_LABELS } from
 '../../lib/medicalOptions';
 import { IN_CARE_STATUSES } from '../../lib/animalStatus';
+import { ExportButton } from '../ui/ExportButton';
+import { CsvColumn } from '../../lib/csv';
 import { MedicalRecord, MedicalStatus } from '../../types';
 
 // Stable string[] of in-care statuses for membership checks (module scope so
@@ -152,6 +154,25 @@ export function MedicalRecordsView() {
   };
   const hasFilters = typeFilter.length > 0 || statusFilter.length > 0;
 
+  // CSV export columns for the current records view (animal resolved via index).
+  const recordCsvColumns: CsvColumn<MedicalRecord>[] = [
+  { header: 'Animal', value: (r) => {
+      const a = animalById.get(r.animal_id);
+      return a ? animalDisplayName(a) : '';
+    } },
+  { header: 'Rescue ID', value: (r) => animalById.get(r.animal_id)?.rescue_id },
+  { header: 'Type', value: (r) => PROCEDURE_TYPE_LABELS[r.procedure_type] || r.procedure_type },
+  { header: 'Subtype', value: (r) => {
+      const s = subtypeLabel(r);
+      return s === '—' ? '' : s;
+    } },
+  { header: 'Date Performed', value: (r) => r.performed_date },
+  { header: 'Due Date', value: (r) => r.due_date },
+  { header: 'Status', value: (r) => (STATUS_TONE[r.status] || STATUS_TONE.cancelled).label },
+  { header: 'Provider', value: (r) => r.provider_name },
+  { header: 'Facility', value: (r) => r.facility_name },
+  { header: 'Notes', value: (r) => r.notes }];
+
   return (
     <div className="space-y-5">
       {/* Search — dominant, full width */}
@@ -211,7 +232,16 @@ export function MedicalRecordsView() {
         </label>
       </div>
 
-      <div className="flex justify-end -mt-2">
+      <div className="flex items-center justify-between gap-3 -mt-1">
+        <ExportButton
+          entityLabel="Medical Records"
+          noun="medical records"
+          filenameBase="medical-records"
+          columns={recordCsvColumns}
+          current={sorted}
+          allRows={medicalRecords}
+          allCount={medicalRecords.length}
+          triggerClassName="h-9 text-sm px-3" />
         <span className="text-xs text-text-secondary">
           {sorted.length} {sorted.length === 1 ? 'record' : 'records'}
         </span>

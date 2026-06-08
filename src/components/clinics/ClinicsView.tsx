@@ -4,6 +4,8 @@ import { useWhisker } from '../../context/WhiskerContext';
 import { Card } from '../ui/Card';
 import { StethoscopeIcon, MapPinIcon, UserIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { ExportButton } from '../ui/ExportButton';
+import { CsvColumn } from '../../lib/csv';
 import { ClinicEvent, ClinicEventStatus } from '../../types';
 
 const EVENT_STATUS_LABEL: Record<ClinicEventStatus, string> = {
@@ -47,31 +49,71 @@ export function ClinicsView() {
 
   const display = tab === 'upcoming' ? upcoming : past;
 
+  const filledFor = (e: ClinicEvent) =>
+  clinicSlots.filter(
+    (s) => s.clinic_event_id === e.id && s.status !== 'cancelled'
+  ).length;
+  const vetNameFor = (e: ClinicEvent) => {
+    const v = e.veterinarian_person_id ?
+    people.find((p) => p.id === e.veterinarian_person_id) :
+    undefined;
+    return v ? `${v.first_name} ${v.last_name}` : '';
+  };
+
+  // CSV export columns for the current (Upcoming/Past) clinics view.
+  const clinicCsvColumns: CsvColumn<ClinicEvent>[] = [
+  { header: 'Date', value: (e) =>
+      new Date(e.date_time).toLocaleDateString('en-US', {
+        year: 'numeric', month: 'short', day: 'numeric'
+      }) },
+  { header: 'Time', value: (e) =>
+      new Date(e.date_time).toLocaleTimeString('en-US', {
+        hour: 'numeric', minute: '2-digit'
+      }) },
+  { header: 'Location', value: (e) => e.location },
+  { header: 'Address', value: (e) => e.location_address },
+  { header: 'Veterinarian', value: (e) => vetNameFor(e) },
+  { header: 'Status', value: (e) => EVENT_STATUS_LABEL[e.status] },
+  { header: 'Slots Filled', value: (e) => filledFor(e) },
+  { header: 'Slot Capacity', value: (e) => e.slot_capacity },
+  { header: 'Notes', value: (e) => e.notes }];
+
   return (
     <div className="space-y-6">
-      <div className="flex gap-2 border-b border-border">
-        <button
-          onClick={() => setTab('upcoming')}
-          className={cn(
-            'px-4 py-3 text-sm font-semibold border-b-2 transition-colors',
-            tab === 'upcoming' ?
-            'border-primary text-primary' :
-            'border-transparent text-text-secondary hover:text-text-primary'
-          )}>
+      <div className="flex items-center justify-between gap-2 border-b border-border">
+        <div className="flex gap-2">
+          <button
+            onClick={() => setTab('upcoming')}
+            className={cn(
+              'px-4 py-3 text-sm font-semibold border-b-2 transition-colors',
+              tab === 'upcoming' ?
+              'border-primary text-primary' :
+              'border-transparent text-text-secondary hover:text-text-primary'
+            )}>
 
-          Upcoming ({upcoming.length})
-        </button>
-        <button
-          onClick={() => setTab('past')}
-          className={cn(
-            'px-4 py-3 text-sm font-semibold border-b-2 transition-colors',
-            tab === 'past' ?
-            'border-primary text-primary' :
-            'border-transparent text-text-secondary hover:text-text-primary'
-          )}>
+            Upcoming ({upcoming.length})
+          </button>
+          <button
+            onClick={() => setTab('past')}
+            className={cn(
+              'px-4 py-3 text-sm font-semibold border-b-2 transition-colors',
+              tab === 'past' ?
+              'border-primary text-primary' :
+              'border-transparent text-text-secondary hover:text-text-primary'
+            )}>
 
-          Past ({past.length})
-        </button>
+            Past ({past.length})
+          </button>
+        </div>
+        <ExportButton
+          entityLabel="Clinics"
+          noun="clinics"
+          filenameBase="clinics"
+          columns={clinicCsvColumns}
+          current={display}
+          allRows={clinicEvents}
+          allCount={clinicEvents.length}
+          triggerClassName="h-9 text-sm px-3 mb-1" />
       </div>
 
       {display.length === 0 ?

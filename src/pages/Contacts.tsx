@@ -28,6 +28,8 @@ import {
 'lucide-react';
 import { Person, PersonRole } from '../types';
 import { cn } from '../lib/utils';
+import { ExportButton } from '../components/ui/ExportButton';
+import { CsvColumn } from '../lib/csv';
 
 const ACTIVE_BADGE = {
   active: {
@@ -40,7 +42,7 @@ const ACTIVE_BADGE = {
   }
 };
 export function Contacts() {
-  const { people, peopleLoading, ensureInactiveLoaded, inactiveLoaded } =
+  const { people, peopleIndex, peopleLoading, ensureInactiveLoaded, inactiveLoaded } =
   useWhisker();
   const [searchParams] = useSearchParams();
   // Allow deep-linking to a contact, e.g. /contacts?q=Jane Doe (used by the
@@ -104,6 +106,22 @@ export function Contacts() {
   // Virtualized table rows in a self-scrolling container. ~73px per row.
   const tableRows = useWindowRowVirtualizer(sortedPeople.length, 73);
   const humanizeRole = (r: PersonRole) => r.replace('_', ' ');
+
+  // CSV export columns for the current contacts view.
+  const contactCsvColumns: CsvColumn<Person>[] = [
+  { header: 'First Name', value: (p) => p.first_name },
+  { header: 'Last Name', value: (p) => p.last_name },
+  { header: 'Email', value: (p) => p.email },
+  { header: 'Phone', value: (p) => p.phone },
+  { header: 'Roles', value: (p) => p.roles.join('; ') },
+  { header: 'Organization', value: (p) => p.organization_name },
+  { header: 'Address', value: (p) => p.address_formatted ?? p.address },
+  { header: 'City', value: (p) => p.address_city },
+  { header: 'State', value: (p) => p.address_state },
+  { header: 'Postal Code', value: (p) => p.address_postal_code },
+  { header: 'Active', value: (p) => p.active !== false },
+  { header: 'Notes', value: (p) => p.notes },
+  { header: 'Created At', value: (p) => p.created_at }];
   // 'volunteer' was retired as a selectable role (see CLAUDE.md) — the tab
   // filtered against a role nobody writes anymore, so it's gone too.
   const tabs: {
@@ -129,10 +147,22 @@ export function Contacts() {
             Directory of vets, staff, volunteers, and adopters.
           </p>
         </div>
-        <Button onClick={() => setIsAddOpen(true)} className="gap-2">
-          <PlusIcon className="w-4 h-4" />
-          New Contact
-        </Button>
+        <div className="flex items-center gap-2">
+          <ExportButton
+            entityLabel="Contacts"
+            noun="contacts"
+            filenameBase="contacts"
+            columns={contactCsvColumns}
+            current={sortedPeople}
+            allRows={people.filter((p) => !p.user_id)}
+            allCount={peopleIndex.filter((p) => !p.user_id).length}
+            allComplete={inactiveLoaded}
+            ensureAllLoaded={ensureInactiveLoaded} />
+          <Button onClick={() => setIsAddOpen(true)} className="gap-2">
+            <PlusIcon className="w-4 h-4" />
+            New Contact
+          </Button>
+        </div>
       </div>
 
       {/* Search — dominant, full width */}

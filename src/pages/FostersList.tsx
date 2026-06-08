@@ -28,6 +28,8 @@ import { useWindowRowVirtualizer } from '../lib/useWindowRowVirtualizer';
 import { Person } from '../types';
 import { enabledSpeciesList } from '../lib/orgCatalog';
 import { cn } from '../lib/utils';
+import { ExportButton } from '../components/ui/ExportButton';
+import { CsvColumn } from '../lib/csv';
 
 type Availability = 'available' | 'full' | 'inactive';
 const AVAILABILITY_BADGE: Record<
@@ -50,7 +52,7 @@ const AVAILABILITY_ORDER: Record<Availability, number> = {
   inactive: 2
 };
 export function FostersList() {
-  const { fosters, fostersLoading, placements, species: speciesCatalog,
+  const { fosters, peopleIndex, fostersLoading, placements, species: speciesCatalog,
     organizationSpecies, ensureInactiveLoaded, inactiveLoaded } =
   useWhisker();
   const enabledSpecies = enabledSpeciesList(speciesCatalog, organizationSpecies);
@@ -143,6 +145,25 @@ export function FostersList() {
   }, [filteredFosters, sort, activeCountByFoster]);
 
   const showSpeciesFilter = enabledSpecies.length > 1;
+
+  // CSV export columns for the current fosters view.
+  const fosterCsvColumns: CsvColumn<Person>[] = [
+  { header: 'First Name', value: (f) => f.first_name },
+  { header: 'Last Name', value: (f) => f.last_name },
+  { header: 'Email', value: (f) => f.email },
+  { header: 'Phone', value: (f) => f.phone },
+  { header: 'Roles', value: (f) => f.roles.join('; ') },
+  { header: 'Availability', value: (f) => getAvailability(f) },
+  { header: 'Active Placements', value: (f) => getActivePlacementsCount(f.id) },
+  { header: 'Max Capacity', value: (f) => f.max_capacity ?? 0 },
+  { header: 'Preferred Species', value: (f) => (f.preferred_species ?? []).join('; ') },
+  { header: 'Address', value: (f) => f.address_formatted ?? f.address },
+  { header: 'City', value: (f) => f.address_city },
+  { header: 'State', value: (f) => f.address_state },
+  { header: 'Postal Code', value: (f) => f.address_postal_code },
+  { header: 'Active', value: (f) => f.active !== false },
+  { header: 'Created At', value: (f) => f.created_at }];
+
   // Virtualized table rows in a self-scrolling container. ~73px per row.
   const tableRows = useWindowRowVirtualizer(sortedFosters.length, 73);
   return (
@@ -156,10 +177,24 @@ export function FostersList() {
             Manage foster homes and capacity.
           </p>
         </div>
-        <Button onClick={() => setIsAddModalOpen(true)} className="gap-2">
-          <PlusIcon className="w-4 h-4" />
-          Add Foster
-        </Button>
+        <div className="flex items-center gap-2">
+          <ExportButton
+            entityLabel="Foster Parents"
+            noun="foster parents"
+            filenameBase="foster-parents"
+            columns={fosterCsvColumns}
+            current={sortedFosters}
+            allRows={fosters}
+            allCount={
+            peopleIndex.filter((p) => p.roles?.includes('foster_parent')).length
+            }
+            allComplete={inactiveLoaded}
+            ensureAllLoaded={ensureInactiveLoaded} />
+          <Button onClick={() => setIsAddModalOpen(true)} className="gap-2">
+            <PlusIcon className="w-4 h-4" />
+            Add Foster
+          </Button>
+        </div>
       </div>
 
       {/* Search — dominant, full width */}
