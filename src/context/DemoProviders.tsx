@@ -824,9 +824,10 @@ export function DemoWhiskerProvider({
     c.id === id ? { ...c, ...updates, updated_at: now() } : c
     )
     ),
-    addClinicSlot: (slot, procedureTypes) => {
+    addClinicSlot: async (slot, procedureTypes) => {
       const slotId = `cs${generateId()}`;
-      setClinicSlots((prev) => [{ ...slot, id: slotId }, ...prev]);
+      const newSlot = { ...slot, id: slotId };
+      setClinicSlots((prev) => [newSlot, ...prev]);
       if (procedureTypes.length) {
         setClinicSlotProcedures((prev) => [
         ...procedureTypes.map((t) => ({
@@ -838,6 +839,7 @@ export function DemoWhiskerProvider({
         ...prev]
         );
       }
+      return newSlot;
     },
     updateClinicSlot: (id, updates) =>
     setClinicSlots((prev) =>

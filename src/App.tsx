@@ -17,6 +17,7 @@ import { Requests } from './pages/Requests';
 import { ProductCatalog } from './pages/ProductCatalog';
 import { Medical } from './pages/Medical';
 import { ClinicProfile } from './pages/ClinicProfile';
+import { ClinicCompletionPage } from './pages/ClinicCompletionPage';
 import { Login } from './pages/Login';
 import { NoOrganizationScreen } from './pages/Onboarding';
 import { AcceptInvitePage } from './pages/AcceptInvitePage';
@@ -66,6 +67,7 @@ function AppRoutes() {
         <Route path="supplies/catalog" element={<ProductCatalog />} />
         <Route path="medical" element={<Medical />} />
         <Route path="clinics/:id" element={<ClinicProfile />} />
+        <Route path="clinics/:id/complete" element={<ClinicCompletionPage />} />
         {/* Legacy paths — redirect to the consolidated Medical / Requests
             pages so old links and bookmarks keep working. */}
         <Route path="clinics" element={<Navigate to="/medical" replace />} />

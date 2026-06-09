@@ -6,7 +6,7 @@ import { Button } from '../ui/Button';
 import { Avatar } from '../ui/Avatar';
 import { StatusBadge } from '../ui/Badge';
 import { useWhisker } from '../../context/WhiskerContext';
-import { SearchIcon, XIcon, CheckIcon } from 'lucide-react';
+import { SearchIcon, XIcon, CheckIcon, AlertTriangleIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { animalDisplayName } from '../../lib/utils';
 
@@ -89,6 +89,15 @@ export function PlaceAnimalModal({
   const anchorFosterFull = anchorFoster ?
   anchorFosterActive >= (anchorFoster.max_capacity ?? 0) :
   false;
+  // Animal mode: a selected existing foster who's already at/over their stated
+  // capacity — placing another animal pushes them past it. Over-capacity
+  // placements are allowed (exceptions happen), so this is a soft, non-blocking
+  // hint, not a confirmation gate.
+  const selectedFosterOverCapacity =
+  mode === 'animal' &&
+  !!selectedFoster &&
+  selectedIsFoster &&
+  getActivePlacementsCount(selectedFoster.id) >= (selectedFoster.max_capacity ?? 0);
 
   // Foster results (animal mode): active foster parents, excluding the current
   // one. Shown first — they're the primary, expected choice.
@@ -558,6 +567,18 @@ export function PlaceAnimalModal({
               }
               </AnimatePresence>
             </div>
+          }
+
+          {/* Soft capacity warning — rendered inside the Foster Parent field
+              block (not as a form-level sibling) so it sits directly under the
+              field it refers to and isn't spaced equidistant from the next one. */}
+          {selectedFosterOverCapacity &&
+          <p className="mt-2 flex items-start gap-1.5 text-xs text-status-medical-text">
+              <AlertTriangleIcon className="w-3.5 h-3.5 shrink-0 mt-px" />
+              <span>
+                This placement will exceed the foster parent's stated capacity.
+              </span>
+            </p>
           }
         </div>
 

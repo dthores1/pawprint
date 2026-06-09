@@ -384,7 +384,7 @@ export interface WhiskerContextType {
   addClinicSlot: (
   slot: Omit<ClinicSlot, 'id'>,
   procedureTypes: ClinicSlotProcedureType[])
-  => void;
+  => Promise<ClinicSlot | undefined>;
   updateClinicSlot: (id: string, updates: Partial<ClinicSlot>) => void;
   deleteClinicSlot: (id: string) => void;
   addClinicSlotProcedure: (
@@ -2285,9 +2285,9 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   };
   const addClinicSlot = async (
   slot: Omit<ClinicSlot, 'id'>,
-  procedureTypes: ClinicSlotProcedureType[]) =>
-  {
-    if (!orgId) return;
+  procedureTypes: ClinicSlotProcedureType[])
+  : Promise<ClinicSlot | undefined> => {
+    if (!orgId) return undefined;
     const { data, error } = await supabase.
     from('clinic_slots').
     insert(clinicSlotToInsert(slot, orgId)).
@@ -2295,11 +2295,11 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     single();
     if (error || !data) {
       console.error('[clinic slot] create failed:', error?.message);
-      return;
+      return undefined;
     }
     const newSlot = rowToClinicSlot(data);
     setClinicSlots((prev) => [newSlot, ...prev]);
-    if (procedureTypes.length === 0) return;
+    if (procedureTypes.length === 0) return newSlot;
     const rows = procedureTypes.map((t) =>
     clinicSlotProcedureToInsert(
       { clinic_slot_id: newSlot.id, procedure_type: t, completed: false },
@@ -2313,7 +2313,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     if (procErr) {
       console.error('[clinic slot procedures] create failed:', procErr.message);
       loadCoordination();
-      return;
+      return newSlot;
     }
     if (procs) {
       setClinicSlotProcedures((prev) => [
@@ -2321,6 +2321,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       ...prev]
       );
     }
+    return newSlot;
   };
   const updateClinicSlot = (id: string, updates: Partial<ClinicSlot>) => {
     setClinicSlots((prev) =>

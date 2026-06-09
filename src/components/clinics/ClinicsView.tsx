@@ -1,12 +1,19 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useWhisker } from '../../context/WhiskerContext';
 import { Card } from '../ui/Card';
-import { StethoscopeIcon, MapPinIcon, UserIcon } from 'lucide-react';
+import { StethoscopeIcon, MapPinIcon, UserIcon, CheckCircle2Icon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { ExportButton } from '../ui/ExportButton';
 import { CsvColumn } from '../../lib/csv';
 import { ClinicEvent, ClinicEventStatus } from '../../types';
+
+// Any not-yet-finished clinic can be marked complete (including Planning —
+// people don't always advance the status). Empty clinics are allowed too, since
+// attendees can be added during the completion flow.
+function isCompletable(status: ClinicEventStatus): boolean {
+  return status !== 'completed' && status !== 'cancelled';
+}
 
 const EVENT_STATUS_LABEL: Record<ClinicEventStatus, string> = {
   planning: 'Planning',
@@ -26,6 +33,7 @@ const EVENT_STATUS_PILL: Record<ClinicEventStatus, string> = {
 export function ClinicsView() {
   const { clinicEvents, clinicSlots, peopleIndex: people } = useWhisker();
   const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
+  const navigate = useNavigate();
 
   const now = Date.now();
   const { upcoming, past } = useMemo(() => {
@@ -144,7 +152,8 @@ export function ClinicsView() {
               key={e.id}
               event={e}
               vetName={vet ? `${vet.first_name} ${vet.last_name}` : undefined}
-              slotsFilled={slotsForEvent.length} />);
+              slotsFilled={slotsForEvent.length}
+              onMarkComplete={() => navigate(`/clinics/${e.id}/complete`)} />);
 
 
         })}
@@ -158,12 +167,15 @@ interface ClinicEventCardProps {
   event: ClinicEvent;
   vetName?: string;
   slotsFilled: number;
+  onMarkComplete: () => void;
 }
 function ClinicEventCard({
   event,
   vetName,
-  slotsFilled
+  slotsFilled,
+  onMarkComplete
 }: ClinicEventCardProps) {
+  const completable = isCompletable(event.status);
   const date = new Date(event.date_time);
   const dayLabel = date.toLocaleString('en-US', {
     weekday: 'short',
@@ -189,14 +201,30 @@ function ClinicEventCard({
             </h3>
             <p className="text-sm text-text-secondary">{timeLabel}</p>
           </div>
-          <span
-            className={cn(
-              'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold shrink-0',
-              EVENT_STATUS_PILL[event.status]
-            )}>
+          <div className="flex flex-col items-end gap-1.5 shrink-0">
+            <span
+              className={cn(
+                'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold',
+                EVENT_STATUS_PILL[event.status]
+              )}>
 
-            {EVENT_STATUS_LABEL[event.status]}
-          </span>
+              {EVENT_STATUS_LABEL[event.status]}
+            </span>
+            {completable &&
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onMarkComplete();
+              }}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
+
+                <CheckCircle2Icon className="w-3.5 h-3.5" />
+                Mark Complete
+              </button>
+            }
+          </div>
         </div>
 
         <div className="space-y-1.5 text-sm text-text-secondary mb-3">

@@ -11,7 +11,6 @@ import { Label, Input } from '../components/ui/Forms';
 import { AnimalSearchPicker } from '../components/ui/AnimalSearchPicker';
 import { AddressDisplay } from '../components/ui/AddressDisplay';
 import { EditClinicEventModal } from '../components/clinics/EditClinicEventModal';
-import { ClinicCompletionModal } from '../components/clinics/ClinicCompletionModal';
 import {
   ClinicEventStatus,
   ClinicSlotStatus,
@@ -98,12 +97,12 @@ export function ClinicProfile() {
     updateClinicSlot,
     addClinicSlotProcedure,
     updateClinicSlotProcedure,
-    deleteClinicSlotProcedure
+    deleteClinicSlotProcedure,
+    medicalRecords
   } = useWhisker();
   const { currentPersonId } = useAuth();
 
   const [editing, setEditing] = useState(false);
-  const [completing, setCompleting] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [adding, setAdding] = useState(false);
   const [newAnimalId, setNewAnimalId] = useState('');
@@ -160,9 +159,13 @@ export function ClinicProfile() {
     (a) => !slots.some((s) => s.animal_id === a.id && s.status !== 'cancelled')
   );
 
+  // Any not-yet-finished clinic can be completed (including Planning — people
+  // don't always advance the status). Walk-ins can be added during completion.
   const canComplete =
-  (event.status === 'scheduled' || event.status === 'in_progress') &&
-  slots.length > 0;
+  event.status !== 'completed' && event.status !== 'cancelled';
+  // Once completed, the clinic is locked: no new reservations or inline slot/
+  // procedure edits. Corrections happen on the generated medical records.
+  const isCompleted = event.status === 'completed';
 
   // Clinic archives are admin-only and gated to states where it's safe to
   // remove from active workflows (planning / completed / cancelled). The
@@ -216,7 +219,7 @@ export function ClinicProfile() {
         </Link>
         <div className="flex items-center gap-2">
           {canComplete &&
-          <Button size="sm" onClick={() => setCompleting(true)}>
+          <Button size="sm" onClick={() => navigate(`/clinics/${event.id}/complete`)}>
               <CheckCircle2Icon className="w-4 h-4 mr-2" />
               Complete Clinic
             </Button>
@@ -356,7 +359,7 @@ export function ClinicProfile() {
                   {filled} of {event.slot_capacity} filled
                 </span>
               </h2>
-              {!adding && filled < event.slot_capacity &&
+              {!adding && !isCompleted && filled < event.slot_capacity &&
               <Button size="sm" variant="outline" onClick={() => setAdding(true)}>
                   <PlusIcon className="w-4 h-4 mr-1" />
                   Add Animal
@@ -469,7 +472,12 @@ export function ClinicProfile() {
                             Unknown
                           </p>
                       }
-                        <SlotProcedureChips
+                        {/* Planned procedures are editable before completion.
+                            Once completed, the created medical records (linked
+                            below) are the source of truth, so the coarse planned
+                            chips are hidden to avoid a misleading "not done" look. */}
+                        {!isCompleted &&
+                      <SlotProcedureChips
                         procedures={clinicSlotProcedures.filter(
                           (p) => p.clinic_slot_id === s.id
                         )}
@@ -480,14 +488,43 @@ export function ClinicProfile() {
                         }
                         onRemove={(proc) => deleteClinicSlotProcedure(proc.id)}
                         onAdd={(type) => addClinicSlotProcedure(s.id, type)} />
+                      }
 
                         {s.notes &&
                       <p className="text-xs text-text-secondary italic mt-1.5 truncate">
                             {s.notes}
                           </p>
                       }
+                        {(() => {
+                        if (!isCompleted || !animal) return null;
+                        const recCount = medicalRecords.filter(
+                          (m) =>
+                          m.clinic_id === event.id &&
+                          m.animal_id === s.animal_id
+                        ).length;
+                        if (recCount === 0) return null;
+                        return (
+                          <Link
+                            to={`/animals/${s.animal_id}`}
+                            className="mt-1.5 flex w-fit items-center gap-1 text-xs font-semibold text-status-adoptable-text hover:underline">
+
+                              <CheckCircle2Icon className="w-3.5 h-3.5" />
+                              {recCount} Medical Record{recCount === 1 ? '' : 's'} Created
+                            </Link>);
+
+                      })()}
                       </div>
-                      <select
+                      {isCompleted ?
+                    <span
+                      className={cn(
+                        'shrink-0 inline-flex items-center h-7 text-xs font-semibold px-2.5 rounded-full',
+                        SLOT_STATUS_PILL[s.status]
+                      )}>
+
+                          {SLOT_STATUS_LABEL[s.status]}
+                        </span> :
+
+                    <select
                       value={s.status}
                       onChange={(e) =>
                       updateClinicSlot(s.id, {
@@ -508,6 +545,7 @@ export function ClinicProfile() {
                             </option>
                       )}
                       </select>
+                    }
                       {canArchiveSlot &&
                     <button
                       type="button"
@@ -538,11 +576,6 @@ export function ClinicProfile() {
         onClose={() => setEditing(false)}
         event={event} />
 
-
-      <ClinicCompletionModal
-        isOpen={completing}
-        onClose={() => setCompleting(false)}
-        clinicEventId={event.id} />
 
       {archiving &&
       <ArchiveConfirmDialog
@@ -612,12 +645,14 @@ function SlotProcedureChips({
   procedures,
   onToggle,
   onRemove,
-  onAdd
+  onAdd,
+  readOnly = false
 }: {
   procedures: ClinicSlotProcedure[];
   onToggle: (proc: ClinicSlotProcedure) => void;
   onRemove: (proc: ClinicSlotProcedure) => void;
   onAdd: (type: ClinicSlotProcedureType) => void;
+  readOnly?: boolean;
 }) {
   const present = new Set(procedures.map((p) => p.procedure_type));
   const addable = PROCEDURE_ORDER.filter((t) => !present.has(t));
@@ -626,6 +661,34 @@ function SlotProcedureChips({
     PROCEDURE_ORDER.indexOf(a.procedure_type) -
     PROCEDURE_ORDER.indexOf(b.procedure_type)
   );
+  // Completed clinics show their procedures as static (done/not-done) chips.
+  if (readOnly) {
+    if (ordered.length === 0) {
+      return (
+        <p className="text-xs text-text-secondary italic mt-1.5">
+          No procedures recorded
+        </p>);
+
+    }
+    return (
+      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+        {ordered.map((proc) =>
+        <span
+          key={proc.id}
+          className={cn(
+            'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border',
+            proc.completed ?
+            'bg-status-adoptable-bg text-status-adoptable-text border-transparent' :
+            'bg-white text-text-secondary border-border line-through'
+          )}>
+
+            {proc.completed && <CheckIcon className="w-3 h-3" />}
+            {PROCEDURE_LABEL[proc.procedure_type]}
+          </span>
+        )}
+      </div>);
+
+  }
   return (
     <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
       {ordered.map((proc) =>

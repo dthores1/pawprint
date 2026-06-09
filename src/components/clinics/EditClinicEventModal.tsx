@@ -187,14 +187,27 @@ export function EditClinicEventModal({ isOpen, onClose, event }: Props) {
             <Select
               id="status"
               value={form.status}
+              disabled={event.status === 'completed'}
               onChange={(e) => set('status', e.target.value as ClinicEventStatus)}>
 
-              {STATUS_ORDER.map((s) =>
+              {/* "Completed" is intentionally not selectable here — completing a
+                  clinic must go through the Complete Clinic flow so the medical
+                  records get created. It's only shown when already completed. */}
+              {(event.status === 'completed' ?
+              STATUS_ORDER :
+              STATUS_ORDER.filter((s) => s !== 'completed')).
+              map((s) =>
               <option key={s} value={s}>
                   {STATUS_LABEL[s]}
                 </option>
               )}
             </Select>
+            {event.status !== 'completed' &&
+            <p className="mt-1.5 text-xs text-text-secondary">
+                To mark a clinic completed, use “Complete Clinic” — it records
+                attendance and creates the medical records.
+              </p>
+            }
           </div>
           <div>
             <Label htmlFor="location" required>Location</Label>
