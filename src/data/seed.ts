@@ -12,6 +12,7 @@ import {
   MedicalRecord,
   AnimalNote,
   AnimalRelationship,
+  AnimalExternalListing,
   AnimalPhoto,
   Person,
   PersonRole,
@@ -161,7 +162,6 @@ const SEED_ANIMALS_RAW: Animal[] = [
   description:
   'A sweet, goofy Golden Retriever mix who loves everyone. Great with kids and other dogs. Needs a yard to run in.',
   microchip_number: '981020000000001',
-  adoption_profile_url: 'https://www.petfinder.com/dog/biscuit-whiskerville-a1',
   primary_photo_url:
   'https://images.unsplash.com/photo-1552053831-71594a27632d?auto=format&fit=crop&q=80&w=800',
   created_at: '2025-10-01T10:00:00Z',
@@ -275,7 +275,6 @@ const SEED_ANIMALS_RAW: Animal[] = [
   description:
   'Trapped in Columbia City, Seattle with four of his littermates and his mother.',
   microchip_number: '981020000000007',
-  adoption_profile_url: 'https://www.petfinder.com/cat/pip-whiskerville-a7',
   primary_photo_url: '/images/animals/pip-1.jpg',
   created_at: '2025-10-20T10:00:00Z',
   updated_at: '2025-11-01T10:00:00Z'
@@ -747,6 +746,36 @@ export const seedRelationships: AnimalRelationship[] = [
   related_animal_id: 'a11',
   relationship_type: 'bonded_pair',
   notes: 'Adopt together — they get anxious when separated.'
+}];
+
+export const seedExternalListings: AnimalExternalListing[] = [
+{
+  id: 'el1',
+  animal_id: 'a1',
+  provider: 'petfinder',
+  url: 'https://www.petfinder.com/dog/biscuit-whiskerville-a1',
+  status: 'published',
+  notes: 'Bonded-pair note added to the description.',
+  created_at: '2025-11-01T10:00:00Z',
+  updated_at: '2025-11-01T10:00:00Z'
+},
+{
+  id: 'el2',
+  animal_id: 'a1',
+  provider: 'rescue_website',
+  url: 'https://alleycatproject.org/adopt/biscuit',
+  status: 'published',
+  created_at: '2025-11-02T10:00:00Z',
+  updated_at: '2025-11-02T10:00:00Z'
+},
+{
+  id: 'el3',
+  animal_id: 'a7',
+  provider: 'petfinder',
+  url: 'https://www.petfinder.com/cat/pip-whiskerville-a7',
+  status: 'published',
+  created_at: '2025-11-01T10:00:00Z',
+  updated_at: '2025-11-01T10:00:00Z'
 }];
 
 

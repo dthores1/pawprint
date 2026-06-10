@@ -25,6 +25,7 @@ import {
   AnimalNote,
   AnimalActionItem,
   AnimalRelationship,
+  AnimalExternalListing,
   AnimalPhoto,
   Person,
   Product,
@@ -94,6 +95,11 @@ import {
   rowToRelationship,
   relationshipToInsert } from
 '../lib/relationshipsApi';
+import {
+  rowToExternalListing,
+  externalListingToInsert,
+  externalListingUpdateToRow } from
+'../lib/externalListingsApi';
 import {
   rowToPerson,
   personToInsert,
@@ -172,6 +178,7 @@ export interface WhiskerContextType {
   notes: AnimalNote[];
   actionItems: AnimalActionItem[];
   relationships: AnimalRelationship[];
+  externalListings: AnimalExternalListing[];
   photos: AnimalPhoto[];
   /**
    * Heavy full rows loaded so far. Starts ACTIVE ONLY (+ self/account records);
@@ -318,6 +325,14 @@ export interface WhiskerContextType {
   deletePhoto: (id: string) => void;
   addRelationship: (rel: Omit<AnimalRelationship, 'id'>) => void;
   deleteRelationship: (id: string) => void;
+  addExternalListing: (
+  listing: Omit<AnimalExternalListing, 'id' | 'created_at' | 'updated_at'>)
+  => void;
+  updateExternalListing: (
+  id: string,
+  updates: Partial<AnimalExternalListing>)
+  => void;
+  deleteExternalListing: (id: string) => void;
   placeAnimal: (
   animal_id: string,
   person_id: string,
@@ -650,6 +665,29 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   useEffect(() => {
     loadRelationships();
   }, [loadRelationships]);
+  // External adoption listings — where each animal is posted online. No
+  // soft-delete column (hard delete), so no is_deleted filter.
+  const [externalListings, setExternalListings] = useState<
+    AnimalExternalListing[]>(
+    []);
+  const loadExternalListings = useCallback(async () => {
+    if (!orgId) {
+      setExternalListings([]);
+      return;
+    }
+    const { data, error } = await supabase.
+    from('animal_external_listings').
+    select('*').
+    eq('organization_id', orgId);
+    if (error) {
+      console.error('[external listings] load failed:', error.message);
+    } else {
+      setExternalListings((data ?? []).map(rowToExternalListing));
+    }
+  }, [orgId]);
+  useEffect(() => {
+    loadExternalListings();
+  }, [loadExternalListings]);
   // Litters — org-scoped grouping objects. Members link via animals.litter_id.
   const [litters, setLitters] = useState<Litter[]>([]);
   const [littersLoading, setLittersLoading] = useState(false);
@@ -1914,6 +1952,60 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       }
     });
   };
+  const addExternalListing = async (
+  listing: Omit<AnimalExternalListing, 'id' | 'created_at' | 'updated_at'>) =>
+  {
+    if (!orgId) {
+      console.error('[external listings] cannot create — no current organization');
+      return;
+    }
+    const { data, error } = await supabase.
+    from('animal_external_listings').
+    insert(externalListingToInsert(listing, orgId)).
+    select('*').
+    single();
+    if (error) {
+      console.error('[external listings] create failed:', error.message);
+      return;
+    }
+    if (data) {
+      setExternalListings((prev) => [rowToExternalListing(data), ...prev]);
+    }
+  };
+  const updateExternalListing = (
+  id: string,
+  updates: Partial<AnimalExternalListing>) =>
+  {
+    setExternalListings((prev) =>
+    prev.map((l) => l.id === id ? { ...l, ...updates } : l)
+    );
+    const row = externalListingUpdateToRow(updates);
+    if (Object.keys(row).length === 0) return;
+    supabase.
+    from('animal_external_listings').
+    update(row).
+    eq('id', id).
+    then(({ error }) => {
+      if (error) {
+        console.error('[external listings] update failed:', error.message);
+        loadExternalListings();
+      }
+    });
+  };
+  const deleteExternalListing = (id: string) => {
+    const prev = externalListings;
+    setExternalListings((cur) => cur.filter((l) => l.id !== id));
+    supabase.
+    from('animal_external_listings').
+    delete().
+    eq('id', id).
+    then(({ error }) => {
+      if (error) {
+        console.error('[external listings] delete failed:', error.message);
+        setExternalListings(prev); // restore
+      }
+    });
+  };
   // Placing an animal with someone makes them a foster parent — the "Place in
   // Foster" picker lets you choose any contact, so add the role on placement if
   // they don't already have it (idempotent; mirrors ensureAdopterRole).
@@ -2430,6 +2522,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     animal_photos: loadPhotos,
     animal_action_items: loadActionItems,
     animal_relationships: loadRelationships,
+    animal_external_listings: loadExternalListings,
     people: loadPeople,
     medical_records: loadMedicalRecords,
     foster_placements: loadPlacements,
@@ -2545,6 +2638,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         notes,
         actionItems,
         relationships,
+        externalListings,
         photos,
         people,
         peopleIndex: mergedPeopleIndex,
@@ -2604,6 +2698,9 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         deletePhoto,
         addRelationship,
         deleteRelationship,
+        addExternalListing,
+        updateExternalListing,
+        deleteExternalListing,
         placeAnimal,
         reassignFoster,
         addSupplyRequest,

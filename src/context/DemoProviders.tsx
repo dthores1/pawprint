@@ -7,6 +7,7 @@ import {
   MedicalRecord,
   AnimalNote,
   AnimalRelationship,
+  AnimalExternalListing,
   AnimalPhoto,
   Person,
   PersonRole,
@@ -38,6 +39,7 @@ import {
   seedNotes,
   seedActionItems,
   seedRelationships,
+  seedExternalListings,
   seedPhotos,
   seedPeople,
   seedProducts,
@@ -108,6 +110,8 @@ export function DemoWhiskerProvider({
   useState<AnimalActionItem[]>(seedActionItems);
   const [relationships, setRelationships] =
   useState<AnimalRelationship[]>(seedRelationships);
+  const [externalListings, setExternalListings] =
+  useState<AnimalExternalListing[]>(seedExternalListings);
   const [photos, setPhotos] = useState<AnimalPhoto[]>(seedPhotos);
   const [litters, setLitters] = useState<Litter[]>(seedLitters);
   const [adoptions, setAdoptions] = useState<Adoption[]>(seedAdoptions);
@@ -244,6 +248,7 @@ export function DemoWhiskerProvider({
     notes,
     actionItems,
     relationships,
+    externalListings,
     photos,
     people,
     // Demo holds every contact in memory, so the index is the same set and
@@ -646,6 +651,23 @@ export function DemoWhiskerProvider({
     ),
     deleteRelationship: (id) =>
     setRelationships((prev) => prev.filter((r) => r.id !== id)),
+
+    addExternalListing: (listing) =>
+    setExternalListings((prev) => [
+    {
+      ...listing,
+      id: `el${generateId()}`,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    },
+    ...prev]
+    ),
+    updateExternalListing: (id, updates) =>
+    setExternalListings((prev) =>
+    prev.map((l) => l.id === id ? { ...l, ...updates } : l)
+    ),
+    deleteExternalListing: (id) =>
+    setExternalListings((prev) => prev.filter((l) => l.id !== id)),
 
     placeAnimal: (animal_id, person_id, start_date, notes) => {
       setPlacements((prev) => [

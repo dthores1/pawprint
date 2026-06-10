@@ -116,11 +116,6 @@ export interface Animal {
   microchip_number?: string;
   primary_photo_url?: string;
   /**
-   * Public adoption-listing URL (e.g. Petfinder, Adopt-a-Pet, the org's own site).
-   * Meaningful when status is 'adoptable'.
-   */
-  adoption_profile_url?: string;
-  /**
    * Denormalized cache: person_id of the active FosterPlacement's foster, if any.
    * The placements collection remains the source of truth for history; kept
    * in sync by placeAnimal / reassignFoster. Components may prefer the
@@ -223,6 +218,34 @@ export interface AnimalPhoto {
   /** Auth user id who uploaded it. Used for archive permission. */
   created_by?: string;
   uploaded_at: string;
+}
+
+// Where an animal is posted online for adoption. Replaces the old single
+// `adoption_profile_url` field — orgs often post the same animal to several
+// platforms. Groundwork for future automated syncing (Petfinder, etc.).
+export type ExternalListingProvider =
+'petfinder' |
+'adopt_a_pet' |
+'rescue_website' |
+'facebook' |
+'instagram' |
+'other';
+
+export type ExternalListingStatus =
+'draft' |
+'published' |
+'removed' |
+'unknown';
+
+export interface AnimalExternalListing {
+  id: string;
+  animal_id: string;
+  provider: ExternalListingProvider;
+  url: string;
+  status: ExternalListingStatus;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 // The foster-specific fields captured by the Add/Edit Foster forms. A foster is

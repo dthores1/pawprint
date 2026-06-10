@@ -330,9 +330,17 @@ export function MedicalRecordsView() {
                         </p>
                       </td>
                       <td className="py-4 px-6">
+                        {r.performed_date ?
                         <p className="text-sm text-text-primary">
-                          {r.performed_date ? formatDate(r.performed_date) : '—'}
-                        </p>
+                            {formatDate(r.performed_date)}
+                          </p> :
+                        r.status === 'completed' ?
+                        <p className="text-sm italic text-text-secondary">
+                            Date unknown
+                          </p> :
+
+                        <p className="text-sm text-text-primary">—</p>
+                        }
                       </td>
                       <td className="py-4 px-6">
                         <span

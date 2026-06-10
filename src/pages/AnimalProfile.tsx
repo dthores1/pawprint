@@ -17,7 +17,7 @@ import { AdoptionReturnModal } from '../components/animals/AdoptionReturnModal';
 import { AdoptionPanel } from '../components/animals/AdoptionPanel';
 import { ActionNeededCallout } from '../components/animals/ActionNeededCallout';
 import { RelationshipsCard } from '../components/animals/RelationshipsCard';
-import { AdoptionProfileCard } from '../components/animals/AdoptionProfileCard';
+import { ExternalListingsCard } from '../components/animals/ExternalListingsCard';
 import { PhotoGallery } from '../components/animals/PhotoGallery';
 import {
   calculateAge,
@@ -1010,12 +1010,9 @@ export function AnimalProfile() {
 
         {/* Right Column: Sidebar Widgets */}
         <div className="space-y-6">
-          {/* Adoption Listing (only shown when adoptable) */}
-          <AdoptionProfileCard
-            animalId={animal.id}
-            status={animal.status}
-            adoptionProfileUrl={animal.adoption_profile_url} />
-          
+          {/* External adoption listings (Petfinder, the org's site, social…) */}
+          <ExternalListingsCard animalId={animal.id} />
+
 
           {/* Relationships (auto-hides when none exist) */}
           <RelationshipsCard animalId={animal.id} />
@@ -1518,6 +1515,9 @@ function MedicalGroup({
       <div className="divide-y divide-border">
         {records.map((r) => {
           const tone = STATUS_TONE[r.status] || STATUS_TONE.cancelled;
+          // A completed record can have no date (the "Date unknown" escape
+          // hatch on the form) — show that explicitly rather than a bare dash.
+          const dateUnknown = r.status === 'completed' && !r.performed_date;
           const dateLabel = r.performed_date ?
           formatDate(r.performed_date) :
           r.due_date ?
@@ -1585,10 +1585,16 @@ function MedicalGroup({
               </div>
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-text-secondary">
                 <span>
-                  <span className="text-text-secondary/70">{datePrefix}:</span>{' '}
-                  <span className="text-text-primary font-medium">
-                    {dateLabel}
-                  </span>
+                  {dateUnknown ?
+                  <span className="italic text-text-secondary">Date unknown</span> :
+
+                  <>
+                      <span className="text-text-secondary/70">{datePrefix}:</span>{' '}
+                      <span className="text-text-primary font-medium">
+                        {dateLabel}
+                      </span>
+                    </>
+                  }
                 </span>
                 {performerLabel(r) &&
                 <span>

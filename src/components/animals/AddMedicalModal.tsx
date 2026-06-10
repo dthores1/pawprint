@@ -192,6 +192,12 @@ export function AddMedicalModal({
   );
   const [intervalValue, setIntervalValue] = useState('');
   const [intervalUnit, setIntervalUnit] = useState<AgeUnit>('months');
+  // Escape hatch for a completed record whose exact date genuinely isn't known
+  // (historic vaccines, imported records, "altered before intake", etc.). The
+  // date stays required by default; this lets the user explicitly opt out.
+  const [dateUnknown, setDateUnknown] = useState<boolean>(
+    !!record && record.status === 'completed' && !record.performed_date
+  );
 
   // Re-populate the form whenever the modal is opened (or the editing target
   // changes), so closing and reopening the modal always reflects the current
@@ -211,6 +217,9 @@ export function AddMedicalModal({
     setNextDueMode(record?.next_due_date ? 'date' : 'relative');
     setIntervalValue('');
     setIntervalUnit('months');
+    setDateUnknown(
+      !!record && record.status === 'completed' && !record.performed_date
+    );
   }, [isOpen, record]);
 
   // Valid `procedure` options for the current type, gated by species/sex.
@@ -287,7 +296,7 @@ export function AddMedicalModal({
       next.custom_procedure_name = 'Please name the procedure.';
     }
     if (formData.status === 'completed') {
-      if (!formData.performed_date) {
+      if (!dateUnknown && !formData.performed_date) {
         next.performed_date = 'Date performed is required.';
       }
     } else if (!formData.due_date) {
@@ -304,7 +313,9 @@ export function AddMedicalModal({
     const microchipNumber =
     showMicrochip ? formData.microchip_number.trim() : '';
     const performedDate =
-    formData.status === 'completed' ? formData.performed_date : undefined;
+    formData.status === 'completed' && !dateUnknown ?
+    formData.performed_date :
+    undefined;
     const dueDate =
     formData.status !== 'completed' ? formData.due_date : undefined;
     const nextDueDate = showNextDue ?
@@ -552,14 +563,38 @@ export function AddMedicalModal({
 
         {formData.status === 'completed' ?
         <div>
-            <Label htmlFor="performed_date" required>Date Performed</Label>
+            <Label htmlFor="performed_date" required={!dateUnknown}>
+              Date Performed
+            </Label>
             <DatePicker
             id="performed_date"
-            required
+            required={!dateUnknown}
+            disabled={dateUnknown}
             error={Boolean(errors.performed_date)}
-            value={formData.performed_date}
+            value={dateUnknown ? '' : formData.performed_date}
             onChange={(v) => handleBaseDateChange('performed_date', v)} />
             <FieldError id="performed_date_error">{errors.performed_date}</FieldError>
+            {dateUnknown ?
+            <label className="mt-2 inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+                <input
+                type="checkbox"
+                checked={dateUnknown}
+                onChange={(e) => setDateUnknown(e.target.checked)}
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary/40 cursor-pointer" />
+
+                <span className="text-text-secondary">
+                  Date unknown — this record will be saved without a date.
+                </span>
+              </label> :
+
+            <button
+              type="button"
+              onClick={() => setDateUnknown(true)}
+              className="mt-2 text-xs font-medium text-primary hover:underline">
+
+                Can't find the date?
+              </button>
+            }
           </div> :
 
         <div>
