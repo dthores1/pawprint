@@ -19,6 +19,7 @@ import { ActionNeededCallout } from '../components/animals/ActionNeededCallout';
 import { RelationshipsCard } from '../components/animals/RelationshipsCard';
 import { ExternalListingsCard } from '../components/animals/ExternalListingsCard';
 import { PhotoGallery } from '../components/animals/PhotoGallery';
+import { PLACEMENT_PURPOSE_LABELS } from '../lib/placementPurpose';
 import {
   calculateAge,
   formatDate,
@@ -219,6 +220,10 @@ export function AnimalProfile() {
     description: string;
     icon: React.ElementType;
     color: string;
+    /** Optional categorical tag rendered as a pill (e.g. placement purpose). */
+    purposeLabel?: string;
+    /** Optional trailing text shown after the pill (e.g. "expected through …"). */
+    descriptionTail?: string;
     /** Note rows opt in here so the timeline can offer an Archive control. */
     note?: { id: string; created_by?: string };
     /** Resolved action-item rows opt in so they can be archived from history. */
@@ -265,7 +270,15 @@ export function AnimalProfile() {
       ts: p.start_date,
       type: 'placement' as const,
       title: `Placed in Foster`,
+      // Rendered as: "With {name} · [purpose pill] · expected through {date}".
       description: `With ${fosterName}`,
+      purposeLabel:
+      p.placement_purpose && p.placement_purpose !== 'general_foster' ?
+      PLACEMENT_PURPOSE_LABELS[p.placement_purpose] :
+      undefined,
+      descriptionTail: p.expected_end_date ?
+      `expected through ${formatDate(p.expected_end_date)}` :
+      undefined,
       icon: HomeIcon,
       color: 'bg-[#DCEAF7] text-[#356A9A]',
       // Non-active placements opt in for archive — keeps Phase 6 access
@@ -744,6 +757,27 @@ export function AnimalProfile() {
                         None (Needs Placement)
                       </p>
                   }
+                    {currentFoster && activePlacement && (() => {
+                    const parts: string[] = [];
+                    if (
+                    activePlacement.placement_purpose &&
+                    activePlacement.placement_purpose !== 'general_foster')
+                    {
+                      parts.push(
+                        PLACEMENT_PURPOSE_LABELS[activePlacement.placement_purpose]
+                      );
+                    }
+                    if (activePlacement.expected_end_date) {
+                      parts.push(
+                        `expected through ${formatDate(activePlacement.expected_end_date)}`
+                      );
+                    }
+                    return parts.length ?
+                    <p className="text-xs text-text-secondary mt-0.5">
+                          {parts.join(' · ')}
+                        </p> :
+                    null;
+                  })()}
                   </div>
                 }
               </div>
@@ -972,9 +1006,23 @@ export function AnimalProfile() {
 
                           }
                               </div>
-                              <p className="text-text-secondary">
-                                {event.description}
-                              </p>
+                              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-text-secondary">
+                                <span>{event.description}</span>
+                                {event.purposeLabel &&
+                          <>
+                                    <span aria-hidden="true">·</span>
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#DCEAF7] text-[#356A9A]">
+                                      {event.purposeLabel}
+                                    </span>
+                                  </>
+                          }
+                                {event.descriptionTail &&
+                          <>
+                                    <span aria-hidden="true">·</span>
+                                    <span>{event.descriptionTail}</span>
+                                  </>
+                          }
+                              </div>
                             </div>
                           </motion.div>
                     )}

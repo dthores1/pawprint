@@ -280,17 +280,39 @@ export interface FosterInput {
 
 export type PlacementType = 'foster' | 'medical_foster' | 'trial_adoption';
 
+// Why an animal is placed with a foster. 'general_foster' is the open-ended
+// default; the rest are time-boxed (surfaced with an expected end date). Labels
+// live in src/lib/placementPurpose.ts.
+export type PlacementPurpose =
+'general_foster' |
+'temporary_holding' |
+'medical_recovery' |
+'behavioral_observation' |
+'transport_staging';
+
 export interface FosterPlacement {
   id: string;
   animal_id: string;
   /** The foster — a `people` row (with the 'foster_parent' role). */
   person_id: string;
   start_date: string;
-  /** Nullable while the placement is active. */
+  /** Actual close date. Nullable while the placement is active. */
   end_date?: string;
+  /**
+   * Optional planned end date — flags a time-boxed (temporary) foster stay
+   * (emergency hold, until-clinic, transport staging…). Distinct from `end_date`
+   * (the date it actually closed). Surfaced as "expected through …".
+   */
+  expected_end_date?: string;
   placement_status: 'active' | 'completed' | 'interrupted';
   /** Defaults to 'foster' on creation; more types may be added later. */
   placement_type: PlacementType;
+  /**
+   * Why the animal is here. Always populated at runtime (DB default +
+   * rowToPlacement + the place/reassign actions); optional only so seed/raw
+   * literals can omit it. Treat a missing value as 'general_foster'.
+   */
+  placement_purpose?: PlacementPurpose;
   /** Free-form reason a placement ended (e.g. "Reassigned", "Adopted"). */
   reason_ended?: string;
   notes?: string;

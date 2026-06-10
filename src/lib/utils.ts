@@ -59,7 +59,13 @@ export function calculateAge(birthDate: string): string {
 }
 
 export function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('en-US', {
+  // Date-only strings (yyyy-MM-dd) must parse as LOCAL midnight — otherwise
+  // `new Date('2026-06-24')` is UTC midnight and renders as the previous day in
+  // negative-offset timezones. Full ISO timestamps parse as-is.
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(dateString) ?
+  new Date(`${dateString}T00:00:00`) :
+  new Date(dateString);
+  return d.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric'

@@ -7,8 +7,10 @@ export function rowToPlacement(r: any): FosterPlacement {
     person_id: r.person_id,
     start_date: r.start_date,
     end_date: r.end_date ?? undefined,
+    expected_end_date: r.expected_end_date ?? undefined,
     placement_status: r.placement_status,
     placement_type: r.placement_type ?? 'foster',
+    placement_purpose: r.placement_purpose ?? 'general_foster',
     reason_ended: r.reason_ended ?? undefined,
     notes: r.notes ?? undefined
   };
@@ -19,8 +21,10 @@ const PLACEMENT_COLUMNS = [
 'person_id',
 'start_date',
 'end_date',
+'expected_end_date',
 'placement_status',
 'placement_type',
+'placement_purpose',
 'reason_ended',
 'notes'] as
 const;

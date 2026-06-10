@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { Modal } from '../ui/Modal';
-import { Textarea, Label, Input } from '../ui/Forms';
+import { Textarea, Label, Input, Select } from '../ui/Forms';
+import { PLACEMENT_PURPOSE_OPTIONS } from '../../lib/placementPurpose';
+import { PlacementPurpose } from '../../types';
 import { DatePicker } from '../ui/DatePicker';
 import { Button } from '../ui/Button';
 import { Avatar } from '../ui/Avatar';
@@ -38,6 +40,11 @@ export function PlaceAnimalModal({
   const [startDate, setStartDate] = useState(
     new Date().toISOString().split('T')[0]
   );
+  const [placementPurpose, setPlacementPurpose] =
+  useState<PlacementPurpose>('general_foster');
+  // Optional planned end date — only collected for time-boxed (non-general) stays.
+  const [expectedEndDate, setExpectedEndDate] = useState('');
+  const isTemporary = placementPurpose !== 'general_foster';
   const [notes, setNotes] = useState('');
   const [reasonEnded, setReasonEnded] = useState('');
   // Foster mode: by default the animal search is scoped to the foster's
@@ -183,14 +190,25 @@ export function PlaceAnimalModal({
       setReasonEnded('');
       setShowAllSpecies(false);
       setStartDate(new Date().toISOString().split('T')[0]);
+      setExpectedEndDate('');
+      setPlacementPurpose('general_foster');
     }
   }, [isOpen]);
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedId) return;
+    // General Foster hides the end-date field; don't persist a stale value.
+    const expectedEnd = isTemporary ? expectedEndDate || undefined : undefined;
     if (mode === 'foster') {
       if (!anchorFoster) return;
-      placeAnimal(selectedId, anchorFoster.id, startDate, notes);
+      placeAnimal(
+        selectedId,
+        anchorFoster.id,
+        startDate,
+        notes,
+        expectedEnd,
+        placementPurpose
+      );
     } else {
       if (!anchorAnimal) return;
       if (isReassign) {
@@ -199,10 +217,19 @@ export function PlaceAnimalModal({
           selectedId,
           startDate,
           reasonEnded.trim() || undefined,
-          notes.trim() || undefined
+          notes.trim() || undefined,
+          expectedEnd,
+          placementPurpose
         );
       } else {
-        placeAnimal(anchorAnimal.id, selectedId, startDate, notes);
+        placeAnimal(
+          anchorAnimal.id,
+          selectedId,
+          startDate,
+          notes,
+          expectedEnd,
+          placementPurpose
+        );
       }
     }
     onClose();
@@ -582,15 +609,57 @@ export function PlaceAnimalModal({
           }
         </div>
 
-        {/* Start Date */}
+        {/* Placement purpose — drives whether an end date is collected */}
         <div>
-          <Label htmlFor="start_date" required>Start Date</Label>
-          <DatePicker
-            id="start_date"
-            required
-            value={startDate}
-            onChange={setStartDate} />
+          <Label htmlFor="placement_purpose">Placement Purpose</Label>
+          <Select
+            id="placement_purpose"
+            value={placementPurpose}
+            onChange={(e) =>
+            setPlacementPurpose(e.target.value as PlacementPurpose)
+            }>
 
+            {PLACEMENT_PURPOSE_OPTIONS.map((o) =>
+            <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            )}
+          </Select>
+          {isTemporary &&
+          <p className="mt-1 pl-1 text-xs text-text-secondary">
+              A time-boxed stay — set an expected end date below.
+            </p>
+          }
+        </div>
+
+        {/* Start date + (for temporary purposes) an expected end date */}
+        <div
+          className={
+          isTemporary ? 'grid grid-cols-1 sm:grid-cols-2 gap-4' : undefined
+          }>
+
+          <div>
+            <Label htmlFor="start_date" required>Start Date</Label>
+            <DatePicker
+              id="start_date"
+              required
+              value={startDate}
+              onChange={setStartDate} />
+
+          </div>
+          {isTemporary &&
+          <div>
+              <Label htmlFor="expected_end_date">
+                Expected End Date (optional)
+              </Label>
+              <DatePicker
+              id="expected_end_date"
+              align="end"
+              value={expectedEndDate}
+              onChange={setExpectedEndDate} />
+
+            </div>
+          }
         </div>
 
         {/* Reason for ending the previous placement — reassign only */}

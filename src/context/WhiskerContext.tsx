@@ -21,6 +21,7 @@ import {
   PersonRole,
   FosterInput,
   FosterPlacement,
+  PlacementPurpose,
   MedicalRecord,
   AnimalNote,
   AnimalActionItem,
@@ -337,7 +338,9 @@ export interface WhiskerContextType {
   animal_id: string,
   person_id: string,
   start_date: string,
-  notes?: string)
+  notes?: string,
+  expected_end_date?: string,
+  placement_purpose?: PlacementPurpose)
   => void;
   /**
    * Move an animal from its current foster to a new one. Closes the active
@@ -350,7 +353,9 @@ export interface WhiskerContextType {
   new_person_id: string,
   start_date: string,
   reason_ended?: string,
-  notes?: string)
+  notes?: string,
+  expected_end_date?: string,
+  placement_purpose?: PlacementPurpose)
   => void;
   addSupplyRequest: (
   req: Omit<SupplyRequest, 'id' | 'created_at' | 'updated_at'>)
@@ -2019,7 +2024,9 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   animal_id: string,
   person_id: string,
   start_date: string,
-  notes?: string) =>
+  notes?: string,
+  expected_end_date?: string,
+  placement_purpose: PlacementPurpose = 'general_foster') =>
   {
     if (!orgId) {
       console.error('[placements] cannot place — no current organization');
@@ -2033,8 +2040,10 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
           animal_id,
           person_id,
           start_date,
+          expected_end_date,
           placement_status: 'active',
           placement_type: 'foster',
+          placement_purpose,
           notes
         },
         orgId
@@ -2059,7 +2068,9 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   new_person_id: string,
   start_date: string,
   reason_ended?: string,
-  notes?: string) =>
+  notes?: string,
+  expected_end_date?: string,
+  placement_purpose: PlacementPurpose = 'general_foster') =>
   {
     if (!orgId) {
       console.error('[placements] cannot reassign — no current organization');
@@ -2093,8 +2104,10 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
           animal_id,
           person_id: new_person_id,
           start_date,
+          expected_end_date,
           placement_status: 'active',
           placement_type: 'foster',
+          placement_purpose,
           notes
         },
         orgId

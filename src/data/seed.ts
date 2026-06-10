@@ -535,9 +535,11 @@ export const seedPlacements: FosterPlacement[] = [
   animal_id: 'a2',
   person_id:'f3',
   start_date: '2023-11-06T14:00:00Z',
+  expected_end_date: '2026-06-24',
   placement_status: 'active',
   placement_type: 'medical_foster',
-  notes: 'Recovering from dental surgery.'
+  placement_purpose: 'medical_recovery',
+  notes: 'Temporary holding while recovering from dental surgery.'
 },
 {
   id: 'p3',

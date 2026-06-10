@@ -669,15 +669,24 @@ export function DemoWhiskerProvider({
     deleteExternalListing: (id) =>
     setExternalListings((prev) => prev.filter((l) => l.id !== id)),
 
-    placeAnimal: (animal_id, person_id, start_date, notes) => {
+    placeAnimal: (
+    animal_id,
+    person_id,
+    start_date,
+    notes,
+    expected_end_date,
+    placement_purpose = 'general_foster') =>
+    {
       setPlacements((prev) => [
       {
         id: `p${generateId()}`,
         animal_id,
         person_id,
         start_date,
+        expected_end_date,
         placement_status: 'active',
         placement_type: 'foster',
+        placement_purpose,
         notes
       },
       ...prev]
@@ -700,7 +709,9 @@ export function DemoWhiskerProvider({
     new_person_id,
     start_date,
     reason_ended,
-    notes) =>
+    notes,
+    expected_end_date,
+    placement_purpose = 'general_foster') =>
     {
       setPlacements((prev) => {
         const closed = prev.map((p) =>
@@ -719,8 +730,10 @@ export function DemoWhiskerProvider({
           animal_id,
           person_id: new_person_id,
           start_date,
+          expected_end_date,
           placement_status: 'active' as const,
           placement_type: 'foster' as const,
+          placement_purpose,
           notes
         },
         ...closed];
