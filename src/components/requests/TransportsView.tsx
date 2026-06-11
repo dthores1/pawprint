@@ -12,6 +12,7 @@ import {
   Trash2Icon } from
 'lucide-react';
 import { AddressDisplay } from '../ui/AddressDisplay';
+import { PillTabs } from '../ui/PillTabs';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -125,27 +126,16 @@ export function TransportsView() {
 
   return (
     <div className="space-y-6">
-      <div className="flex gap-2 border-b border-border">
-        {(
-        [
-        { key: 'open', label: 'Open' },
-        { key: 'claimed', label: 'Claimed / In Progress' },
-        { key: 'completed', label: 'Completed' }] as const).
-        map((t) =>
-        <button
-          key={t.key}
-          onClick={() => setActiveTab(t.key)}
-          className={cn(
-            'px-4 py-3 text-sm font-semibold border-b-2 transition-colors',
-            activeTab === t.key ?
-            'border-primary text-primary' :
-            'border-transparent text-text-secondary hover:text-text-primary'
-          )}>
-
-            {t.label} ({grouped[t.key].length})
-          </button>
-        )}
-      </div>
+      <PillTabs
+        value={activeTab}
+        onChange={(k) => setActiveTab(k as typeof activeTab)}
+        tabs={[
+        { key: 'open', label: `Open (${grouped.open.length})` },
+        {
+          key: 'claimed',
+          label: `Claimed / In Progress (${grouped.claimed.length})`
+        },
+        { key: 'completed', label: `Completed (${grouped.completed.length})` }]} />
 
       {display.length === 0 ?
       <Card className="p-10 text-center text-text-secondary">

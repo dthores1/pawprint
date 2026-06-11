@@ -82,13 +82,6 @@ export function ExternalListingsCard({ animalId }: Props) {
             <p className="text-sm text-text-secondary mb-3">
               Not posted anywhere yet.
             </p>
-            <button
-            onClick={() => setIsAddOpen(true)}
-            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold bg-text-primary text-white hover:bg-text-primary/90 transition-colors">
-
-              <PlusIcon className="w-3.5 h-3.5" />
-              Add Listing
-            </button>
           </div> :
 
         <div className="space-y-2.5">

@@ -239,6 +239,7 @@ const SEED_ANIMALS_RAW: Animal[] = [
   description:
   'Calm, older husky mix. Loves long walks and naps on the couch.',
   microchip_number: '981020000000005',
+  litter_id: 'litter_luna',
   primary_photo_url:
   'https://images.unsplash.com/photo-1605568420105-eb2a4caa5e3e?auto=format&fit=crop&q=80&w=800',
   created_at: '2025-09-15T09:00:00Z',
@@ -718,11 +719,24 @@ export const seedLitters: Litter[] = [
   id: 'litter_demo',
   name: 'Columbia City - July 2025',
   species: 'Cat',
+  breed_text: 'Domestic Shorthair',
   estimated_birth_date: '2025-06-01',
   intake_date: '2025-07-13',
   intake_source: 'Trapped with mother',
   mother_animal_id: 'a2',
   notes: 'Litter trapped with mother near apartment complex in Columbia City.'
+},
+// Historical litter — all members have aged out of care (adopted). Hidden by
+// default; appears under "Show Historical Litters".
+{
+  id: 'litter_luna',
+  name: 'Lents - Sept 2023',
+  species: 'Dog',
+  breed_text: 'Husky Mix',
+  estimated_birth_date: '2019-03-12',
+  intake_date: '2023-09-15',
+  intake_source: 'City Shelter Transfer',
+  notes: 'Littermates adopted out; kept for history.'
 }];
 
 

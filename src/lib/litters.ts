@@ -1,8 +1,22 @@
 import { Animal, Breed, Litter, MedicalRecord, Person } from '../types';
+import { IN_CARE_STATUSES } from './animalStatus';
 
 /** Members of a litter — derived from the shared animals.litter_id. */
 export function litterMembers(animals: Animal[], litterId: string): Animal[] {
   return animals.filter((a) => a.litter_id === litterId);
+}
+
+/**
+ * A litter is "historical" once every member has left the org's care (adopted/
+ * released/deceased). An empty litter (no members assigned yet) is NOT historical
+ * — it's freshly created and still operationally relevant. Derived client-side
+ * from the animal index, which carries every animal's status.
+ */
+export function litterIsHistorical(members: Animal[]): boolean {
+  return (
+    members.length > 0 &&
+    !members.some((m) => IN_CARE_STATUSES.includes(m.status)));
+
 }
 
 function monthYear(dateStr?: string): string {

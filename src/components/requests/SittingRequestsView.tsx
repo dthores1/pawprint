@@ -3,6 +3,7 @@ import { useWhisker } from '../../context/WhiskerContext';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Avatar } from '../ui/Avatar';
+import { PillTabs } from '../ui/PillTabs';
 import { NewSittingRequestModal } from '../sitting/NewSittingRequestModal';
 import {
   HeartHandshakeIcon,
@@ -128,30 +129,12 @@ export function SittingRequestsView() {
 
   return (
     <div className="space-y-6">
-      <div className="flex gap-2 border-b border-border">
-        <button
-          onClick={() => setTab('unclaimed')}
-          className={cn(
-            'px-4 py-3 text-sm font-semibold border-b-2 transition-colors',
-            tab === 'unclaimed' ?
-            'border-primary text-primary' :
-            'border-transparent text-text-secondary hover:text-text-primary'
-          )}>
-
-          Unclaimed ({unclaimed.length})
-        </button>
-        <button
-          onClick={() => setTab('mine')}
-          className={cn(
-            'px-4 py-3 text-sm font-semibold border-b-2 transition-colors',
-            tab === 'mine' ?
-            'border-primary text-primary' :
-            'border-transparent text-text-secondary hover:text-text-primary'
-          )}>
-
-          My Requests ({mine.length})
-        </button>
-      </div>
+      <PillTabs
+        value={tab}
+        onChange={(k) => setTab(k as typeof tab)}
+        tabs={[
+        { key: 'unclaimed', label: `Unclaimed (${unclaimed.length})` },
+        { key: 'mine', label: `My Requests (${mine.length})` }]} />
 
       {display.length === 0 ?
       <Card className="p-10 text-center text-text-secondary">

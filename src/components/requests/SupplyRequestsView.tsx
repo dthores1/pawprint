@@ -3,6 +3,7 @@ import { useWhisker } from '../../context/WhiskerContext';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Avatar } from '../ui/Avatar';
+import { PillTabs } from '../ui/PillTabs';
 import { SupplyRequestDetailModal } from '../supplies/SupplyRequestDetailModal';
 import {
   PackageOpenIcon,
@@ -150,41 +151,13 @@ export function SupplyRequestsView() {
   };
   return (
     <div className="space-y-6">
-      <div className="flex gap-2 border-b border-border">
-        <button
-          onClick={() => setActiveTab('active')}
-          className={cn(
-            'px-4 py-3 text-sm font-semibold border-b-2 transition-colors',
-            activeTab === 'active' ?
-            'border-primary text-primary' :
-            'border-transparent text-text-secondary hover:text-text-primary'
-          )}>
-
-          Active Requests ({activeRequests.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('completed')}
-          className={cn(
-            'px-4 py-3 text-sm font-semibold border-b-2 transition-colors',
-            activeTab === 'completed' ?
-            'border-primary text-primary' :
-            'border-transparent text-text-secondary hover:text-text-primary'
-          )}>
-
-          Completed & Cancelled
-        </button>
-        <button
-          onClick={() => setActiveTab('common')}
-          className={cn(
-            'px-4 py-3 text-sm font-semibold border-b-2 transition-colors',
-            activeTab === 'common' ?
-            'border-primary text-primary' :
-            'border-transparent text-text-secondary hover:text-text-primary'
-          )}>
-
-          Common Requests ({myCommonRequests.length})
-        </button>
-      </div>
+      <PillTabs
+        value={activeTab}
+        onChange={(k) => setActiveTab(k as typeof activeTab)}
+        tabs={[
+        { key: 'active', label: `Active (${activeRequests.length})` },
+        { key: 'completed', label: 'History' },
+        { key: 'common', label: `Common (${myCommonRequests.length})` }]} />
 
       {activeTab === 'common' ?
       myCommonRequests.length === 0 ?

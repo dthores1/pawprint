@@ -5,6 +5,7 @@ import { Card } from '../ui/Card';
 import { StethoscopeIcon, MapPinIcon, UserIcon, CheckCircle2Icon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { ExportButton } from '../ui/ExportButton';
+import { PillTabs } from '../ui/PillTabs';
 import { CsvColumn } from '../../lib/csv';
 import { ClinicEvent, ClinicEventStatus } from '../../types';
 
@@ -88,31 +89,14 @@ export function ClinicsView() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-2 border-b border-border">
-        <div className="flex gap-2">
-          <button
-            onClick={() => setTab('upcoming')}
-            className={cn(
-              'px-4 py-3 text-sm font-semibold border-b-2 transition-colors',
-              tab === 'upcoming' ?
-              'border-primary text-primary' :
-              'border-transparent text-text-secondary hover:text-text-primary'
-            )}>
+      <div className="flex items-center justify-between gap-2">
+        <PillTabs
+          value={tab}
+          onChange={(k) => setTab(k as typeof tab)}
+          tabs={[
+          { key: 'upcoming', label: `Upcoming (${upcoming.length})` },
+          { key: 'past', label: `Past (${past.length})` }]} />
 
-            Upcoming ({upcoming.length})
-          </button>
-          <button
-            onClick={() => setTab('past')}
-            className={cn(
-              'px-4 py-3 text-sm font-semibold border-b-2 transition-colors',
-              tab === 'past' ?
-              'border-primary text-primary' :
-              'border-transparent text-text-secondary hover:text-text-primary'
-            )}>
-
-            Past ({past.length})
-          </button>
-        </div>
         <ExportButton
           entityLabel="Clinics"
           noun="clinics"

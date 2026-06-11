@@ -702,12 +702,17 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       return;
     }
     setLittersLoading(true);
-    const { data, error } = await supabase.
+    // Page through so orgs with >1000 litters don't silently truncate — the
+    // Litters view derives "historical" client-side and needs the full set.
+    const { data, error } = await fetchAllPages((from, to) =>
+    supabase.
     from('litters').
     select('*').
     eq('organization_id', orgId).
     eq('is_deleted', false).
-    order('created_at', { ascending: false });
+    order('created_at', { ascending: false }).
+    range(from, to)
+    );
     if (error) {
       console.error('[litters] load failed:', error.message);
     } else {
