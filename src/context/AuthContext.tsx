@@ -33,6 +33,12 @@ export interface AuthContextType {
    * created on first use) once a user + org are known.
    */
   currentPersonId: string | null;
+  /**
+   * The signed-in user's `organization_members.id` in the current org. Permission
+   * grants attach to this membership id (see member_permissions). Null until a
+   * user + org are known.
+   */
+  currentMemberId: string | null;
   signInWithGoogle: () => Promise<void>;
   signInWithPassword: (
   email: string,
@@ -158,6 +164,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Resolve (find-or-create) the signed-in user's person record in the org.
   const [currentPersonId, setCurrentPersonId] = useState<string | null>(null);
   const currentOrgIdResolved = currentOrg?.id ?? null;
+
+  // Resolve the signed-in user's organization_members.id (permission grants
+  // attach to it). Read-only lookup — membership is created elsewhere (invite
+  // accept / onboarding), not here.
+  const [currentMemberId, setCurrentMemberId] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!user || !currentOrgIdResolved) {
+        setCurrentMemberId(null);
+        return;
+      }
+      const { data, error } = await supabase.
+      from('organization_members').
+      select('id').
+      eq('organization_id', currentOrgIdResolved).
+      eq('user_id', user.id).
+      limit(1);
+      if (cancelled) return;
+      if (error) {
+        console.error('[auth] member lookup failed:', error.message);
+        return;
+      }
+      setCurrentMemberId(data && data.length > 0 ? data[0].id : null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, currentOrgIdResolved]);
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -341,6 +376,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setCurrentOrgId,
         refreshOrganizations,
         currentPersonId,
+        currentMemberId,
         signInWithGoogle,
         signInWithPassword,
         signUpWithPassword,

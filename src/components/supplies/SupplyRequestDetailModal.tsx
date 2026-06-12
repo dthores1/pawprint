@@ -5,6 +5,7 @@ import { Avatar } from '../ui/Avatar';
 import { Input, Select, Textarea, Label } from '../ui/Forms';
 import { useWhisker } from '../../context/WhiskerContext';
 import { useAuth } from '../../context/AuthContext';
+import { useCanManageSupplyRequests } from '../../lib/useSupplyPermissions';
 import { SupplyRequestStatus, SupplySupplier } from '../../types';
 import { formatDate, cn } from '../../lib/utils';
 import {
@@ -66,6 +67,7 @@ export function SupplyRequestDetailModal({
     updateSupplyRequest
   } = useWhisker();
   const { currentPersonId } = useAuth();
+  const canManage = useCanManageSupplyRequests();
 
   const request = requestId ?
   supplyRequests.find((r) => r.id === requestId) :
@@ -343,10 +345,12 @@ export function SupplyRequestDetailModal({
         <>
             {request.status === 'submitted' &&
           <div className="flex flex-wrap gap-2">
-                <Button size="sm" onClick={() => handleSetStatus('in_progress')}>
-                  Start Processing
-                </Button>
-                {isRequester ?
+                {canManage &&
+            <Button size="sm" onClick={() => handleSetStatus('in_progress')}>
+                    Start Processing
+                  </Button>
+            }
+                {isRequester &&
             <Button
               variant="ghost"
               size="sm"
@@ -354,8 +358,9 @@ export function SupplyRequestDetailModal({
               className="text-text-secondary hover:text-[#9B3A3A]">
 
                     Cancel Request
-                  </Button> :
-
+                  </Button>
+            }
+                {canManage && !isRequester &&
             <Button
               variant="ghost"
               size="sm"
@@ -369,10 +374,12 @@ export function SupplyRequestDetailModal({
           }
             {request.status === 'in_progress' &&
           <div className="flex flex-wrap gap-2">
-                <Button size="sm" onClick={() => handleSetStatus('fulfilled')}>
-                  <CheckIcon className="w-4 h-4 mr-1.5" /> Mark Fulfilled
-                </Button>
-                {isRequester ?
+                {canManage &&
+            <Button size="sm" onClick={() => handleSetStatus('fulfilled')}>
+                    <CheckIcon className="w-4 h-4 mr-1.5" /> Mark Fulfilled
+                  </Button>
+            }
+                {isRequester &&
             <Button
               variant="ghost"
               size="sm"
@@ -380,8 +387,9 @@ export function SupplyRequestDetailModal({
               className="text-text-secondary hover:text-[#9B3A3A]">
 
                     Cancel Request
-                  </Button> :
-
+                  </Button>
+            }
+                {canManage && !isRequester &&
             <Button
               variant="ghost"
               size="sm"
@@ -393,7 +401,7 @@ export function SupplyRequestDetailModal({
             }
               </div>
           }
-            {request.status === 'fulfilled' &&
+            {request.status === 'fulfilled' && canManage &&
           <div>
                 <Button
               size="sm"
@@ -403,6 +411,15 @@ export function SupplyRequestDetailModal({
                   <RotateCcwIcon className="w-4 h-4 mr-1.5" /> Reopen
                 </Button>
               </div>
+          }
+            {!canManage &&
+          !isRequester && (
+          request.status === 'submitted' ||
+          request.status === 'in_progress') &&
+          <p className="text-sm text-text-secondary flex items-center gap-1.5">
+                <BanIcon className="w-4 h-4 shrink-0 text-text-secondary/60" />
+                Only fulfillment members can process this request.
+              </p>
           }
             {request.status === 'cancelled' &&
           <div className="flex items-center gap-2 text-[#9B3A3A] bg-[#F5D7D7]/60 p-3 rounded-lg text-sm">
@@ -481,7 +498,8 @@ export function SupplyRequestDetailModal({
           </div>
         </div>
 
-        {/* Fulfillment */}
+        {/* Fulfillment — editable by fulfillment members only */}
+        {canManage &&
         <div>
           <h4 className="font-semibold text-text-primary mb-2">Fulfillment</h4>
           <div className="border border-border rounded-xl p-4 space-y-4">
@@ -535,6 +553,7 @@ export function SupplyRequestDetailModal({
             }
           </div>
         </div>
+        }
 
         {/* History — small + de-emphasized, lives at the bottom */}
         {history.length > 0 &&

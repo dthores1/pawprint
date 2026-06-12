@@ -8,6 +8,8 @@ import {
   AnimalNote,
   AnimalRelationship,
   AnimalExternalListing,
+  MemberPermission,
+  OrgMember,
   AnimalPhoto,
   Person,
   PersonRole,
@@ -40,6 +42,8 @@ import {
   seedActionItems,
   seedRelationships,
   seedExternalListings,
+  seedOrgMembers,
+  seedMemberPermissions,
   seedPhotos,
   seedPeople,
   seedProducts,
@@ -81,6 +85,7 @@ const demoAuthValue: AuthContextType = {
   setCurrentOrgId: () => {},
   refreshOrganizations: async () => {},
   currentPersonId: 'p_dan',
+  currentMemberId: 'm_dan',
   signInWithGoogle: async () => {},
   signInWithPassword: async () => ({ error: null }),
   signUpWithPassword: async () => ({ error: null, needsConfirmation: false }),
@@ -112,6 +117,10 @@ export function DemoWhiskerProvider({
   useState<AnimalRelationship[]>(seedRelationships);
   const [externalListings, setExternalListings] =
   useState<AnimalExternalListing[]>(seedExternalListings);
+  const [orgMembers] = useState<OrgMember[]>(seedOrgMembers);
+  const [memberPermissions, setMemberPermissions] = useState<MemberPermission[]>(
+    seedMemberPermissions
+  );
   const [photos, setPhotos] = useState<AnimalPhoto[]>(seedPhotos);
   const [litters, setLitters] = useState<Litter[]>(seedLitters);
   const [adoptions, setAdoptions] = useState<Adoption[]>(seedAdoptions);
@@ -249,6 +258,37 @@ export function DemoWhiskerProvider({
     actionItems,
     relationships,
     externalListings,
+    orgMembers,
+    memberPermissions,
+    grantSupplyPermission: (memberId: string) =>
+    setMemberPermissions((prev) =>
+    prev.some(
+      (p) =>
+      p.member_id === memberId &&
+      p.permission_type === 'MANAGE_SUPPLY_REQUESTS' &&
+      p.is_active
+    ) ?
+    prev :
+    [
+    ...prev,
+    {
+      id: `mp${generateId()}`,
+      organization_id: 'demo-org',
+      member_id: memberId,
+      permission_type: 'MANAGE_SUPPLY_REQUESTS',
+      is_active: true,
+      starts_at: new Date().toISOString()
+    }]
+    ),
+    revokeSupplyPermission: (memberId: string) =>
+    setMemberPermissions((prev) =>
+    prev.map((p) =>
+    p.member_id === memberId &&
+    p.permission_type === 'MANAGE_SUPPLY_REQUESTS' ?
+    { ...p, is_active: false } :
+    p
+    )
+    ),
     photos,
     people,
     // Demo holds every contact in memory, so the index is the same set and

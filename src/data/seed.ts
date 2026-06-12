@@ -13,6 +13,8 @@ import {
   AnimalNote,
   AnimalRelationship,
   AnimalExternalListing,
+  OrgMember,
+  MemberPermission,
   AnimalPhoto,
   Person,
   PersonRole,
@@ -764,6 +766,27 @@ export const seedRelationships: AnimalRelationship[] = [
   notes: 'Adopt together — they get anxious when separated.'
 }];
 
+// Demo org roster (accounts). user_id matches the account self-records above
+// (p_dan / pa_admin / pa_member) so names resolve in the Fulfillment Access UI.
+export const seedOrgMembers: OrgMember[] = [
+{ id: 'm_dan', user_id: 'u_dan', role: 'owner' },
+{ id: 'm_admin', user_id: 'u_admin', role: 'admin' },
+{ id: 'm_member', user_id: 'u_member', role: 'member' }];
+
+
+// Marco (member) starts with an active fulfillment grant so the toggle shows the
+// "on" state out of the box; admins/owner are always allowed (no grant row).
+export const seedMemberPermissions: MemberPermission[] = [
+{
+  id: 'mp1',
+  organization_id: 'demo-org',
+  member_id: 'm_member',
+  permission_type: 'MANAGE_SUPPLY_REQUESTS',
+  is_active: true,
+  starts_at: '2025-02-01T10:00:00Z'
+}];
+
+
 export const seedExternalListings: AnimalExternalListing[] = [
 {
   id: 'el1',
@@ -981,7 +1004,9 @@ const contactPeople: Omit<Person, 'roles'>[] = [
 },
 {
   // The demo current-user. Matches CURRENT_USER.person_id used across forms.
+  // user_id makes this an account self-record (the signed-in member).
   id: 'p_dan',
+  user_id: 'u_dan',
   first_name: 'Dan',
   last_name: 'Thoreson',
   email: 'thoreson.dan@gmail.com',
@@ -991,6 +1016,32 @@ const contactPeople: Omit<Person, 'roles'>[] = [
   active: true,
   created_at: '2024-09-10T10:00:00Z',
   photo_url: '/images/contacts/Dan_Thoreson.jpeg'
+},
+// Two more account self-records (have user_id) so the demo member roster /
+// Fulfillment Access UI has people to grant access to. Hidden from Contacts.
+{
+  id: 'pa_admin',
+  user_id: 'u_admin',
+  first_name: 'Priya',
+  last_name: 'Nair',
+  email: 'pnair@whiskervillerescue.org',
+  phone: '(555) 818-2200',
+  role: 'rescue_staff',
+  notes: 'Operations Manager',
+  active: true,
+  created_at: '2024-10-01T10:00:00Z'
+},
+{
+  id: 'pa_member',
+  user_id: 'u_member',
+  first_name: 'Marco',
+  last_name: 'Diaz',
+  email: 'mdiaz@whiskervillerescue.org',
+  phone: '(555) 818-2201',
+  role: 'rescue_staff',
+  notes: 'Volunteer coordinator',
+  active: true,
+  created_at: '2025-01-15T10:00:00Z'
 },
 {
   id: 'pe9',

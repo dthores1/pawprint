@@ -9,6 +9,7 @@ import { SittingRequestsView } from '../components/requests/SittingRequestsView'
 import { NewSupplyRequestModal } from '../components/supplies/NewSupplyRequestModal';
 import { NewTransportRequestModal } from '../components/transports/NewTransportRequestModal';
 import { NewSittingRequestModal } from '../components/sitting/NewSittingRequestModal';
+import { useCanManageSupplyRequests } from '../lib/useSupplyPermissions';
 
 type RequestsTab = 'supply' | 'transport' | 'sitting';
 const TABS: { key: RequestsTab; label: string }[] = [
@@ -28,6 +29,7 @@ export function Requests() {
   const tab: RequestsTab =
   param === 'transport' || param === 'sitting' ? param : 'supply';
   const [isNewOpen, setIsNewOpen] = useState(false);
+  const canManageSupply = useCanManageSupplyRequests();
   const setTab = (next: RequestsTab) => {
     setIsNewOpen(false);
     setSearchParams(next === 'supply' ? {} : { tab: next }, { replace: true });
@@ -46,11 +48,11 @@ export function Requests() {
           </p>
         </div>
         <div className="flex gap-2">
-          {tab === 'supply' &&
-          <Link to="/supplies/catalog">
+          {tab === 'supply' && canManageSupply &&
+          <Link to="/supplies/options">
               <Button variant="soft" className="gap-2">
                 <PackageIcon className="w-4 h-4" />
-                Manage Product Options
+                Manage Supply Options
               </Button>
             </Link>
           }
