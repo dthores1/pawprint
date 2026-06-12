@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { FieldError, Input, Select, Textarea, Label } from '../ui/Forms';
+import { ProductSearchPicker } from '../ui/ProductSearchPicker';
 import { Button } from '../ui/Button';
 import { useWhisker } from '../../context/WhiskerContext';
 import { useAuth } from '../../context/AuthContext';
@@ -62,7 +63,7 @@ notes?: string)
 : string {
   const itemSigs = items.
   map((it) => {
-    const isCustom = !it.product_id || it.product_id === 'custom';
+    const isCustom = !it.product_id;
     return [
     isCustom ?
     `c:${(it.custom_item_name || '').trim().toLowerCase()}` :
@@ -119,7 +120,7 @@ export function NewSupplyRequestModal({
   const itemsForRequest = (requestId: string) =>
   supplyRequestItems.filter((i) => i.supply_request_id === requestId);
   const itemLabel = (it: { product_id?: string; custom_item_name?: string }) =>
-  it.product_id && it.product_id !== 'custom' ?
+  it.product_id ?
   products.find((p) => p.id === it.product_id)?.name ?? 'Item' :
   it.custom_item_name || 'Custom item';
   const deriveName = (
@@ -164,7 +165,6 @@ export function NewSupplyRequestModal({
         notes: it.notes ?? ''
       } :
       {
-        product_id: 'custom',
         custom_item_name: it.custom_item_name,
         quantity: it.quantity,
         unit: it.unit,
@@ -209,6 +209,24 @@ export function NewSupplyRequestModal({
     setItems(newItems);
     if (itemsError) setItemsError(undefined);
   };
+  // Product/custom is set together (mutually exclusive) by the search picker.
+  const handleProductChange = (
+  index: number,
+  next: { product_id?: string; custom_item_name?: string }) =>
+  {
+    const newItems = [...items];
+    newItems[index] = {
+      ...newItems[index],
+      product_id: next.product_id ?? '',
+      custom_item_name: next.custom_item_name
+    };
+    if (next.product_id) {
+      const product = products.find((p) => p.id === next.product_id);
+      if (product) newItems[index].unit = product.default_unit;
+    }
+    setItems(newItems);
+    if (itemsError) setItemsError(undefined);
+  };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (items.length === 0) {
@@ -217,7 +235,7 @@ export function NewSupplyRequestModal({
     }
     // Filter out empty items
     const validItems = items.filter(
-      (i) => i.product_id && i.product_id !== 'custom' || i.custom_item_name
+      (i) => i.product_id || i.custom_item_name
     );
     if (validItems.length === 0) {
       setItemsError('Select a product or enter a custom item.');
@@ -251,9 +269,8 @@ export function NewSupplyRequestModal({
       validItems.map((item) =>
       addSupplyRequestItem({
         supply_request_id: requestId,
-        product_id: item.product_id === 'custom' ? undefined : item.product_id,
-        custom_item_name:
-        item.product_id === 'custom' ? item.custom_item_name : undefined,
+        product_id: item.product_id || undefined,
+        custom_item_name: item.custom_item_name || undefined,
         quantity: Number(item.quantity) || 1,
         unit: item.unit || 'each',
         notes: item.notes?.trim() || undefined,
@@ -396,7 +413,6 @@ export function NewSupplyRequestModal({
 
           <div className="space-y-3">
             {items.map((item, index) => {
-              const isCustom = item.product_id === 'custom';
               return (
                 <div
                   key={index}
@@ -419,41 +435,20 @@ export function NewSupplyRequestModal({
                     }
                   </div>
 
-                  {/* Product picker */}
+                  {/* Product picker — searchable, with an "Other" free-text option */}
                   <div>
                     <Label htmlFor={`product-${index}`} className="text-xs" required>
                       Product
                     </Label>
-                    <Select
+                    <ProductSearchPicker
                       id={`product-${index}`}
-                      value={item.product_id || ''}
-                      onChange={(e) =>
-                      handleItemChange(index, 'product_id', e.target.value)
-                      }>
-                      
-                      <option value="">Select an item...</option>
-                      {products.map((p) =>
-                      <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      )}
-                      <option value="custom">Other (custom item)</option>
-                    </Select>
+                      products={products}
+                      value={{
+                        product_id: item.product_id,
+                        custom_item_name: item.custom_item_name
+                      }}
+                      onChange={(next) => handleProductChange(index, next)} />
 
-                    {isCustom &&
-                    <Input
-                      placeholder="Custom item name..."
-                      value={item.custom_item_name || ''}
-                      onChange={(e) =>
-                      handleItemChange(
-                        index,
-                        'custom_item_name',
-                        e.target.value
-                      )
-                      }
-                      className="mt-2" />
-
-                    }
                   </div>
 
                   {/* Quantity + Unit */}
@@ -590,11 +585,7 @@ export function NewSupplyRequestModal({
               onChange={(e) => setCommonName(e.target.value)}
               placeholder={
               deriveName(
-                items.filter(
-                  (i) =>
-                  i.product_id && i.product_id !== 'custom' ||
-                  i.custom_item_name
-                )
+                items.filter((i) => i.product_id || i.custom_item_name)
               ) || 'e.g. Monthly litter refill'
               }
               className="mt-2"

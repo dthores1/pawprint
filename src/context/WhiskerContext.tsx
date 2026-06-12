@@ -27,6 +27,8 @@ import {
   AnimalActionItem,
   AnimalRelationship,
   AnimalExternalListing,
+  MemberPermission,
+  OrgMember,
   AnimalPhoto,
   Person,
   Product,
@@ -101,6 +103,7 @@ import {
   externalListingToInsert,
   externalListingUpdateToRow } from
 '../lib/externalListingsApi';
+import { rowToMemberPermission } from '../lib/memberPermissionsApi';
 import {
   rowToPerson,
   personToInsert,
@@ -180,6 +183,10 @@ export interface WhiskerContextType {
   actionItems: AnimalActionItem[];
   relationships: AnimalRelationship[];
   externalListings: AnimalExternalListing[];
+  orgMembers: OrgMember[];
+  memberPermissions: MemberPermission[];
+  grantSupplyPermission: (memberId: string) => void;
+  revokeSupplyPermission: (memberId: string) => void;
   photos: AnimalPhoto[];
   /**
    * Heavy full rows loaded so far. Starts ACTIVE ONLY (+ self/account records);
@@ -693,6 +700,73 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   useEffect(() => {
     loadExternalListings();
   }, [loadExternalListings]);
+  // Org members (accounts) + their permission grants. Used to gate restricted
+  // actions (admin OR active grant) and to drive the Fulfillment Access UI.
+  const [orgMembers, setOrgMembers] = useState<OrgMember[]>([]);
+  const loadOrgMembers = useCallback(async () => {
+    if (!orgId) {
+      setOrgMembers([]);
+      return;
+    }
+    const { data, error } = await supabase.
+    from('organization_members').
+    select('id, user_id, role').
+    eq('organization_id', orgId).
+    order('created_at', { ascending: true });
+    if (error) {
+      console.error('[org members] load failed:', error.message);
+    } else {
+      setOrgMembers((data ?? []) as OrgMember[]);
+    }
+  }, [orgId]);
+  useEffect(() => {
+    loadOrgMembers();
+  }, [loadOrgMembers]);
+
+  const [memberPermissions, setMemberPermissions] = useState<MemberPermission[]>(
+    []
+  );
+  const loadMemberPermissions = useCallback(async () => {
+    if (!orgId) {
+      setMemberPermissions([]);
+      return;
+    }
+    const { data, error } = await supabase.
+    from('member_permissions').
+    select('*').
+    eq('organization_id', orgId);
+    if (error) {
+      console.error('[permissions] load failed:', error.message);
+    } else {
+      setMemberPermissions((data ?? []).map(rowToMemberPermission));
+    }
+  }, [orgId]);
+  useEffect(() => {
+    loadMemberPermissions();
+  }, [loadMemberPermissions]);
+
+  const grantSupplyPermission = async (memberId: string) => {
+    const { error } = await supabase.rpc('grant_member_permission', {
+      p_member_id: memberId,
+      p_permission_type: 'MANAGE_SUPPLY_REQUESTS'
+    });
+    if (error) {
+      console.error('[permissions] grant failed:', error.message);
+      return;
+    }
+    loadMemberPermissions();
+  };
+  const revokeSupplyPermission = async (memberId: string) => {
+    const { error } = await supabase.rpc('revoke_member_permission', {
+      p_member_id: memberId,
+      p_permission_type: 'MANAGE_SUPPLY_REQUESTS'
+    });
+    if (error) {
+      console.error('[permissions] revoke failed:', error.message);
+      return;
+    }
+    loadMemberPermissions();
+  };
   // Litters — org-scoped grouping objects. Members link via animals.litter_id.
   const [litters, setLitters] = useState<Litter[]>([]);
   const [littersLoading, setLittersLoading] = useState(false);
@@ -2657,6 +2731,10 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         actionItems,
         relationships,
         externalListings,
+        orgMembers,
+        memberPermissions,
+        grantSupplyPermission,
+        revokeSupplyPermission,
         photos,
         people,
         peopleIndex: mergedPeopleIndex,

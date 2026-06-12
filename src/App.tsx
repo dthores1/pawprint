@@ -14,7 +14,7 @@ import { FosterProfile } from './pages/FosterProfile';
 import { Contacts } from './pages/Contacts';
 import { ContactProfile } from './pages/ContactProfile';
 import { Requests } from './pages/Requests';
-import { ProductCatalog } from './pages/ProductCatalog';
+import { ManageSupplyOptions } from './pages/ManageSupplyOptions';
 import { Medical } from './pages/Medical';
 import { ClinicProfile } from './pages/ClinicProfile';
 import { ClinicCompletionPage } from './pages/ClinicCompletionPage';
@@ -64,7 +64,11 @@ function AppRoutes() {
         <Route path="fosters" element={<FostersList />} />
         <Route path="fosters/:id" element={<FosterProfile />} />
         <Route path="requests" element={<Requests />} />
-        <Route path="supplies/catalog" element={<ProductCatalog />} />
+        <Route path="supplies/options" element={<ManageSupplyOptions />} />
+        {/* Back-compat: old catalog path → new Manage Supply Options */}
+        <Route
+          path="supplies/catalog"
+          element={<Navigate to="/supplies/options" replace />} />
         <Route path="medical" element={<Medical />} />
         <Route path="clinics/:id" element={<ClinicProfile />} />
         <Route path="clinics/:id/complete" element={<ClinicCompletionPage />} />

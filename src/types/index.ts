@@ -705,6 +705,35 @@ export interface SupplyRequestItem {
   product_url?: string;
 }
 
+// ---- Member permissions ----------------------------------------------------
+// A restricted action is allowed when the member is an org admin/owner OR holds
+// an active grant for the matching permission type. Grants attach to an
+// organization_members.id (a membership). Only MANAGE_SUPPLY_REQUESTS is
+// enforced today; the rest are reserved for future Transport/Sitting gating.
+export type MemberPermissionType =
+'MANAGE_SUPPLY_REQUESTS' |
+'MANAGE_SUPPLY_OPTIONS' |
+'MANAGE_TRANSPORT_REQUESTS' |
+'MANAGE_SITTING_REQUESTS';
+
+export interface MemberPermission {
+  id: string;
+  organization_id: string;
+  member_id: string;
+  permission_type: MemberPermissionType;
+  is_active: boolean;
+  starts_at?: string;
+  ends_at?: string;
+  granted_by_member_id?: string;
+}
+
+/** A row from organization_members — an account's membership in an org. */
+export interface OrgMember {
+  id: string;
+  user_id: string;
+  role: 'owner' | 'admin' | 'member';
+}
+
 // — Transport Requests —————————————————————————————————————
 // Volunteers ferry animals or supplies. Common at orgs like Alley Cat Project
 // where cats move between trap site → vet → foster, and supplies are dropped
