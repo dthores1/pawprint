@@ -45,6 +45,7 @@ import {
   Trash2Icon,
   PencilIcon,
   TagIcon,
+  MapPinnedIcon,
   CheckIcon } from
 'lucide-react';
 import { format } from 'date-fns';
@@ -79,6 +80,8 @@ export function AnimalProfile() {
     breeds,
     traits,
     animalTraits,
+    sites,
+    externalListings,
     addPhoto,
     updateMedicalRecord
   } = useWhisker();
@@ -182,6 +185,10 @@ export function AnimalProfile() {
   const adopter = animal.adopted_by_id ?
   people.find((p) => p.id === animal.adopted_by_id) :
   null;
+  // Rescue Site this animal came from (drives the header "Origin" stat).
+  const originSite = animal.site_id ?
+  sites.find((s) => s.id === animal.site_id) :
+  null;
   const animalAdoptions = adoptions.filter((a) => a.animal_id === animal.id);
   // At most one in-progress adoption per animal (terminal ones — completed,
   // cancelled, returned — are history).
@@ -242,7 +249,13 @@ export function AnimalProfile() {
     ts: animal.intake_date,
     type: 'intake' as const,
     title: 'Intake',
-    description: `Source: ${animal.intake_source || 'Not specified'}`,
+    description: `Source: ${animal.intake_source || 'Not specified'}${
+    animal.site_id ?
+    ` · Site: ${
+    sites.find((s) => s.id === animal.site_id)?.name ?? 'Unknown'
+    }` :
+    ''
+    }`,
     icon: ActivityIcon,
     color: 'bg-[#E5E2DC] text-[#6B6B6B]'
   },
@@ -493,6 +506,14 @@ export function AnimalProfile() {
 
   const readinessPercent =
   checklist.filter((c) => c.done).length / checklist.length * 100;
+  // "Posted for Adoption" is a status row shown after the core readiness items.
+  // It reflects a published external listing (an outcome of being adoptable),
+  // so it's displayed but intentionally NOT counted in the readiness percentage.
+  const postedForAdoption = externalListings.some(
+    (l) => l.animal_id === animal.id && l.status === 'published'
+  );
+  const statusRows: ChecklistItem[] = [
+  { label: 'Posted for Adoption', done: postedForAdoption }];
   return (
     <div className="space-y-6 pb-12">
       <Link
@@ -723,10 +744,10 @@ export function AnimalProfile() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-6 border-t border-border">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-[#DCEAF7] text-[#356A9A] rounded-lg">
-                  <HomeIcon className="w-5 h-5" />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-6 border-t border-border">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 bg-[#DCEAF7] text-[#356A9A] rounded-lg shrink-0">
+                  <HomeIcon className="w-4 h-4" />
                 </div>
                 {isAdopted ?
                 <div>
@@ -781,40 +802,53 @@ export function AnimalProfile() {
                   </div>
                 }
               </div>
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-[#F3E4D7] text-[#D98C5F] rounded-lg">
-                  <SyringeIcon className="w-5 h-5" />
+              {originSite &&
+              <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 bg-primary/10 text-primary rounded-lg shrink-0">
+                    <MapPinnedIcon className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm text-text-secondary">Origin</p>
+                    <Link
+                    to={`/sites/${originSite.id}`}
+                    className="font-medium text-primary hover:underline truncate block">
+                      {originSite.name}
+                    </Link>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-text-secondary">Next Medical</p>
-                  {animalMedical.length === 0 ?
-                  <p className="font-medium text-text-secondary">
-                      No medical history yet
-                    </p> :
-                  overdueMedical.length > 0 ?
+              }
+              {animalMedical.length > 0 &&
+              <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 bg-[#F3E4D7] text-[#D98C5F] rounded-lg shrink-0">
+                    <SyringeIcon className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-text-secondary">Next Medical</p>
+                    {overdueMedical.length > 0 ?
                   <p className="font-medium text-status-urgent-text flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                      <span>
-                        {overdueMedical[0].procedure_name}
-                        {overdueMedical[0].due_date &&
+                        <span>
+                          {overdueMedical[0].procedure_name}
+                          {overdueMedical[0].due_date &&
                       ` (${formatDate(overdueMedical[0].due_date)})`}
-                      </span>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-[#F5D7D7] text-[#9B3A3A]">
-                        Overdue
-                      </span>
-                    </p> :
+                        </span>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-[#F5D7D7] text-[#9B3A3A]">
+                          Overdue
+                        </span>
+                      </p> :
                   upcomingMedical.length > 0 ?
                   <p className="font-medium text-text-primary">
-                      {upcomingMedical[0].procedure_name}
-                      {upcomingMedical[0].due_date &&
+                        {upcomingMedical[0].procedure_name}
+                        {upcomingMedical[0].due_date &&
                     ` (${formatDate(upcomingMedical[0].due_date)})`}
-                    </p> :
+                      </p> :
 
                   <p className="font-medium text-text-primary">Up to date</p>
                   }
+                  </div>
                 </div>
-              </div>
+              }
               {animal.description &&
-              <div className="flex items-start gap-3 sm:col-span-2">
+              <div className="flex items-start gap-3 sm:col-span-3">
                   <div className="p-2 bg-background text-text-secondary rounded-lg shrink-0">
                     <FileTextIcon className="w-5 h-5" />
                   </div>
@@ -1058,13 +1092,6 @@ export function AnimalProfile() {
 
         {/* Right Column: Sidebar Widgets */}
         <div className="space-y-6">
-          {/* External adoption listings (Petfinder, the org's site, social…) */}
-          <ExternalListingsCard animalId={animal.id} />
-
-
-          {/* Relationships (auto-hides when none exist) */}
-          <RelationshipsCard animalId={animal.id} />
-
           {/* Adoption Readiness */}
           <Card className="p-6">
             <h3 className="text-lg font-heading font-bold mb-4">
@@ -1076,7 +1103,7 @@ export function AnimalProfile() {
                 style={{
                   width: `${readinessPercent}%`
                 }} />
-              
+
             </div>
             <div className="space-y-3">
               {checklist.map((item, i) =>
@@ -1108,6 +1135,21 @@ export function AnimalProfile() {
                   </div>
                 </div>
               )}
+              {/* Post-readiness status (not counted in the % above). */}
+              <div className="pt-3 border-t border-border space-y-3">
+                {statusRows.map((item, i) =>
+                <div key={`status-${i}`} className="flex items-start gap-3">
+                    {item.done ?
+                  <CheckCircle2Icon className="w-5 h-5 text-[#3E7B52] shrink-0" /> :
+                  <PawPrintGlyph className="w-5 h-5 text-border shrink-0" />
+                  }
+                    <span
+                    className={item.done ? 'text-text-primary' : 'text-text-secondary'}>
+                      {item.label}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
             {readinessPercent === 100 &&
             animal.status !== 'adoptable' &&
@@ -1115,11 +1157,17 @@ export function AnimalProfile() {
             <Button
               className="w-full mt-6 bg-[#DDEFE2] text-[#3E7B52] hover:bg-[#C8E6D0]"
               onClick={() => setIsStatusModalOpen(true)}>
-              
+
                   Mark as Adoptable
                 </Button>
             }
           </Card>
+
+          {/* External adoption listings (Petfinder, the org's site, social…) */}
+          <ExternalListingsCard animalId={animal.id} />
+
+          {/* Relationships (auto-hides when none exist) */}
+          <RelationshipsCard animalId={animal.id} />
 
           {/* TODO - REMOVE THIS IF WE DON'T NEED…Upcoming Medical Widget */}
           {/* {upcomingMedical.length > 0 &&

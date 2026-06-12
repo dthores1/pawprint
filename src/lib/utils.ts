@@ -72,6 +72,18 @@ export function formatDate(dateString: string): string {
   });
 }
 
+/** Like formatDate but with the full month name, e.g. "June 11, 2026". */
+export function formatDateLong(dateString: string): string {
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(dateString) ?
+  new Date(`${dateString}T00:00:00`) :
+  new Date(dateString);
+  return d.toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric'
+  });
+}
+
 export function getDaysUntil(dateString: string): number {
   const target = new Date(dateString);
   const now = new Date();

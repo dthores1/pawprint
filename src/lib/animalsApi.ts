@@ -23,6 +23,7 @@ const WRITABLE_COLUMNS = [
 'estimated_age_as_of',
 'intake_date',
 'intake_source',
+'site_id',
 'status',
 'priority',
 'action_needed',
@@ -39,7 +40,7 @@ const WRITABLE_COLUMNS = [
 const;
 
 // uuid columns referencing people; skip non-uuid values (e.g. seed ids).
-const UUID_COLUMNS = new Set(['current_foster_id', 'adopted_by_id']);
+const UUID_COLUMNS = new Set(['current_foster_id', 'adopted_by_id', 'site_id']);
 
 // Date columns reject empty strings, so coalesce '' → null.
 const DATE_COLUMNS = new Set([
@@ -82,6 +83,7 @@ export function rowToAnimal(r: any): Animal {
     estimated_birth_date: r.estimated_birth_date ?? '',
     intake_date: r.intake_date ?? '',
     intake_source: r.intake_source ?? '',
+    site_id: r.site_id ?? undefined,
     status: r.status,
     priority: r.priority,
     action_needed: r.action_needed ?? undefined,
@@ -116,7 +118,7 @@ export function rowToAnimal(r: any): Animal {
 export const ANIMAL_INDEX_COLUMNS =
 'id,organization_id,name,rescue_id,microchip_number,species_id,status,priority,' +
 'sex,estimated_birth_date,primary_photo_url,is_on_hold,has_behavior_concern,' +
-'has_medical_concern,current_foster_id,adopted_by_id,litter_id,created_at,updated_at';
+'has_medical_concern,current_foster_id,adopted_by_id,litter_id,site_id,created_at,updated_at';
 
 // Read an entire org-scoped table in 1000-row `.range()` pages, concatenating
 // until a short page signals the end. Bypasses the PostgREST max-rows cap

@@ -1,16 +1,24 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { FieldError, Input, Textarea, Label } from '../ui/Forms';
 import { Button } from '../ui/Button';
 import { RolesMultiSelect } from '../ui/RolesMultiSelect';
 import { AddressAutocomplete } from '../ui/AddressAutocomplete';
 import { useWhisker } from '../../context/WhiskerContext';
-import { AddressValue, PersonRole } from '../../types';
+import { AddressValue, Person, PersonRole } from '../../types';
 import { legacyRoleFor } from '../../lib/peopleApi';
 import { addressValueToPersonFields } from '../../lib/address';
 interface AddContactModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Pre-select these roles when the form opens (e.g. 'community_contact' from a site). */
+  defaultRoles?: PersonRole[];
+  /**
+   * Called with the created Person after a successful save. Used by callers
+   * that launch this modal inline (e.g. the Rescue Site form) to capture the
+   * new contact and keep their own form open.
+   */
+  onCreated?: (person: Person) => void;
 }
 const INITIAL = {
   first_name: '',
@@ -37,23 +45,35 @@ function validateForm(form: typeof INITIAL): FormErrors {
   }
   return nextErrors;
 }
-export function AddContactModal({ isOpen, onClose }: AddContactModalProps) {
+export function AddContactModal({
+  isOpen,
+  onClose,
+  defaultRoles,
+  onCreated
+}: AddContactModalProps) {
   const { addPerson } = useWhisker();
   const [form, setForm] = useState(INITIAL);
   const [address, setAddress] = useState<AddressValue | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
+  // Seed the default roles each time the modal opens (the form otherwise resets
+  // to INITIAL on close).
+  useEffect(() => {
+    if (isOpen && defaultRoles && defaultRoles.length > 0) {
+      setForm((prev) => ({ ...prev, roles: defaultRoles }));
+    }
+  }, [isOpen, defaultRoles]);
   const handleClose = () => {
     setForm(INITIAL);
     setAddress(null);
     setErrors({});
     onClose();
   };
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const nextErrors = validateForm(form);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
-    addPerson({
+    const created = await addPerson({
       first_name: form.first_name.trim(),
       last_name: form.last_name.trim(),
       email: form.email.trim(),
@@ -69,6 +89,7 @@ export function AddContactModal({ isOpen, onClose }: AddContactModalProps) {
       active: true,
       ...addressValueToPersonFields(address)
     });
+    if (created && onCreated) onCreated(created);
     handleClose();
   };
   const set = (key: ContactField, value: string) => {

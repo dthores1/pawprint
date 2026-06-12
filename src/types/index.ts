@@ -105,6 +105,8 @@ export interface Animal {
   estimated_age_as_of?: string;
   intake_date: string;
   intake_source: string;
+  /** Optional link to the Rescue Site the animal was taken from (sites.id). */
+  site_id?: string;
   status: AnimalStatus;
   priority: Priority;
   /**
@@ -444,6 +446,51 @@ export interface AnimalNote {
   created_at: string;
 }
 
+export type SiteStatus =
+'reported' |
+'assessing' |
+'active' |
+'monitoring' |
+'closed';
+
+/** A physical location reported to the rescue that animals are taken from. */
+export interface Site {
+  id: string;
+  organization_id: string;
+  name: string;
+  status: SiteStatus;
+  /** Point-of-contact person (people.id). */
+  contact_id?: string;
+  /** Person coordinating the site (people.id). Defaults to the creator. */
+  site_lead?: string;
+  notes?: string;
+  /** Structured address (carries the map pin + lat/long). */
+  address?: AddressValue | null;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A person assigned to help at a site (many-to-many people <-> sites). */
+export interface SiteVolunteer {
+  id: string;
+  site_id: string;
+  contact_id: string;
+  /** Free-text role at this site, e.g. "Feeder", "Trapper". */
+  role?: string;
+  added_at: string;
+}
+
+/** A free-form note attached to a Site (parallel to AnimalNote). */
+export interface SiteNote {
+  id: string;
+  site_id: string;
+  author_name: string;
+  created_by?: string;
+  body: string;
+  created_at: string;
+}
+
 export interface AnimalRelationship {
   id: string;
   animal_id: string;
@@ -533,7 +580,8 @@ export type PersonRole =
 'transport' |
 'admin' |
 'event_support' |
-'social_media';
+'social_media' |
+'community_contact';
 export type VolunteerType =
 'foster_parent' |
 'administrative' |
@@ -714,7 +762,8 @@ export type MemberPermissionType =
 'MANAGE_SUPPLY_REQUESTS' |
 'MANAGE_SUPPLY_OPTIONS' |
 'MANAGE_TRANSPORT_REQUESTS' |
-'MANAGE_SITTING_REQUESTS';
+'MANAGE_SITTING_REQUESTS' |
+'MANAGE_SITES';
 
 export interface MemberPermission {
   id: string;

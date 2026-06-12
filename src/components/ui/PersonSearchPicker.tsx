@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { SearchIcon, XIcon } from 'lucide-react';
+import { SearchIcon, XIcon, UserPlusIcon } from 'lucide-react';
 import { Input } from './Forms';
 import { Avatar } from './Avatar';
 import { CalendarPopover } from './CalendarPopover';
@@ -17,6 +17,12 @@ interface Props {
   /** Hide these ids from results. */
   excludeIds?: string[];
   id?: string;
+  /**
+   * When supplied, a "+ New Contact" action shows at the bottom of the dropdown
+   * (Salesforce-style). The caller is responsible for opening a create flow and
+   * setting `value` to the new person's id once created.
+   */
+  onCreateNew?: () => void;
 }
 export function PersonSearchPicker({
   people,
@@ -25,7 +31,8 @@ export function PersonSearchPicker({
   placeholder = 'Search people by name or email…',
   role,
   excludeIds = [],
-  id
+  id,
+  onCreateNew
 }: Props) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -56,7 +63,7 @@ export function PersonSearchPicker({
 
   if (selected) {
     return (
-      <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border border-primary/30 bg-primary/5 min-h-[3.5rem]">
+      <div className="flex items-center justify-between gap-3 px-3 py-1.5 rounded-lg border border-primary/30 bg-primary/5">
         <div className="flex items-center gap-3 min-w-0">
           <Avatar
             src={selected.photo_url}
@@ -154,6 +161,22 @@ export function PersonSearchPicker({
                 </li>
             )}
             </ul>
+          }
+          {onCreateNew &&
+          <div className="border-t border-border">
+              <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                setQuery('');
+                onCreateNew();
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-sm font-medium text-primary hover:bg-primary/5 cursor-pointer transition-colors">
+
+                <UserPlusIcon className="w-4 h-4 shrink-0" />
+                New Contact{query.trim() ? ` "${query.trim()}"` : ''}
+              </button>
+            </div>
           }
         </div>
       </CalendarPopover>

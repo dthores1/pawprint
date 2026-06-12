@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { Modal } from '../ui/Modal';
-import { Textarea, Label, Input, Select } from '../ui/Forms';
+import { Textarea, Label, Input, Select, FieldError } from '../ui/Forms';
 import { PLACEMENT_PURPOSE_OPTIONS } from '../../lib/placementPurpose';
 import { PlacementPurpose } from '../../types';
 import { DatePicker } from '../ui/DatePicker';
@@ -42,6 +42,9 @@ export function PlaceAnimalModal({
   );
   const [placementPurpose, setPlacementPurpose] =
   useState<PlacementPurpose>('general_foster');
+  // Client-side only: a placement can't predate the animal's intake. Enforced in
+  // the UI (not the DB) so historical/bulk imports aren't blocked.
+  const [dateError, setDateError] = useState('');
   // Optional planned end date — only collected for time-boxed (non-general) stays.
   const [expectedEndDate, setExpectedEndDate] = useState('');
   const isTemporary = placementPurpose !== 'general_foster';
@@ -68,6 +71,9 @@ export function PlaceAnimalModal({
   !!selectedFoster?.roles.includes('foster_parent');
   const selectedAnimal =
   mode === 'foster' ? animals.find((a) => a.id === selectedId) : undefined;
+  // The animal being placed (the anchor in animal mode, the selection in foster
+  // mode) — its intake date is the earliest valid placement start.
+  const placementAnimal = mode === 'foster' ? selectedAnimal : anchorAnimal;
 
   // Species scoping for the animal search (foster mode only).
   const fosterPrefs = anchorFoster?.preferred_species ?? [];
@@ -192,11 +198,17 @@ export function PlaceAnimalModal({
       setStartDate(new Date().toISOString().split('T')[0]);
       setExpectedEndDate('');
       setPlacementPurpose('general_foster');
+      setDateError('');
     }
   }, [isOpen]);
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedId) return;
+    // A placement can't start before the animal was taken in (UI guard only).
+    if (placementAnimal?.intake_date && startDate < placementAnimal.intake_date) {
+      setDateError('Foster placement cannot occur before intake.');
+      return;
+    }
     // General Foster hides the end-date field; don't persist a stale value.
     const expectedEnd = isTemporary ? expectedEndDate || undefined : undefined;
     if (mode === 'foster') {
@@ -644,8 +656,13 @@ export function PlaceAnimalModal({
               id="start_date"
               required
               value={startDate}
-              onChange={setStartDate} />
-
+              min={placementAnimal?.intake_date || undefined}
+              error={Boolean(dateError)}
+              onChange={(v) => {
+                setStartDate(v);
+                if (dateError) setDateError('');
+              }} />
+            <FieldError>{dateError}</FieldError>
           </div>
           {isTemporary &&
           <div>

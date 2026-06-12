@@ -33,7 +33,8 @@ import {
   thisYearRange } from
 '../lib/reports';
 import { ADOPTION_STATUS_LABELS, isActiveAdoption } from '../lib/adoptions';
-import { AnimalStatus } from '../types';
+import { AnimalStatus, SiteStatus } from '../types';
+import { SITE_STATUS_META, SITE_STATUS_ORDER } from '../lib/siteStatus';
 import { formatDate } from '../lib/utils';
 import { speciesIconByName } from '../lib/speciesIcons';
 
@@ -68,6 +69,14 @@ const ADOPTION_COLORS: Record<string, string> = {
   returned: '#B5677E'
 };
 const NEUTRAL_BARS = ['#3E7B52', '#356A9A', '#B8632E', '#A36B00', '#6E4E80'];
+// Chart hexes for site statuses (the SITE_STATUS_META tones are CSS classes).
+const SITE_STATUS_COLORS: Record<SiteStatus, string> = {
+  reported: '#356A9A',
+  assessing: '#A36B00',
+  active: '#3E7B52',
+  monitoring: '#6E4E80',
+  closed: '#6B6B6B'
+};
 
 // Square marker for the Intake line so the two trend series stay
 // distinguishable without relying on color (Adoptions uses default circles).
@@ -222,7 +231,9 @@ export function ReportsPage() {
     clinicSlots,
     supplyRequests,
     supplyRequestItems,
-    products
+    products,
+    sites,
+    siteVolunteers
   } = useWhisker();
 
   // Reports must cover everything, but the default loads are scoped (animals =
@@ -237,6 +248,7 @@ export function ReportsPage() {
   const [range, setRange] = useState<DateRange>(thisMonthRange);
   const [appsChartType, setAppsChartType] = useState<ChartType>('pie');
   const [animalsChartType, setAnimalsChartType] = useState<ChartType>('pie');
+  const [sitesChartType, setSitesChartType] = useState<ChartType>('pie');
 
   // — Adoptions —————————————————————————————————————————————————————
   const adoptionsThisMonth = useMemo(() => {
@@ -328,6 +340,53 @@ export function ReportsPage() {
       ).length
     }));
   }, [animals, adoptions]);
+
+  // — Rescue Sites ——————————————————————————————————————————————————
+  // "Recovered" = animals whose intake falls in the range AND that came from a
+  // site (have an origin site_id).
+  const recoveredAnimals = useMemo(
+    () =>
+    animals.filter((a) => a.site_id && inRange(a.intake_date, range)),
+    [animals, range]
+  );
+  const newRescueSites = useMemo(
+    () => sites.filter((s) => inRange(s.created_at, range)).length,
+    [sites, range]
+  );
+  const activeSites = useMemo(
+    () => sites.filter((s) => s.status === 'active').length,
+    [sites]
+  );
+  const sitesWithVolunteers = useMemo(
+    () => new Set(siteVolunteers.map((v) => v.site_id)).size,
+    [siteVolunteers]
+  );
+  // Recovered animals grouped by origin site (in range), most active first.
+  const animalsBySite = useMemo(() => {
+    const acc = new Map<string, number>();
+    for (const a of recoveredAnimals) {
+      acc.set(a.site_id!, (acc.get(a.site_id!) ?? 0) + 1);
+    }
+    return Array.from(acc.entries()).
+    map(([siteId, count]) => ({
+      siteId,
+      name: sites.find((s) => s.id === siteId)?.name ?? 'Unknown site',
+      count
+    })).
+    sort((a, b) => b.count - a.count);
+  }, [recoveredAnimals, sites]);
+  const sitesByStatus = useMemo(() => {
+    const acc = new Map<SiteStatus, number>();
+    for (const s of sites) acc.set(s.status, (acc.get(s.status) ?? 0) + 1);
+    return SITE_STATUS_ORDER.
+    filter((st) => acc.has(st)).
+    map((st) => ({
+      status: st,
+      label: SITE_STATUS_META[st].label,
+      count: acc.get(st)!,
+      color: SITE_STATUS_COLORS[st]
+    }));
+  }, [sites]);
 
   // — Fosters ———————————————————————————————————————————————————————
   const newFostersInRange = useMemo(
@@ -660,6 +719,87 @@ export function ReportsPage() {
 
               </LineChart>
             </ResponsiveContainer>
+          </Card>
+        </div>
+      </section>
+
+      {/* Rescue Sites */}
+      <section>
+        <SectionTitle>Rescue Sites</SectionTitle>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          <MetricCard
+            label="New rescue sites"
+            value={newRescueSites}
+            hint="Created in selected range" />
+
+          <MetricCard
+            label="Recovered animals"
+            value={recoveredAnimals.length}
+            hint="From sites, intake in range" />
+
+          <MetricCard label="Active sites" value={activeSites} />
+          <MetricCard
+            label="Site volunteers"
+            value={siteVolunteers.length}
+            hint={`Across ${sitesWithVolunteers} site${
+            sitesWithVolunteers === 1 ? '' : 's'}`
+            } />
+
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Card className="p-5">
+            <h3 className="text-base font-semibold text-text-primary mb-3">
+              Animals by origin site
+            </h3>
+            {animalsBySite.length === 0 ?
+            <p className="text-sm text-text-secondary">
+                No animals recovered from sites in this range.
+              </p> :
+
+            <div className="max-h-[240px] overflow-y-auto -mx-2">
+                <table className="w-full text-left text-sm">
+                  <thead className="text-xs uppercase tracking-wider text-text-secondary border-b border-border">
+                    <tr>
+                      <th className="py-2 px-2 font-medium">Site</th>
+                      <th className="py-2 px-2 font-medium text-right">Animals</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {animalsBySite.map((row) =>
+                  <tr key={row.siteId}>
+                        <td className="py-2.5 px-2">
+                          <Link
+                        to={`/sites/${row.siteId}`}
+                        className="font-medium text-text-primary hover:text-primary truncate">
+                            {row.name}
+                          </Link>
+                        </td>
+                        <td className="py-2.5 px-2 text-right text-text-primary">
+                          {row.count}
+                        </td>
+                      </tr>
+                  )}
+                  </tbody>
+                </table>
+              </div>
+            }
+          </Card>
+
+          <Card className="p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-base font-semibold text-text-primary">
+                Sites by status
+              </h3>
+              <ChartTypeToggle
+                value={sitesChartType}
+                onChange={setSitesChartType} />
+
+            </div>
+            {sitesByStatus.length === 0 ?
+            <p className="text-sm text-text-secondary">No sites yet.</p> :
+
+            <StatusBreakdown data={sitesByStatus} type={sitesChartType} />
+            }
           </Card>
         </div>
       </section>

@@ -16,6 +16,8 @@ import { ContactProfile } from './pages/ContactProfile';
 import { Requests } from './pages/Requests';
 import { ManageSupplyOptions } from './pages/ManageSupplyOptions';
 import { Medical } from './pages/Medical';
+import { SitesList } from './pages/SitesList';
+import { SiteProfile } from './pages/SiteProfile';
 import { ClinicProfile } from './pages/ClinicProfile';
 import { ClinicCompletionPage } from './pages/ClinicCompletionPage';
 import { Login } from './pages/Login';
@@ -70,6 +72,8 @@ function AppRoutes() {
           path="supplies/catalog"
           element={<Navigate to="/supplies/options" replace />} />
         <Route path="medical" element={<Medical />} />
+        <Route path="sites" element={<SitesList />} />
+        <Route path="sites/:id" element={<SiteProfile />} />
         <Route path="clinics/:id" element={<ClinicProfile />} />
         <Route path="clinics/:id/complete" element={<ClinicCompletionPage />} />
         {/* Legacy paths — redirect to the consolidated Medical / Requests

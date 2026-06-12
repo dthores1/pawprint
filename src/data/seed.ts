@@ -29,6 +29,9 @@ import {
   ClinicSlotProcedure,
   AnimalActionItem,
   Litter,
+  Site,
+  SiteNote,
+  SiteVolunteer,
   Adoption } from
 '../types';
 
@@ -377,9 +380,28 @@ const SEED_ANIMALS_RAW: Animal[] = [
 
 // Stamp species_id from the species name so demo animals match the real model
 // (production sets species_id from the DB and derives the display name from it).
+// Cats taken from the North Beacon Hill colony (site1) — drives the demo
+// Site Summary + the site's animals roster.
+// Recent intake offsets (days ago) so the Reports "Animals by origin site"
+// widget has data: 3 land in the current month, 2 in earlier months this year.
+const SITE1_ANIMAL_INTAKE: Record<string, number> = {
+  a2: -2,
+  a4: -5,
+  a7: -8,
+  a8: -27,
+  a10: -52
+};
+
 export const seedAnimals: Animal[] = SEED_ANIMALS_RAW.map((a) => ({
   ...a,
-  species_id: a.species_id ?? seedSpecies.find((s) => s.name === a.species)?.id
+  species_id: a.species_id ?? seedSpecies.find((s) => s.name === a.species)?.id,
+  ...(a.id in SITE1_ANIMAL_INTAKE
+    ? {
+      site_id: 'site1',
+      intake_source: 'Community Cat Colony',
+      intake_date: seedDateOnly(SITE1_ANIMAL_INTAKE[a.id])
+    }
+    : {})
 }));
 
 
@@ -1656,4 +1678,116 @@ export const seedActionItems: AnimalActionItem[] = [
   completed_at: '2025-11-12T14:00:00Z',
   completed_by: 'demo',
   completion_note: 'Dental surgery completed; switched to soft-food recovery.'
+}];
+
+// — Rescue Sites — physical locations animals are taken from. Coordinates are
+// Seattle-area so the demo "distance from you" has something to compute against.
+export const seedSites: Site[] = [
+{
+  id: 'site1',
+  organization_id: 'demo-org',
+  name: 'North Beacon Hill Colony',
+  status: 'active',
+  contact_id: 'pe1',
+  site_lead: 'p_dan',
+  notes:
+  'Established colony behind the community garden. Reporter feeds nightly ~8pm. ' +
+  'TNR in progress — several already eartipped.',
+  address: {
+    formatted: '2600 15th Ave S, Seattle, WA 98144',
+    placeId: undefined,
+    city: 'Seattle',
+    state: 'WA',
+    postalCode: '98144',
+    country: 'US',
+    latitude: 47.5806,
+    longitude: -122.3119
+  },
+  created_at: '2025-10-02T16:00:00Z',
+  updated_at: '2025-11-20T16:00:00Z'
+},
+{
+  id: 'site2',
+  organization_id: 'demo-org',
+  name: 'Rainier Ave Warehouse',
+  status: 'assessing',
+  contact_id: 'pe1',
+  site_lead: 'pe1',
+  notes: 'Caller reports 6–8 cats living around the loading dock. Awaiting site visit.',
+  address: {
+    formatted: '3800 Rainier Ave S, Seattle, WA 98118',
+    city: 'Seattle',
+    state: 'WA',
+    postalCode: '98118',
+    country: 'US',
+    latitude: 47.5673,
+    longitude: -122.2876
+  },
+  created_at: '2025-11-18T19:30:00Z',
+  updated_at: '2025-11-18T19:30:00Z'
+},
+{
+  id: 'site3',
+  organization_id: 'demo-org',
+  name: 'Greenwood Backyard Report',
+  status: 'reported',
+  contact_id: undefined,
+  notes: 'New report via the website form — mother cat + kittens under a porch.',
+  address: {
+    formatted: '8500 Greenwood Ave N, Seattle, WA 98103',
+    city: 'Seattle',
+    state: 'WA',
+    postalCode: '98103',
+    country: 'US',
+    latitude: 47.6907,
+    longitude: -122.3551
+  },
+  // Recent so the demo "New" (last 7 days) tab has something to show.
+  created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+  updated_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+}];
+
+export const seedSiteNotes: SiteNote[] = [
+{
+  id: 'sn1',
+  site_id: 'site1',
+  author_name: 'You',
+  created_by: 'u_dan',
+  body: 'Trapped 3 more on Nov 18 — all transported to the Saturday clinic for S/N.',
+  created_at: '2025-11-18T22:00:00Z'
+},
+{
+  id: 'sn2',
+  site_id: 'site1',
+  author_name: 'You',
+  created_by: 'u_dan',
+  body: 'Reporter confirms one new unfixed tom showed up this week. Set traps Thursday.',
+  created_at: '2025-11-26T18:30:00Z'
+}];
+
+// Site volunteer roster. site1 is led by the demo user (p_dan, set above), so
+// "My Sites" includes it via the lead; p_dan also volunteers at site2, so it
+// shows there too. The Site Lead is rendered at the top of the list in the UI
+// and is intentionally NOT duplicated as a volunteer row.
+export const seedSiteVolunteers: SiteVolunteer[] = [
+{
+  id: 'svol1',
+  site_id: 'site1',
+  contact_id: 'pe5',
+  role: 'Feeder',
+  added_at: '2025-10-05T16:00:00Z'
+},
+{
+  id: 'svol2',
+  site_id: 'site1',
+  contact_id: 'pe6',
+  role: 'Trapper',
+  added_at: '2025-10-12T16:00:00Z'
+},
+{
+  id: 'svol3',
+  site_id: 'site2',
+  contact_id: 'p_dan',
+  role: 'Transport',
+  added_at: '2025-11-19T16:00:00Z'
 }];

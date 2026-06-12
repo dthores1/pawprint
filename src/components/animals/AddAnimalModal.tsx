@@ -8,6 +8,7 @@ import { AgeInformationFields, AgeInputMode } from './AgeInformationFields';
 import { BreedCombobox } from './BreedCombobox';
 import { TraitMultiSelect } from './TraitMultiSelect';
 import { LitterForm } from './LitterForm';
+import { SiteSearchPicker } from '../ui/SiteSearchPicker';
 import { useWhisker } from '../../context/WhiskerContext';
 import { AnimalStatus, Sex, Priority, AgeUnit } from '../../types';
 import { deriveAgeInfo } from '../../lib/age';
@@ -18,6 +19,12 @@ interface AddAnimalModalProps {
   onClose: () => void;
   /** Which sub-form to open on first render (e.g. 'litter' from the Litters tab). */
   initialMode?: AddMode;
+  /**
+   * Pre-link created animal(s) to a Rescue Site (e.g. when launched from a
+   * Site profile). When set, the Site field shows the locked site instead of
+   * a picker.
+   */
+  initialSiteId?: string;
 }
 const INITIAL = {
   name: '',
@@ -95,14 +102,22 @@ type AddMode = 'single' | 'litter';
 export function AddAnimalModal({
   isOpen,
   onClose,
-  initialMode = 'single'
+  initialMode = 'single',
+  initialSiteId
 }: AddAnimalModalProps) {
-  const { addAnimal, setAnimalTraits, species: speciesCatalog, organizationSpecies } =
-  useWhisker();
+  const {
+    addAnimal,
+    setAnimalTraits,
+    species: speciesCatalog,
+    organizationSpecies,
+    sites
+  } = useWhisker();
   const [traitIds, setTraitIds] = useState<string[]>([]);
   const enabledSpecies = enabledSpeciesList(speciesCatalog, organizationSpecies);
   const [mode, setMode] = useState<AddMode>(initialMode);
   const [formData, setFormData] = useState(INITIAL);
+  const [siteId, setSiteId] = useState(initialSiteId ?? '');
+  const lockedSite = initialSiteId ? sites.find((s) => s.id === initialSiteId) : null;
   const [ageMode, setAgeMode] = useState<AgeInputMode>('birthdate');
   const [errors, setErrors] = useState<FormErrors>({});
   // Lifted from LitterForm so the modal's sticky footer can show the correct
@@ -123,14 +138,18 @@ export function AddAnimalModal({
   const selectedSpecies = speciesCatalog.find((s) => s.id === formData.species_id);
   // Open on the requested sub-form each time the modal is shown.
   useEffect(() => {
-    if (isOpen) setMode(initialMode);
-  }, [isOpen, initialMode]);
+    if (isOpen) {
+      setMode(initialMode);
+      setSiteId(initialSiteId ?? '');
+    }
+  }, [isOpen, initialMode, initialSiteId]);
   const handleClose = () => {
     setFormData(INITIAL);
     setTraitIds([]);
     setAgeMode('birthdate');
     setErrors({});
     setMode(initialMode);
+    setSiteId(initialSiteId ?? '');
     setLitterMembersCount(2);
     setLitterSubmitting(false);
     onClose();
@@ -158,6 +177,7 @@ export function AddAnimalModal({
       breed_text: formData.breed_text,
       intake_date: formData.intake_date,
       intake_source: formData.intake_source.trim(),
+      site_id: siteId || undefined,
       status: formData.status,
       priority: formData.priority,
       description: formData.description.trim(),
@@ -261,6 +281,8 @@ export function AddAnimalModal({
         <LitterForm
           onClose={handleClose}
           formId="add-litter-form"
+          siteId={siteId || undefined}
+          lockedSiteName={lockedSite?.name}
           onMembersCountChange={setLitterMembersCount}
           onSubmittingChange={setLitterSubmitting} /> :
 
@@ -439,6 +461,20 @@ export function AddAnimalModal({
                 {errors.intake_source}
               </FieldError>
             </div>
+          </div>
+          <div>
+            <Label htmlFor="site">Rescue Site (optional)</Label>
+            {lockedSite ?
+            <div className="px-3 py-2 rounded-lg border border-primary/30 bg-primary/5 text-sm font-medium text-text-primary">
+                {lockedSite.name}
+              </div> :
+
+            <SiteSearchPicker
+              id="site"
+              sites={sites}
+              value={siteId}
+              onChange={setSiteId} />
+            }
           </div>
         </FormSection>
 

@@ -18,6 +18,10 @@ interface LitterFormProps {
   onMembersCountChange?: (count: number) => void;
   /** Notifies the parent that the async submit is in flight so the sticky button can disable + show "Adding…". */
   onSubmittingChange?: (submitting: boolean) => void;
+  /** When set, links every litter member to this Rescue Site. */
+  siteId?: string;
+  /** Display name of the locked site (shown read-only when launched from a Site). */
+  lockedSiteName?: string;
 }
 
 interface MemberRow {
@@ -46,7 +50,9 @@ export function LitterForm({
   onClose,
   formId,
   onMembersCountChange,
-  onSubmittingChange
+  onSubmittingChange,
+  siteId,
+  lockedSiteName
 }: LitterFormProps) {
   const { addLitter, species: speciesCatalog, organizationSpecies } =
   useWhisker();
@@ -134,6 +140,7 @@ export function LitterForm({
         estimated_birth_date: ageInfo.estimated_birth_date,
         intake_date: intakeDate,
         intake_source: intakeSource.trim() || undefined,
+        site_id: siteId,
         notes: notes.trim() || undefined,
         birthdate_source: ageInfo.birthdate_source,
         estimated_age_value: ageInfo.estimated_age_value,
@@ -239,6 +246,17 @@ export function LitterForm({
             <FieldError>{errors.intake_source}</FieldError>
           </div>
         </div>
+
+        {lockedSiteName &&
+        <div>
+            <Label htmlFor="litter_site">Rescue Site</Label>
+            <div
+            id="litter_site"
+            className="px-3 py-2 rounded-lg border border-primary/30 bg-primary/5 text-sm font-medium text-text-primary">
+              {lockedSiteName}
+            </div>
+          </div>
+        }
 
         <div>
           <Label htmlFor="litter_name">Litter Name (optional)</Label>

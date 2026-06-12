@@ -5,6 +5,7 @@ import {
   HomeIcon,
   UsersIcon,
   StethoscopeIcon,
+  MapPinnedIcon,
   InboxIcon,
   BuildingIcon,
   BarChart3Icon,
@@ -39,6 +40,11 @@ export const navItems = [
   to: '/medical',
   icon: StethoscopeIcon,
   label: 'Medical'
+},
+{
+  to: '/sites',
+  icon: MapPinnedIcon,
+  label: 'Rescue Sites'
 },
 {
   to: '/requests',

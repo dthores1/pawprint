@@ -41,6 +41,9 @@ import {
   ClinicSlot,
   ClinicSlotProcedure,
   ClinicSlotProcedureType,
+  Site,
+  SiteNote,
+  SiteVolunteer,
   ArchiveTable,
   ArchivedRecord } from
 '../types';
@@ -150,6 +153,15 @@ import {
   clinicSlotProcedureToInsert,
   clinicSlotProcedureUpdateToRow } from
 '../lib/clinicApi';
+import {
+  rowToSite,
+  siteToInsert,
+  siteUpdateToRow,
+  rowToSiteNote,
+  siteNoteToInsert,
+  rowToSiteVolunteer,
+  siteVolunteerToInsert } from
+'../lib/sitesApi';
 export interface WhiskerContextType {
   /**
    * Heavy full rows loaded so far. Starts IN-CARE ONLY; grows on demand via
@@ -264,6 +276,8 @@ export interface WhiskerContextType {
     estimated_age_value?: number;
     estimated_age_unit?: Animal['estimated_age_unit'];
     estimated_age_as_of?: string;
+    /** Links every member animal to this Rescue Site. */
+    site_id?: string;
   },
   members: { name: string; sex: Sex; description?: string }[])
   => Promise<void>;
@@ -424,6 +438,28 @@ export interface WhiskerContextType {
   updates: Partial<ClinicSlotProcedure>)
   => void;
   deleteClinicSlotProcedure: (id: string) => void;
+  // Rescue Sites
+  sites: Site[];
+  siteNotes: SiteNote[];
+  siteVolunteers: SiteVolunteer[];
+  addSite: (
+  site: Omit<Site, 'id' | 'created_at' | 'updated_at'>)
+  => Promise<string>;
+  updateSite: (id: string, updates: Partial<Site>) => void;
+  /** Soft-delete a site (RLS-gated to MANAGE_SITES holders). */
+  deleteSite: (id: string) => Promise<void>;
+  addSiteNote: (
+  note: Omit<SiteNote, 'id' | 'created_at' | 'author_name'>)
+  => void;
+  /** Add a person to a site's volunteer roster (idempotent per person/site). */
+  addSiteVolunteer: (
+  vol: Omit<SiteVolunteer, 'id' | 'added_at'>)
+  => void;
+  /** Remove a site volunteer row. */
+  removeSiteVolunteer: (id: string) => void;
+  /** Grant / revoke the MANAGE_SITES permission for a member. */
+  grantSitePermission: (memberId: string) => void;
+  revokeSitePermission: (memberId: string) => void;
   // --- Archive / Recycle Bin ---
   /**
    * Soft-delete a record. Goes through the archive_record RPC, which enforces
@@ -767,6 +803,28 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     }
     loadMemberPermissions();
   };
+  const grantSitePermission = async (memberId: string) => {
+    const { error } = await supabase.rpc('grant_member_permission', {
+      p_member_id: memberId,
+      p_permission_type: 'MANAGE_SITES'
+    });
+    if (error) {
+      console.error('[permissions] grant failed:', error.message);
+      return;
+    }
+    loadMemberPermissions();
+  };
+  const revokeSitePermission = async (memberId: string) => {
+    const { error } = await supabase.rpc('revoke_member_permission', {
+      p_member_id: memberId,
+      p_permission_type: 'MANAGE_SITES'
+    });
+    if (error) {
+      console.error('[permissions] revoke failed:', error.message);
+      return;
+    }
+    loadMemberPermissions();
+  };
   // Litters — org-scoped grouping objects. Members link via animals.litter_id.
   const [litters, setLitters] = useState<Litter[]>([]);
   const [littersLoading, setLittersLoading] = useState(false);
@@ -1052,6 +1110,9 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   const [clinicSlotProcedures, setClinicSlotProcedures] = useState<
     ClinicSlotProcedure[]>(
     []);
+  const [sites, setSites] = useState<Site[]>([]);
+  const [siteNotes, setSiteNotes] = useState<SiteNote[]>([]);
+  const [siteVolunteers, setSiteVolunteers] = useState<SiteVolunteer[]>([]);
   const loadCoordination = useCallback(async () => {
     if (!orgId) {
       setProducts([]);
@@ -1063,6 +1124,9 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       setClinicEvents([]);
       setClinicSlots([]);
       setClinicSlotProcedures([]);
+      setSites([]);
+      setSiteNotes([]);
+      setSiteVolunteers([]);
       return;
     }
     const tables = [
@@ -1099,7 +1163,13 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     [
     'clinic_slot_procedures',
     (rows: any[]) =>
-    setClinicSlotProcedures(rows.map(rowToClinicSlotProcedure))]] as
+    setClinicSlotProcedures(rows.map(rowToClinicSlotProcedure))],
+
+    ['sites', (rows: any[]) => setSites(rows.map(rowToSite))],
+    [
+    'site_notes',
+    (rows: any[]) =>
+    setSiteNotes(rows.map((r) => rowToSiteNote(r, currentUserLite)))]] as
     const;
     await Promise.all(
       tables.map(async ([table, set]) => {
@@ -1115,6 +1185,20 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         }
       })
     );
+    // site_volunteers is a plain join table (no is_deleted column), so it's
+    // loaded separately from the uniform is_deleted-filtered batch above.
+    const sv = await supabase.
+    from('site_volunteers').
+    select('*').
+    eq('organization_id', orgId);
+    if (sv.error) {
+      console.error('[site_volunteers] load failed:', sv.error.message);
+    } else {
+      setSiteVolunteers((sv.data ?? []).map(rowToSiteVolunteer));
+    }
+    // currentUserLite is a fresh object each render (used only to label site
+    // note authors); including it would re-create loadCoordination every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orgId]);
   useEffect(() => {
     loadCoordination();
@@ -1436,6 +1520,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         estimated_age_as_of: shared.estimated_age_as_of,
         intake_date: shared.intake_date,
         intake_source: shared.intake_source ?? '',
+        site_id: shared.site_id,
         status: 'intake',
         priority: 'normal',
         description: m.description ?? '',
@@ -2354,6 +2439,116 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       status: 'claimed'
     });
   };
+  // — Rescue Sites —————————————————————————————————
+  const addSite = async (
+  site: Omit<Site, 'id' | 'created_at' | 'updated_at'>) =>
+  {
+    if (!orgId) {
+      console.error('[sites] cannot create — no current organization');
+      return '';
+    }
+    const { data, error } = await supabase.
+    from('sites').
+    insert(siteToInsert(site, orgId, user?.id ?? null)).
+    select('*').
+    single();
+    if (error || !data) {
+      console.error('[sites] create failed:', error?.message);
+      return '';
+    }
+    setSites((prev) => [rowToSite(data), ...prev]);
+    return data.id as string;
+  };
+  const updateSite = (id: string, updates: Partial<Site>) => {
+    setSites((prev) =>
+    prev.map((s) =>
+    s.id === id ?
+    { ...s, ...updates, updated_at: new Date().toISOString() } :
+    s
+    )
+    );
+    const row = siteUpdateToRow(updates);
+    if (Object.keys(row).length === 0) return;
+    supabase.
+    from('sites').
+    update(row).
+    eq('id', id).
+    then(({ error }) => {
+      if (error) {
+        console.error('[sites] update failed:', error.message);
+        loadCoordination();
+      }
+    });
+  };
+  const deleteSite = async (id: string) => {
+    // Optimistic remove; soft-delete via a direct RLS-gated update (MANAGE_SITES).
+    setSites((prev) => prev.filter((s) => s.id !== id));
+    const { error } = await supabase.
+    from('sites').
+    update({
+      is_deleted: true,
+      deleted_at: new Date().toISOString(),
+      deleted_by: user?.id ?? null
+    }).
+    eq('id', id);
+    if (error) {
+      console.error('[sites] delete failed:', error.message);
+      loadCoordination();
+    }
+  };
+  const addSiteNote = async (
+  note: Omit<SiteNote, 'id' | 'created_at' | 'author_name'>) =>
+  {
+    if (!orgId) {
+      console.error('[site notes] cannot create — no current organization');
+      return;
+    }
+    const { data, error } = await supabase.
+    from('site_notes').
+    insert(siteNoteToInsert(note, orgId, user?.id ?? null)).
+    select('*').
+    single();
+    if (error) {
+      console.error('[site notes] create failed:', error.message);
+      return;
+    }
+    if (data) {
+      setSiteNotes((prev) => [rowToSiteNote(data, currentUserLite), ...prev]);
+    }
+  };
+  const addSiteVolunteer = async (
+  vol: Omit<SiteVolunteer, 'id' | 'added_at'>) =>
+  {
+    if (!orgId) {
+      console.error('[site volunteers] cannot create — no current organization');
+      return;
+    }
+    const { data, error } = await supabase.
+    from('site_volunteers').
+    insert(siteVolunteerToInsert(vol, orgId)).
+    select('*').
+    single();
+    if (error) {
+      console.error('[site volunteers] create failed:', error.message);
+      return;
+    }
+    if (data) {
+      setSiteVolunteers((prev) => [...prev, rowToSiteVolunteer(data)]);
+    }
+  };
+  const removeSiteVolunteer = (id: string) => {
+    setSiteVolunteers((prev) => prev.filter((v) => v.id !== id));
+    supabase.
+    from('site_volunteers').
+    delete().
+    eq('id', id).
+    then(({ error }) => {
+      if (error) {
+        console.error('[site volunteers] remove failed:', error.message);
+        loadCoordination();
+      }
+    });
+  };
   // — Sitting Requests —————————————————————————————————
   const addSittingRequest = async (
   req: Omit<SittingRequest, 'id' | 'created_at' | 'updated_at'>,
@@ -2822,6 +3017,17 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         addClinicSlotProcedure,
         updateClinicSlotProcedure,
         deleteClinicSlotProcedure,
+        sites,
+        siteNotes,
+        siteVolunteers,
+        addSite,
+        updateSite,
+        deleteSite,
+        addSiteNote,
+        addSiteVolunteer,
+        removeSiteVolunteer,
+        grantSitePermission,
+        revokeSitePermission,
         archiveRecord,
         restoreRecord,
         fetchArchived

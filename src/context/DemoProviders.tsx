@@ -24,6 +24,9 @@ import {
   ClinicSlotProcedure,
   AnimalActionItem,
   Litter,
+  Site,
+  SiteNote,
+  SiteVolunteer,
   Adoption } from
 '../types';
 import { NewPhotoInput } from '../lib/photosApi';
@@ -56,6 +59,9 @@ import {
   seedClinicSlots,
   seedClinicSlotProcedures,
   seedLitters,
+  seedSites,
+  seedSiteNotes,
+  seedSiteVolunteers,
   seedAdoptions } from
 '../data/seed';
 import { generateId } from '../lib/utils';
@@ -145,6 +151,10 @@ export function DemoWhiskerProvider({
   const [clinicSlotProcedures, setClinicSlotProcedures] = useState<
     ClinicSlotProcedure[]>(
     seedClinicSlotProcedures);
+  const [sites, setSites] = useState<Site[]>(seedSites);
+  const [siteNotes, setSiteNotes] = useState<SiteNote[]>(seedSiteNotes);
+  const [siteVolunteers, setSiteVolunteers] =
+  useState<SiteVolunteer[]>(seedSiteVolunteers);
 
   const [organizationSpecies, setOrganizationSpecies] = useState(
     seedOrganizationSpecies
@@ -371,6 +381,7 @@ export function DemoWhiskerProvider({
         estimated_age_as_of: shared.estimated_age_as_of,
         intake_date: shared.intake_date,
         intake_source: shared.intake_source ?? '',
+        site_id: shared.site_id,
         status: 'intake',
         priority: 'normal',
         description: m.description ?? '',
@@ -943,6 +954,87 @@ export function DemoWhiskerProvider({
     ),
     deleteClinicSlotProcedure: (id) =>
     setClinicSlotProcedures((prev) => prev.filter((p) => p.id !== id)),
+    // Rescue Sites
+    sites,
+    siteNotes,
+    siteVolunteers,
+    addSiteVolunteer: (vol) =>
+    setSiteVolunteers((prev) =>
+    prev.some(
+      (v) => v.site_id === vol.site_id && v.contact_id === vol.contact_id
+    ) ?
+    prev :
+    [
+    ...prev,
+    {
+      ...vol,
+      id: `svol${generateId()}`,
+      added_at: now()
+    }]
+    ),
+    removeSiteVolunteer: (id) =>
+    setSiteVolunteers((prev) => prev.filter((v) => v.id !== id)),
+    addSite: async (site) => {
+      const id = `site${generateId()}`;
+      setSites((prev) => [
+      {
+        ...site,
+        id,
+        organization_id: 'demo-org',
+        created_at: now(),
+        updated_at: now()
+      },
+      ...prev]
+      );
+      return id;
+    },
+    updateSite: (id, updates) =>
+    setSites((prev) =>
+    prev.map((s) =>
+    s.id === id ? { ...s, ...updates, updated_at: now() } : s
+    )
+    ),
+    deleteSite: async (id) =>
+    setSites((prev) => prev.filter((s) => s.id !== id)),
+    addSiteNote: (note) =>
+    setSiteNotes((prev) => [
+    {
+      ...note,
+      id: `sn${generateId()}`,
+      author_name: 'You',
+      created_by: 'u_dan',
+      created_at: now()
+    },
+    ...prev]
+    ),
+    grantSitePermission: (memberId: string) =>
+    setMemberPermissions((prev) =>
+    prev.some(
+      (p) =>
+      p.member_id === memberId &&
+      p.permission_type === 'MANAGE_SITES' &&
+      p.is_active
+    ) ?
+    prev :
+    [
+    ...prev,
+    {
+      id: `mp${generateId()}`,
+      organization_id: 'demo-org',
+      member_id: memberId,
+      permission_type: 'MANAGE_SITES',
+      is_active: true,
+      starts_at: new Date().toISOString()
+    }]
+    ),
+    revokeSitePermission: (memberId: string) =>
+    setMemberPermissions((prev) =>
+    prev.map((p) =>
+    p.member_id === memberId && p.permission_type === 'MANAGE_SITES' ?
+    { ...p, is_active: false } :
+    p
+    )
+    ),
     // Demo mode has no real archive layer (the demo store is in-memory),
     // so these are stubs that no-op against the seed. Recycle Bin returns
     // an empty list. This keeps the contract while ensuring demo never

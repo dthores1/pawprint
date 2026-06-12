@@ -29,7 +29,8 @@ export const ROLE_GROUPS: {
   { value: 'social_media', label: 'Social Media' },
   { value: 'trapper', label: 'Trapper' },
   { value: 'transport', label: 'Transport' },
-  { value: 'donor', label: 'Donor' }]
+  { value: 'donor', label: 'Donor' },
+  { value: 'community_contact', label: 'Community Contact' }]
 
 },
 {
