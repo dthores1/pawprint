@@ -100,7 +100,7 @@ export function AnimalsList() {
   // default) to keep the list above the fold; they're always shown at md+.
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [searchParams] = useSearchParams();
-  // Initialize filters from the URL (e.g. /animals?status=intake,medical),
+  // Initialize filters from the URL (e.g. /animals?status=intake,in_care),
   // keeping only values that match a known option.
   const parseParam = (key: string, allowed: readonly string[]) =>
   (searchParams.get(key) ?? '').

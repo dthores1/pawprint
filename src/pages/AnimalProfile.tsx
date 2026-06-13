@@ -470,12 +470,12 @@ export function AnimalProfile() {
   'needs_number' :
   'pending';
   // Behavior is "assessed" once there's no open behavior concern AND the animal
-  // is past initial intake/medical (either placed in foster, or moved to a later
-  // lifecycle stage where behavior would have been evaluated).
+  // is past the initial intake/in-care stage (either placed in foster, or moved
+  // to a later lifecycle stage where behavior would have been evaluated).
   const behaviorAssessed =
   !animal.has_behavior_concern && (
   !!animal.current_foster_id ||
-  animal.status !== 'intake' && animal.status !== 'medical');
+  animal.status !== 'intake' && animal.status !== 'in_care');
   type ChecklistItem = {
     label: string;
     done: boolean;

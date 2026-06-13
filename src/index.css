@@ -12,6 +12,13 @@
 
 /* END TAILWIND IMPORTS — ALL OTHER CSS MUST GO BELOW THIS LINE */
 
+/* Snappier highlight on relational typeahead option rows. The default 150ms
+   color transition made arrow-key navigation feel laggy as the highlight moved.
+   Unlayered so it wins over Tailwind's `transition-colors` utility. */
+[data-ta-index] {
+  transition-duration: 75ms;
+}
+
 @layer base {
   body {
     @apply bg-background text-text-primary font-sans antialiased;

@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { useWhisker } from '../../context/WhiskerContext';
 import { PhotoCategory } from '../../types';
 import { UploadIcon, LinkIcon } from 'lucide-react';
+import { focusFirstError } from '../../lib/focusFirstError';
 interface AddPhotoModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -89,10 +90,12 @@ export function AddPhotoModal({
     e.preventDefault();
     if (uploadMode === 'file' && files.length === 0) {
       setSourceError('Choose at least one image.');
+      requestAnimationFrame(() => focusFirstError(['photo_source']));
       return;
     }
     if (uploadMode === 'url' && !url.trim()) {
       setSourceError('Photo URL is required.');
+      requestAnimationFrame(() => focusFirstError(['photo_source']));
       return;
     }
     setSubmitting(true);
@@ -157,7 +160,7 @@ export function AddPhotoModal({
         onSubmit={handleSubmit}
         className="space-y-5"
         noValidate>
-        <div>
+        <div id="photo_source" style={{ scrollMarginTop: '1rem' }}>
           <div className="flex items-center justify-between mb-2">
             <Label className="mb-0" required>Photo Source</Label>
             <div className="flex bg-background rounded-lg p-1">

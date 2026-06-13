@@ -10,7 +10,8 @@ import { StatusBadge } from '../ui/Badge';
 import { useWhisker } from '../../context/WhiskerContext';
 import { SearchIcon, XIcon, CheckIcon, AlertTriangleIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { animalDisplayName } from '../../lib/utils';
+import { animalDisplayName, cn } from '../../lib/utils';
+import { useTypeaheadKeyboard } from '../../lib/useTypeaheadKeyboard';
 
 // Placement can be launched from either side of the relationship:
 //   • animal-anchored (pass animalId): search for a foster to place this animal
@@ -54,6 +55,7 @@ export function PlaceAnimalModal({
   // preferred species; this opts out of that scoping.
   const [showAllSpecies, setShowAllSpecies] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   // Fixed anchor (from props) + the selected counterpart (from state).
   const anchorAnimal = animalId ?
@@ -263,6 +265,23 @@ export function PlaceAnimalModal({
     setQuery('');
   };
 
+  // Flat list of the currently-shown options, in render order, for keyboard nav.
+  // Animal mode lists fosters then other contacts; foster mode lists animals.
+  const navChoices: (() => void)[] =
+  mode === 'foster' ?
+  animalResults.map((a) => () => handleSelectAnimal(a.id)) :
+  [
+  ...fosterResults.map(({ foster }) => () => handleSelectFoster(foster.id)),
+  ...otherContactResults.map((c) => () => handleSelectFoster(c.id))];
+
+  const { activeIndex, setActiveIndex, onKeyDown } = useTypeaheadKeyboard({
+    open,
+    setOpen,
+    count: navChoices.length,
+    onChoose: (i) => navChoices[i](),
+    menuRef
+  });
+
   const title =
   mode === 'foster' && anchorFoster ?
   `Place Animal with ${anchorFoster.first_name} ${anchorFoster.last_name}` :
@@ -425,12 +444,14 @@ export function PlaceAnimalModal({
                 setOpen(true);
               }}
               onFocus={() => setOpen(true)}
+              onKeyDown={onKeyDown}
               className="pl-9" />
 
 
               <AnimatePresence>
                 {open &&
               <motion.div
+                ref={menuRef}
                 initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
@@ -455,12 +476,17 @@ export function PlaceAnimalModal({
                                 Foster Parents
                               </div>
                               <ul className="py-1">
-                                {fosterResults.map(({ foster, active, isFull }) =>
+                                {fosterResults.map(({ foster, active, isFull }, i) =>
                         <li key={foster.id}>
                                     <button
                             type="button"
+                            data-ta-index={i}
+                            onMouseEnter={() => setActiveIndex(i)}
                             onClick={() => handleSelectFoster(foster.id)}
-                            className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-background cursor-pointer">
+                            className={cn(
+                              'w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-background cursor-pointer',
+                              activeIndex === i && 'bg-background'
+                            )}>
 
                                       <div className="flex items-center gap-3 min-w-0">
                                         <Avatar
@@ -498,12 +524,20 @@ export function PlaceAnimalModal({
                                 Other Contacts
                               </div>
                               <ul className="py-1">
-                                {otherContactResults.map((contact) =>
+                                {otherContactResults.map((contact, j) =>
                         <li key={contact.id}>
                                     <button
                             type="button"
+                            data-ta-index={fosterResults.length + j}
+                            onMouseEnter={() =>
+                            setActiveIndex(fosterResults.length + j)
+                            }
                             onClick={() => handleSelectFoster(contact.id)}
-                            className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-background cursor-pointer">
+                            className={cn(
+                              'w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-background cursor-pointer',
+                              activeIndex === fosterResults.length + j &&
+                              'bg-background'
+                            )}>
 
                                       <div className="flex items-center gap-3 min-w-0">
                                         <Avatar
@@ -564,12 +598,17 @@ export function PlaceAnimalModal({
                         </div> :
 
                   <ul className="py-1">
-                          {animalResults.map((animal) =>
+                          {animalResults.map((animal, j) =>
                     <li key={animal.id}>
                               <button
                         type="button"
+                        data-ta-index={j}
+                        onMouseEnter={() => setActiveIndex(j)}
                         onClick={() => handleSelectAnimal(animal.id)}
-                        className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-background cursor-pointer transition-colors">
+                        className={cn(
+                          'w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-background cursor-pointer transition-colors',
+                          activeIndex === j && 'bg-background'
+                        )}>
 
                                 <div className="flex items-center gap-3 min-w-0">
                                   <Avatar

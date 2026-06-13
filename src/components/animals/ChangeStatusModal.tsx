@@ -6,6 +6,7 @@ import { DatePicker } from '../ui/DatePicker';
 import { FormSection } from '../ui/FormSection';
 import { Button } from '../ui/Button';
 import { AgeInformationFields, AgeInputMode } from './AgeInformationFields';
+import { focusFirstError } from '../../lib/focusFirstError';
 import { BreedCombobox } from './BreedCombobox';
 import { TraitMultiSelect } from './TraitMultiSelect';
 import { useWhisker } from '../../context/WhiskerContext';
@@ -186,8 +187,11 @@ export function ChangeStatusModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Validation runs top-to-bottom and stops at the first failure; scroll that
+    // field into view so the block isn't invisible when it's below the fold.
     if (!name.trim() && !rescueId.trim()) {
       setNameError('Animals must have either a Name or Rescue ID.');
+      requestAnimationFrame(() => focusFirstError(['edit_name']));
       return;
     }
     const ageInfo = deriveAgeInfo({
@@ -198,14 +202,19 @@ export function ChangeStatusModal({
     });
     if (!ageInfo.valid) {
       setAgeError('Enter a birthdate or an estimated age.');
+      const ageId =
+      ageMode === 'age' ? 'estimated_age_value' : 'estimated_birthdate';
+      requestAnimationFrame(() => focusFirstError([ageId]));
       return;
     }
     if (!intakeDate) {
       setIntakeDateError('Intake date is required.');
+      requestAnimationFrame(() => focusFirstError(['edit_intake_date']));
       return;
     }
     if (!isValidUrl(photoUrl.trim())) {
       setPhotoError('Enter a valid URL.');
+      requestAnimationFrame(() => focusFirstError(['edit_photo']));
       return;
     }
     const changes: string[] = [];
@@ -501,7 +510,7 @@ export function ChangeStatusModal({
                 onChange={(e) => setStatus(e.target.value as AnimalStatus)}>
 
                 <option value="intake">Intake</option>
-                <option value="medical">Medical</option>
+                <option value="in_care">In Care</option>
                 <option value="adoptable">Adoptable</option>
                 <option value="adopted">Adopted</option>
                 <option value="released">Released</option>

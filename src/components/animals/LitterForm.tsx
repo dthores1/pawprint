@@ -9,6 +9,7 @@ import { useWhisker } from '../../context/WhiskerContext';
 import { Sex, AgeUnit } from '../../types';
 import { deriveAgeInfo } from '../../lib/age';
 import { enabledSpeciesList, defaultSpeciesId } from '../../lib/orgCatalog';
+import { focusFirstError } from '../../lib/focusFirstError';
 
 interface LitterFormProps {
   onClose: () => void;
@@ -128,7 +129,19 @@ export function LitterForm({
       nextErrors.intake_source = 'Intake source is required.';
     }
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+    if (Object.keys(nextErrors).length > 0) {
+      // Map each error to its visible input id (top-to-bottom) and scroll to
+      // the first — the litter form is tall enough to hide the intake fields.
+      const birthdateId =
+      ageMode === 'age' ? 'estimated_age_value' : 'estimated_birthdate';
+      const ids = [
+      nextErrors.birthdate && birthdateId,
+      nextErrors.intake_date && 'litter_intake_date',
+      nextErrors.intake_source && 'litter_intake_source'].
+      filter((v): v is string => Boolean(v));
+      requestAnimationFrame(() => focusFirstError(ids));
+      return;
+    }
 
     setSubmitting(true);
     await addLitter(

@@ -7,6 +7,7 @@ import { AddressAutocomplete } from '../ui/AddressAutocomplete';
 import { useWhisker } from '../../context/WhiskerContext';
 import { AddressValue, Person, PersonRole } from '../../types';
 import { legacyRoleFor } from '../../lib/peopleApi';
+import { focusFirstError } from '../../lib/focusFirstError';
 import {
   addressValueToPersonFields,
   personToAddressValue } from
@@ -27,6 +28,14 @@ type ContactForm = {
   active: boolean;
 };
 type FormErrors = Partial<Record<keyof ContactForm, string>>;
+// Validatable fields in visual order; on a blocked submit we scroll to the
+// first with an error. Keys match the input ids except `roles`, whose target
+// is the wrapper div (the RolesMultiSelect has no single focusable input).
+const ERROR_FIELD_ORDER: (keyof ContactForm)[] = [
+'first_name',
+'last_name',
+'email',
+'roles'];
 
 function fromPerson(p: Person): ContactForm {
   return {
@@ -77,7 +86,11 @@ export function EditContactModal({
     e.preventDefault();
     const nextErrors = validateForm(form);
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+    if (Object.keys(nextErrors).length > 0) {
+      const ids = ERROR_FIELD_ORDER.filter((f) => nextErrors[f]);
+      requestAnimationFrame(() => focusFirstError(ids));
+      return;
+    }
     updatePerson(person.id, {
       first_name: form.first_name.trim(),
       last_name: form.last_name.trim(),
@@ -172,7 +185,7 @@ export function EditContactModal({
             onChange={setAddress} />
         </div>
 
-        <div>
+        <div id="roles" style={{ scrollMarginTop: '1rem' }}>
           <Label required>Roles</Label>
           <RolesMultiSelect
             value={form.roles}

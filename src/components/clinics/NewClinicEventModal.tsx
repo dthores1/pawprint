@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { FieldError, Input, Textarea, Label } from '../ui/Forms';
+import { focusFirstError } from '../../lib/focusFirstError';
 import { DateTimePicker } from '../ui/DateTimePicker';
 import { AddressAutocomplete } from '../ui/AddressAutocomplete';
 import { Button } from '../ui/Button';
 import { PersonSearchPicker } from '../ui/PersonSearchPicker';
+import { AddContactModal } from '../contacts/AddContactModal';
 import { useWhisker } from '../../context/WhiskerContext';
 import { AddressValue } from '../../types';
 
@@ -50,6 +52,10 @@ export function NewClinicEventModal({ isOpen, onClose }: Props) {
   const { addClinicEvent, peopleIndex: people } = useWhisker();
   const [form, setForm] = useState<ClinicForm>(INITIAL);
   const [errors, setErrors] = useState<FormErrors>({});
+  // Which person field (if any) is creating a new contact inline.
+  const [createTarget, setCreateTarget] = useState<'vet' | 'contact' | null>(
+    null
+  );
 
   // Vet picker filters to people with role 'vet'. Contact picker accepts
   // anyone — some clinics have one person serving both roles, while at
@@ -71,7 +77,15 @@ export function NewClinicEventModal({ isOpen, onClose }: Props) {
     e.preventDefault();
     const nextErrors = validateForm(form);
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+    if (Object.keys(nextErrors).length > 0) {
+      const ids = [
+      nextErrors.dateTime && 'datetime',
+      nextErrors.capacity && 'capacity',
+      nextErrors.location && 'location'].
+      filter((v): v is string => Boolean(v));
+      requestAnimationFrame(() => focusFirstError(ids));
+      return;
+    }
     addClinicEvent({
       date_time: new Date(form.dateTime).toISOString(),
       location: form.location?.formatted.trim() ?? '',
@@ -160,6 +174,7 @@ export function NewClinicEventModal({ isOpen, onClose }: Props) {
             role="vet"
             value={form.vetId}
             onChange={(value) => set('vetId', value)}
+            onCreateNew={() => setCreateTarget('vet')}
             placeholder="Search veterinarians by name or organization…" />
 
         </div>
@@ -170,6 +185,7 @@ export function NewClinicEventModal({ isOpen, onClose }: Props) {
             people={people}
             value={form.contactId}
             onChange={(value) => set('contactId', value)}
+            onCreateNew={() => setCreateTarget('contact')}
             placeholder="Search staff, volunteers, or vets…" />
 
         </div>
@@ -185,6 +201,20 @@ export function NewClinicEventModal({ isOpen, onClose }: Props) {
 
         </div>
       </form>
+
+      {/* Inline "New Contact" flow — stacks above the clinic form, which keeps
+          its state so the new person lands back in the field that opened it. */}
+      <AddContactModal
+        isOpen={createTarget !== null}
+        defaultRoles={[createTarget === 'vet' ? 'vet' : 'rescue_staff']}
+        onCreated={(person) =>
+        setForm((prev) => ({
+          ...prev,
+          [createTarget === 'vet' ? 'vetId' : 'contactId']: person.id
+        }))
+        }
+        onClose={() => setCreateTarget(null)} />
+
     </Modal>);
 
 }

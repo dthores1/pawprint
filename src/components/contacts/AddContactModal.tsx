@@ -8,6 +8,7 @@ import { useWhisker } from '../../context/WhiskerContext';
 import { AddressValue, Person, PersonRole } from '../../types';
 import { legacyRoleFor } from '../../lib/peopleApi';
 import { addressValueToPersonFields } from '../../lib/address';
+import { focusFirstError } from '../../lib/focusFirstError';
 interface AddContactModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -31,6 +32,14 @@ const INITIAL = {
 };
 type ContactField = keyof typeof INITIAL;
 type FormErrors = Partial<Record<ContactField, string>>;
+// Validatable fields in visual order; on a blocked submit we scroll to the
+// first with an error. Keys match the input ids except `roles`, whose target
+// is the wrapper div (the RolesMultiSelect has no single focusable input).
+const ERROR_FIELD_ORDER: ContactField[] = [
+'first_name',
+'last_name',
+'email',
+'roles'];
 
 function validateForm(form: typeof INITIAL): FormErrors {
   const nextErrors: FormErrors = {};
@@ -72,7 +81,11 @@ export function AddContactModal({
     e.preventDefault();
     const nextErrors = validateForm(form);
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+    if (Object.keys(nextErrors).length > 0) {
+      const ids = ERROR_FIELD_ORDER.filter((f) => nextErrors[f]);
+      requestAnimationFrame(() => focusFirstError(ids));
+      return;
+    }
     const created = await addPerson({
       first_name: form.first_name.trim(),
       last_name: form.last_name.trim(),
@@ -179,7 +192,7 @@ export function AddContactModal({
 
         </div>
 
-        <div>
+        <div id="roles" style={{ scrollMarginTop: '1rem' }}>
           <Label required>Roles</Label>
           <RolesMultiSelect
             value={form.roles}

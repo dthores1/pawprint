@@ -7,6 +7,7 @@ import { AddressAutocomplete } from '../ui/AddressAutocomplete';
 import { useWhisker } from '../../context/WhiskerContext';
 import { AddressValue, PersonRole } from '../../types';
 import { enabledSpeciesList } from '../../lib/orgCatalog';
+import { focusFirstError } from '../../lib/focusFirstError';
 interface AddFosterModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -38,6 +39,15 @@ const INITIAL_FORM: FosterForm = {
 };
 type FormField = keyof FosterForm;
 type FormErrors = Partial<Record<FormField, string>>;
+// Validatable fields in visual order; on a blocked submit we scroll to the
+// first with an error (each key matches its input's DOM id).
+const ERROR_FIELD_ORDER: FormField[] = [
+'first_name',
+'last_name',
+'email',
+'phone',
+'address',
+'max_capacity'];
 
 // Provides form validations -- required fields, validation rules, email formatting, etc.
 function validateForm(formData: FosterForm): FormErrors {
@@ -81,7 +91,11 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
     e.preventDefault();
     const nextErrors = validateForm(formData);
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+    if (Object.keys(nextErrors).length > 0) {
+      const ids = ERROR_FIELD_ORDER.filter((f) => nextErrors[f]);
+      requestAnimationFrame(() => focusFirstError(ids));
+      return;
+    }
     const addr = formData.address;
     addFoster({
       ...formData,

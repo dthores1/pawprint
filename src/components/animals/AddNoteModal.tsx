@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { FieldError, Select, Textarea, Label } from '../ui/Forms';
+import { focusFirstError } from '../../lib/focusFirstError';
 import { Button } from '../ui/Button';
 import { useWhisker } from '../../context/WhiskerContext';
 import { Animal, NoteType } from '../../types';
@@ -22,6 +23,7 @@ export function AddNoteModal({ isOpen, onClose, animalId, animal }: AddNoteModal
     e.preventDefault();
     if (!formData.body.trim()) {
       setBodyError('Note content is required.');
+      requestAnimationFrame(() => focusFirstError(['body']));
       return;
     }
     addNote({

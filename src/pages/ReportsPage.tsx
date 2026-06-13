@@ -40,7 +40,7 @@ import { speciesIconByName } from '../lib/speciesIcons';
 
 const STATUS_LABEL: Record<AnimalStatus, string> = {
   intake: 'Intake',
-  medical: 'Medical',
+  in_care: 'In Care',
   adoptable: 'Adoptable',
   adopted: 'Adopted',
   released: 'Released',
@@ -51,7 +51,7 @@ const STATUS_LABEL: Record<AnimalStatus, string> = {
 // Palette tuned to the existing status tokens so charts blend with the rest.
 const STATUS_COLORS: Record<AnimalStatus, string> = {
   intake: '#6B6B6B',
-  medical: '#A36B00',
+  in_care: '#525694',
   adoptable: '#3E7B52',
   adopted: '#B8632E',
   released: '#4F7A70',

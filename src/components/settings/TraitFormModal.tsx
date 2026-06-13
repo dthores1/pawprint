@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { useWhisker } from '../../context/WhiskerContext';
 import { Trait } from '../../types';
 import { cn } from '../../lib/utils';
+import { focusFirstError } from '../../lib/focusFirstError';
 
 interface Props {
   isOpen: boolean;
@@ -34,6 +35,7 @@ export function TraitFormModal({ isOpen, onClose, trait }: Props) {
     const n = name.trim();
     if (!n) {
       setError('Name is required.');
+      requestAnimationFrame(() => focusFirstError(['trait_name']));
       return;
     }
     const payload = {

@@ -6,6 +6,7 @@ import { PersonSearchPicker } from '../ui/PersonSearchPicker';
 import { useWhisker } from '../../context/WhiskerContext';
 import { legacyRoleFor } from '../../lib/peopleApi';
 import { animalDisplayName } from '../../lib/utils';
+import { focusFirstError } from '../../lib/focusFirstError';
 
 interface StartAdoptionModalProps {
   isOpen: boolean;
@@ -75,12 +76,14 @@ export function StartAdoptionModal({
       if (!selectedId) {
         setError('Select a contact, or add a new one.');
         setSubmitting(false);
+        requestAnimationFrame(() => focusFirstError(['adopter_existing']));
         return;
       }
     } else {
       if (!first.trim() || !last.trim() || !email.trim()) {
         setError('First name, last name, and email are required.');
         setSubmitting(false);
+        requestAnimationFrame(() => focusFirstError(['adopter_first']));
         return;
       }
       const created = await addPerson({
@@ -158,7 +161,7 @@ export function StartAdoptionModal({
         </div>
 
         {mode === 'existing' ?
-        <div>
+        <div id="adopter_existing" style={{ scrollMarginTop: '1rem' }}>
             <Label required>Adopter</Label>
             <PersonSearchPicker
             people={directory}

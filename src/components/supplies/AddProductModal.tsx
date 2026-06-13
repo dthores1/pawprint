@@ -4,6 +4,7 @@ import { FieldError, Input, Select, Label } from '../ui/Forms';
 import { Button } from '../ui/Button';
 import { useWhisker } from '../../context/WhiskerContext';
 import { Product, ProductCategory } from '../../types';
+import { focusFirstError } from '../../lib/focusFirstError';
 
 const CATEGORIES: { value: ProductCategory; label: string }[] = [
 { value: 'food', label: 'Food' },
@@ -53,6 +54,7 @@ export function AddProductModal({ isOpen, onClose, product }: Props) {
     e.preventDefault();
     if (!name.trim()) {
       setNameError('Name is required.');
+      requestAnimationFrame(() => focusFirstError(['product_name']));
       return;
     }
     if (editing && product) {

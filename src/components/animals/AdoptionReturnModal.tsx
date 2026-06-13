@@ -6,6 +6,7 @@ import { DatePicker } from '../ui/DatePicker';
 import { PersonSearchPicker } from '../ui/PersonSearchPicker';
 import { useWhisker } from '../../context/WhiskerContext';
 import { animalDisplayName } from '../../lib/utils';
+import { focusFirstError } from '../../lib/focusFirstError';
 import {
   ADOPTION_RETURN_REASONS,
   ADOPTION_RETURN_REASON_LABELS } from
@@ -88,14 +89,17 @@ export function AdoptionReturnModal({
     e.preventDefault();
     if (!returnedAt) {
       setError('A return date is required.');
+      requestAnimationFrame(() => focusFirstError(['returned_at']));
       return;
     }
     if (!reason) {
       setError('A return reason is required.');
+      requestAnimationFrame(() => focusFirstError(['return_reason']));
       return;
     }
     if (!hasRecord && !adopterId) {
       setError('Select the original adopter.');
+      requestAnimationFrame(() => focusFirstError(['return_adopter']));
       return;
     }
     setSubmitting(true);
@@ -159,7 +163,7 @@ export function AdoptionReturnModal({
                 {animalDisplayName(animal)}
               </div>
             </div>
-            <div>
+            <div id="return_adopter" style={{ scrollMarginTop: '1rem' }}>
               <Label required>Adopter</Label>
               <PersonSearchPicker
               people={directory}

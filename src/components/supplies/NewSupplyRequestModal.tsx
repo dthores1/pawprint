@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { FieldError, Input, Select, Textarea, Label } from '../ui/Forms';
 import { ProductSearchPicker } from '../ui/ProductSearchPicker';
+import { focusFirstError } from '../../lib/focusFirstError';
 import { Button } from '../ui/Button';
 import { useWhisker } from '../../context/WhiskerContext';
 import { useAuth } from '../../context/AuthContext';
@@ -231,6 +232,7 @@ export function NewSupplyRequestModal({
     e.preventDefault();
     if (items.length === 0) {
       setItemsError('Add at least one item.');
+      requestAnimationFrame(() => focusFirstError(['supply_items']));
       return;
     }
     // Filter out empty items
@@ -239,6 +241,7 @@ export function NewSupplyRequestModal({
     );
     if (validItems.length === 0) {
       setItemsError('Select a product or enter a custom item.');
+      requestAnimationFrame(() => focusFirstError(['supply_items']));
       return;
     }
     // Don't create a duplicate template: if "save as common" is on but the
@@ -408,7 +411,7 @@ export function NewSupplyRequestModal({
         */}
 
         {/* Items — card-style stacked layout */}
-        <div>
+        <div id="supply_items" style={{ scrollMarginTop: '1rem' }}>
           <Label className="mb-3" required>Items</Label>
 
           <div className="space-y-3">

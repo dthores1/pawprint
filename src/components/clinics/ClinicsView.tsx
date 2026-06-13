@@ -16,6 +16,23 @@ function isCompletable(status: ClinicEventStatus): boolean {
   return status !== 'completed' && status !== 'cancelled';
 }
 
+// Completed/cancelled are terminal — the clinic is done with, so it never sits in
+// Upcoming even if its scheduled date hasn't arrived yet (it falls to Past, or
+// stays under Today on the day itself — today's events always show under Today).
+function isTerminalStatus(status: ClinicEventStatus): boolean {
+  return status === 'completed' || status === 'cancelled';
+}
+
+type ClinicTab = 'today' | 'upcoming' | 'past';
+
+// Midnight (local) of an ISO timestamp's calendar day. Bucketing compares whole
+// days, not exact times, so a clinic earlier *today* reads as Today, not Past.
+function dayStartOf(iso: string): number {
+  const d = new Date(iso);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
 const EVENT_STATUS_LABEL: Record<ClinicEventStatus, string> = {
   planning: 'Planning',
   scheduled: 'Scheduled',
@@ -33,30 +50,50 @@ const EVENT_STATUS_PILL: Record<ClinicEventStatus, string> = {
 
 export function ClinicsView() {
   const { clinicEvents, clinicSlots, peopleIndex: people } = useWhisker();
-  const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
   const navigate = useNavigate();
 
-  const now = Date.now();
-  const { upcoming, past } = useMemo(() => {
+  // Stable for the session (a clinic doesn't change buckets just because the
+  // user kept the tab open across midnight — a refresh re-evaluates).
+  const startOfToday = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  }, []);
+
+  // Land on Today when there's something on today (it's the operational focus —
+  // clinic day is when you complete the clinic); otherwise default to Upcoming.
+  const [tab, setTab] = useState<ClinicTab>(() =>
+  clinicEvents.some((e) => dayStartOf(e.date_time) === startOfToday) ?
+  'today' :
+  'upcoming'
+  );
+
+  const { today, upcoming, past } = useMemo(() => {
     const sorted = [...clinicEvents].sort(
       (a, b) =>
       new Date(a.date_time).getTime() - new Date(b.date_time).getTime()
     );
-    return {
-      upcoming: sorted.filter(
-        (e) =>
-        new Date(e.date_time).getTime() >= now && e.status !== 'cancelled'
-      ),
-      past: sorted.
-      filter(
-        (e) =>
-        new Date(e.date_time).getTime() < now || e.status === 'cancelled'
-      ).
-      reverse()
-    };
-  }, [clinicEvents, now]);
+    const today: ClinicEvent[] = [];
+    const upcoming: ClinicEvent[] = [];
+    const past: ClinicEvent[] = [];
+    for (const e of sorted) {
+      const day = dayStartOf(e.date_time);
+      if (day === startOfToday) {
+        // Everything happening today, whatever its status.
+        today.push(e);
+      } else if (day > startOfToday && !isTerminalStatus(e.status)) {
+        upcoming.push(e);
+      } else {
+        // Before today, or a terminal (completed/cancelled) clinic on a future date.
+        past.push(e);
+      }
+    }
+    past.reverse();
+    return { today, upcoming, past };
+  }, [clinicEvents, startOfToday]);
 
-  const display = tab === 'upcoming' ? upcoming : past;
+  const display =
+  tab === 'today' ? today : tab === 'upcoming' ? upcoming : past;
 
   const filledFor = (e: ClinicEvent) =>
   clinicSlots.filter(
@@ -94,6 +131,7 @@ export function ClinicsView() {
           value={tab}
           onChange={(k) => setTab(k as typeof tab)}
           tabs={[
+          { key: 'today', label: `Today (${today.length})` },
           { key: 'upcoming', label: `Upcoming (${upcoming.length})` },
           { key: 'past', label: `Past (${past.length})` }]} />
 
@@ -112,7 +150,11 @@ export function ClinicsView() {
       <Card className="p-10 text-center text-text-secondary">
           <StethoscopeIcon className="w-10 h-10 mx-auto mb-3 opacity-30" />
           <p className="font-medium text-text-primary mb-1">
-            {tab === 'upcoming' ? 'No upcoming clinics' : 'No past clinics'}
+            {tab === 'today' ?
+            'No clinics today' :
+            tab === 'upcoming' ?
+            'No upcoming clinics' :
+            'No past clinics'}
           </p>
           {tab === 'upcoming' &&
         <p className="text-sm">

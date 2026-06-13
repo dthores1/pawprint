@@ -18,6 +18,7 @@ import {
   ClinicSlotProcedureType } from
 '../types';
 import { cn, formatDate } from '../lib/utils';
+import { isInCare } from '../lib/animalStatus';
 import {
   ArrowLeftIcon,
   StethoscopeIcon,
@@ -155,8 +156,12 @@ export function ClinicProfile() {
   people.find((p) => p.id === event.intake_coordinator_person_id) :
   undefined;
 
+  // Only animals still in the rescue's care can be scheduled — adopted/released/
+  // deceased animals shouldn't show up in the clinic slot search.
   const animalsAvailable = animals.filter(
-    (a) => !slots.some((s) => s.animal_id === a.id && s.status !== 'cancelled')
+    (a) =>
+    isInCare(a.status) &&
+    !slots.some((s) => s.animal_id === a.id && s.status !== 'cancelled')
   );
 
   // Any not-yet-finished clinic can be completed (including Planning — people

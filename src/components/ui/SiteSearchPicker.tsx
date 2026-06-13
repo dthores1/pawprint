@@ -5,6 +5,7 @@ import { CalendarPopover } from './CalendarPopover';
 import { Site } from '../../types';
 import { SITE_STATUS_META } from '../../lib/siteStatus';
 import { cn } from '../../lib/utils';
+import { useTypeaheadKeyboard } from '../../lib/useTypeaheadKeyboard';
 
 // Single-select typeahead for picking a Rescue Site. Same UX shape as the other
 // relational pickers (see CLAUDE.md "Relational pickers" convention).
@@ -28,6 +29,7 @@ export function SiteSearchPicker({
   const [open, setOpen] = useState(false);
   const [menuWidth, setMenuWidth] = useState<number>();
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const selected = sites.find((s) => s.id === value) || null;
 
   const results = useMemo(() => {
@@ -39,6 +41,18 @@ export function SiteSearchPicker({
     }).
     slice(0, 12);
   }, [sites, query]);
+
+  const { activeIndex, setActiveIndex, onKeyDown } = useTypeaheadKeyboard({
+    open,
+    setOpen,
+    count: results.length,
+    onChoose: (i) => {
+      onChange(results[i].id);
+      setOpen(false);
+      setQuery('');
+    },
+    menuRef
+  });
 
   useLayoutEffect(() => {
     if (open) setMenuWidth(wrapperRef.current?.offsetWidth);
@@ -93,6 +107,7 @@ export function SiteSearchPicker({
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
+        onKeyDown={onKeyDown}
         className="pl-9" />
 
       <CalendarPopover
@@ -101,25 +116,33 @@ export function SiteSearchPicker({
         onClose={() => setOpen(false)}
         padded={false}>
 
-        <div style={{ width: menuWidth }} className="max-h-72 overflow-y-auto">
+        <div
+          ref={menuRef}
+          style={{ width: menuWidth }}
+          className="max-h-72 overflow-y-auto">
           {results.length === 0 ?
           <div className="p-4 text-sm text-text-secondary text-center">
               {query ? <>No sites match "{query}".</> : 'No sites available.'}
             </div> :
 
           <ul className="py-1">
-              {results.map((s) => {
+              {results.map((s, i) => {
               const meta = SITE_STATUS_META[s.status];
               return (
                 <li key={s.id}>
                     <button
                     type="button"
+                    data-ta-index={i}
+                    onMouseEnter={() => setActiveIndex(i)}
                     onClick={() => {
                       onChange(s.id);
                       setOpen(false);
                       setQuery('');
                     }}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-background cursor-pointer transition-colors">
+                    className={cn(
+                      'w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-background cursor-pointer transition-colors',
+                      activeIndex === i && 'bg-background'
+                    )}>
                       <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
                         <MapPinnedIcon className="w-4 h-4" />
                       </div>

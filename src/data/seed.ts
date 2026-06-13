@@ -128,7 +128,7 @@ const BREED_DATA: [BreedSpecies, string[]][] = [
 'Chihuahua', 'Chihuahua Mix', 'Husky', 'Husky Mix', 'Australian Shepherd',
 'Border Collie', 'Boxer', 'Poodle', 'Standard Poodle', 'Miniature Poodle',
 'Shih Tzu', 'Yorkshire Terrier', 'Dachshund', 'Beagle', 'Corgi',
-'Great Pyrenees', 'Mastiff', 'Doberman Pinscher', 'Rottweiler',
+'Great Pyrenees', 'Great Dane', 'Mastiff', 'Doberman Pinscher', 'Rottweiler',
 'Pomeranian', 'French Bulldog', 'Bulldog', 'Cocker Spaniel',
 'Jack Russell Terrier', 'Boston Terrier']],
 ['cat', [
@@ -180,7 +180,8 @@ const SEED_ANIMALS_RAW: Animal[] = [
   estimated_birth_date: '2020-08-15',
   intake_date: '2023-11-05',
   intake_source: 'Owner Surrender',
-  status: 'medical',
+  status: 'in_care',
+  has_medical_concern: true,
   priority: 'needs_attention',
   action_needed:
   'Soft food only + finish 10-day antibiotic course (3 days remaining). Recheck on Nov 25.',
@@ -219,7 +220,8 @@ const SEED_ANIMALS_RAW: Animal[] = [
   estimated_birth_date: '2023-10-20',
   intake_date: '2023-11-22',
   intake_source: 'Stray Litter',
-  status: 'medical',
+  status: 'in_care',
+  has_medical_concern: true,
   priority: 'critical',
   action_needed:
   'Start URI antibiotics today and find an isolated foster — cannot be housed with other kittens.',
@@ -367,7 +369,8 @@ const SEED_ANIMALS_RAW: Animal[] = [
   estimated_birth_date: '2017-09-20',
   intake_date: '2023-10-10',
   intake_source: 'City Shelter Transfer',
-  status: 'medical',
+  status: 'in_care',
+  has_medical_concern: true,
   priority: 'needs_attention',
   action_needed:
   'Review senior bloodwork results with vet and confirm renal diet plan.',

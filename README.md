@@ -76,21 +76,21 @@ Two more Animal fields worth calling out:
 
 ## 2. Status taxonomy (lifecycle)
 
-Status describes **where the animal is in its journey**. It is intentionally a closed enum; arbitrary statuses are not supported.
+Status describes **where the animal is in its journey** — and *only* that. It is intentionally a closed enum; arbitrary statuses are not supported.
 
 | Value | Label | Meaning |
 |---|---|---|
 | `intake` | Intake | Just arrived. Awaiting evaluation or placement. |
-| `medical` | Medical | Actively undergoing medical treatment or recovery. |
-| `hold` | Hold | Administrative hold (court case, bite quarantine, owner dispute, etc.). |
-| `fostered` | Fostered | In an active foster placement. |
+| `in_care` | In Care | In the rescue's care and being readied, but not yet cleared for adoption. |
 | `adoptable` | Adoptable | Cleared for adoption and listed. |
 | `adopted` | Adopted | Adopted out. Reversible — an **Adoption Return** sends the animal back to `intake` (see §8). |
-| `released` | Released | TNR - animal was returned to site. |
+| `released` | Released | TNR — animal was returned to site. |
 | `hospice` | Hospice | End-of-life comfort care. |
 | `deceased` | Deceased | Final outcome — passed away. |
 
 Status colors are tuned to feel calm and descriptive, not alarming. See `tailwind.config.js → colors.status`.
+
+**Care flags are orthogonal to status.** *Why* an animal isn't progressing (or what to know about it) is **not** a lifecycle stage — it lives in independent boolean flags that coexist with any status: `is_on_hold` ("temporarily unavailable for adoption or transfer"), `has_behavior_concern`, and `has_medical_concern`. So a kitten with a URI is `in_care` + medical concern; an adoptable dog with a pending application is `adoptable` + on hold. Status is the single gate for listing (`adoptable` && !`is_on_hold`); the concern flags are informational and never subtract from adoptability. This is why there is no `medical` status — it described a *reason*, not a place in the journey (retired in migration 0054 → `in_care` + `has_medical_concern`).
 
 ---
 

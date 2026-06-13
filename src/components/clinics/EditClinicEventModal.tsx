@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { FieldError, Input, Textarea, Label, Select } from '../ui/Forms';
+import { focusFirstError } from '../../lib/focusFirstError';
 import { DateTimePicker } from '../ui/DateTimePicker';
 import { AddressAutocomplete } from '../ui/AddressAutocomplete';
 import { Button } from '../ui/Button';
 import { PersonSearchPicker } from '../ui/PersonSearchPicker';
+import { AddContactModal } from '../contacts/AddContactModal';
 import { useWhisker } from '../../context/WhiskerContext';
 import { AddressValue, ClinicEvent, ClinicEventStatus } from '../../types';
 
@@ -79,10 +81,21 @@ function validateForm(form: ClinicForm): FormErrors {
   return next;
 }
 
+// Each person field can create a new contact inline (which form field it sets +
+// the role to pre-check in the New Contact form).
+const PERSON_FIELD_META = {
+  vet: { field: 'vetId', role: 'vet' },
+  contact: { field: 'contactId', role: 'rescue_staff' },
+  transport: { field: 'transportId', role: 'transport' },
+  intake: { field: 'intakeId', role: 'rescue_staff' }
+} as const;
+type PersonTarget = keyof typeof PERSON_FIELD_META;
+
 export function EditClinicEventModal({ isOpen, onClose, event }: Props) {
   const { updateClinicEvent, peopleIndex: people } = useWhisker();
   const [form, setForm] = useState<ClinicForm>(() => fromEvent(event));
   const [errors, setErrors] = useState<FormErrors>({});
+  const [createTarget, setCreateTarget] = useState<PersonTarget | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -103,7 +116,15 @@ export function EditClinicEventModal({ isOpen, onClose, event }: Props) {
     e.preventDefault();
     const next = validateForm(form);
     setErrors(next);
-    if (Object.keys(next).length > 0) return;
+    if (Object.keys(next).length > 0) {
+      const ids = [
+      next.dateTime && 'datetime',
+      next.capacity && 'capacity',
+      next.location && 'location'].
+      filter((v): v is string => Boolean(v));
+      requestAnimationFrame(() => focusFirstError(ids));
+      return;
+    }
     // Cast to `any` so we can explicitly pass `null` to clear an optional
     // person FK — `Partial<ClinicEvent>` only allows `string | undefined`,
     // and `undefined` would get dropped before reaching Postgres.
@@ -231,6 +252,7 @@ export function EditClinicEventModal({ isOpen, onClose, event }: Props) {
               role="vet"
               value={form.vetId}
               onChange={(value) => set('vetId', value)}
+              onCreateNew={() => setCreateTarget('vet')}
               placeholder="Search veterinarians…" />
 
           </div>
@@ -241,6 +263,7 @@ export function EditClinicEventModal({ isOpen, onClose, event }: Props) {
               people={people}
               value={form.contactId}
               onChange={(value) => set('contactId', value)}
+              onCreateNew={() => setCreateTarget('contact')}
               placeholder="Search staff, volunteers, or vets…" />
 
           </div>
@@ -251,6 +274,7 @@ export function EditClinicEventModal({ isOpen, onClose, event }: Props) {
               people={people}
               value={form.transportId}
               onChange={(value) => set('transportId', value)}
+              onCreateNew={() => setCreateTarget('transport')}
               placeholder="Search people…" />
 
           </div>
@@ -261,6 +285,7 @@ export function EditClinicEventModal({ isOpen, onClose, event }: Props) {
               people={people}
               value={form.intakeId}
               onChange={(value) => set('intakeId', value)}
+              onCreateNew={() => setCreateTarget('intake')}
               placeholder="Search people…" />
 
           </div>
@@ -277,6 +302,19 @@ export function EditClinicEventModal({ isOpen, onClose, event }: Props) {
 
         </div>
       </form>
+
+      {/* Inline "New Contact" flow — stacks above the form, which keeps its state
+          so the new person lands back in the field that opened it. */}
+      <AddContactModal
+        isOpen={createTarget !== null}
+        defaultRoles={createTarget ? [PERSON_FIELD_META[createTarget].role] : []}
+        onCreated={(person) => {
+          if (!createTarget) return;
+          const field = PERSON_FIELD_META[createTarget].field;
+          setForm((prev) => ({ ...prev, [field]: person.id }));
+        }}
+        onClose={() => setCreateTarget(null)} />
+
     </Modal>);
 
 }

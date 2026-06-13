@@ -8,6 +8,7 @@ import { useWhisker } from '../../context/WhiskerContext';
 import { AddressValue, Person, PersonRole } from '../../types';
 import { enabledSpeciesList } from '../../lib/orgCatalog';
 import { personToAddressValue } from '../../lib/address';
+import { focusFirstError } from '../../lib/focusFirstError';
 interface EditFosterModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -29,6 +30,15 @@ type FosterForm = {
 };
 type FormField = keyof FosterForm;
 type FormErrors = Partial<Record<FormField, string>>;
+// Validatable fields in visual order; on a blocked submit we scroll to the
+// first with an error (each key matches its input's DOM id).
+const ERROR_FIELD_ORDER: FormField[] = [
+'first_name',
+'last_name',
+'email',
+'phone',
+'address',
+'max_capacity'];
 
 function fromFoster(f: Person): FosterForm {
   return {
@@ -92,7 +102,11 @@ export function EditFosterModal({
     e.preventDefault();
     const nextErrors = validateForm(formData);
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+    if (Object.keys(nextErrors).length > 0) {
+      const ids = ERROR_FIELD_ORDER.filter((f) => nextErrors[f]);
+      requestAnimationFrame(() => focusFirstError(ids));
+      return;
+    }
     const addr = formData.address;
     updateFoster(foster.id, {
       ...formData,

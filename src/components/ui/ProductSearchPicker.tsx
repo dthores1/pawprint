@@ -3,6 +3,8 @@ import { SearchIcon, XIcon, PlusIcon } from 'lucide-react';
 import { Input } from './Forms';
 import { CalendarPopover } from './CalendarPopover';
 import { Product } from '../../types';
+import { cn } from '../../lib/utils';
+import { useTypeaheadKeyboard } from '../../lib/useTypeaheadKeyboard';
 
 // Searchable product picker. Pick a catalog product (→ product_id) or type a
 // custom item (→ custom_item_name) for the "Other" case. Mirrors BreedCombobox:
@@ -28,6 +30,7 @@ export function ProductSearchPicker({
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [menuWidth, setMenuWidth] = useState<number>();
   useLayoutEffect(() => {
     if (open && anchorRef.current) setMenuWidth(anchorRef.current.offsetWidth);
@@ -65,6 +68,17 @@ export function ProductSearchPicker({
     setQuery('');
     setOpen(false);
   };
+
+  // The custom-item row (when shown) is the last navigable row.
+  const { activeIndex, setActiveIndex, onKeyDown: navKeyDown } =
+  useTypeaheadKeyboard({
+    open,
+    setOpen,
+    count: results.length + (showCustomOption ? 1 : 0),
+    onChoose: (i) =>
+    i < results.length ? pickKnown(results[i].id) : pickCustom(trimmed),
+    menuRef
+  });
 
   if (selectedLabel) {
     return (
@@ -106,7 +120,9 @@ export function ProductSearchPicker({
         }}
         onFocus={() => setOpen(true)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && showCustomOption) {
+          navKeyDown(e);
+          // Enter with nothing highlighted still commits a typed custom item.
+          if (!e.defaultPrevented && e.key === 'Enter' && showCustomOption) {
             e.preventDefault();
             pickCustom(trimmed);
           }
@@ -119,7 +135,10 @@ export function ProductSearchPicker({
         onClose={() => setOpen(false)}
         padded={false}>
 
-        <div style={{ width: menuWidth }} className="max-h-60 overflow-y-auto">
+        <div
+          ref={menuRef}
+          style={{ width: menuWidth }}
+          className="max-h-60 overflow-y-auto">
           {results.length === 0 && !showCustomOption &&
           <div className="p-4 text-sm text-text-secondary text-center">
               No supplies match. Type to add a custom item.
@@ -127,12 +146,17 @@ export function ProductSearchPicker({
           }
           {results.length > 0 &&
           <ul className="py-1">
-              {results.map((p) =>
+              {results.map((p, i) =>
             <li key={p.id}>
                   <button
                 type="button"
+                data-ta-index={i}
+                onMouseEnter={() => setActiveIndex(i)}
                 onClick={() => pickKnown(p.id)}
-                className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-background cursor-pointer transition-colors">
+                className={cn(
+                  'w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-background cursor-pointer transition-colors',
+                  activeIndex === i && 'bg-background'
+                )}>
 
                     {p.name}
                   </button>
@@ -143,8 +167,13 @@ export function ProductSearchPicker({
           {showCustomOption &&
           <button
             type="button"
+            data-ta-index={results.length}
+            onMouseEnter={() => setActiveIndex(results.length)}
             onClick={() => pickCustom(trimmed)}
-            className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-sm text-primary hover:bg-background border-t border-border cursor-pointer transition-colors">
+            className={cn(
+              'w-full flex items-center gap-2 px-3 py-2.5 text-left text-sm text-primary hover:bg-background border-t border-border cursor-pointer transition-colors',
+              activeIndex === results.length && 'bg-background'
+            )}>
 
               <PlusIcon className="w-4 h-4 shrink-0" />
               <span>

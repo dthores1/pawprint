@@ -9,8 +9,10 @@ import { Animal } from '../../types';
 import {
   animalDisplayName,
   animalShowsRescueIdBadge,
-  calculateAge } from
+  calculateAge,
+  cn } from
 '../../lib/utils';
+import { useTypeaheadKeyboard } from '../../lib/useTypeaheadKeyboard';
 
 // Multi-select typeahead — used by the Sitting Request form when the
 // foster wants to scope coverage to specific animals.
@@ -34,6 +36,7 @@ export function AnimalMultiPicker({
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const universe = scope ?? animals;
   const selectedAnimals = selectedIds.
@@ -76,6 +79,14 @@ export function AnimalMultiPicker({
   const remove = (animalId: string) => {
     onChange(selectedIds.filter((id) => id !== animalId));
   };
+
+  const { activeIndex, setActiveIndex, onKeyDown } = useTypeaheadKeyboard({
+    open,
+    setOpen,
+    count: results.length,
+    onChoose: (i) => add(results[i].id),
+    menuRef
+  });
 
   return (
     <div className="space-y-2">
@@ -122,12 +133,14 @@ export function AnimalMultiPicker({
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
+          onKeyDown={onKeyDown}
           className="pl-9" />
 
 
         <AnimatePresence>
           {open &&
           <motion.div
+            ref={menuRef}
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
@@ -143,12 +156,17 @@ export function AnimalMultiPicker({
                 </div> :
 
             <ul className="py-1">
-                  {results.map((a) =>
+                  {results.map((a, i) =>
               <li key={a.id}>
                       <button
                   type="button"
+                  data-ta-index={i}
+                  onMouseEnter={() => setActiveIndex(i)}
                   onClick={() => add(a.id)}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-background cursor-pointer transition-colors">
+                  className={cn(
+                    'w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-background cursor-pointer transition-colors',
+                    activeIndex === i && 'bg-background'
+                  )}>
 
                         <div className="relative shrink-0">
                           <Avatar

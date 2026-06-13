@@ -85,10 +85,10 @@ export function Avatar({
           type === 'animal' ?
           (() => {
             const SpeciesGlyph = speciesIconByName(species);
-            return <SpeciesGlyph className="w-1/2 h-1/2 opacity-50" />;
+            return <SpeciesGlyph className="w-3/5 h-3/5 opacity-50" />;
           })() :
 
-          <UserIcon className="w-1/2 h-1/2 opacity-50" />
+          <UserIcon className="w-3/5 h-3/5 opacity-50" />
           }
         </span>
       </div>);

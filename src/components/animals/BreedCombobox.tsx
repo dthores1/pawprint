@@ -5,6 +5,8 @@ import { CalendarPopover } from '../ui/CalendarPopover';
 import { useWhisker } from '../../context/WhiskerContext';
 import { breedFieldLabel } from '../../lib/speciesIcons';
 import { acceptedBreeds } from '../../lib/orgCatalog';
+import { cn } from '../../lib/utils';
+import { useTypeaheadKeyboard } from '../../lib/useTypeaheadKeyboard';
 
 // Searchable breed picker filtered by species (via the catalog species_id).
 // Pick a known breed (→ breed_id) or type a custom value (→ breed_text).
@@ -35,6 +37,7 @@ export function BreedCombobox({
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   // Match the popover width to the input so the list aligns under it.
   const [menuWidth, setMenuWidth] = useState<number>();
   useLayoutEffect(() => {
@@ -74,6 +77,17 @@ export function BreedCombobox({
     setOpen(false);
   };
 
+  // The custom-breed row (when shown) is the last navigable row.
+  const { activeIndex, setActiveIndex, onKeyDown: navKeyDown } =
+  useTypeaheadKeyboard({
+    open,
+    setOpen,
+    count: results.length + (showCustomOption ? 1 : 0),
+    onChoose: (i) =>
+    i < results.length ? pickKnown(results[i].id) : pickCustom(trimmed),
+    menuRef
+  });
+
   if (selectedLabel) {
     return (
       <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border border-primary/30 bg-primary/5">
@@ -107,7 +121,9 @@ export function BreedCombobox({
         }}
         onFocus={() => setOpen(true)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && showCustomOption) {
+          navKeyDown(e);
+          // Enter with nothing highlighted still commits a typed custom value.
+          if (!e.defaultPrevented && e.key === 'Enter' && showCustomOption) {
             e.preventDefault();
             pickCustom(trimmed);
           }
@@ -121,7 +137,10 @@ export function BreedCombobox({
         padded={false}>
 
         {/* ~6 rows tall, then scroll — keeps the list compact. */}
-        <div style={{ width: menuWidth }} className="max-h-60 overflow-y-auto">
+        <div
+          ref={menuRef}
+          style={{ width: menuWidth }}
+          className="max-h-60 overflow-y-auto">
           {results.length === 0 && !showCustomOption &&
           <div className="p-4 text-sm text-text-secondary text-center">
               No {nounPlural} available.
@@ -129,12 +148,17 @@ export function BreedCombobox({
           }
           {results.length > 0 &&
           <ul className="py-1">
-              {results.map((b) =>
+              {results.map((b, i) =>
             <li key={b.id}>
                   <button
                 type="button"
+                data-ta-index={i}
+                onMouseEnter={() => setActiveIndex(i)}
                 onClick={() => pickKnown(b.id)}
-                className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-background cursor-pointer transition-colors">
+                className={cn(
+                  'w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-background cursor-pointer transition-colors',
+                  activeIndex === i && 'bg-background'
+                )}>
 
                     {b.name}
                   </button>
@@ -145,8 +169,13 @@ export function BreedCombobox({
           {showCustomOption &&
           <button
             type="button"
+            data-ta-index={results.length}
+            onMouseEnter={() => setActiveIndex(results.length)}
             onClick={() => pickCustom(trimmed)}
-            className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-sm text-primary hover:bg-background border-t border-border cursor-pointer transition-colors">
+            className={cn(
+              'w-full flex items-center gap-2 px-3 py-2.5 text-left text-sm text-primary hover:bg-background border-t border-border cursor-pointer transition-colors',
+              activeIndex === results.length && 'bg-background'
+            )}>
 
               <PlusIcon className="w-4 h-4 shrink-0" />
               <span>

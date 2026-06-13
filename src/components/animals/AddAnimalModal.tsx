@@ -14,6 +14,7 @@ import { AnimalStatus, Sex, Priority, AgeUnit } from '../../types';
 import { deriveAgeInfo } from '../../lib/age';
 import { breedFieldLabel } from '../../lib/speciesIcons';
 import { enabledSpeciesList, defaultSpeciesId } from '../../lib/orgCatalog';
+import { focusFirstError } from '../../lib/focusFirstError';
 interface AddAnimalModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -97,6 +98,26 @@ function validateForm(formData: AnimalForm, ageMode: AgeInputMode): FormErrors {
   }
   return nextErrors;
 }
+
+// Validatable fields in visual (top-to-bottom) order, so a failed submit can
+// scroll to the FIRST offending field. The modal is tall enough that an error
+// below the fold otherwise makes the save look like it silently did nothing.
+const FIELD_ORDER: FormField[] = [
+'name',
+'rescue_id',
+'primary_photo_url',
+'birthdate',
+'intake_date',
+'intake_source'];
+
+// The age error lives on the `birthdate` key, but the visible input id depends
+// on which age-input mode is currently showing.
+function errorFieldDomId(field: FormField, ageMode: AgeInputMode): string {
+  if (field === 'birthdate') {
+    return ageMode === 'age' ? 'estimated_age_value' : 'estimated_birthdate';
+  }
+  return field;
+}
 type AddMode = 'single' | 'litter';
 
 export function AddAnimalModal({
@@ -160,7 +181,15 @@ export function AddAnimalModal({
     e.preventDefault();
     const nextErrors = validateForm(formData, ageMode);
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+    if (Object.keys(nextErrors).length > 0) {
+      // Bring the first offending field into view so a below-the-fold error
+      // can't read as a silent no-op. rAF lets the error state paint first.
+      const ids = FIELD_ORDER.filter((f) => nextErrors[f]).map((f) =>
+      errorFieldDomId(f, ageMode)
+      );
+      requestAnimationFrame(() => focusFirstError(ids));
+      return;
+    }
     const ageInfo = deriveAgeInfo({
       birthdate: ageMode === 'birthdate' ? formData.birthdate : '',
       ageValue: ageMode === 'age' ? formData.ageValue : '',

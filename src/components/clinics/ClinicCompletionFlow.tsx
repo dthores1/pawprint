@@ -15,6 +15,7 @@ import {
   Sex } from
 '../../types';
 import { cn, formatDate } from '../../lib/utils';
+import { isInCare } from '../../lib/animalStatus';
 import {
   deriveProcedureName,
   getProcedureOptions,
@@ -140,6 +141,16 @@ function isDraftComplete(d: RecordDraft): boolean {
   return true;
 }
 
+// Sex is "unknown" when not explicitly Male/Female (covers 'Unknown' and any
+// missing value). Common for ferals at intake — the clinic, with the animal on
+// the table and the paperwork in hand, is the natural moment to resolve it.
+const isUnknownSex = (sex?: Sex | null): boolean =>
+sex !== 'Male' && sex !== 'Female';
+
+// The Spay/Neuter subtype implied by a known sex.
+const spayNeuterForSex = (sex: Sex): Procedure =>
+sex === 'Female' ? 'spay' : 'neuter';
+
 type Step = 1 | 2 | 3;
 
 export function ClinicCompletionFlow({ clinicEventId, onClose }: Props) {
@@ -153,7 +164,8 @@ export function ClinicCompletionFlow({ clinicEventId, onClose }: Props) {
     updateClinicEvent,
     updateClinicSlot,
     addClinicSlot,
-    addMedicalRecord
+    addMedicalRecord,
+    updateAnimal
   } = useWhisker();
   const { currentPersonId } = useAuth();
 
@@ -179,6 +191,10 @@ export function ClinicCompletionFlow({ clinicEventId, onClose }: Props) {
     []);
   const [picking, setPicking] = useState(false);
   const [pickAnimalId, setPickAnimalId] = useState('');
+  // Animal ids whose sex has been touched via the resolver this session. We keep
+  // the resolver visible for these even once a sex is chosen, so a mis-click is
+  // one click to correct (rather than the control vanishing on selection).
+  const [sexTouched, setSexTouched] = useState<Set<string>>(new Set());
 
   React.useEffect(() => {
     if (!event) return;
@@ -205,6 +221,7 @@ export function ClinicCompletionFlow({ clinicEventId, onClose }: Props) {
     setAddedAnimals([]);
     setPicking(false);
     setPickAnimalId('');
+    setSexTouched(new Set());
     setInitFor(event.id);
   }, [event, slots, clinicSlotProcedures, animals, initFor]);
 
@@ -249,14 +266,31 @@ export function ClinicCompletionFlow({ clinicEventId, onClose }: Props) {
       }
     }));
   };
-  const updateRecord = (key: string, draft: RecordDraft) =>
-  setState((prev) => ({
-    ...prev,
-    [key]: {
-      ...prev[key],
-      records: prev[key].records.map((d) => d.id === draft.id ? draft : d)
+  const updateRecord = (key: string, draft: RecordDraft) => {
+    setState((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        records: prev[key].records.map((d) => d.id === draft.id ? draft : d)
+      }
+    }));
+    // Reverse inference: picking Spay/Neuter on an unknown-sex animal tells us
+    // the sex (the vet just determined it), so backfill it. Never overrides a
+    // sex that's already known.
+    const animal = animalOf(key);
+    if (
+    animal &&
+    isUnknownSex(animal.sex) &&
+    draft.procedure_type === 'spay_neuter' && (
+    draft.procedure === 'spay' || draft.procedure === 'neuter'))
+    {
+      updateAnimal(animal.id, {
+        sex: draft.procedure === 'spay' ? 'Female' : 'Male'
+      });
+      // Keep the resolver visible so this inferred sex can be corrected too.
+      setSexTouched((prev) => new Set(prev).add(animal.id));
     }
-  }));
+  };
   const removeRecord = (key: string, id: string) =>
   setState((prev) => ({
     ...prev,
@@ -265,6 +299,37 @@ export function ClinicCompletionFlow({ clinicEventId, onClose }: Props) {
       records: prev[key].records.filter((d) => d.id !== id)
     }
   }));
+
+  // Resolve (or re-set) an animal's sex from the clinic paperwork: persist it,
+  // and align any of its Spay/Neuter drafts accordingly — Female → Spay, Male →
+  // Neuter, or back to blank ("Select…") when set to Unknown. 'other' subtypes
+  // are left alone (an intentional override). The id is marked touched so the
+  // resolver stays visible for correction.
+  const setAnimalSex = (animalId: string, sex: Sex) => {
+    updateAnimal(animalId, { sex });
+    setSexTouched((prev) => new Set(prev).add(animalId));
+    setState((prev) => {
+      const next = { ...prev };
+      for (const at of attendees) {
+        if (at.animal_id !== animalId) continue;
+        const st = next[at.key];
+        if (!st) continue;
+        next[at.key] = {
+          ...st,
+          records: st.records.map((d) => {
+            if (d.procedure_type !== 'spay_neuter' || d.procedure === 'other') {
+              return d;
+            }
+            const procedure: Procedure | '' = isUnknownSex(sex) ?
+            '' :
+            spayNeuterForSex(sex);
+            return { ...d, procedure };
+          })
+        };
+      }
+      return next;
+    });
+  };
 
   const confirmAddAnimal = () => {
     if (!pickAnimalId) return;
@@ -316,6 +381,9 @@ export function ClinicCompletionFlow({ clinicEventId, onClose }: Props) {
   const excludeAnimalIds = [
   ...slots.map((s) => s.animal_id),
   ...addedAnimals.map((a) => a.animal_id)];
+
+  // Only in-care animals can be added to a clinic (no adopted/released/deceased).
+  const addableAnimals = animals.filter((a) => isInCare(a.status));
 
 
   // Hard block (records that can't be created). Empty clinics / future dates are
@@ -484,7 +552,7 @@ export function ClinicCompletionFlow({ clinicEventId, onClose }: Props) {
                       Add an animal to this clinic
                     </p>
                     <AnimalSearchPicker
-                  animals={animals}
+                  animals={addableAnimals}
                   value={pickAnimalId}
                   onChange={setPickAnimalId}
                   excludeIds={excludeAnimalIds}
@@ -544,7 +612,9 @@ export function ClinicCompletionFlow({ clinicEventId, onClose }: Props) {
             setAttendee={setAttendee}
             addRecord={addRecord}
             updateRecord={updateRecord}
-            removeRecord={removeRecord} />
+            removeRecord={removeRecord}
+            onSetSex={setAnimalSex}
+            sexTouchedIds={sexTouched} />
 
           }
 
@@ -841,7 +911,9 @@ function Step2({
   setAttendee,
   addRecord,
   updateRecord,
-  removeRecord
+  removeRecord,
+  onSetSex,
+  sexTouchedIds
 }: {
   attendingAttendees: Attendee[];
   animals: any[];
@@ -850,6 +922,8 @@ function Step2({
   addRecord: (key: string) => void;
   updateRecord: (key: string, draft: RecordDraft) => void;
   removeRecord: (key: string, id: string) => void;
+  onSetSex: (animalId: string, sex: Sex) => void;
+  sexTouchedIds: Set<string>;
 }) {
   return (
     <div>
@@ -870,6 +944,13 @@ function Step2({
           if (!st) return null;
           const incomplete = st.records.some((d) => !isDraftComplete(d));
           const needsRecord = a.isAdded && st.records.length === 0;
+          // Show the sex resolver while the sex is unknown, and keep it shown
+          // once touched so a mis-click stays correctable.
+          const showSexResolver =
+          isUnknownSex(animal?.sex) || sexTouchedIds.has(a.animal_id);
+          const hasSpayNeuter = st.records.some(
+            (d) => d.procedure_type === 'spay_neuter'
+          );
           return (
             <div
               key={a.key}
@@ -891,6 +972,13 @@ function Step2({
                     </span>
                 }
                 </div>
+
+                {showSexResolver &&
+              <SexResolver
+                sex={animal?.sex}
+                hasSpayNeuter={hasSpayNeuter}
+                onSelect={(sex) => onSetSex(a.animal_id, sex)} />
+              }
 
                 {st.records.length > 0 &&
               <div className="space-y-2">
@@ -947,6 +1035,104 @@ function Step2({
         </div>
       }
     </div>);
+
+}
+
+// Inline sex control shown on the Records step for animals whose sex is (or was)
+// Unknown — the clinic is the moment it gets resolved off the paperwork. It's a
+// 3-way toggle, so "Unknown" is a real choice (no pressure to guess) and a
+// mis-click is one click to fix. Female/Male persist the sex and auto-fill the
+// Spay/Neuter procedure; Unknown clears it back to "Select…".
+function SexResolver({
+  sex,
+  hasSpayNeuter,
+  onSelect
+}: {
+  sex?: Sex | null;
+  hasSpayNeuter: boolean;
+  onSelect: (sex: Sex) => void;
+}) {
+  const unknown = isUnknownSex(sex);
+  const tone = unknown ?
+  { box: 'border-[#F8E7C8] bg-[#FFF7E6]', text: 'text-[#A36B00]' } :
+  {
+    box: 'border-status-adoptable-text/25 bg-status-adoptable-bg',
+    text: 'text-status-adoptable-text'
+  };
+  return (
+    <div className={cn('rounded-lg border p-3', tone.box)}>
+      <div className="flex items-start gap-2">
+        {unknown ?
+        <AlertTriangleIcon className={cn('w-4 h-4 mt-0.5 shrink-0', tone.text)} /> :
+
+        <CheckCircle2Icon className={cn('w-4 h-4 mt-0.5 shrink-0', tone.text)} />
+        }
+        <div className="space-y-2 min-w-0">
+          <div className={cn('text-sm', tone.text)}>
+            {unknown ?
+            <>
+                <p className="font-semibold">Sex is currently Unknown.</p>
+                <p className="opacity-90">
+                  {hasSpayNeuter ?
+                'Set it from the clinic paperwork to fill in the Spay/Neuter procedure below — or leave it Unknown if it wasn’t determined.' :
+                'Set it from the clinic paperwork if it was determined — otherwise leave it Unknown.'}
+                </p>
+              </> :
+
+            <p className="font-semibold">
+                Sex set to {sex}.{' '}
+                <span className="font-normal opacity-90">
+                  Change it below if that was a mistake.
+                </span>
+              </p>
+            }
+          </div>
+          <div className="flex gap-1.5">
+            <SexSegment
+              label="Female"
+              active={sex === 'Female'}
+              onClick={() => onSelect('Female')} />
+
+            <SexSegment
+              label="Male"
+              active={sex === 'Male'}
+              onClick={() => onSelect('Male')} />
+
+            <SexSegment
+              label="Unknown"
+              active={unknown}
+              onClick={() => onSelect('Unknown')} />
+
+          </div>
+        </div>
+      </div>
+    </div>);
+
+}
+
+function SexSegment({
+  label,
+  active,
+  onClick
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border transition-colors',
+        active ?
+        'bg-text-primary text-white border-text-primary' :
+        'bg-white text-text-secondary border-border hover:border-primary/40'
+      )}>
+
+      {label}
+    </button>);
 
 }
 

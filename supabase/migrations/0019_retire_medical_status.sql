@@ -5,6 +5,14 @@
 
 begin;
 
+-- 0. Ensure the orthogonal care-flag columns exist before we write to them.
+--    These were originally added out-of-band (manually / via the Supabase GUI),
+--    so they were never recorded in a migration — this makes the history
+--    replayable from scratch. Idempotent: a no-op where they already exist.
+alter table animals add column if not exists is_on_hold           boolean not null default false;
+alter table animals add column if not exists has_behavior_concern boolean not null default false;
+alter table animals add column if not exists has_medical_concern  boolean not null default false;
+
 -- 1. Migrate the data: medical → not_ready + has_medical_concern = true.
 update animals
    set status              = 'not_ready',

@@ -8,6 +8,7 @@ import { Button } from '../ui/Button';
 import { useWhisker } from '../../context/WhiskerContext';
 import { useAuth } from '../../context/AuthContext';
 import { AddressValue, Site, SiteStatus } from '../../types';
+import { focusFirstError } from '../../lib/focusFirstError';
 import { SITE_STATUS_META, SITE_STATUS_ORDER } from '../../lib/siteStatus';
 
 interface Props {
@@ -62,6 +63,7 @@ export function NewSiteModal({ isOpen, onClose, site }: Props) {
     e.preventDefault();
     if (!name.trim()) {
       setErrors({ name: 'Site name is required.' });
+      requestAnimationFrame(() => focusFirstError(['site_name']));
       return;
     }
     const payload = {

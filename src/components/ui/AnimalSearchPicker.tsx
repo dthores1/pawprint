@@ -9,8 +9,10 @@ import { Animal } from '../../types';
 import {
   animalDisplayName,
   animalShowsRescueIdBadge,
-  calculateAge } from
+  calculateAge,
+  cn } from
 '../../lib/utils';
+import { useTypeaheadKeyboard } from '../../lib/useTypeaheadKeyboard';
 
 // Single-select typeahead for picking one animal. Same UX shape as the
 // foster picker in PlaceAnimalModal — we use it across the new coordination
@@ -38,6 +40,7 @@ export function AnimalSearchPicker({
   const [open, setOpen] = useState(false);
   const [menuWidth, setMenuWidth] = useState<number>();
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const selected = animals.find((a) => a.id === value) || null;
 
   const results = useMemo(() => {
@@ -52,6 +55,18 @@ export function AnimalSearchPicker({
     }).
     slice(0, 12);
   }, [animals, query, excludeIds]);
+
+  const { activeIndex, setActiveIndex, onKeyDown } = useTypeaheadKeyboard({
+    open,
+    setOpen,
+    count: results.length,
+    onChoose: (i) => {
+      onChange(results[i].id);
+      setOpen(false);
+      setQuery('');
+    },
+    menuRef
+  });
 
   // Match the dropdown width to the input each time it opens.
   useLayoutEffect(() => {
@@ -116,6 +131,7 @@ export function AnimalSearchPicker({
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
+        onKeyDown={onKeyDown}
         className="pl-9" />
 
 
@@ -126,6 +142,7 @@ export function AnimalSearchPicker({
         padded={false}>
 
         <div
+          ref={menuRef}
           style={{ width: menuWidth }}
           className="max-h-72 overflow-y-auto">
 
@@ -137,16 +154,21 @@ export function AnimalSearchPicker({
             </div> :
 
           <ul className="py-1">
-              {results.map((a) =>
+              {results.map((a, i) =>
             <li key={a.id}>
                   <button
                 type="button"
+                data-ta-index={i}
+                onMouseEnter={() => setActiveIndex(i)}
                 onClick={() => {
                   onChange(a.id);
                   setOpen(false);
                   setQuery('');
                 }}
-                className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-background cursor-pointer transition-colors">
+                className={cn(
+                  'w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-background cursor-pointer transition-colors',
+                  activeIndex === i && 'bg-background'
+                )}>
 
                     <div className="relative shrink-0">
                       <Avatar

@@ -527,9 +527,9 @@ export function Dashboard() {
                   color: 'bg-[#E5E2DC]'
                 },
                 {
-                  status: 'medical',
-                  label: 'Medical',
-                  color: 'bg-[#F8E7C8]'
+                  status: 'in_care',
+                  label: 'In Care',
+                  color: 'bg-[#E3E4F2]'
                 },
                 {
                   status: 'adoptable',

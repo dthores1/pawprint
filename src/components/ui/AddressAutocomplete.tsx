@@ -5,6 +5,8 @@ import { CalendarPopover } from './CalendarPopover';
 import { AddressValue } from '../../types';
 import { loadGoogleMaps, isGoogleMapsConfigured } from '../../lib/googleMaps';
 import { placeResultToAddressValue, rawAddressValue } from '../../lib/address';
+import { cn } from '../../lib/utils';
+import { useTypeaheadKeyboard } from '../../lib/useTypeaheadKeyboard';
 
 interface Props {
   value: AddressValue | null;
@@ -47,6 +49,7 @@ export function AddressAutocomplete({
   const [menuWidth, setMenuWidth] = useState<number>();
 
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLUListElement>(null);
   const autocompleteRef = useRef<any>(null);
   const placesRef = useRef<any>(null);
   const tokenRef = useRef<any>(null);
@@ -169,6 +172,14 @@ export function AddressAutocomplete({
     onChange(null);
   };
 
+  const { activeIndex, setActiveIndex, onKeyDown } = useTypeaheadKeyboard({
+    open: open && predictions.length > 0,
+    setOpen,
+    count: predictions.length,
+    onChoose: (i) => handleSelect(predictions[i].placeId),
+    menuRef
+  });
+
   return (
     <div>
       <div className="relative" ref={wrapperRef}>
@@ -184,7 +195,8 @@ export function AddressAutocomplete({
         error ? 'border-red-500 focus:ring-red-500' : ''}`
         }
         onChange={(e) => handleInput(e.target.value)}
-        onFocus={() => predictions.length > 0 && setOpen(true)} />
+        onFocus={() => predictions.length > 0 && setOpen(true)}
+        onKeyDown={onKeyDown} />
 
       {loading ?
       <Loader2Icon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary animate-spin" /> :
@@ -205,18 +217,26 @@ export function AddressAutocomplete({
         onClose={() => setOpen(false)}
         padded={false}>
 
-        <ul style={{ width: menuWidth }} className="max-h-72 overflow-y-auto py-1">
-          {predictions.map((p) =>
+        <ul
+          ref={menuRef}
+          style={{ width: menuWidth }}
+          className="max-h-72 overflow-y-auto py-1">
+          {predictions.map((p, i) =>
           <li key={p.placeId}>
               <button
               type="button"
+              data-ta-index={i}
+              onMouseEnter={() => setActiveIndex(i)}
               onMouseDown={(e) => {
                 // Keep focus on the input so the popover's outside-click close
                 // doesn't fire before the selection handler runs.
                 e.preventDefault();
                 handleSelect(p.placeId);
               }}
-              className="w-full flex items-start gap-2.5 px-3 py-2.5 text-left hover:bg-background cursor-pointer transition-colors">
+              className={cn(
+                'w-full flex items-start gap-2.5 px-3 py-2.5 text-left hover:bg-background cursor-pointer transition-colors',
+                activeIndex === i && 'bg-background'
+              )}>
 
                 <MapPinIcon className="w-4 h-4 text-text-secondary mt-0.5 shrink-0" />
                 <span className="min-w-0">

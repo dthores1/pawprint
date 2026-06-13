@@ -5,7 +5,7 @@
 // kept in sync by addAdoption/cancelAdoption/completeAdoption.
 export type AnimalStatus =
 'intake' |
-'medical' |
+'in_care' |
 'adoptable' |
 'adopted' |
 'released' |
@@ -126,7 +126,7 @@ export interface Animal {
   current_foster_id?: string;
   /**
    * Condition flags — orthogonal to lifecycle `status` (an animal can be
-   * Adoptable AND On Hold, or Not Ready with a behavior concern). DB columns are
+   * Adoptable AND On Hold, or In Care with a behavior concern). DB columns are
    * NOT NULL DEFAULT false; optional here since optimistic local rows may omit
    * them (treat undefined as false).
    */

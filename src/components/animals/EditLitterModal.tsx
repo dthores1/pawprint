@@ -8,6 +8,7 @@ import { AnimalSearchPicker } from '../ui/AnimalSearchPicker';
 import { useWhisker } from '../../context/WhiskerContext';
 import { litterMembers } from '../../lib/litters';
 import { enabledSpeciesList } from '../../lib/orgCatalog';
+import { focusFirstError } from '../../lib/focusFirstError';
 
 interface EditLitterModalProps {
   isOpen: boolean;
@@ -60,6 +61,7 @@ export function EditLitterModal({
     e.preventDefault();
     if (!intakeDate) {
       setIntakeError('Intake date is required.');
+      requestAnimationFrame(() => focusFirstError(['litter_edit_intake']));
       return;
     }
     updateLitter(litterId, {

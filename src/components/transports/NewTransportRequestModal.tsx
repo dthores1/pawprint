@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { FieldError, Select, Textarea, Label } from '../ui/Forms';
+import { focusFirstError } from '../../lib/focusFirstError';
 import { DateTimePicker } from '../ui/DateTimePicker';
 import { AddressAutocomplete } from '../ui/AddressAutocomplete';
 import { Button } from '../ui/Button';
@@ -113,7 +114,16 @@ export function NewTransportRequestModal({ isOpen, onClose, request }: Props) {
     nextErrors.dropoff = 'Dropoff location is required.';
     if (!pickupTime) nextErrors.pickupTime = 'Pickup time is required.';
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+    if (Object.keys(nextErrors).length > 0) {
+      const ids = [
+      nextErrors.animalId && 'animal',
+      nextErrors.pickup && 'pickup',
+      nextErrors.dropoff && 'dropoff',
+      nextErrors.pickupTime && 'pickup_time'].
+      filter((v): v is string => Boolean(v));
+      requestAnimationFrame(() => focusFirstError(ids));
+      return;
+    }
     // Guard against past times — but only on changes. In edit mode, leaving
     // the original same-day time alone shouldn't trip a "past time" error
     // just because the form was reopened a few minutes later.
@@ -124,6 +134,7 @@ export function NewTransportRequestModal({ isOpen, onClose, request }: Props) {
     const changedTime = pickupDate.toISOString() !== originalIso;
     if (changedTime && pickupDate.getTime() < Date.now()) {
       setErrors({ pickupTime: 'Pickup time must be in the future.' });
+      requestAnimationFrame(() => focusFirstError(['pickup_time']));
       return;
     }
     if (request) {

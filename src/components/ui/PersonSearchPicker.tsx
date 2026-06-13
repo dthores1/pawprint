@@ -4,6 +4,8 @@ import { Input } from './Forms';
 import { Avatar } from './Avatar';
 import { CalendarPopover } from './CalendarPopover';
 import { Person, PersonRole } from '../../types';
+import { cn } from '../../lib/utils';
+import { useTypeaheadKeyboard } from '../../lib/useTypeaheadKeyboard';
 
 // Single-select typeahead for picking a Person. Optionally filter to a role
 // (e.g. vets only for the clinic form). Mirrors AnimalSearchPicker.
@@ -38,6 +40,7 @@ export function PersonSearchPicker({
   const [open, setOpen] = useState(false);
   const [menuWidth, setMenuWidth] = useState<number>();
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const selected = people.find((p) => p.id === value) || null;
 
   const results = useMemo(() => {
@@ -55,6 +58,25 @@ export function PersonSearchPicker({
     }).
     slice(0, 12);
   }, [people, query, role, excludeIds]);
+
+  // The "New Contact" action is the last navigable row when present.
+  const { activeIndex, setActiveIndex, onKeyDown } = useTypeaheadKeyboard({
+    open,
+    setOpen,
+    count: results.length + (onCreateNew ? 1 : 0),
+    onChoose: (i) => {
+      if (i < results.length) {
+        onChange(results[i].id);
+        setOpen(false);
+        setQuery('');
+      } else if (onCreateNew) {
+        setOpen(false);
+        setQuery('');
+        onCreateNew();
+      }
+    },
+    menuRef
+  });
 
   // Match the dropdown width to the input each time it opens.
   useLayoutEffect(() => {
@@ -111,6 +133,7 @@ export function PersonSearchPicker({
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
+        onKeyDown={onKeyDown}
         className="pl-9" />
 
 
@@ -121,6 +144,7 @@ export function PersonSearchPicker({
         padded={false}>
 
         <div
+          ref={menuRef}
           style={{ width: menuWidth }}
           className="max-h-72 overflow-y-auto">
 
@@ -132,16 +156,21 @@ export function PersonSearchPicker({
             </div> :
 
           <ul className="py-1">
-              {results.map((p) =>
+              {results.map((p, i) =>
             <li key={p.id}>
                   <button
                 type="button"
+                data-ta-index={i}
+                onMouseEnter={() => setActiveIndex(i)}
                 onClick={() => {
                   onChange(p.id);
                   setOpen(false);
                   setQuery('');
                 }}
-                className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-background cursor-pointer transition-colors">
+                className={cn(
+                  'w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-background cursor-pointer transition-colors',
+                  activeIndex === i && 'bg-background'
+                )}>
 
                     <Avatar
                   src={p.photo_url}
@@ -166,12 +195,17 @@ export function PersonSearchPicker({
           <div className="border-t border-border">
               <button
               type="button"
+              data-ta-index={results.length}
+              onMouseEnter={() => setActiveIndex(results.length)}
               onClick={() => {
                 setOpen(false);
                 setQuery('');
                 onCreateNew();
               }}
-              className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-sm font-medium text-primary hover:bg-primary/5 cursor-pointer transition-colors">
+              className={cn(
+                'w-full flex items-center gap-2 px-3 py-2.5 text-left text-sm font-medium text-primary hover:bg-primary/5 cursor-pointer transition-colors',
+                activeIndex === results.length && 'bg-primary/5'
+              )}>
 
                 <UserPlusIcon className="w-4 h-4 shrink-0" />
                 New Contact{query.trim() ? ` "${query.trim()}"` : ''}

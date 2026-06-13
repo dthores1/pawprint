@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { SearchIcon, XIcon, StethoscopeIcon } from 'lucide-react';
 import { Input } from './Forms';
 import { ClinicEvent } from '../../types';
-import { formatDate } from '../../lib/utils';
+import { formatDate, cn } from '../../lib/utils';
+import { useTypeaheadKeyboard } from '../../lib/useTypeaheadKeyboard';
 
 // Single-select typeahead for picking a scheduled clinic event. Mirrors
 // PersonSearchPicker / AnimalSearchPicker. Searches by location and date.
@@ -30,6 +31,7 @@ export function ClinicEventSearchPicker({
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const selected = events.find((e) => e.id === value) || null;
 
   const results = useMemo(() => {
@@ -46,6 +48,18 @@ export function ClinicEventSearchPicker({
     }).
     slice(0, 12);
   }, [events, query]);
+
+  const { activeIndex, setActiveIndex, onKeyDown } = useTypeaheadKeyboard({
+    open,
+    setOpen,
+    count: results.length,
+    onChoose: (i) => {
+      onChange(results[i].id);
+      setOpen(false);
+      setQuery('');
+    },
+    menuRef
+  });
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -107,12 +121,14 @@ export function ClinicEventSearchPicker({
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
+        onKeyDown={onKeyDown}
         className="pl-9" />
 
 
       <AnimatePresence>
         {open &&
         <motion.div
+          ref={menuRef}
           initial={{ opacity: 0, y: -4 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -4 }}
@@ -125,16 +141,21 @@ export function ClinicEventSearchPicker({
               </div> :
 
           <ul className="py-1">
-                {results.map((e) =>
+                {results.map((e, i) =>
             <li key={e.id}>
                     <button
                 type="button"
+                data-ta-index={i}
+                onMouseEnter={() => setActiveIndex(i)}
                 onClick={() => {
                   onChange(e.id);
                   setOpen(false);
                   setQuery('');
                 }}
-                className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-background cursor-pointer transition-colors">
+                className={cn(
+                  'w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-background cursor-pointer transition-colors',
+                  activeIndex === i && 'bg-background'
+                )}>
 
                       <div className="shrink-0 p-1.5 rounded-lg bg-background text-text-secondary">
                         <StethoscopeIcon className="w-4 h-4" />

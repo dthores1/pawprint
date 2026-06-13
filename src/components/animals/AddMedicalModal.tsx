@@ -8,6 +8,7 @@ import { PersonSearchPicker } from '../ui/PersonSearchPicker';
 import { ClinicEventSearchPicker } from '../ui/ClinicEventSearchPicker';
 import { Button } from '../ui/Button';
 import { formatDate, animalDisplayName } from '../../lib/utils';
+import { focusFirstError } from '../../lib/focusFirstError';
 import { useWhisker } from '../../context/WhiskerContext';
 import {
   PROCEDURE_TYPE_OPTIONS,
@@ -52,6 +53,13 @@ type FormErrors = {
   performed_date?: string;
   due_date?: string;
 };
+// Validatable fields in visual order; on a blocked submit we scroll to the
+// first one with an error (its key matches the input's DOM id).
+const ERROR_FIELD_ORDER: (keyof FormErrors)[] = [
+'procedure',
+'custom_procedure_name',
+'performed_date',
+'due_date'];
 // Only these procedure types are commonly recurring, so the "next due" prompt
 // is offered just for them (keeps the form low-friction for one-off records).
 const RECURRING_TYPES = new Set<ProcedureType>([
@@ -309,7 +317,11 @@ export function AddMedicalModal({
     if (duplicateMessage) return;
     const nextErrors = validate();
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+    if (Object.keys(nextErrors).length > 0) {
+      const ids = ERROR_FIELD_ORDER.filter((f) => nextErrors[f]);
+      requestAnimationFrame(() => focusFirstError(ids));
+      return;
+    }
     const microchipNumber =
     showMicrochip ? formData.microchip_number.trim() : '';
     const performedDate =
