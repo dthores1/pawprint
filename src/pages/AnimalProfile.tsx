@@ -18,13 +18,16 @@ import { AdoptionPanel } from '../components/animals/AdoptionPanel';
 import { ActionNeededCallout } from '../components/animals/ActionNeededCallout';
 import { RelationshipsCard } from '../components/animals/RelationshipsCard';
 import { ExternalListingsCard } from '../components/animals/ExternalListingsCard';
+import { SummaryTab } from '../components/animals/SummaryTab';
+import { AdoptionProfileTab } from '../components/animals/AdoptionProfileTab';
 import { PhotoGallery } from '../components/animals/PhotoGallery';
 import { PLACEMENT_PURPOSE_LABELS } from '../lib/placementPurpose';
 import {
   calculateAge,
   formatDate,
   animalDisplayName,
-  animalShowsRescueIdBadge } from
+  animalShowsRescueIdBadge,
+  humanizeSnakeCase } from
 '../lib/utils';
 import {
   SyringeIcon,
@@ -46,7 +49,9 @@ import {
   PencilIcon,
   TagIcon,
   MapPinnedIcon,
-  CheckIcon } from
+  CheckIcon,
+  SparklesIcon,
+  MegaphoneIcon } from
 'lucide-react';
 import { format } from 'date-fns';
 import { ArchiveConfirmDialog } from '../components/archive/ArchiveConfirmDialog';
@@ -96,8 +101,9 @@ export function AnimalProfile() {
   const [isStartAdoptionOpen, setIsStartAdoptionOpen] = useState(false);
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
   const [isAddPhotoOpen, setIsAddPhotoOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'timeline' | 'medical' | 'photos'>(
-    'timeline'
+  const [activeTab, setActiveTab] = useState<
+    'summary' | 'timeline' | 'medical' | 'photos' | 'adoption'>(
+    'summary'
   );
   const [archivingNote, setArchivingNote] = useState<
     {id: string;preview: string;} | null>(
@@ -306,7 +312,7 @@ export function AnimalProfile() {
     date: n.created_at.split('T')[0],
     ts: n.created_at,
     type: 'note' as const,
-    title: `Note: ${n.note_type}`,
+    title: `Note: ${humanizeSnakeCase(n.note_type)}`,
     description: n.body,
     icon: MessageSquareIcon,
     color: 'bg-background text-text-secondary',
@@ -875,9 +881,17 @@ export function AnimalProfile() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Tabs (Timeline / Medical History) */}
         <div className="lg:col-span-2 space-y-5">
-          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
-            {/* Tabs */}
+          <div className="space-y-3">
+            {/* Tabs — own row; scroll horizontally on narrow widths rather than
+                pushing the per-tab action off the card. */}
+            <div className="overflow-x-auto -mx-1 px-1">
             <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-card border border-border shadow-soft self-start">
+              <button
+                onClick={() => setActiveTab('summary')}
+                className={`flex items-center gap-2 px-3 h-9 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'summary' ? 'bg-primary/10 text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-background'}`}>
+
+                <SparklesIcon className="w-4 h-4" /> Summary
+              </button>
               <button
                 onClick={() => setActiveTab('timeline')}
                 className={`flex items-center gap-2 px-3 h-9 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'timeline' ? 'bg-primary/10 text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-background'}`}>
@@ -906,11 +920,20 @@ export function AnimalProfile() {
                   </span>
                 }
               </button>
+              <button
+                onClick={() => setActiveTab('adoption')}
+                className={`flex items-center gap-2 px-3 h-9 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'adoption' ? 'bg-primary/10 text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-background'}`}>
+
+                <MegaphoneIcon className="w-4 h-4" /> Adoption Profile
+              </button>
+            </div>
             </div>
 
             {/* The Add button matches the active tab: each surface owns its
-                own primary action so there's no cross-tab clutter. */}
-            <div className="flex gap-2">
+                own primary action so there's no cross-tab clutter. Sits on its
+                own right-aligned row under the tabs so it never overflows the
+                card as tabs grow. */}
+            <div className="flex justify-end empty:hidden">
               {activeTab === 'timeline' &&
               <Button
                 variant="soft"
@@ -940,6 +963,17 @@ export function AnimalProfile() {
               }
             </div>
           </div>
+
+          {activeTab === 'summary' &&
+          <SummaryTab
+            animalId={animal.id}
+            traitCount={animalTraitList.length}
+            noteCount={animalNotes.length}
+            medicalCount={animalMedical.length}
+            fosterNoteCount={
+            animalNotes.filter((n) => n.note_type === 'foster_update').length
+            } />
+          }
 
           {activeTab === 'timeline' &&
           <Card className="overflow-hidden">
@@ -1087,6 +1121,17 @@ export function AnimalProfile() {
             animalId={animal.id}
             isAddOpen={isAddPhotoOpen}
             onAddOpenChange={setIsAddPhotoOpen} />
+          }
+
+          {activeTab === 'adoption' &&
+          <AdoptionProfileTab
+            animalId={animal.id}
+            traitCount={animalTraitList.length}
+            noteCount={animalNotes.length}
+            fosterUpdateCount={
+            animalNotes.filter((n) => n.note_type === 'foster_update').length
+            }
+            medicalCount={animalMedical.length} />
           }
         </div>
 

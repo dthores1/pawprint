@@ -6,6 +6,7 @@ import { Card } from '../components/ui/Card';
 import { Select } from '../components/ui/Forms';
 import { Button } from '../components/ui/Button';
 import { TraitFormModal } from '../components/settings/TraitFormModal';
+import { AdoptionTemplateEditor } from '../components/settings/AdoptionTemplateEditor';
 import { SpeciesIcon } from '../lib/speciesIcons';
 import { cn } from '../lib/utils';
 import { Trait } from '../types';
@@ -331,6 +332,9 @@ export function Settings() {
           </ul>
         </Card>
       }
+
+      {/* Adoption Profiles — admin-managed posting template. */}
+      {isAdmin && <AdoptionTemplateEditor />}
 
       <TraitFormModal
         isOpen={traitForm.open}

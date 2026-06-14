@@ -98,6 +98,18 @@ export function generateId(): string {
 }
 
 /**
+ * Turns a snake_case enum value into a human label, e.g.
+ * `foster_update` → `Foster Update`, `general` → `General`.
+ */
+export function humanizeSnakeCase(value: string): string {
+  return value.
+  split('_').
+  filter(Boolean).
+  map((word) => word.charAt(0).toUpperCase() + word.slice(1)).
+  join(' ');
+}
+
+/**
  * Returns the greeting prefix appropriate for the given local time.
  * Boundaries (inclusive):
  *  - 5:01am – 11:00am → "Good morning"
