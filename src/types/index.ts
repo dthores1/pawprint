@@ -250,6 +250,76 @@ export interface AnimalExternalListing {
   updated_at: string;
 }
 
+/**
+ * Kind of AI-generated content. `summary` backs the animal page's Summary tab;
+ * the rest are reserved for future AI surfaces sharing the same table
+ * (migration 0055). Keep in sync with the CHECK constraint on
+ * `animal_ai_content.content_type`.
+ */
+export type AiContentType =
+'summary' |
+'adoption_profile' |
+'internal_summary' |
+'medical_summary' |
+'foster_update';
+
+/**
+ * One piece of AI-generated content for an animal (migration 0055). Both content
+ * fields start identical: `ai_generated_content` is the verbatim model output
+ * and never changes through hand-edits; `draft_content` is what the UI shows
+ * and edits. `user_edited` flips true once draft diverges from the AI version.
+ * "Reset" copies ai_generated_content back into draft; "Regenerate" replaces
+ * both with fresh output. At most one row per (animal_id, content_type).
+ */
+export interface AnimalAiContent {
+  id: string;
+  organization_id: string;
+  animal_id: string;
+  content_type: AiContentType;
+  ai_generated_content: string;
+  draft_content: string;
+  user_edited: boolean;
+  /** Model id used for the current ai_generated_content (e.g. 'gpt-4o-mini'). */
+  model?: string;
+  /**
+   * Hash of the generation inputs (traits/notes/medical/animal fields) captured
+   * when this content was produced. Compared to the current fingerprint to flag
+   * "may be outdated". Null for rows generated before migration 0057.
+   */
+  source_fingerprint?: string;
+  /** When the current ai_generated_content was produced. */
+  generated_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Org-level generation controls for adoption profiles (migration 0056). */
+export type AdoptionProfileTone =
+'warm_conversational' |
+'professional' |
+'playful';
+
+export type AdoptionProfileLength = 'short' | 'standard' | 'detailed';
+
+/**
+ * An org's adoption-posting template (migration 0056). `template_body` is fixed
+ * text plus placeholders: AI sections ({{ai_intro}}, {{ai_body}},
+ * {{ai_home_requirements}}) and animal variables ({{animal.name}} etc.).
+ * `tone`/`length`/`style_notes` steer the AI. MVP: one default per org.
+ */
+export interface OrganizationAdoptionTemplate {
+  id: string;
+  organization_id: string;
+  name: string;
+  template_body: string;
+  tone: AdoptionProfileTone;
+  length: AdoptionProfileLength;
+  style_notes?: string;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 // The foster-specific fields captured by the Add/Edit Foster forms. A foster is
 // created/updated as a `people` row (role 'volunteer' + roles ['foster_parent']).
 export interface FosterInput {

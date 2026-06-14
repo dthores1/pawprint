@@ -73,10 +73,7 @@ export function AddNoteModal({ isOpen, onClose, animalId, animal }: AddNoteModal
             }>
             
             <option value="general">General</option>
-            <option value="behavior">Behavior</option>
-            <option value="medical">Medical</option>
             <option value="foster_update">Foster Update</option>
-            <option value="adoption">Adoption</option>
           </Select>
         </div>
 

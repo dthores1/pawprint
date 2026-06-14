@@ -27,6 +27,9 @@ import {
   AnimalActionItem,
   AnimalRelationship,
   AnimalExternalListing,
+  AnimalAiContent,
+  AiContentType,
+  OrganizationAdoptionTemplate,
   MemberPermission,
   OrgMember,
   AnimalPhoto,
@@ -48,7 +51,8 @@ import {
   ArchivedRecord } from
 '../types';
 import { supabase } from '../lib/supabase';
-import { rowToBreed } from '../lib/breedsApi';
+import { rowToBreed, animalBreedLabel } from '../lib/breedsApi';
+import { calculateAge, animalDisplayName } from '../lib/utils';
 import { rowToSpecies } from '../lib/speciesApi';
 import { rowToOrgSpecies, rowToOrgBreed } from '../lib/organizationCatalogApi';
 import {
@@ -106,6 +110,17 @@ import {
   externalListingToInsert,
   externalListingUpdateToRow } from
 '../lib/externalListingsApi';
+import { rowToAiContent, aiContentToUpsert } from '../lib/aiContentApi';
+import { computeAnimalInputsFingerprint } from '../lib/aiContentFingerprint';
+import {
+  rowToAdoptionTemplate,
+  adoptionTemplateUpdateToRow } from
+'../lib/adoptionTemplateApi';
+import {
+  assembleAdoptionProfile,
+  animalTemplateVars,
+  DEFAULT_ADOPTION_TEMPLATE_BODY } from
+'../lib/adoptionTemplate';
 import { rowToMemberPermission } from '../lib/memberPermissionsApi';
 import {
   rowToPerson,
@@ -355,6 +370,47 @@ export interface WhiskerContextType {
   updates: Partial<AnimalExternalListing>)
   => void;
   deleteExternalListing: (id: string) => void;
+  /** AI-generated content rows (summaries, etc.) for the org's animals. */
+  aiContent: AnimalAiContent[];
+  /**
+   * Generate (or regenerate) the AI summary for an animal: builds the prompt
+   * from the animal's bio/traits/medical/notes, calls the edge function, and
+   * upserts the result into both content fields. Throws on failure.
+   */
+  generateAiSummary: (animalId: string) => Promise<void>;
+  /** Persist a hand-edit to the draft only; flips user_edited if it diverges. */
+  updateAiDraft: (id: string, draft: string) => void;
+  /** Reset the draft back to the verbatim AI version (user_edited → false). */
+  resetAiDraft: (id: string) => void;
+  /**
+   * Current fingerprint of an animal's generation inputs. Compare to a content
+   * row's `source_fingerprint` to detect "may be outdated" (differs → stale).
+   */
+  computeAnimalFingerprint: (animalId: string) => string;
+  /** Org adoption-profile templates (migration 0056). One is the org default. */
+  adoptionTemplates: OrganizationAdoptionTemplate[];
+  /**
+   * Generate (or regenerate) an animal's adoption posting: AI writes the
+   * grounded sections, which are assembled into the chosen template (defaults
+   * to the org default) to produce the full posting, stored as content_type
+   * 'adoption_profile'. Throws on failure.
+   */
+  generateAdoptionProfile: (
+  animalId: string,
+  guidance?: string,
+  templateId?: string)
+  => Promise<void>;
+  /** Edit an adoption-profile template (name/body/tone/length/style). */
+  updateAdoptionTemplate: (
+  id: string,
+  updates: Partial<OrganizationAdoptionTemplate>)
+  => void;
+  /** Create a new template (seeded from the current default). Returns its id. */
+  addAdoptionTemplate: (name: string) => Promise<string>;
+  /** Make a template the org default (only one default per org). */
+  setDefaultAdoptionTemplate: (id: string) => void;
+  /** Delete a non-default template. */
+  deleteAdoptionTemplate: (id: string) => void;
   placeAnimal: (
   animal_id: string,
   person_id: string,
@@ -736,6 +792,49 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   useEffect(() => {
     loadExternalListings();
   }, [loadExternalListings]);
+  // AI-generated content per animal (summaries, etc. — migration 0055). One row
+  // per (animal, content_type); generation upserts on that pair. No soft-delete.
+  const [aiContent, setAiContent] = useState<AnimalAiContent[]>([]);
+  const loadAiContent = useCallback(async () => {
+    if (!orgId) {
+      setAiContent([]);
+      return;
+    }
+    const { data, error } = await supabase.
+    from('animal_ai_content').
+    select('*').
+    eq('organization_id', orgId);
+    if (error) {
+      console.error('[ai content] load failed:', error.message);
+    } else {
+      setAiContent((data ?? []).map(rowToAiContent));
+    }
+  }, [orgId]);
+  useEffect(() => {
+    loadAiContent();
+  }, [loadAiContent]);
+  // Org adoption-profile templates (migration 0056). MVP: one default per org.
+  const [adoptionTemplates, setAdoptionTemplates] = useState<
+    OrganizationAdoptionTemplate[]>(
+    []);
+  const loadAdoptionTemplates = useCallback(async () => {
+    if (!orgId) {
+      setAdoptionTemplates([]);
+      return;
+    }
+    const { data, error } = await supabase.
+    from('organization_adoption_templates').
+    select('*').
+    eq('organization_id', orgId);
+    if (error) {
+      console.error('[adoption templates] load failed:', error.message);
+    } else {
+      setAdoptionTemplates((data ?? []).map(rowToAdoptionTemplate));
+    }
+  }, [orgId]);
+  useEffect(() => {
+    loadAdoptionTemplates();
+  }, [loadAdoptionTemplates]);
   // Org members (accounts) + their permission grants. Used to gate restricted
   // actions (admin OR active grant) and to drive the Fulfillment Access UI.
   const [orgMembers, setOrgMembers] = useState<OrgMember[]>([]);
@@ -2175,6 +2274,385 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       }
     });
   };
+  // --- AI content (summaries) ----------------------------------------------
+  // Fingerprint of an animal's generation inputs (traits/notes/medical/core
+  // fields), used to detect when stored AI content predates a change to those
+  // inputs. Shared by both summary and adoption-profile generation + the tabs.
+  const computeAnimalFingerprint = (animalId: string): string => {
+    const animal = animals.find((a) => a.id === animalId);
+    if (!animal) return '';
+    const traitIds = animalTraits.
+    filter((at) => at.animal_id === animalId).
+    map((at) => at.trait_id);
+    return computeAnimalInputsFingerprint({
+      animal,
+      traitIds,
+      notes: notes.filter((n) => n.animal_id === animalId),
+      medical: medicalRecords.filter((m) => m.animal_id === animalId)
+    });
+  };
+  // Assemble the prompt inputs from data already in memory, call the
+  // `generate-animal-summary` edge function (which talks to OpenAI), and upsert
+  // the result. Both content fields are set to the fresh output and
+  // `user_edited` is cleared — this serves first generation AND "Regenerate".
+  // Throws on failure so the calling component can show an inline error.
+  const generateAiSummary = async (animalId: string): Promise<void> => {
+    if (!orgId) throw new Error('No current organization.');
+    const animal = animals.find((a) => a.id === animalId);
+    if (!animal) throw new Error('Animal not found.');
+    const animalTraitList = animalTraits.
+    filter((at) => at.animal_id === animalId).
+    map((at) => traits.find((t) => t.id === at.trait_id)).
+    filter((t): t is Trait => !!t && t.active);
+    const animalMedical = medicalRecords.filter((m) => m.animal_id === animalId);
+    const animalNotes = notes.filter((n) => n.animal_id === animalId);
+    const inputs = {
+      contentType: 'summary' as AiContentType,
+      animal: {
+        name: animalDisplayName(animal),
+        species: animal.species,
+        breed: animalBreedLabel(animal, breeds) || undefined,
+        sex: animal.sex,
+        age: calculateAge(animal.estimated_birth_date),
+        status: animal.status,
+        intakeSource: animal.intake_source || undefined,
+        description: animal.description || undefined
+      },
+      traits: animalTraitList.map((t) => ({
+        name: t.name,
+        description: t.description
+      })),
+      medical: animalMedical.map((m) => ({
+        name: m.procedure_name,
+        type: m.procedure_type,
+        status: m.status,
+        date: m.performed_date || m.due_date || undefined,
+        notes: m.notes || undefined
+      })),
+      notes: animalNotes.map((n) => ({
+        type: n.note_type,
+        body: n.body,
+        date: n.created_at.split('T')[0]
+      }))
+    };
+    const { data, error } = await supabase.functions.invoke(
+      'generate-animal-summary',
+      { body: inputs }
+    );
+    if (error) {
+      // supabase-js wraps a non-2xx as FunctionsHttpError; surface the server
+      // message (e.g. an OpenAI error) rather than the generic wrapper text.
+      let message = error.message;
+      try {
+        const body = await (error as any).context?.json?.();
+        if (body?.error) message = body.error;
+      } catch {
+        /* fall back to the wrapper message */
+      }
+      throw new Error(message);
+    }
+    const content: string | undefined = data?.content;
+    const model: string = data?.model || 'gpt-4o-mini';
+    if (!content) throw new Error('No summary was returned.');
+    const generatedAt = new Date().toISOString();
+    const { data: row, error: upErr } = await supabase.
+    from('animal_ai_content').
+    upsert(
+      aiContentToUpsert(
+        {
+          animalId,
+          contentType: 'summary',
+          content,
+          model,
+          generatedAt,
+          sourceFingerprint: computeAnimalFingerprint(animalId)
+        },
+        orgId
+      ),
+      { onConflict: 'animal_id,content_type' }
+    ).
+    select('*').
+    single();
+    if (upErr || !row) {
+      throw new Error(upErr?.message || 'Failed to save the generated summary.');
+    }
+    const saved = rowToAiContent(row);
+    setAiContent((prev) => [saved, ...prev.filter((c) => c.id !== saved.id)]);
+  };
+  // A user edit writes only `draft_content`; the AI version is preserved.
+  // `user_edited` reflects whether the draft currently diverges from it.
+  const updateAiDraft = (id: string, draft: string): void => {
+    const existing = aiContent.find((c) => c.id === id);
+    const userEdited = existing ?
+    draft !== existing.ai_generated_content :
+    true;
+    setAiContent((prev) =>
+    prev.map((c) =>
+    c.id === id ?
+    { ...c, draft_content: draft, user_edited: userEdited } :
+    c
+    )
+    );
+    supabase.
+    from('animal_ai_content').
+    update({ draft_content: draft, user_edited: userEdited }).
+    eq('id', id).
+    then(({ error }) => {
+      if (error) {
+        console.error('[ai content] draft update failed:', error.message);
+        loadAiContent();
+      }
+    });
+  };
+  // "Reset to AI version" — copy ai_generated_content back into the draft.
+  const resetAiDraft = (id: string): void => {
+    const existing = aiContent.find((c) => c.id === id);
+    if (!existing) return;
+    const reset = existing.ai_generated_content;
+    setAiContent((prev) =>
+    prev.map((c) =>
+    c.id === id ?
+    { ...c, draft_content: reset, user_edited: false } :
+    c
+    )
+    );
+    supabase.
+    from('animal_ai_content').
+    update({ draft_content: reset, user_edited: false }).
+    eq('id', id).
+    then(({ error }) => {
+      if (error) {
+        console.error('[ai content] reset failed:', error.message);
+        loadAiContent();
+      }
+    });
+  };
+  // --- Adoption profiles ----------------------------------------------------
+  // Generate (or regenerate) an animal's adoption posting: the edge function
+  // returns grounded AI sections, which we assemble into the org template
+  // (fixed text + {{animal.*}} variables) to produce the full posting. The
+  // assembled text is stored in BOTH content fields (content_type =
+  // 'adoption_profile'), reusing the same draft/edit/reset machinery as
+  // summaries. `guidance` is optional per-generation instructions. Throws on
+  // failure so the calling component can show an inline error.
+  const generateAdoptionProfile = async (
+  animalId: string,
+  guidance?: string,
+  templateId?: string)
+  : Promise<void> => {
+    if (!orgId) throw new Error('No current organization.');
+    const animal = animals.find((a) => a.id === animalId);
+    if (!animal) throw new Error('Animal not found.');
+    // Use the explicitly chosen template, else the org default.
+    const template =
+    (templateId ? adoptionTemplates.find((t) => t.id === templateId) : null) ??
+    adoptionTemplates.find((t) => t.is_default) ??
+    adoptionTemplates[0];
+    if (!template) {
+      throw new Error(
+        'No adoption-profile template is configured. Add one in Settings → Adoption Profiles.'
+      );
+    }
+    const animalTraitList = animalTraits.
+    filter((at) => at.animal_id === animalId).
+    map((at) => traits.find((t) => t.id === at.trait_id)).
+    filter((t): t is Trait => !!t && t.active);
+    const animalMedical = medicalRecords.filter((m) => m.animal_id === animalId);
+    const animalNotes = notes.filter((n) => n.animal_id === animalId);
+    // Grounded readiness signals the AI may reference (the fixed boilerplate
+    // about spay/neuter etc. lives in the template, not here).
+    const readiness = {
+      spayed_neutered: animalMedical.some(
+        (m) => m.procedure_type === 'spay_neuter' && m.status === 'completed'
+      ),
+      microchipped: !!animal.microchip_number,
+      rabies_vaccine: animalMedical.some(
+        (m) =>
+        m.status === 'completed' && (
+        m.procedure === 'rabies' ||
+        !m.procedure && m.procedure_name.toLowerCase().includes('rabies'))
+      )
+    };
+    const inputs = {
+      animal: {
+        name: animalDisplayName(animal),
+        species: animal.species,
+        breed: animalBreedLabel(animal, breeds) || undefined,
+        sex: animal.sex,
+        age: calculateAge(animal.estimated_birth_date),
+        status: animal.status,
+        description: animal.description || undefined
+      },
+      traits: animalTraitList.map((t) => ({
+        name: t.name,
+        description: t.description
+      })),
+      medical: animalMedical.map((m) => ({
+        name: m.procedure_name,
+        type: m.procedure_type,
+        status: m.status,
+        date: m.performed_date || m.due_date || undefined,
+        notes: m.notes || undefined
+      })),
+      notes: animalNotes.map((n) => ({
+        type: n.note_type,
+        body: n.body,
+        date: n.created_at.split('T')[0]
+      })),
+      readiness,
+      guidance: guidance?.trim() || undefined,
+      tone: template.tone,
+      length: template.length,
+      styleNotes: template.style_notes || undefined
+    };
+    const { data, error } = await supabase.functions.invoke(
+      'generate-adoption-profile',
+      { body: inputs }
+    );
+    if (error) {
+      let message = error.message;
+      try {
+        const body = await (error as any).context?.json?.();
+        if (body?.error) message = body.error;
+      } catch {
+        /* fall back to the wrapper message */
+      }
+      throw new Error(message);
+    }
+    const sections = data?.sections;
+    const model: string = data?.model || 'gpt-4o-mini';
+    if (!sections) throw new Error('No profile was returned.');
+    // Assemble the full posting: template + animal variables + AI sections.
+    const content = assembleAdoptionProfile(
+      template.template_body,
+      animalTemplateVars(animal, breeds),
+      {
+        ai_intro: sections.ai_intro ?? '',
+        ai_body: sections.ai_body ?? '',
+        ai_home_requirements: sections.ai_home_requirements ?? ''
+      }
+    );
+    const generatedAt = new Date().toISOString();
+    const { data: row, error: upErr } = await supabase.
+    from('animal_ai_content').
+    upsert(
+      aiContentToUpsert(
+        {
+          animalId,
+          contentType: 'adoption_profile' as AiContentType,
+          content,
+          model,
+          generatedAt,
+          sourceFingerprint: computeAnimalFingerprint(animalId)
+        },
+        orgId
+      ),
+      { onConflict: 'animal_id,content_type' }
+    ).
+    select('*').
+    single();
+    if (upErr || !row) {
+      throw new Error(upErr?.message || 'Failed to save the generated profile.');
+    }
+    const saved = rowToAiContent(row);
+    setAiContent((prev) => [saved, ...prev.filter((c) => c.id !== saved.id)]);
+  };
+  // Edit the org's adoption-profile template (Settings → Adoption Profiles).
+  const updateAdoptionTemplate = (
+  id: string,
+  updates: Partial<OrganizationAdoptionTemplate>) =>
+  {
+    setAdoptionTemplates((prev) =>
+    prev.map((t) => t.id === id ? { ...t, ...updates } : t)
+    );
+    const row = adoptionTemplateUpdateToRow(updates);
+    if (Object.keys(row).length === 0) return;
+    supabase.
+    from('organization_adoption_templates').
+    update(row).
+    eq('id', id).
+    then(({ error }) => {
+      if (error) {
+        console.error('[adoption templates] update failed:', error.message);
+        loadAdoptionTemplates();
+      }
+    });
+  };
+  // Add a new adoption-profile template. Seeds it from the current default (so
+  // orgs tweak from a working starting point), or the built-in starter body.
+  const addAdoptionTemplate = async (name: string): Promise<string> => {
+    if (!orgId) {
+      console.error('[adoption templates] cannot create — no current org');
+      return '';
+    }
+    const base =
+    adoptionTemplates.find((t) => t.is_default) ?? adoptionTemplates[0];
+    const { data, error } = await supabase.
+    from('organization_adoption_templates').
+    insert({
+      organization_id: orgId,
+      name: name.trim() || 'New template',
+      template_body: base?.template_body ?? DEFAULT_ADOPTION_TEMPLATE_BODY,
+      tone: base?.tone ?? 'warm_conversational',
+      length: base?.length ?? 'standard',
+      is_default: false
+    }).
+    select('*').
+    single();
+    if (error || !data) {
+      console.error('[adoption templates] create failed:', error?.message);
+      return '';
+    }
+    setAdoptionTemplates((prev) => [...prev, rowToAdoptionTemplate(data)]);
+    return data.id as string;
+  };
+  // Make a template the org default. The partial unique index allows only one
+  // default per org, so unset the others before setting this one.
+  const setDefaultAdoptionTemplate = async (id: string) => {
+    if (!orgId) return;
+    const prev = adoptionTemplates;
+    setAdoptionTemplates((cur) =>
+    cur.map((t) => ({ ...t, is_default: t.id === id }))
+    );
+    const { error: clearErr } = await supabase.
+    from('organization_adoption_templates').
+    update({ is_default: false }).
+    eq('organization_id', orgId).
+    neq('id', id);
+    if (clearErr) {
+      console.error('[adoption templates] clear default failed:', clearErr.message);
+      setAdoptionTemplates(prev);
+      loadAdoptionTemplates();
+      return;
+    }
+    const { error: setErr } = await supabase.
+    from('organization_adoption_templates').
+    update({ is_default: true }).
+    eq('id', id);
+    if (setErr) {
+      console.error('[adoption templates] set default failed:', setErr.message);
+      setAdoptionTemplates(prev);
+      loadAdoptionTemplates();
+    }
+  };
+  // Delete a non-default template. The default can't be deleted (set another
+  // default first); the UI enforces this too.
+  const deleteAdoptionTemplate = (id: string) => {
+    const target = adoptionTemplates.find((t) => t.id === id);
+    if (!target || target.is_default) return;
+    const prev = adoptionTemplates;
+    setAdoptionTemplates((cur) => cur.filter((t) => t.id !== id));
+    supabase.
+    from('organization_adoption_templates').
+    delete().
+    eq('id', id).
+    then(({ error }) => {
+      if (error) {
+        console.error('[adoption templates] delete failed:', error.message);
+        setAdoptionTemplates(prev);
+      }
+    });
+  };
   // Placing an animal with someone makes them a foster parent — the "Place in
   // Foster" picker lets you choose any contact, so add the role on placement if
   // they don't already have it (idempotent; mirrors ensureAdopterRole).
@@ -2926,6 +3404,17 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         actionItems,
         relationships,
         externalListings,
+        aiContent,
+        generateAiSummary,
+        updateAiDraft,
+        resetAiDraft,
+        computeAnimalFingerprint,
+        adoptionTemplates,
+        generateAdoptionProfile,
+        updateAdoptionTemplate,
+        addAdoptionTemplate,
+        setDefaultAdoptionTemplate,
+        deleteAdoptionTemplate,
         orgMembers,
         memberPermissions,
         grantSupplyPermission,

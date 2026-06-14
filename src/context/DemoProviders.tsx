@@ -8,6 +8,8 @@ import {
   AnimalNote,
   AnimalRelationship,
   AnimalExternalListing,
+  AnimalAiContent,
+  OrganizationAdoptionTemplate,
   MemberPermission,
   OrgMember,
   AnimalPhoto,
@@ -66,6 +68,11 @@ import {
 '../data/seed';
 import { generateId } from '../lib/utils';
 import { adoptionStatusPatch } from '../lib/adoptions';
+import {
+  assembleAdoptionProfile,
+  animalTemplateVars } from
+'../lib/adoptionTemplate';
+import { computeAnimalInputsFingerprint } from '../lib/aiContentFingerprint';
 
 // ============================================================
 // Demo mode providers — public portfolio. No auth, no Supabase.
@@ -123,6 +130,27 @@ export function DemoWhiskerProvider({
   useState<AnimalRelationship[]>(seedRelationships);
   const [externalListings, setExternalListings] =
   useState<AnimalExternalListing[]>(seedExternalListings);
+  // Demo mode has no edge function / OpenAI — AI content lives purely in memory
+  // and "generation" produces a deterministic placeholder so the flow is
+  // exercisable without an API key.
+  const [aiContent, setAiContent] = useState<AnimalAiContent[]>([]);
+  const [adoptionTemplates, setAdoptionTemplates] = useState<
+    OrganizationAdoptionTemplate[]>(
+    [
+    {
+      id: 'tmpl-default',
+      organization_id: 'demo-org',
+      name: 'Default',
+      template_body:
+      'Please read the full posting before applying.\n\n{{ai_intro}}\n\n{{ai_body}}\n\nWhat {{animal.name}} is looking for in a home:\n\n{{ai_home_requirements}}\n\nAll of our animals are spayed/neutered, microchipped, and vaccinated prior to adoption.\n\nAdoption fees apply. Thank you for your interest in adopting {{animal.name}}!',
+      tone: 'warm_conversational',
+      length: 'standard',
+      style_notes: undefined,
+      is_default: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }]
+    );
   const [orgMembers] = useState<OrgMember[]>(seedOrgMembers);
   const [memberPermissions, setMemberPermissions] = useState<MemberPermission[]>(
     seedMemberPermissions
@@ -268,6 +296,8 @@ export function DemoWhiskerProvider({
     actionItems,
     relationships,
     externalListings,
+    aiContent,
+    adoptionTemplates,
     orgMembers,
     memberPermissions,
     grantSupplyPermission: (memberId: string) =>
@@ -719,6 +749,180 @@ export function DemoWhiskerProvider({
     ),
     deleteExternalListing: (id) =>
     setExternalListings((prev) => prev.filter((l) => l.id !== id)),
+
+    generateAiSummary: async (animalId: string) => {
+      const animal = enrichedAnimals.find((a) => a.id === animalId);
+      const now = new Date().toISOString();
+      const name = animal?.name || 'This animal';
+      const traitCount = animalTraits.filter(
+        (at) => at.animal_id === animalId
+      ).length;
+      const content =
+      `${name} is a ${animal?.species ?? 'pet'} currently in the rescue's care. ` +
+      `This is a demo summary generated without an AI provider — connect the ` +
+      `generate-animal-summary edge function to produce real summaries from ` +
+      `${traitCount} personality trait(s), notes, and medical history.`;
+      const fingerprint = animal ?
+      computeAnimalInputsFingerprint({
+        animal,
+        traitIds: animalTraits.
+        filter((at) => at.animal_id === animalId).
+        map((at) => at.trait_id),
+        notes: notes.filter((n) => n.animal_id === animalId),
+        medical: medicalRecords.filter((m) => m.animal_id === animalId)
+      }) :
+      undefined;
+      setAiContent((prev) => [
+      {
+        id: `ai${generateId()}`,
+        organization_id: 'demo-org',
+        animal_id: animalId,
+        content_type: 'summary',
+        ai_generated_content: content,
+        draft_content: content,
+        user_edited: false,
+        model: 'demo',
+        source_fingerprint: fingerprint,
+        generated_at: now,
+        created_at: now,
+        updated_at: now
+      },
+      ...prev.filter(
+        (c) => !(c.animal_id === animalId && c.content_type === 'summary')
+      )]
+      );
+    },
+    updateAiDraft: (id: string, draft: string) =>
+    setAiContent((prev) =>
+    prev.map((c) =>
+    c.id === id ?
+    {
+      ...c,
+      draft_content: draft,
+      user_edited: draft !== c.ai_generated_content
+    } :
+    c
+    )
+    ),
+    resetAiDraft: (id: string) =>
+    setAiContent((prev) =>
+    prev.map((c) =>
+    c.id === id ?
+    { ...c, draft_content: c.ai_generated_content, user_edited: false } :
+    c
+    )
+    ),
+
+    computeAnimalFingerprint: (animalId: string) => {
+      const animal = enrichedAnimals.find((a) => a.id === animalId);
+      if (!animal) return '';
+      return computeAnimalInputsFingerprint({
+        animal,
+        traitIds: animalTraits.
+        filter((at) => at.animal_id === animalId).
+        map((at) => at.trait_id),
+        notes: notes.filter((n) => n.animal_id === animalId),
+        medical: medicalRecords.filter((m) => m.animal_id === animalId)
+      });
+    },
+
+    adoptionTemplates,
+    generateAdoptionProfile: async (
+    animalId: string,
+    guidance?: string,
+    templateId?: string) =>
+    {
+      const animal = enrichedAnimals.find((a) => a.id === animalId);
+      const now = new Date().toISOString();
+      const template =
+      (templateId ?
+      adoptionTemplates.find((t) => t.id === templateId) :
+      null) ??
+      adoptionTemplates.find((t) => t.is_default) ??
+      adoptionTemplates[0];
+      const name = animal?.name || 'This animal';
+      const sections = {
+        ai_intro: `Meet ${name}! (Demo intro — connect the generate-adoption-profile edge function for real output.)`,
+        ai_body:
+        `${name} is a ${animal?.species ?? 'pet'} in our care.${
+        guidance ? ` (Guidance applied: ${guidance})` : ''
+        } This demo text is assembled into your organization's template.`,
+        ai_home_requirements:
+        `- ${name} needs a loving home.\n- Demo bullet generated without AI.`
+      };
+      const content = template ?
+      assembleAdoptionProfile(
+        template.template_body,
+        animal ? animalTemplateVars(animal, seedBreeds) : {},
+        sections
+      ) :
+      `${sections.ai_intro}\n\n${sections.ai_body}`;
+      setAiContent((prev) => [
+      {
+        id: `ai${generateId()}`,
+        organization_id: 'demo-org',
+        animal_id: animalId,
+        content_type: 'adoption_profile',
+        ai_generated_content: content,
+        draft_content: content,
+        user_edited: false,
+        model: 'demo',
+        source_fingerprint: animal ?
+        computeAnimalInputsFingerprint({
+          animal,
+          traitIds: animalTraits.
+          filter((at) => at.animal_id === animalId).
+          map((at) => at.trait_id),
+          notes: notes.filter((n) => n.animal_id === animalId),
+          medical: medicalRecords.filter((m) => m.animal_id === animalId)
+        }) :
+        undefined,
+        generated_at: now,
+        created_at: now,
+        updated_at: now
+      },
+      ...prev.filter(
+        (c) =>
+        !(c.animal_id === animalId && c.content_type === 'adoption_profile')
+      )]
+      );
+    },
+    updateAdoptionTemplate: (id, updates) =>
+    setAdoptionTemplates((prev) =>
+    prev.map((t) => t.id === id ? { ...t, ...updates } : t)
+    ),
+    addAdoptionTemplate: async (name: string) => {
+      const base =
+      adoptionTemplates.find((t) => t.is_default) ?? adoptionTemplates[0];
+      const id = `tmpl-${generateId()}`;
+      const now = new Date().toISOString();
+      setAdoptionTemplates((prev) => [
+      ...prev,
+      {
+        id,
+        organization_id: 'demo-org',
+        name: name.trim() || 'New template',
+        template_body: base?.template_body ?? '{{ai_intro}}\n\n{{ai_body}}',
+        tone: base?.tone ?? 'warm_conversational',
+        length: base?.length ?? 'standard',
+        style_notes: undefined,
+        is_default: false,
+        created_at: now,
+        updated_at: now
+      }]
+      );
+      return id;
+    },
+    setDefaultAdoptionTemplate: (id: string) =>
+    setAdoptionTemplates((prev) =>
+    prev.map((t) => ({ ...t, is_default: t.id === id }))
+    ),
+    deleteAdoptionTemplate: (id: string) =>
+    setAdoptionTemplates((prev) => {
+      const target = prev.find((t) => t.id === id);
+      if (!target || target.is_default) return prev;
+      return prev.filter((t) => t.id !== id);
+    }),
 
     placeAnimal: (
     animal_id,
