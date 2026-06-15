@@ -25,12 +25,26 @@ export function AddressDisplay({ value, className, singleLine }: Props) {
   const hasStructured = Boolean(line1 || line2);
   const href = googleMapsUrl(value);
 
-  const body = singleLine || !hasStructured ?
-  <span className="truncate">{value.formatted}</span> :
+  // For manually-typed addresses we only have the formatted string. Split on the
+  // first comma so the street sits on its own line and the rest (city/state/zip)
+  // wraps below — matching the structured two-line block instead of truncating.
+  const commaIdx = value.formatted.indexOf(',');
+  const fallbackLine1 =
+  commaIdx === -1 ? value.formatted : value.formatted.slice(0, commaIdx).trim();
+  const fallbackLine2 =
+  commaIdx === -1 ? '' : value.formatted.slice(commaIdx + 1).trim();
 
+  const body = singleLine ?
+  <span className="truncate">{value.formatted}</span> :
+  hasStructured ?
   <span className="leading-snug">
       {line1 && <span className="block">{line1}</span>}
       {line2 && <span className="block">{line2}</span>}
+    </span> :
+
+  <span className="leading-snug">
+      <span className="block">{fallbackLine1}</span>
+      {fallbackLine2 && <span className="block">{fallbackLine2}</span>}
     </span>;
 
   if (!href) {

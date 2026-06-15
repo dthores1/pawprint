@@ -80,7 +80,10 @@ export function ChangeStatusModal({
     species: speciesCatalog,
     organizationSpecies,
     animalTraits,
-    setAnimalTraits
+    setAnimalTraits,
+    actionItems,
+    addActionItem,
+    updateActionItem
   } = useWhisker();
   const navigate = useNavigate();
   const animal = animals.find((a) => a.id === animalId);
@@ -112,6 +115,9 @@ export function ChangeStatusModal({
   const [photoError, setPhotoError] = useState<string | undefined>();
   const [reason, setReason] = useState('');
   const [internalNotes, setInternalNotes] = useState('');
+  // Inline action item, shown when priority is elevated — lets the user capture
+  // the next step in the same save (rather than a second trip to the profile).
+  const [actionItemText, setActionItemText] = useState('');
   const [traitIds, setTraitIds] = useState<string[]>([]);
   // At-open trait selection (stable ordering snapshot for TraitMultiSelect).
   const [initialTraitIds, setInitialTraitIds] = useState<string[]>([]);
@@ -171,6 +177,14 @@ export function ChangeStatusModal({
     setPhotoError(undefined);
     setReason('');
     setInternalNotes(animal.internal_notes ?? '');
+    // Prefill with the current open action item so editing priority + the next
+    // step happens in one place (and we update rather than collide with the
+    // one-open-item-per-animal constraint).
+    setActionItemText(
+      actionItems.find(
+        (a) => a.animal_id === animal.id && a.status === 'open'
+      )?.description ?? ''
+    );
     // Snapshot from the animal at open; collections (animalTraits/speciesCatalog)
     // intentionally excluded from deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -306,6 +320,26 @@ export function ChangeStatusModal({
     });
 
     setAnimalTraits(animalId, traitIds);
+
+    // Inline action item: only when the priority is elevated. Update the existing
+    // open item if there is one (one-open-item-per-animal), else create it. Its
+    // priority tracks the animal's chosen elevated priority.
+    if (priority !== 'normal') {
+      const openItem = actionItems.find(
+        (a) => a.animal_id === animalId && a.status === 'open'
+      );
+      const text = actionItemText.trim();
+      if (openItem) {
+        if (
+          text &&
+          (text !== openItem.description || priority !== openItem.priority))
+        {
+          updateActionItem(openItem.id, { description: text, priority });
+        }
+      } else if (text) {
+        addActionItem({ animal_id: animalId, description: text, priority });
+      }
+    }
 
     // A filled timeline note always logs; field changes are prepended for context.
     if (reason.trim()) {
@@ -511,6 +545,58 @@ export function ChangeStatusModal({
           </div>
         </FormSection>
 
+        {/* Status & Priority */}
+        <FormSection title="Status & Priority">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="edit_status" required>Status</Label>
+              <Select
+                id="edit_status"
+                value={status}
+                onChange={(e) => setStatus(e.target.value as AnimalStatus)}>
+
+                <option value="intake">Intake</option>
+                <option value="in_care">In Care</option>
+                <option value="adoptable">Adoptable</option>
+                <option value="adopted">Adopted</option>
+                <option value="released">Released</option>
+                <option value="hospice">Hospice</option>
+                <option value="deceased">Deceased</option>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="edit_priority" required>Priority</Label>
+              <Select
+                id="edit_priority"
+                value={priority}
+                onChange={(e) => setPriority(e.target.value as Priority)}>
+
+                <option value="normal">Normal</option>
+                <option value="needs_attention">Needs Attention</option>
+                <option value="urgent">Urgent</option>
+                <option value="critical">Critical</option>
+              </Select>
+            </div>
+          </div>
+          {/* Inline action item — appears once the priority is elevated so the
+              "what's the next step" can be captured in the same save. Optional. */}
+          {priority !== 'normal' &&
+          <div>
+            <Label htmlFor="edit_action_item">Action Item (optional)</Label>
+            <Textarea
+              id="edit_action_item"
+              value={actionItemText}
+              onChange={(e) => setActionItemText(e.target.value)}
+              placeholder="What's the next step? Be specific — what, when, who."
+              rows={2} />
+
+            <p className="text-xs text-text-secondary mt-1">
+              Shown in the Action Needed banner and the dashboard's Needs Action list.
+            </p>
+          </div>
+          }
+        </FormSection>
+
         {/* Age & Intake */}
         <FormSection title="Age & Intake">
           <AgeInformationFields
@@ -554,41 +640,6 @@ export function ChangeStatusModal({
                 onChange={(e) => setIntakeSource(e.target.value)}
                 placeholder="e.g. City Shelter Transfer" />
 
-            </div>
-          </div>
-        </FormSection>
-
-        {/* Status & Priority */}
-        <FormSection title="Status & Priority">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="edit_status" required>Status</Label>
-              <Select
-                id="edit_status"
-                value={status}
-                onChange={(e) => setStatus(e.target.value as AnimalStatus)}>
-
-                <option value="intake">Intake</option>
-                <option value="in_care">In Care</option>
-                <option value="adoptable">Adoptable</option>
-                <option value="adopted">Adopted</option>
-                <option value="released">Released</option>
-                <option value="hospice">Hospice</option>
-                <option value="deceased">Deceased</option>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="edit_priority" required>Priority</Label>
-              <Select
-                id="edit_priority"
-                value={priority}
-                onChange={(e) => setPriority(e.target.value as Priority)}>
-
-                <option value="normal">Normal</option>
-                <option value="needs_attention">Needs Attention</option>
-                <option value="urgent">Urgent</option>
-                <option value="critical">Critical</option>
-              </Select>
             </div>
           </div>
         </FormSection>
