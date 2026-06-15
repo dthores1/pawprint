@@ -117,7 +117,9 @@ export function ChangeStatusModal({
   const [internalNotes, setInternalNotes] = useState('');
   // Inline action item, shown when priority is elevated — lets the user capture
   // the next step in the same save (rather than a second trip to the profile).
+  // Required whenever the priority is elevated.
   const [actionItemText, setActionItemText] = useState('');
+  const [actionItemError, setActionItemError] = useState<string | undefined>();
   const [traitIds, setTraitIds] = useState<string[]>([]);
   // At-open trait selection (stable ordering snapshot for TraitMultiSelect).
   const [initialTraitIds, setInitialTraitIds] = useState<string[]>([]);
@@ -185,6 +187,7 @@ export function ChangeStatusModal({
         (a) => a.animal_id === animal.id && a.status === 'open'
       )?.description ?? ''
     );
+    setActionItemError(undefined);
     // Snapshot from the animal at open; collections (animalTraits/speciesCatalog)
     // intentionally excluded from deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -275,6 +278,13 @@ export function ChangeStatusModal({
     if (!isValidUrl(photoUrl.trim())) {
       setPhotoError('Enter a valid URL.');
       requestAnimationFrame(() => focusFirstError(['edit_photo']));
+      return;
+    }
+    // An elevated priority must carry a next step, so the Action Needed banner
+    // and dashboard never show "no active action item".
+    if (priority !== 'normal' && !actionItemText.trim()) {
+      setActionItemError('Add an action item for a non-normal priority.');
+      requestAnimationFrame(() => focusFirstError(['edit_action_item']));
       return;
     }
     const changes: string[] = [];
@@ -579,17 +589,24 @@ export function ChangeStatusModal({
             </div>
           </div>
           {/* Inline action item — appears once the priority is elevated so the
-              "what's the next step" can be captured in the same save. Optional. */}
+              "what's the next step" can be captured in the same save. Required
+              for a non-normal priority. */}
           {priority !== 'normal' &&
           <div>
-            <Label htmlFor="edit_action_item">Action Item (optional)</Label>
+            <Label htmlFor="edit_action_item" required>Action Item</Label>
             <Textarea
               id="edit_action_item"
               value={actionItemText}
-              onChange={(e) => setActionItemText(e.target.value)}
+              onChange={(e) => {
+                setActionItemText(e.target.value);
+                if (actionItemError) setActionItemError(undefined);
+              }}
+              aria-invalid={Boolean(actionItemError)}
+              className={actionItemError ? 'border-red-500 focus:ring-red-500' : undefined}
               placeholder="What's the next step? Be specific — what, when, who."
               rows={2} />
 
+            <FieldError>{actionItemError}</FieldError>
             <p className="text-xs text-text-secondary mt-1">
               Shown in the Action Needed banner and the dashboard's Needs Action list.
             </p>

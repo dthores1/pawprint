@@ -774,9 +774,10 @@ export function AnimalProfile() {
                   priority={animal.priority}
                   className="text-sm px-3 py-1" />
                 
+                {/* No "Fostered" chip here — the Current Foster row below the
+                    header already conveys it. (List cards still pass isFostered.) */}
                 <AnimalFlags
                   animal={animal}
-                  isFostered={!!activePlacement}
                   size="md" />
 
                 {animal.microchip_number &&
