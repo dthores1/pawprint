@@ -7,6 +7,7 @@ import { ClinicsView } from '../components/clinics/ClinicsView';
 import { MedicalRecordsView } from '../components/medical/MedicalRecordsView';
 import { AddMedicalRecordModal } from '../components/medical/AddMedicalRecordModal';
 import { NewClinicEventModal } from '../components/clinics/NewClinicEventModal';
+import { useCanManageMedical } from '../lib/useAnimalPermissions';
 
 type MedicalTab = 'clinics' | 'records';
 const TABS: { key: MedicalTab; label: string }[] = [
@@ -22,6 +23,7 @@ export function Medical() {
   };
   const [isNewClinicOpen, setIsNewClinicOpen] = useState(false);
   const [isAddRecordOpen, setIsAddRecordOpen] = useState(false);
+  const canManageMedical = useCanManageMedical();
 
   return (
     <div className="space-y-6 pb-8">
@@ -35,7 +37,8 @@ export function Medical() {
             Track medical records and plan spay/neuter and vaccine clinics.
           </p>
         </div>
-        {tab === 'clinics' ?
+        {canManageMedical && (
+        tab === 'clinics' ?
         <Button onClick={() => setIsNewClinicOpen(true)} className="gap-2">
             <PlusIcon className="w-4 h-4" />
             New Clinic
@@ -44,7 +47,7 @@ export function Medical() {
         <Button onClick={() => setIsAddRecordOpen(true)} className="gap-2">
             <PlusIcon className="w-4 h-4" />
             Add Medical Record
-          </Button>
+          </Button>)
         }
       </div>
 

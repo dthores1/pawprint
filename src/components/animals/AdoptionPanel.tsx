@@ -23,11 +23,15 @@ import {
 
 interface AdoptionPanelProps {
   adoptionId: string;
+  /** Whether the viewer may run the adoption workflow (update/complete/cancel).
+   *  Adoption management is a manager action (MANAGE_ANIMALS or admin) — fosters
+   *  and read-only members see the status but no controls. Defaults to true. */
+  canManage?: boolean;
 }
 
 // Shown on the animal profile while an adoption is active (not completed /
 // cancelled). Surfaces the adopter, status, milestones, and the workflow actions.
-export function AdoptionPanel({ adoptionId }: AdoptionPanelProps) {
+export function AdoptionPanel({ adoptionId, canManage = true }: AdoptionPanelProps) {
   const { adoptions, people, animals } = useWhisker();
   const [isUpdateOpen, setIsUpdateOpen] = useState(false);
   const [isCompleteOpen, setIsCompleteOpen] = useState(false);
@@ -116,6 +120,7 @@ export function AdoptionPanel({ adoptionId }: AdoptionPanelProps) {
         </div>
       }
 
+      {canManage &&
       <div className="flex flex-wrap gap-2 pt-4 border-t border-border">
         {readyToComplete &&
         <Button
@@ -141,6 +146,7 @@ export function AdoptionPanel({ adoptionId }: AdoptionPanelProps) {
           Cancel Adoption
         </Button>
       </div>
+      }
 
       <UpdateAdoptionModal
         isOpen={isUpdateOpen}

@@ -833,7 +833,10 @@ export type MemberPermissionType =
 'MANAGE_SUPPLY_OPTIONS' |
 'MANAGE_TRANSPORT_REQUESTS' |
 'MANAGE_SITTING_REQUESTS' |
-'MANAGE_SITES';
+'MANAGE_SITES' |
+'MANAGE_ANIMALS' |
+'MANAGE_MEDICAL' |
+'MANAGE_EXTERNAL_LISTINGS';
 
 export interface MemberPermission {
   id: string;

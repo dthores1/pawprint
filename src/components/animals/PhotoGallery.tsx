@@ -19,6 +19,10 @@ import { ArchiveConfirmDialog } from '../archive/ArchiveConfirmDialog';
 import { useCanArchive } from '../archive/useCanArchive';
 interface PhotoGalleryProps {
   animalId: string;
+  /** Whether the viewer may upload photos / set the profile photo (MANAGE_ANIMALS,
+   *  admin, or the active foster). When false the gallery is view-only. Defaults
+   *  to true. Per-photo archive stays separately gated by useCanArchive. */
+  canManage?: boolean;
   /** Add-photo modal state, lifted so the trigger can live in the tab row. */
   isAddOpen: boolean;
   onAddOpenChange: (open: boolean) => void;
@@ -44,6 +48,7 @@ const CATEGORY_ORDER: PhotoCategory[] = [
 
 export function PhotoGallery({
   animalId,
+  canManage = true,
   isAddOpen,
   onAddOpenChange
 }: PhotoGalleryProps) {
@@ -114,9 +119,10 @@ export function PhotoGallery({
     return () => document.removeEventListener('keydown', handleKey);
   }, [lightboxIndex, flatPhotos.length]);
   const handleDragOver = useCallback((e: React.DragEvent) => {
+    if (!canManage) return;
     e.preventDefault();
     setIsDragging(true);
-  }, []);
+  }, [canManage]);
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
@@ -125,6 +131,7 @@ export function PhotoGallery({
     (e: React.DragEvent) => {
       e.preventDefault();
       setIsDragging(false);
+      if (!canManage) return;
       const files = Array.from(e.dataTransfer.files).filter((f) =>
       f.type.startsWith('image/')
       );
@@ -138,7 +145,7 @@ export function PhotoGallery({
         });
       });
     },
-    [addPhoto, animalId]
+    [addPhoto, animalId, canManage]
   );
   return (
     <>
@@ -241,7 +248,7 @@ export function PhotoGallery({
                   }
 
                       <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-                        {!isProfile &&
+                        {!isProfile && canManage &&
                     <button
                       type="button"
                       onClick={() => handleSetProfile(photo)}
@@ -287,6 +294,7 @@ export function PhotoGallery({
         {lightboxIndex !== null && flatPhotos[lightboxIndex] &&
         <Lightbox
           photo={flatPhotos[lightboxIndex]}
+          canSetProfile={canManage}
           isProfile={
           !!profileUrl && flatPhotos[lightboxIndex].url === profileUrl
           }
@@ -340,6 +348,7 @@ function PhotoArchiveButton({
 
 interface LightboxProps {
   photo: AnimalPhoto;
+  canSetProfile: boolean;
   isProfile: boolean;
   hasPrev: boolean;
   hasNext: boolean;
@@ -351,6 +360,7 @@ interface LightboxProps {
 }
 function Lightbox({
   photo,
+  canSetProfile,
   isProfile,
   hasPrev,
   hasNext,
@@ -360,6 +370,12 @@ function Lightbox({
   onSetProfile,
   onDelete
 }: LightboxProps) {
+  // Mirror the per-thumbnail archive gate so the lightbox Delete respects the
+  // same admin/uploader rule.
+  const canArchive = useCanArchive('animal_photos', {
+    id: photo.id,
+    created_by: photo.created_by ?? null
+  });
   // Portal to <body> so the fixed-position backdrop anchors to the viewport
   // (not the AppShell page wrapper, which has framer-motion transforms that
   // would otherwise establish a containing block and leave the sidebar
@@ -399,7 +415,7 @@ function Lightbox({
             <StarIcon className="w-4 h-4 fill-current" />
             Profile photo
           </span> :
-
+        canSetProfile ?
         <button
           type="button"
           onClick={(e) => {
@@ -410,8 +426,10 @@ function Lightbox({
 
             <StarIcon className="w-4 h-4" />
             Set as profile
-          </button>
+          </button> :
+        null
         }
+        {canArchive &&
         <button
           type="button"
           onClick={(e) => {
@@ -423,6 +441,7 @@ function Lightbox({
           <Trash2Icon className="w-4 h-4" />
           Delete
         </button>
+        }
       </div>
 
       {hasPrev &&

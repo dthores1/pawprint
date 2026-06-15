@@ -29,6 +29,7 @@ import {
   ListIcon } from
 'lucide-react';
 import { formatDate, cn } from '../../lib/utils';
+import { useCanManageAnimals } from '../../lib/useAnimalPermissions';
 import {
   litterMembers,
   litterLabel,
@@ -50,6 +51,7 @@ export function LittersView() {
     medicalRecords,
     breeds
   } = useWhisker();
+  const canManageAnimals = useCanManageAnimals();
   const [editLitterId, setEditLitterId] = useState<string | null>(null);
   const [addMemberLitterId, setAddMemberLitterId] = useState<string | null>(
     null
@@ -231,6 +233,7 @@ export function LittersView() {
           }
         </div>
 
+        {canManageAnimals &&
         <div className="mt-4 pt-4 border-t border-border flex flex-wrap gap-2">
           <Button
             variant="soft"
@@ -247,6 +250,7 @@ export function LittersView() {
             <Edit2Icon className="w-4 h-4 mr-1.5" /> Update Group
           </Button>
         </div>
+        }
       </Card>);
 
   };

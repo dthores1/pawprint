@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useWhisker } from '../context/WhiskerContext';
+import { useAuth } from '../context/AuthContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Forms';
@@ -45,11 +46,13 @@ import { CsvColumn } from '../lib/csv';
 import { Animal, Person, AnimalStatus } from '../types';
 import { PawPrintIcon as PawPrintGlyph } from '../components/ui/PawPrintIcon';
 import { STATUS_LABELS, IN_CARE_STATUSES } from '../lib/animalStatus';
+import { useCanManageAnimals } from '../lib/useAnimalPermissions';
 // Stable string[] view of the in-care statuses for membership checks (module
 // scope so it doesn't re-create each render and churn the filter memo).
 const IN_CARE_SET: string[] = IN_CARE_STATUSES;
-// "Fostered" stays a quick toggle pill (derived from an active placement).
-const FLAG_FILTERS = [{ key: 'fostered', label: 'Fostered' }];
+// "My Animals" stays a quick toggle pill — animals the signed-in user is
+// actively fostering (their person_id on an active placement).
+const FLAG_FILTERS = [{ key: 'my_animals', label: 'My Animals' }];
 // On Hold / Behavior / Medical are consolidated into one "Special Conditions"
 // dropdown (match ALL selected).
 const SPECIAL_CONDITIONS: FilterOption[] = [
@@ -93,7 +96,9 @@ export function AnimalsList() {
     animalTraits,
     adoptions
   } = useWhisker();
+  const { currentPersonId } = useAuth();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const canManageAnimals = useCanManageAnimals();
   const [view, setView] = useState<'animals' | 'litters'>('animals');
   const isMobile = useIsMobile();
   // On phones the filter controls collapse behind a "Filters" toggle (closed by
@@ -319,10 +324,15 @@ export function AnimalsList() {
   const matchesAllButSpecies = useCallback(
     (animal: Animal) => {
       const q = searchQuery.toLowerCase();
+      const foster = fosterByAnimal.get(animal.id);
+      const fosterName = foster ?
+      `${foster.first_name} ${foster.last_name}`.toLowerCase() :
+      '';
       const matchesSearch =
       (animal.name ?? '').toLowerCase().includes(q) ||
       (animal.rescue_id ?? '').toLowerCase().includes(q) ||
       animal.id.toLowerCase().includes(q) ||
+      fosterName.includes(q) ||
       !!animal.microchip_number && animal.microchip_number.includes(searchQuery);
       // Default view is in-care only. `animals` may also hold historical rows
       // (loaded by the toggle, or merged when a historical profile was opened),
@@ -331,9 +341,10 @@ export function AnimalsList() {
       includeHistorical || IN_CARE_SET.includes(animal.status);
       const matchesStatus =
       statusFilter.length === 0 || statusFilter.includes(animal.status);
-      const matchesFostered =
-      !flagFilters.includes('fostered') ||
-      fosterByAnimal.get(animal.id) != null;
+      const matchesMyAnimals =
+      !flagFilters.includes('my_animals') ||
+      currentPersonId != null &&
+      fosterByAnimal.get(animal.id)?.id === currentPersonId;
       // Special conditions — match ALL selected.
       const matchesConditions = specialConditions.every((c) => {
         switch (c) {
@@ -360,7 +371,7 @@ export function AnimalsList() {
         matchesSearch &&
         matchesInCare &&
         matchesStatus &&
-        matchesFostered &&
+        matchesMyAnimals &&
         matchesConditions &&
         matchesAge &&
         matchesTraits);
@@ -375,7 +386,8 @@ export function AnimalsList() {
     ageGroups,
     traitFilter,
     traitIdsByAnimal,
-    fosterByAnimal]
+    fosterByAnimal,
+    currentPersonId]
   );
   const speciesPool = useMemo(
     () => animals.filter(matchesAllButSpecies),
@@ -568,10 +580,12 @@ export function AnimalsList() {
             allComplete={historicalLoaded}
             ensureAllLoaded={ensureHistoricalLoaded} />
           }
+          {canManageAnimals &&
           <Button onClick={() => setIsAddModalOpen(true)} className="gap-2">
             <PlusIcon className="w-4 h-4" />
             {view === 'litters' ? 'Add Litter' : 'Add Animal'}
           </Button>
+          }
         </div>
       </div>
 
@@ -601,7 +615,7 @@ export function AnimalsList() {
       <div className="relative">
         <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-secondary pointer-events-none" />
         <Input
-          placeholder="Search by name, ID, or microchip…"
+          placeholder="Search animals..."
           className="pl-11 h-12 text-base"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)} />

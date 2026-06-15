@@ -21,12 +21,13 @@ import {
 import {
   getDaysUntil,
   formatDate,
+  formatDatesInText,
   getGreeting,
   animalDisplayName } from
 '../lib/utils';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Priority } from '../types';
+import { Priority, Animal } from '../types';
 import { BoneIcon } from '../components/ui/BoneIcon';
 const PRIORITY_RANK: Record<Priority, number> = {
   critical: 4,
@@ -83,10 +84,32 @@ export function Dashboard() {
   const animalsInFoster = animals.filter((a) => !!a.current_foster_id);
   const availableSpots = totalCapacity - activePlacementsCount;
 
-  // High-priority animals (urgent + critical), sorted critical first
+  // Animals needing action: elevated priority OR an open action item (the
+  // literal next step — e.g. a foster reassignment request). An open item always
+  // carries an elevated priority, so we triage by the higher of the animal's own
+  // priority and its open item's priority.
+  const openActionByAnimal = new Map(
+    actionItems.filter((a) => a.status === 'open').map((a) => [a.animal_id, a])
+  );
+  const effectivePriority = (animal: Animal): Priority => {
+    const item = openActionByAnimal.get(animal.id);
+    return item &&
+    PRIORITY_RANK[item.priority] > PRIORITY_RANK[animal.priority] ?
+    item.priority :
+    animal.priority;
+  };
   const highPriorityAnimals = animals.
-  filter((a) => a.priority === 'urgent' || a.priority === 'critical').
-  sort((a, b) => PRIORITY_RANK[b.priority] - PRIORITY_RANK[a.priority]);
+  filter((a) => a.status !== 'adopted' && a.status !== 'deceased').
+  filter(
+    (a) =>
+    a.priority === 'urgent' ||
+    a.priority === 'critical' ||
+    openActionByAnimal.has(a.id)
+  ).
+  sort(
+    (a, b) =>
+    PRIORITY_RANK[effectivePriority(b)] - PRIORITY_RANK[effectivePriority(a)]
+  );
   const overdueMedical = medicalRecords.filter(
     (m) =>
     m.status === 'overdue' ||
@@ -268,6 +291,7 @@ export function Dashboard() {
                   const hasActivePlacement = activePlacements.some(
                     (p) => p.animal_id === animal.id
                   );
+                  const actionDesc = openActionFor(animal.id);
                   return (
                     <Link
                       key={animal.id}
@@ -289,15 +313,16 @@ export function Dashboard() {
                               {animalDisplayName(animal)}
                             </p>
                             <p className="text-sm text-text-secondary line-clamp-1">
-                              {openActionFor(animal.id) || (
+                              {actionDesc ?
+                            formatDatesInText(actionDesc) :
                             !hasActivePlacement ?
                             'Needs placement' :
-                            'Needs review')}
+                            'Needs review'}
                             </p>
                           </div>
                         </div>
                         <PriorityBadge
-                        priority={animal.priority}
+                        priority={effectivePriority(animal)}
                         className="shrink-0" />
 
                       </Link>);

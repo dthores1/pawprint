@@ -57,11 +57,20 @@ interface ChangeStatusModalProps {
   isOpen: boolean;
   onClose: () => void;
   animalId: string;
+  /**
+   * Foster-collaboration mode: the viewer is this animal's active foster but
+   * isn't an animal manager. Only the care considerations, traits, and a
+   * timeline note are editable — the rest of the form is hidden and the save
+   * sends only the foster-writable columns (matching the server-side trigger
+   * whitelist). Defaults to false (full edit).
+   */
+  fosterScope?: boolean;
 }
 export function ChangeStatusModal({
   isOpen,
   onClose,
-  animalId
+  animalId,
+  fosterScope = false
 }: ChangeStatusModalProps) {
   const {
     animals,
@@ -187,6 +196,43 @@ export function ChangeStatusModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Foster-collaboration save: only the care flags, traits, and a timeline
+    // note. These are exactly the columns the RLS trigger allows the assigned
+    // foster to change — nothing else is sent, so nothing else can be rejected.
+    if (fosterScope) {
+      updateAnimal(animalId, {
+        is_on_hold: isOnHold,
+        has_behavior_concern: behaviorConcern,
+        has_medical_concern: medicalConcern
+      });
+      setAnimalTraits(animalId, traitIds);
+      if (reason.trim()) {
+        const flagChanges: string[] = [];
+        const flagDiff = (
+        label: string,
+        next: boolean,
+        prev: boolean | undefined) =>
+        {
+          if (next !== !!prev)
+          flagChanges.push(`${label}: ${next ? 'on' : 'off'}`);
+        };
+        flagDiff('on hold', isOnHold, animal.is_on_hold);
+        flagDiff('behavior concern', behaviorConcern, animal.has_behavior_concern);
+        flagDiff('medical concern', medicalConcern, animal.has_medical_concern);
+        const body =
+        flagChanges.length > 0 ?
+        `${flagChanges.join(', ')}. Note: ${reason.trim()}` :
+        reason.trim();
+        addNote({
+          animal_id: animalId,
+          author_name: 'Current User',
+          note_type: 'general',
+          body
+        });
+      }
+      onClose();
+      return;
+    }
     // Validation runs top-to-bottom and stops at the first failure; scroll that
     // field into view so the block isn't invisible when it's below the fold.
     if (!name.trim() && !rescueId.trim()) {
@@ -293,10 +339,12 @@ export function ChangeStatusModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={`Edit ${animalDisplayName(animal)}`}
+      title={`${fosterScope ? 'Update care for' : 'Edit'} ${animalDisplayName(animal)}`}
       size="lg"
       footer={
       <div className="flex items-center justify-between gap-3">
+          {fosterScope ?
+          <span /> :
           <Button
             type="button"
             variant="ghost"
@@ -304,6 +352,7 @@ export function ChangeStatusModal({
             className="text-[#9B3A3A] hover:bg-[#F5D7D7]/60 hover:text-[#9B3A3A]">
             Delete
           </Button>
+          }
           <div className="flex gap-3">
             <Button type="button" variant="ghost" onClick={onClose}>
               Cancel
@@ -316,6 +365,16 @@ export function ChangeStatusModal({
       }>
 
       <form id="edit-animal-form" onSubmit={handleSubmit} className="space-y-4">
+        {fosterScope &&
+        <p className="text-sm text-text-secondary bg-background border border-border rounded-xl px-4 py-3">
+          As this animal's foster you can update its care considerations, traits,
+          and add a timeline note. Reach out to a coordinator for other changes.
+        </p>
+        }
+
+        {/* Manager-only fields — hidden in foster-collaboration mode. */}
+        {!fosterScope &&
+        <>
         {/* Basic Information */}
         <FormSection title="Basic Information">
           <div className="grid grid-cols-2 gap-4">
@@ -533,6 +592,8 @@ export function ChangeStatusModal({
             </div>
           </div>
         </FormSection>
+        </>
+        }
 
         {/* Care Considerations */}
         <FormSection title="Care Considerations">
@@ -583,7 +644,8 @@ export function ChangeStatusModal({
         </FormSection>
 
         {/* Notes & Activity */}
-        <FormSection title="Notes & Activity" collapsible defaultOpen={false}>
+        <FormSection title="Notes & Activity" collapsible defaultOpen={fosterScope}>
+          {!fosterScope &&
           <div>
             <Label htmlFor="edit_description">Intake Notes</Label>
             <Textarea
@@ -597,6 +659,8 @@ export function ChangeStatusModal({
               Initial observations or intake information.
             </p>
           </div>
+          }
+          {!fosterScope &&
           <div>
             <Label htmlFor="edit_internal_notes">Care Notes</Label>
             <Textarea
@@ -610,6 +674,7 @@ export function ChangeStatusModal({
               Persistent internal notes about behavior, care needs, routines, preferences, or handling.
             </p>
           </div>
+          }
           <div>
             <Label htmlFor="edit_reason">Add Timeline Note (optional)</Label>
             <Textarea

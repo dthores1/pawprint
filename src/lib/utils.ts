@@ -72,6 +72,11 @@ export function formatDate(dateString: string): string {
   });
 }
 
+/** Replaces yyyy-MM-dd substrings in free text with locale-formatted dates. */
+export function formatDatesInText(text: string): string {
+  return text.replace(/\b(\d{4}-\d{2}-\d{2})\b/g, (match) => formatDate(match));
+}
+
 /** Like formatDate but with the full month name, e.g. "June 11, 2026". */
 export function formatDateLong(dateString: string): string {
   const d = /^\d{4}-\d{2}-\d{2}$/.test(dateString) ?

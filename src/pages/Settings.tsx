@@ -7,6 +7,7 @@ import { Select } from '../components/ui/Forms';
 import { Button } from '../components/ui/Button';
 import { TraitFormModal } from '../components/settings/TraitFormModal';
 import { AdoptionTemplateEditor } from '../components/settings/AdoptionTemplateEditor';
+import { MemberPermissionManager } from '../components/settings/MemberPermissionManager';
 import { SpeciesIcon } from '../lib/speciesIcons';
 import { cn } from '../lib/utils';
 import { Trait } from '../types';
@@ -335,6 +336,38 @@ export function Settings() {
 
       {/* Adoption Profiles — admin-managed posting template. */}
       {isAdmin && <AdoptionTemplateEditor />}
+
+      {/* Member Permissions — grant non-admins specific management access. */}
+      {isAdmin &&
+      <Card className="p-0 overflow-hidden">
+        <div className="p-5 border-b border-border">
+          <h2 className="font-heading font-semibold text-lg text-text-primary">
+            Member Permissions
+          </h2>
+          <p className="text-sm text-text-secondary mt-1">
+            Every member can view animals. Grant specific members the ability to
+            manage them. Owners and admins always have full access.
+          </p>
+        </div>
+        <div className="p-5 space-y-6">
+          <MemberPermissionManager
+            permissionType="MANAGE_ANIMALS"
+            title="Animal Management"
+            description="Add, edit, and delete animals and litters, and manage relationships." />
+
+          <MemberPermissionManager
+            permissionType="MANAGE_MEDICAL"
+            title="Medical & Clinics"
+            description="Add and edit medical records and run spay/neuter & vaccine clinics." />
+
+          <MemberPermissionManager
+            permissionType="MANAGE_EXTERNAL_LISTINGS"
+            title="External Listings"
+            description="Manage public adoption posts (Petfinder, the org site, social…)." />
+
+        </div>
+      </Card>
+      }
 
       <TraitFormModal
         isOpen={traitForm.open}
