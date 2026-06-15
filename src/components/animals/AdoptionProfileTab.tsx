@@ -20,6 +20,10 @@ import {
 
 interface AdoptionProfileTabProps {
   animalId: string;
+  /** Whether the viewer may generate/edit/regenerate the profile (MANAGE_ANIMALS,
+   *  admin, or the active foster). When false the tab is read-only — the existing
+   *  profile (if any) can be viewed and copied, but not changed. Defaults to true. */
+  canManage?: boolean;
   /** Counts that drive the "Profile Inputs" data-quality card. */
   traitCount: number;
   noteCount: number;
@@ -138,6 +142,7 @@ function GuidanceField({
 
 export function AdoptionProfileTab({
   animalId,
+  canManage = true,
   traitCount,
   noteCount,
   fosterUpdateCount,
@@ -251,6 +256,21 @@ export function AdoptionProfileTab({
 
   }
 
+  // — Empty state (read-only viewer) —————————————————————————————————————
+  if (!profile && !canManage) {
+    return (
+      <Card className="p-8 text-center">
+        <MegaphoneIcon className="w-8 h-8 mx-auto mb-3 text-text-secondary opacity-40" />
+        <p className="font-medium text-text-primary mb-1">
+          No adoption profile has been generated yet.
+        </p>
+        <p className="text-sm text-text-secondary">
+          A coordinator or this animal's foster can generate one.
+        </p>
+      </Card>);
+
+  }
+
   // — Empty state ————————————————————————————————————————————————————————
   if (!profile) {
     return (
@@ -355,39 +375,43 @@ export function AdoptionProfileTab({
                 </>
             }
             </Button>
-            <Button variant="soft" size="sm" onClick={startEditing}>
-              <PencilIcon className="w-4 h-4 mr-2" /> Edit
-            </Button>
-            {profile.user_edited &&
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => resetAiDraft(profile.id)}>
-
-                <RotateCcwIcon className="w-4 h-4 mr-2" /> Reset to AI version
+            {canManage &&
+          <>
+              <Button variant="soft" size="sm" onClick={startEditing}>
+                <PencilIcon className="w-4 h-4 mr-2" /> Edit
               </Button>
-          }
+              {profile.user_edited &&
             <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowGuidance((s) => !s)}
-            title="Adjust guidance before regenerating">
+              variant="outline"
+              size="sm"
+              onClick={() => resetAiDraft(profile.id)}>
 
-              <SlidersHorizontalIcon className="w-4 h-4 mr-2" /> Guidance
-            </Button>
-            <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRegenerate}
-            disabled={isGenerating}>
-
-              {isGenerating ?
-            <Loader2Icon className="w-4 h-4 mr-2 animate-spin" /> :
-
-            <RefreshCwIcon className="w-4 h-4 mr-2" />
+                  <RotateCcwIcon className="w-4 h-4 mr-2" /> Reset to AI version
+                </Button>
             }
-              Regenerate
-            </Button>
+              <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowGuidance((s) => !s)}
+              title="Adjust guidance before regenerating">
+
+                <SlidersHorizontalIcon className="w-4 h-4 mr-2" /> Guidance
+              </Button>
+              <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRegenerate}
+              disabled={isGenerating}>
+
+                {isGenerating ?
+              <Loader2Icon className="w-4 h-4 mr-2 animate-spin" /> :
+
+              <RefreshCwIcon className="w-4 h-4 mr-2" />
+              }
+                Regenerate
+              </Button>
+            </>
+          }
           </div>
         }
       </div>
@@ -410,7 +434,7 @@ export function AdoptionProfileTab({
 
       {error && <p className="mb-4 text-sm text-status-urgent-text">{error}</p>}
 
-      {isStale && !isEditing &&
+      {isStale && !isEditing && canManage &&
       <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-[#E8D9B0] bg-[#FBF1DC] px-4 py-3">
           <AlertCircleIcon className="w-4 h-4 text-[#A36B00] shrink-0 mt-0.5" />
           <p className="text-sm text-[#7A5200]">

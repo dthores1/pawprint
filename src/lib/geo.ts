@@ -25,13 +25,13 @@ export function haversineMiles(a: LatLng, b: LatLng): number {
 }
 
 /**
- * "2.1 miles away (straight-line)" — one decimal, with sensible rounding. The
+ * "2.1 miles away (straight-line distance)" — one decimal, with sensible rounding. The
  * qualifier flags that this is the great-circle distance (see haversineMiles),
  * not a driving route, so it's not mistaken for a trip estimate.
  */
 export function formatDistance(miles: number): string {
   const rounded = miles < 10 ? Math.round(miles * 10) / 10 : Math.round(miles);
-  return `${rounded} ${rounded === 1 ? 'mile' : 'miles'} away (straight-line)`;
+  return `${rounded} ${rounded === 1 ? 'mile' : 'miles'} away (straight-line distance)`;
 }
 
 export type LocationSource = 'geolocation' | 'profile';

@@ -15,6 +15,9 @@ import {
 
 interface SummaryTabProps {
   animalId: string;
+  /** Whether the viewer may generate/edit/regenerate the summary (MANAGE_ANIMALS,
+   *  admin, or the active foster). When false the tab is read-only. Defaults to true. */
+  canManage?: boolean;
   /** Counts that drive the "Summary Inputs" data-quality card. */
   traitCount: number;
   noteCount: number;
@@ -81,6 +84,7 @@ function SummaryInputsCard({
 
 export function SummaryTab({
   animalId,
+  canManage = true,
   traitCount,
   noteCount,
   medicalCount,
@@ -145,6 +149,21 @@ export function SummaryTab({
     updateAiDraft(summary.id, draftValue);
     setIsEditing(false);
   };
+
+  // — Empty state (read-only viewer) —————————————————————————————————————
+  if (!summary && !canManage) {
+    return (
+      <Card className="p-8 text-center">
+        <SparklesIcon className="w-8 h-8 mx-auto mb-3 text-text-secondary opacity-40" />
+        <p className="font-medium text-text-primary mb-1">
+          No summary has been generated yet.
+        </p>
+        <p className="text-sm text-text-secondary">
+          A coordinator or this animal's foster can generate one.
+        </p>
+      </Card>);
+
+  }
 
   // — Empty state: educational copy + (optional) no-traits warning + Generate —
   if (!summary) {
@@ -237,7 +256,7 @@ export function SummaryTab({
             </span>
           }
         </div>
-        {!isEditing &&
+        {!isEditing && canManage &&
         <div className="flex flex-wrap items-center gap-2">
             <Button variant="soft" size="sm" onClick={startEditing}>
               <PencilIcon className="w-4 h-4 mr-2" /> Edit
@@ -272,7 +291,7 @@ export function SummaryTab({
       <p className="mb-4 text-sm text-status-urgent-text">{error}</p>
       }
 
-      {isStale && !isEditing &&
+      {isStale && !isEditing && canManage &&
       <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-[#E8D9B0] bg-[#FBF1DC] px-4 py-3">
           <AlertCircleIcon className="w-4 h-4 text-[#A36B00] shrink-0 mt-0.5" />
           <p className="text-sm text-[#7A5200]">

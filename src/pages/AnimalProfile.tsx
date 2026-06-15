@@ -27,7 +27,8 @@ import {
   formatDate,
   animalDisplayName,
   animalShowsRescueIdBadge,
-  humanizeSnakeCase } from
+  humanizeSnakeCase,
+  formatDatesInText } from
 '../lib/utils';
 import {
   SyringeIcon,
@@ -66,6 +67,13 @@ import {
   ADOPTION_RETURN_REASON_LABELS,
   isActiveAdoption } from
 '../lib/adoptions';
+import {
+  useCanManageAnimals,
+  useCanManageMedical,
+  useCanManageExternalListings,
+  useIsActiveFosterOf } from
+'../lib/useAnimalPermissions';
+import { RequestReassignmentModal } from '../components/animals/RequestReassignmentModal';
 export function AnimalProfile() {
   const { id } = useParams<{
     id: string;
@@ -90,6 +98,19 @@ export function AnimalProfile() {
     addPhoto,
     updateMedicalRecord
   } = useWhisker();
+  // Permission gating. Admins/owners and MANAGE_ANIMALS holders manage freely;
+  // the active foster of *this* animal gets the limited care-collaboration set.
+  // (Called before the early returns below so hook order stays stable.)
+  const canManageAnimals = useCanManageAnimals();
+  const canManageMedical = useCanManageMedical();
+  const canManageListings = useCanManageExternalListings();
+  const isActiveFoster = useIsActiveFosterOf(id);
+  // "Foster-only": the current user is the assigned foster but cannot manage
+  // animals outright — they get the limited edit/care scope, not full control.
+  const fosterOnly = isActiveFoster && !canManageAnimals;
+  // May touch the foster-collaboration surfaces (notes, photos, traits, AI).
+  const canCollaborate = canManageAnimals || isActiveFoster;
+  const [isReassignRequestOpen, setIsReassignRequestOpen] = useState(false);
   const [isTraitsModalOpen, setIsTraitsModalOpen] = useState(false);
   const [isMedicalModalOpen, setIsMedicalModalOpen] = useState(false);
   const [editingMedical, setEditingMedical] = useState<MedicalRecord | null>(
@@ -313,7 +334,7 @@ export function AnimalProfile() {
     ts: n.created_at,
     type: 'note' as const,
     title: `Note: ${humanizeSnakeCase(n.note_type)}`,
-    description: n.body,
+    description: formatDatesInText(n.body),
     icon: MessageSquareIcon,
     color: 'bg-background text-text-secondary',
     note: { id: n.id, created_by: n.created_by }
@@ -327,7 +348,7 @@ export function AnimalProfile() {
       ts: a.created_at,
       type: 'action' as const,
       title: 'Action item added',
-      description: a.description,
+      description: formatDatesInText(a.description),
       icon: AlertCircleIcon,
       color: 'bg-[#FBF1DC] text-[#A36B00]'
     }];
@@ -344,8 +365,8 @@ export function AnimalProfile() {
         type: 'action' as const,
         title: done ? 'Action completed' : 'Action cancelled',
         description: a.completion_note ?
-        `${a.description} — ${a.completion_note}` :
-        a.description,
+        formatDatesInText(`${a.description} — ${a.completion_note}`) :
+        formatDatesInText(a.description),
         icon: done ? CheckCircle2Icon : CircleIcon,
         color: done ?
         'bg-[#DDEFE2] text-[#3E7B52]' :
@@ -647,7 +668,7 @@ export function AnimalProfile() {
                   })()}
                 </div>
                 <div className="flex flex-wrap gap-2 sm:shrink-0">
-                  {animal.status === 'adoptable' && !activeAdoption &&
+                  {canManageAnimals && animal.status === 'adoptable' && !activeAdoption &&
                   <Button
                     variant="primary"
                     size="sm"
@@ -657,7 +678,7 @@ export function AnimalProfile() {
                       Start Adoption
                     </Button>
                   }
-                  {!isAdopted &&
+                  {canManageAnimals && !isAdopted &&
                   <Button
                     variant={
                     animal.status === 'adoptable' ? 'outline' : 'primary'
@@ -669,7 +690,19 @@ export function AnimalProfile() {
                       {currentFoster ? 'Reassign Foster' : 'Place in Foster'}
                     </Button>
                   }
-                  {isAdopted &&
+                  {/* The assigned foster can't reassign themselves — they ask a
+                      coordinator to find a new placement. */}
+                  {fosterOnly && !isAdopted &&
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsReassignRequestOpen(true)}>
+
+                      <HomeIcon className="w-4 h-4 mr-2" />
+                      Request Reassignment
+                    </Button>
+                  }
+                  {canManageAnimals && isAdopted &&
                   <Button
                     variant="primary"
                     size="sm"
@@ -679,6 +712,7 @@ export function AnimalProfile() {
                       Adoption Return
                     </Button>
                   }
+                  {(canManageAnimals || fosterOnly) &&
                   <Button
                     variant="outline"
                     size="sm"
@@ -686,6 +720,7 @@ export function AnimalProfile() {
 
                     <Edit2Icon className="w-4 h-4 mr-2" /> Edit
                   </Button>
+                  }
                   <AnimalArchiveButton onClick={() => setArchivingAnimal(true)} />
                 </div>
               </div>
@@ -695,9 +730,10 @@ export function AnimalProfile() {
               {animalTraitList.length > 0 ?
               <button
                 type="button"
-                onClick={() => setIsTraitsModalOpen(true)}
-                aria-label="Edit traits"
-                className="group w-full text-left flex items-start gap-2 mb-4">
+                onClick={canCollaborate ? () => setIsTraitsModalOpen(true) : undefined}
+                disabled={!canCollaborate}
+                aria-label={canCollaborate ? 'Edit traits' : 'Traits'}
+                className="group w-full text-left flex items-start gap-2 mb-4 disabled:cursor-default">
 
                   <TagIcon className="w-4 h-4 text-text-secondary mt-1 shrink-0" />
                   <div className="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
@@ -717,7 +753,7 @@ export function AnimalProfile() {
                   }
                   </div>
                 </button> :
-
+              canCollaborate ?
               <button
                 type="button"
                 onClick={() => setIsTraitsModalOpen(true)}
@@ -725,7 +761,8 @@ export function AnimalProfile() {
 
                   <TagIcon className="w-4 h-4 shrink-0" />
                   + Add traits
-                </button>
+                </button> :
+              null
               }
 
               <div className="flex flex-wrap gap-2 mb-6">
@@ -874,9 +911,10 @@ export function AnimalProfile() {
       <ActionNeededCallout
         animalId={animal.id}
         animalName={animalDisplayName(animal)}
-        priority={animal.priority} />
+        priority={animal.priority}
+        canManage={canCollaborate} />
 
-      {activeAdoption && <AdoptionPanel adoptionId={activeAdoption.id} />}
+      {activeAdoption && <AdoptionPanel adoptionId={activeAdoption.id} canManage={canManageAnimals} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Tabs (Timeline / Medical History) */}
@@ -934,7 +972,7 @@ export function AnimalProfile() {
                 own right-aligned row under the tabs so it never overflows the
                 card as tabs grow. */}
             <div className="flex justify-end empty:hidden">
-              {activeTab === 'timeline' &&
+              {activeTab === 'timeline' && canCollaborate &&
               <Button
                 variant="soft"
                 size="sm"
@@ -943,7 +981,7 @@ export function AnimalProfile() {
                   <FileTextIcon className="w-4 h-4 mr-2" /> Add Note
                 </Button>
               }
-              {activeTab === 'medical' &&
+              {activeTab === 'medical' && canManageMedical &&
               <Button
                 variant="soft"
                 size="sm"
@@ -952,7 +990,7 @@ export function AnimalProfile() {
                   <SyringeIcon className="w-4 h-4 mr-2" /> Add Medical Record
                 </Button>
               }
-              {activeTab === 'photos' &&
+              {activeTab === 'photos' && canCollaborate &&
               <Button
                 variant="soft"
                 size="sm"
@@ -967,6 +1005,7 @@ export function AnimalProfile() {
           {activeTab === 'summary' &&
           <SummaryTab
             animalId={animal.id}
+            canManage={canCollaborate}
             traitCount={animalTraitList.length}
             noteCount={animalNotes.length}
             medicalCount={animalMedical.length}
@@ -1104,6 +1143,7 @@ export function AnimalProfile() {
           {activeTab === 'medical' &&
           <MedicalHistoryView
             records={animalMedical}
+            canManage={canManageMedical}
             onArchive={(r) =>
             setArchivingMedical({ id: r.id, preview: r.procedure_name })
             }
@@ -1119,6 +1159,7 @@ export function AnimalProfile() {
           {activeTab === 'photos' &&
           <PhotoGallery
             animalId={animal.id}
+            canManage={canCollaborate}
             isAddOpen={isAddPhotoOpen}
             onAddOpenChange={setIsAddPhotoOpen} />
           }
@@ -1126,6 +1167,7 @@ export function AnimalProfile() {
           {activeTab === 'adoption' &&
           <AdoptionProfileTab
             animalId={animal.id}
+            canManage={canCollaborate}
             traitCount={animalTraitList.length}
             noteCount={animalNotes.length}
             fosterUpdateCount={
@@ -1196,7 +1238,8 @@ export function AnimalProfile() {
                 )}
               </div>
             </div>
-            {readinessPercent === 100 &&
+            {canManageAnimals &&
+            readinessPercent === 100 &&
             animal.status !== 'adoptable' &&
             animal.status !== 'adopted' &&
             <Button
@@ -1209,10 +1252,10 @@ export function AnimalProfile() {
           </Card>
 
           {/* External adoption listings (Petfinder, the org's site, social…) */}
-          <ExternalListingsCard animalId={animal.id} />
+          <ExternalListingsCard animalId={animal.id} canManage={canManageListings} />
 
           {/* Relationships (auto-hides when none exist) */}
-          <RelationshipsCard animalId={animal.id} />
+          <RelationshipsCard animalId={animal.id} canManage={canManageAnimals} />
 
           {/* TODO - REMOVE THIS IF WE DON'T NEED…Upcoming Medical Widget */}
           {/* {upcomingMedical.length > 0 &&
@@ -1267,7 +1310,8 @@ export function AnimalProfile() {
       <ChangeStatusModal
         isOpen={isStatusModalOpen}
         onClose={() => setIsStatusModalOpen(false)}
-        animalId={animal.id} />
+        animalId={animal.id}
+        fosterScope={fosterOnly} />
 
       <EditTraitsModal
         isOpen={isTraitsModalOpen}
@@ -1278,6 +1322,11 @@ export function AnimalProfile() {
         isOpen={isPlaceModalOpen}
         onClose={() => setIsPlaceModalOpen(false)}
         animalId={animal.id} />
+
+      <RequestReassignmentModal
+        isOpen={isReassignRequestOpen}
+        onClose={() => setIsReassignRequestOpen(false)}
+        animal={animal} />
 
       <StartAdoptionModal
         isOpen={isStartAdoptionOpen}
@@ -1510,12 +1559,14 @@ const STATUS_TONE: Record<
 };
 interface MedicalHistoryViewProps {
   records: ReturnType<typeof useWhisker>['medicalRecords'];
+  canManage: boolean;
   onArchive: (record: MedicalRecord) => void;
   onEdit: (record: MedicalRecord) => void;
   onComplete: (record: MedicalRecord) => void;
 }
 function MedicalHistoryView({
   records,
+  canManage,
   onArchive,
   onEdit,
   onComplete
@@ -1555,6 +1606,7 @@ function MedicalHistoryView({
     <div className="space-y-4">
       {overdue.length > 0 &&
       <MedicalGroup
+        canManage={canManage}
         title="Overdue"
         icon={AlertCircleIcon}
         tone="urgent"
@@ -1567,6 +1619,7 @@ function MedicalHistoryView({
       }
       {upcoming.length > 0 &&
       <MedicalGroup
+        canManage={canManage}
         title="Upcoming or Unresolved"
         icon={ClockIcon}
         tone="info"
@@ -1579,6 +1632,7 @@ function MedicalHistoryView({
       }
       {completed.length > 0 &&
       <MedicalGroup
+        canManage={canManage}
         title="Completed"
         icon={CheckCircle2Icon}
         tone="success"
@@ -1591,6 +1645,7 @@ function MedicalHistoryView({
       }
       {other.length > 0 &&
       <MedicalGroup
+        canManage={canManage}
         title="Other"
         icon={CircleIcon}
         tone="neutral"
@@ -1610,6 +1665,7 @@ interface MedicalGroupProps {
   tone: 'urgent' | 'info' | 'success' | 'neutral';
   count: number;
   records: ReturnType<typeof useWhisker>['medicalRecords'];
+  canManage: boolean;
   onArchive: (r: MedicalRecord) => void;
   onEdit: (r: MedicalRecord) => void;
   onComplete: (r: MedicalRecord) => void;
@@ -1620,6 +1676,7 @@ function MedicalGroup({
   tone,
   count,
   records,
+  canManage,
   onArchive,
   onEdit,
   onComplete
@@ -1701,7 +1758,7 @@ function MedicalGroup({
 
                     {tone.label}
                   </span>
-                  {canMarkComplete &&
+                  {canManage && canMarkComplete &&
                   <button
                     type="button"
                     onClick={() => onComplete(r)}
@@ -1712,6 +1769,7 @@ function MedicalGroup({
                       <CheckIcon className="w-3.5 h-3.5" />
                     </button>
                   }
+                  {canManage &&
                   <button
                     type="button"
                     onClick={() => onEdit(r)}
@@ -1721,6 +1779,7 @@ function MedicalGroup({
 
                     <PencilIcon className="w-3.5 h-3.5" />
                   </button>
+                  }
                   <MedicalArchiveButton onClick={() => onArchive(r)} />
                 </div>
               </div>

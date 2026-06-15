@@ -1239,6 +1239,34 @@ export function DemoWhiskerProvider({
     p
     )
     ),
+    grantPermission: (memberId, type) =>
+    setMemberPermissions((prev) =>
+    prev.some(
+      (p) =>
+      p.member_id === memberId &&
+      p.permission_type === type &&
+      p.is_active
+    ) ?
+    prev :
+    [
+    ...prev,
+    {
+      id: `mp${generateId()}`,
+      organization_id: 'demo-org',
+      member_id: memberId,
+      permission_type: type,
+      is_active: true,
+      starts_at: new Date().toISOString()
+    }]
+    ),
+    revokePermission: (memberId, type) =>
+    setMemberPermissions((prev) =>
+    prev.map((p) =>
+    p.member_id === memberId && p.permission_type === type ?
+    { ...p, is_active: false } :
+    p
+    )
+    ),
     // Demo mode has no real archive layer (the demo store is in-memory),
     // so these are stubs that no-op against the seed. Recycle Bin returns
     // an empty list. This keeps the contract while ensuring demo never

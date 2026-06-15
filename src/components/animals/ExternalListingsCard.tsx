@@ -39,13 +39,20 @@ url.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
 interface Props {
   animalId: string;
+  /** Whether the viewer may add/edit/remove listings (MANAGE_EXTERNAL_LISTINGS
+   *  or admin). When false the card is read-only — and hidden entirely if there
+   *  are no listings to show. Defaults to true. */
+  canManage?: boolean;
 }
 
-export function ExternalListingsCard({ animalId }: Props) {
+export function ExternalListingsCard({ animalId, canManage = true }: Props) {
   const { externalListings, deleteExternalListing } = useWhisker();
   const listings = externalListings.filter((l) => l.animal_id === animalId);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editing, setEditing] = useState<AnimalExternalListing | null>(null);
+
+  // Nothing to show and nothing the viewer can do — don't render an empty card.
+  if (!canManage && listings.length === 0) return null;
 
   const remove = (listing: AnimalExternalListing) => {
     if (
@@ -65,6 +72,7 @@ export function ExternalListingsCard({ animalId }: Props) {
             <GlobeIcon className="w-5 h-5 text-primary" />
             External Listings
           </h3>
+          {canManage &&
           <button
             onClick={() => setIsAddOpen(true)}
             className="p-1.5 text-text-secondary hover:text-primary hover:bg-primary/10 rounded-md transition-colors shrink-0"
@@ -72,6 +80,7 @@ export function ExternalListingsCard({ animalId }: Props) {
 
             <PlusIcon className="w-4 h-4" />
           </button>
+          }
         </div>
         <p className="text-sm text-text-secondary mb-4">
           Track public adoption posts for this animal.
@@ -102,6 +111,7 @@ export function ExternalListingsCard({ animalId }: Props) {
 
                     {STATUS_LABEL[l.status]}
                   </span>
+                  {canManage &&
                   <div className="ml-auto flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                     <button
                   type="button"
@@ -120,6 +130,7 @@ export function ExternalListingsCard({ animalId }: Props) {
                       <Trash2Icon className="w-3.5 h-3.5" />
                     </button>
                   </div>
+                  }
                 </div>
 
                 <a

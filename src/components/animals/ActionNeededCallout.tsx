@@ -9,7 +9,7 @@ import {
 'lucide-react';
 import { Priority } from '../../types';
 import { useWhisker } from '../../context/WhiskerContext';
-import { cn } from '../../lib/utils';
+import { cn, formatDatesInText } from '../../lib/utils';
 import { ArchiveConfirmDialog } from '../archive/ArchiveConfirmDialog';
 import { useCanArchive } from '../archive/useCanArchive';
 
@@ -19,6 +19,12 @@ interface ActionNeededCalloutProps {
   animalName: string;
   /** The animal's overall priority (drives the empty-state message). */
   priority: Priority;
+  /**
+   * Whether the viewer may add/edit/complete the action item. When false the
+   * banner is informational only (read-only members who aren't this animal's
+   * foster). Defaults to true. Archiving stays separately admin-gated.
+   */
+  canManage?: boolean;
 }
 const TONE: Record<
   ElevatedPriority,
@@ -54,7 +60,8 @@ type Mode = 'view' | 'confirm' | 'edit' | 'add';
 export function ActionNeededCallout({
   animalId,
   animalName,
-  priority
+  priority,
+  canManage = true
 }: ActionNeededCalloutProps) {
   const {
     actionItems,
@@ -298,10 +305,11 @@ export function ActionNeededCallout({
                 isCritical ? 'text-white' : 'text-text-primary'
               )}>
 
-                {openItem.description}
+                {formatDatesInText(openItem.description)}
               </p>
               <div className="flex items-center gap-1 shrink-0">
-                <button
+                {canManage &&
+              <button
                 type="button"
                 onClick={() => setMode('confirm')}
                 title="Complete"
@@ -310,7 +318,9 @@ export function ActionNeededCallout({
 
                   <CheckCircle2Icon className="w-4 h-4" />
                 </button>
-                <button
+              }
+                {canManage &&
+              <button
                 type="button"
                 onClick={startEdit}
                 title="Edit"
@@ -319,6 +329,7 @@ export function ActionNeededCallout({
 
                   <PencilIcon className="w-4 h-4" />
                 </button>
+              }
                 {canArchiveOpen &&
               <button
                 type="button"
@@ -351,6 +362,7 @@ export function ActionNeededCallout({
                 <span className="font-medium">{tone.label}</span> but has no
                 active action item.
               </p>
+              {canManage &&
               <button
               type="button"
               onClick={() => startAdd(tonePriority)}
@@ -359,6 +371,7 @@ export function ActionNeededCallout({
                 <PlusIcon className="w-3.5 h-3.5" />
                 Add action item
               </button>
+              }
             </motion.div>
           }
         </AnimatePresence>

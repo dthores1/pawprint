@@ -13,6 +13,10 @@ import { ArchiveConfirmDialog } from '../archive/ArchiveConfirmDialog';
 import { useCanArchive } from '../archive/useCanArchive';
 interface RelationshipsCardProps {
   animalId: string;
+  /** Whether the viewer may add relationships (MANAGE_ANIMALS or admin). When
+   *  false the card is read-only — and hidden if there are no relationships to
+   *  show. Defaults to true. Removal stays separately admin-gated. */
+  canManage?: boolean;
 }
 // Each rendered relationship preserves the underlying record id so the user
 // can remove a single accidental link without affecting the rest of the group.
@@ -31,7 +35,10 @@ interface GroupedRelationships {
   siblings: RelEntry[];
   bondedWith: RelEntry[];
 }
-export function RelationshipsCard({ animalId }: RelationshipsCardProps) {
+export function RelationshipsCard({
+  animalId,
+  canManage = true
+}: RelationshipsCardProps) {
   // Index so a historical relative's name/photo still resolves.
   const { relationships, animalsIndex: animals } = useWhisker();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -56,6 +63,8 @@ export function RelationshipsCard({ animalId }: RelationshipsCardProps) {
       animalName: animalDisplayName(entry.animal)
     });
   };
+  // Nothing to show and nothing the viewer can do — don't render an empty card.
+  if (isEmpty && !canManage) return null;
   return (
     <>
       <Card className="p-6">
@@ -64,13 +73,15 @@ export function RelationshipsCard({ animalId }: RelationshipsCardProps) {
             <BoneIcon className="w-5 h-5 text-primary" />
             Relationships
           </h3>
+          {canManage &&
           <button
             onClick={() => setIsAddModalOpen(true)}
             className="p-1.5 text-text-secondary hover:text-primary hover:bg-primary/10 rounded-md transition-colors"
             aria-label="Add relationship">
-            
+
             <PlusIcon className="w-4 h-4" />
           </button>
+          }
         </div>
 
         {isEmpty ?
@@ -78,12 +89,14 @@ export function RelationshipsCard({ animalId }: RelationshipsCardProps) {
             <p className="text-sm text-text-secondary mb-3">
               No relationships added yet.
             </p>
+            {canManage &&
             <button
             onClick={() => setIsAddModalOpen(true)}
             className="text-sm font-medium text-primary hover:underline">
-            
+
               Link to another animal
             </button>
+            }
           </div> :
 
         <div className="space-y-4">

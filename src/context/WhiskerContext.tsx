@@ -31,6 +31,7 @@ import {
   AiContentType,
   OrganizationAdoptionTemplate,
   MemberPermission,
+  MemberPermissionType,
   OrgMember,
   AnimalPhoto,
   Person,
@@ -516,6 +517,9 @@ export interface WhiskerContextType {
   /** Grant / revoke the MANAGE_SITES permission for a member. */
   grantSitePermission: (memberId: string) => void;
   revokeSitePermission: (memberId: string) => void;
+  /** Grant / revoke an arbitrary member permission type (animals/medical/listings). */
+  grantPermission: (memberId: string, type: MemberPermissionType) => void;
+  revokePermission: (memberId: string, type: MemberPermissionType) => void;
   // --- Archive / Recycle Bin ---
   /**
    * Soft-delete a record. Goes through the archive_record RPC, which enforces
@@ -917,6 +921,31 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     const { error } = await supabase.rpc('revoke_member_permission', {
       p_member_id: memberId,
       p_permission_type: 'MANAGE_SITES'
+    });
+    if (error) {
+      console.error('[permissions] revoke failed:', error.message);
+      return;
+    }
+    loadMemberPermissions();
+  };
+  // Generic grant/revoke for any permission type — used by the animal/medical/
+  // listings manager sections in Settings. (The supply/site wrappers above are
+  // kept for their existing call sites.)
+  const grantPermission = async (memberId: string, type: MemberPermissionType) => {
+    const { error } = await supabase.rpc('grant_member_permission', {
+      p_member_id: memberId,
+      p_permission_type: type
+    });
+    if (error) {
+      console.error('[permissions] grant failed:', error.message);
+      return;
+    }
+    loadMemberPermissions();
+  };
+  const revokePermission = async (memberId: string, type: MemberPermissionType) => {
+    const { error } = await supabase.rpc('revoke_member_permission', {
+      p_member_id: memberId,
+      p_permission_type: type
     });
     if (error) {
       console.error('[permissions] revoke failed:', error.message);
@@ -3364,17 +3393,34 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
 
   // The `animals.species` text column is retired (migration 0044); the species
   // display name is derived here from species_id via the catalog so every
-  // `animal.species` read keeps working.
-  const enrichedAnimals = useMemo(() => {
-    const nameById = new Map(species.map((s) => [s.id, s.name]));
-    return animals.map((a) =>
-    a.species_id ? { ...a, species: nameById.get(a.species_id) ?? a.species } : a
-    );
-  }, [animals, species]);
+  // `animal.species` read keeps working. Some rows carry a breed but no
+  // species_id (e.g. legacy imports); for those we fall back to the breed's
+  // species so the name/icon never render blank. Lookups go through prebuilt
+  // maps so enrichment stays O(1) per row at scale.
+  const speciesNameById = useMemo(
+    () => new Map(species.map((s) => [s.id, s.name])),
+    [species]
+  );
+  const breedSpeciesIdById = useMemo(
+    () => new Map(breeds.map((b) => [b.id, b.species_id])),
+    [breeds]
+  );
+  const enrichSpecies = useCallback(
+    (a: Animal): Animal => {
+      let name = (a.species_id && speciesNameById.get(a.species_id)) || a.species;
+      if (!name && a.breed_id) {
+        const breedSpeciesId = breedSpeciesIdById.get(a.breed_id);
+        name = (breedSpeciesId && speciesNameById.get(breedSpeciesId)) || '';
+      }
+      return name !== a.species ? { ...a, species: name } : a;
+    },
+    [speciesNameById, breedSpeciesIdById]
+  );
+  const enrichedAnimals = useMemo(
+    () => animals.map(enrichSpecies),
+    [animals, enrichSpecies]
+  );
   const enrichedAnimalsIndex = useMemo(() => {
-    const nameById = new Map(species.map((s) => [s.id, s.name]));
-    const enrich = (a: Animal) =>
-    a.species_id ? { ...a, species: nameById.get(a.species_id) ?? a.species } : a;
     // Overlay the freshest full rows from `animals` so optimistic adds/edits
     // (rename, status change, brand-new animals) show in search/pickers
     // immediately, rather than the stale once-loaded index snapshot. Deletes
@@ -3383,8 +3429,8 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     const indexIds = new Set(animalsIndex.map((a) => a.id));
     const merged = animalsIndex.map((a) => freshById.get(a.id) ?? a);
     for (const a of animals) if (!indexIds.has(a.id)) merged.push(a);
-    return merged.map(enrich);
-  }, [animalsIndex, animals, species]);
+    return merged.map(enrichSpecies);
+  }, [animalsIndex, animals, enrichSpecies]);
 
   return (
     <WhiskerContext.Provider
@@ -3517,6 +3563,8 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         removeSiteVolunteer,
         grantSitePermission,
         revokeSitePermission,
+        grantPermission,
+        revokePermission,
         archiveRecord,
         restoreRecord,
         fetchArchived
