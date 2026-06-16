@@ -34,6 +34,8 @@ export interface AgeInfoInput {
   ageUnit: AgeUnit;
   /** Date the age estimate is anchored to (intake date or today). */
   asOf: string;
+  /** When true, age is explicitly Unknown — no birthdate/estimate is recorded. */
+  unknown?: boolean;
 }
 export interface AgeInfo {
   estimated_birth_date: string;
@@ -51,6 +53,14 @@ export interface AgeInfo {
  * A birthdate, if present, always wins.
  */
 export function deriveAgeInfo(input: AgeInfoInput): AgeInfo {
+  // Explicit "Unknown": no birthdate on file. A valid choice, so valid:true.
+  if (input.unknown) {
+    return {
+      estimated_birth_date: '',
+      birthdate_source: 'unknown',
+      valid: true
+    };
+  }
   const bd = input.birthdate.trim();
   if (bd) {
     return {

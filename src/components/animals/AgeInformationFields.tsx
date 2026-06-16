@@ -5,9 +5,11 @@ import { AgeUnit } from '../../types';
 import { deriveAgeInfo } from '../../lib/age';
 import { calculateAge } from '../../lib/utils';
 
-// Estimated Birthdate OR Estimated Age, chosen via a radio so only one set of
-// inputs shows at a time (progressive disclosure — no competing fields).
-export type AgeInputMode = 'birthdate' | 'age';
+// Exact Birthdate, Estimated Age, or Unknown — chosen via a radio so only one
+// set of inputs shows at a time (progressive disclosure — no competing fields).
+// "Unknown" is common at intake (esp. for trapped animals) and is filled in
+// later, e.g. during clinic completion.
+export type AgeInputMode = 'birthdate' | 'age' | 'unknown';
 interface AgeInformationFieldsProps {
   birthdate: string;
   ageValue: string;
@@ -92,7 +94,7 @@ export function AgeInformationFields({
             onChange={() => selectMode('birthdate')}
             className="w-4 h-4 text-primary focus:ring-primary" />
 
-          Birthdate
+          Exact Birthdate
         </label>
         <label className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
           <input
@@ -104,9 +106,24 @@ export function AgeInformationFields({
 
           Estimated Age
         </label>
+        <label className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
+          <input
+            type="radio"
+            name="age_mode"
+            checked={mode === 'unknown'}
+            onChange={() => selectMode('unknown')}
+            className="w-4 h-4 text-primary focus:ring-primary" />
+
+          Unknown
+        </label>
       </div>
 
-      {mode === 'birthdate' ?
+      {mode === 'unknown' ?
+      <p className="text-xs text-text-secondary">
+          Age will be recorded as Unknown. You can set it later — for example
+          during clinic completion.
+        </p> :
+      mode === 'birthdate' ?
       <div>
           <Label htmlFor="estimated_birthdate" className="text-xs" required>
             Birthdate

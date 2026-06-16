@@ -9,6 +9,10 @@ import { AddressValue, Person, PersonRole } from '../../types';
 import { legacyRoleFor } from '../../lib/peopleApi';
 import { addressValueToPersonFields } from '../../lib/address';
 import { focusFirstError } from '../../lib/focusFirstError';
+import { ContactVisibilityFields, ShareState } from './ContactVisibilityFields';
+
+// Product defaults: phone & email shared with members, address not.
+const DEFAULT_SHARE: ShareState = { phone: true, email: true, address: false };
 interface AddContactModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -63,6 +67,7 @@ export function AddContactModal({
   const { addPerson } = useWhisker();
   const [form, setForm] = useState(INITIAL);
   const [address, setAddress] = useState<AddressValue | null>(null);
+  const [share, setShare] = useState<ShareState>(DEFAULT_SHARE);
   const [errors, setErrors] = useState<FormErrors>({});
   // Seed the default roles each time the modal opens (the form otherwise resets
   // to INITIAL on close).
@@ -74,6 +79,7 @@ export function AddContactModal({
   const handleClose = () => {
     setForm(INITIAL);
     setAddress(null);
+    setShare(DEFAULT_SHARE);
     setErrors({});
     onClose();
   };
@@ -100,6 +106,9 @@ export function AddContactModal({
       undefined,
       notes: form.notes.trim() || undefined,
       active: true,
+      share_phone: share.phone,
+      share_email: share.email,
+      share_address: share.address,
       ...addressValueToPersonFields(address)
     });
     if (created && onCreated) onCreated(created);
@@ -228,6 +237,8 @@ export function AddContactModal({
             onChange={(e) => set('notes', e.target.value)} />
 
         </div>
+
+        <ContactVisibilityFields value={share} onChange={setShare} />
       </form>
     </Modal>);
 

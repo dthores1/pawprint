@@ -220,6 +220,7 @@ export function ContactProfile() {
                   </a>
                 </div>
               }
+              {person.email &&
               <div className="flex items-center gap-3">
                 <MailIcon className="w-5 h-5 text-text-secondary shrink-0" />
                 <a
@@ -229,6 +230,7 @@ export function ContactProfile() {
                   {person.email}
                 </a>
               </div>
+              }
             </div>
           </Card>
 

@@ -158,6 +158,11 @@ export function ChangeStatusModal({
         ''
       );
       setAgeUnit(animal.estimated_age_unit ?? 'months');
+    } else if (animal.birthdate_source === 'unknown' || !animal.estimated_birth_date) {
+      setAgeMode('unknown');
+      setBirthdate('');
+      setAgeValue('');
+      setAgeUnit('months');
     } else {
       setAgeMode('birthdate');
       setBirthdate(animal.estimated_birth_date);
@@ -261,7 +266,8 @@ export function ChangeStatusModal({
       birthdate: ageMode === 'birthdate' ? birthdate : '',
       ageValue: ageMode === 'age' ? ageValue : '',
       ageUnit,
-      asOf: ageAsOf
+      asOf: ageAsOf,
+      unknown: ageMode === 'unknown'
     });
     if (!ageInfo.valid) {
       setAgeError('Enter a birthdate or an estimated age.');

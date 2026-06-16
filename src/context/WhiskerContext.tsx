@@ -1049,7 +1049,9 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     setInactiveLoaded(false);
     const { data, error } = await fetchAllPages((from, to) =>
     supabase.
-    from('people').
+    // Read through the masking view so non-admin members never receive a
+    // contact's unshared phone/email/address (writes still go to `people`).
+    from('people_masked').
     select('*').
     eq('organization_id', orgId).
     eq('is_deleted', false).
@@ -1083,7 +1085,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     setPeopleIndexLoading(true);
     const { data, error } = await fetchAllPages((from, to) =>
     supabase.
-    from('people').
+    from('people_masked').
     select(PEOPLE_INDEX_COLUMNS).
     eq('organization_id', orgId).
     eq('is_deleted', false).
@@ -1107,7 +1109,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     if (!orgId || inactiveLoaded) return;
     const { data, error } = await fetchAllPages((from, to) =>
       supabase.
-      from('people').
+      from('people_masked').
       select('*').
       eq('organization_id', orgId).
       eq('is_deleted', false).
@@ -1140,7 +1142,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       const existing = people.find((p) => p.id === id);
       if (existing) return existing;
       const { data, error } = await supabase.
-      from('people').
+      from('people_masked').
       select('*').
       eq('organization_id', orgId).
       eq('id', id).

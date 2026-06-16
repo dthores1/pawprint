@@ -41,7 +41,12 @@ export function rowToPerson(r: any): Person {
     r.address_longitude != null ? Number(r.address_longitude) : undefined,
     max_capacity: r.max_capacity ?? undefined,
     preferred_species:
-    (r.preferred_species ?? undefined) as string[] | undefined
+    (r.preferred_species ?? undefined) as string[] | undefined,
+    // Visibility flags. Default to the product defaults when absent (older rows /
+    // slim projections): phone & email shared, address not.
+    share_phone: r.share_phone ?? true,
+    share_email: r.share_email ?? true,
+    share_address: r.share_address ?? false
   };
 }
 
@@ -69,7 +74,10 @@ const PERSON_COLUMNS = [
 'address_latitude',
 'address_longitude',
 'max_capacity',
-'preferred_species'] as
+'preferred_species',
+'share_phone',
+'share_email',
+'share_address'] as
 const;
 
 // Slim column projection for the all-people index (search / pickers /
@@ -79,7 +87,8 @@ const;
 // valid Person (absent fields fall back to their defaults).
 export const PEOPLE_INDEX_COLUMNS =
 'id,organization_id,first_name,last_name,email,phone,roles,role,' +
-'organization_name,photo_url,active,user_id,created_at';
+'organization_name,photo_url,active,user_id,created_at,' +
+'share_phone,share_email,share_address';
 
 function normalize(v: any): any {
   return typeof v === 'string' && v === '' ? null : v;

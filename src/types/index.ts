@@ -53,11 +53,12 @@ export interface SpeciesCatalog {
   active: boolean;
 }
 
-/** How `estimated_birth_date` was derived. */
+/** How `estimated_birth_date` was derived. `unknown` = no age on file yet. */
 export type BirthdateSource =
 'exact_birthdate' |
 'estimated_birthdate' |
-'estimated_age';
+'estimated_age' |
+'unknown';
 export type AgeUnit = 'days' | 'weeks' | 'months' | 'years';
 
 export interface Animal {
@@ -733,6 +734,12 @@ export interface Person {
   // — Foster-specific (meaningful when roles includes 'foster_parent') —
   max_capacity?: number;
   preferred_species?: string[];
+  // — Contact-info visibility (opt-in sharing with non-admin org members) —
+  // Admins always see everything; a user always sees their own record. Server-
+  // enforced via the people_masked view, which nulls a field that isn't shared.
+  share_phone?: boolean;
+  share_email?: boolean;
+  share_address?: boolean;
 }
 
 // Simplified five-state lifecycle. Fulfillment details (pickup vs. shipping)

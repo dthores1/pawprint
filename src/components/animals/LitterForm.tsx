@@ -118,7 +118,8 @@ export function LitterForm({
       birthdate: ageMode === 'birthdate' ? birthdate : '',
       ageValue: ageMode === 'age' ? ageValue : '',
       ageUnit,
-      asOf
+      asOf,
+      unknown: ageMode === 'unknown'
     });
     const nextErrors: typeof errors = {};
     if (!ageInfo.valid) {

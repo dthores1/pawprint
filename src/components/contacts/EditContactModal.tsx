@@ -5,9 +5,13 @@ import { Button } from '../ui/Button';
 import { RolesMultiSelect } from '../ui/RolesMultiSelect';
 import { AddressAutocomplete } from '../ui/AddressAutocomplete';
 import { useWhisker } from '../../context/WhiskerContext';
+import { useAuth } from '../../context/AuthContext';
+import { useIsAdmin } from '../../lib/useIsAdmin';
 import { AddressValue, Person, PersonRole } from '../../types';
 import { legacyRoleFor } from '../../lib/peopleApi';
 import { focusFirstError } from '../../lib/focusFirstError';
+import { canViewContactField } from '../../lib/contactVisibility';
+import { ContactVisibilityFields, ShareState } from './ContactVisibilityFields';
 import {
   addressValueToPersonFields,
   personToAddressValue } from
@@ -68,15 +72,38 @@ export function EditContactModal({
   person
 }: EditContactModalProps) {
   const { updatePerson } = useWhisker();
+  const isAdmin = useIsAdmin();
+  const { user } = useAuth();
+  const currentUserId = user?.id ?? null;
+  // Which contact fields the editor may see (and therefore edit). A masked field
+  // arrives empty, so we lock it and omit it from the save to avoid clobbering.
+  const canView = {
+    phone: canViewContactField(person, 'phone', isAdmin, currentUserId),
+    email: canViewContactField(person, 'email', isAdmin, currentUserId),
+    address: canViewContactField(person, 'address', isAdmin, currentUserId)
+  };
+  // Your own record can't be deactivated here — it would only hide you from
+  // directories/attribution and never makes sense to do to yourself.
+  const isOwnRecord = !!currentUserId && person.user_id === currentUserId;
   const [form, setForm] = useState<ContactForm>(() => fromPerson(person));
   const [address, setAddress] = useState<AddressValue | null>(() =>
   personToAddressValue(person)
   );
+  const [share, setShare] = useState<ShareState>(() => ({
+    phone: person.share_phone ?? true,
+    email: person.share_email ?? true,
+    address: person.share_address ?? false
+  }));
   const [errors, setErrors] = useState<FormErrors>({});
   useEffect(() => {
     if (isOpen) {
       setForm(fromPerson(person));
       setAddress(personToAddressValue(person));
+      setShare({
+        phone: person.share_phone ?? true,
+        email: person.share_email ?? true,
+        address: person.share_address ?? false
+      });
       setErrors({});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -91,11 +118,9 @@ export function EditContactModal({
       requestAnimationFrame(() => focusFirstError(ids));
       return;
     }
-    updatePerson(person.id, {
+    const updates: Partial<Person> = {
       first_name: form.first_name.trim(),
       last_name: form.last_name.trim(),
-      email: form.email.trim(),
-      phone: form.phone.trim() || undefined,
       roles: form.roles,
       role: legacyRoleFor(form.roles),
       organization_name:
@@ -103,9 +128,24 @@ export function EditContactModal({
       form.organization_name.trim() || undefined :
       undefined,
       notes: form.notes.trim() || undefined,
-      active: form.active,
-      ...addressValueToPersonFields(address)
-    });
+      active: form.active
+    };
+    // Only write back the contact fields the editor could actually see — a
+    // hidden field arrived masked (empty), so sending it would erase the value.
+    // Each field's share flag travels with it for the same reason.
+    if (canView.email) {
+      updates.email = form.email.trim();
+      updates.share_email = share.email;
+    }
+    if (canView.phone) {
+      updates.phone = form.phone.trim() || undefined;
+      updates.share_phone = share.phone;
+    }
+    if (canView.address) {
+      Object.assign(updates, addressValueToPersonFields(address));
+      updates.share_address = share.address;
+    }
+    updatePerson(person.id, updates);
     onClose();
   };
   const set = (key: keyof ContactForm, value: string) => {
@@ -162,9 +202,11 @@ export function EditContactModal({
             <Input
               id="email"
               type="email"
+              disabled={!canView.email}
               aria-invalid={Boolean(errors.email)}
               className={errors.email && 'border-red-500 focus:ring-red-500'}
-              value={form.email}
+              value={canView.email ? form.email : ''}
+              placeholder={canView.email ? undefined : 'Hidden by this contact'}
               onChange={(e) => set('email', e.target.value)} />
             <FieldError>{errors.email}</FieldError>
           </div>
@@ -172,17 +214,27 @@ export function EditContactModal({
             <Label htmlFor="phone">Phone</Label>
             <Input
               id="phone"
-              value={form.phone}
+              disabled={!canView.phone}
+              value={canView.phone ? form.phone : ''}
+              placeholder={canView.phone ? undefined : 'Hidden by this contact'}
               onChange={(e) => set('phone', e.target.value)} />
           </div>
         </div>
 
         <div>
           <Label htmlFor="address">Address</Label>
+          {canView.address ?
           <AddressAutocomplete
             id="address"
             value={address}
-            onChange={setAddress} />
+            onChange={setAddress} /> :
+
+          <Input
+            id="address"
+            disabled
+            value=""
+            placeholder="Hidden by this contact" />
+          }
         </div>
 
         <div id="roles" style={{ scrollMarginTop: '1rem' }}>
@@ -220,17 +272,38 @@ export function EditContactModal({
             onChange={(e) => set('notes', e.target.value)} />
         </div>
 
-        <label className="flex items-center gap-3 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={form.active}
-            onChange={(e) =>
-            setForm((prev) => ({ ...prev, active: e.target.checked }))
-            }
-            className="w-4 h-4 rounded text-primary focus:ring-primary" />
+        <ContactVisibilityFields
+          value={share}
+          onChange={setShare}
+          lockedFields={{
+            phone: !canView.phone,
+            email: !canView.email,
+            address: !canView.address
+          }} />
 
-          <span className="text-sm text-text-primary">Active</span>
-        </label>
+        <div>
+          <label
+            className={`flex items-center gap-3 select-none ${
+            isOwnRecord ? 'cursor-not-allowed' : 'cursor-pointer'}`
+            }>
+
+            <input
+              type="checkbox"
+              checked={form.active}
+              disabled={isOwnRecord}
+              onChange={(e) =>
+              setForm((prev) => ({ ...prev, active: e.target.checked }))
+              }
+              className="w-4 h-4 rounded text-primary focus:ring-primary disabled:opacity-50" />
+
+            <span className="text-sm text-text-primary">Active</span>
+          </label>
+          {isOwnRecord &&
+          <p className="text-xs text-text-secondary mt-1 ml-[26px]">
+            You can't deactivate your own record.
+          </p>
+          }
+        </div>
       </form>
     </Modal>);
 

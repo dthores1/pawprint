@@ -5,10 +5,17 @@ import { Button } from '../ui/Button';
 import { RolesMultiSelect } from '../ui/RolesMultiSelect';
 import { AddressAutocomplete } from '../ui/AddressAutocomplete';
 import { useWhisker } from '../../context/WhiskerContext';
+import { useAuth } from '../../context/AuthContext';
+import { useIsAdmin } from '../../lib/useIsAdmin';
 import { AddressValue, Person, PersonRole } from '../../types';
 import { enabledSpeciesList } from '../../lib/orgCatalog';
 import { personToAddressValue } from '../../lib/address';
 import { focusFirstError } from '../../lib/focusFirstError';
+import { canViewContactField } from '../../lib/contactVisibility';
+import {
+  ContactVisibilityFields,
+  ShareState } from
+'../contacts/ContactVisibilityFields';
 interface EditFosterModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -87,12 +94,33 @@ export function EditFosterModal({
 }: EditFosterModalProps) {
   const { updateFoster, species: speciesCatalog, organizationSpecies } =
   useWhisker();
+  const isAdmin = useIsAdmin();
+  const { user } = useAuth();
+  const currentUserId = user?.id ?? null;
+  const canView = {
+    phone: canViewContactField(foster, 'phone', isAdmin, currentUserId),
+    email: canViewContactField(foster, 'email', isAdmin, currentUserId),
+    address: canViewContactField(foster, 'address', isAdmin, currentUserId)
+  };
+  // Your own record can't be deactivated here (it would only hide you from
+  // directories/attribution).
+  const isOwnRecord = !!currentUserId && foster.user_id === currentUserId;
   const [formData, setFormData] = useState<FosterForm>(() => fromFoster(foster));
+  const [share, setShare] = useState<ShareState>(() => ({
+    phone: foster.share_phone ?? true,
+    email: foster.share_email ?? true,
+    address: foster.share_address ?? false
+  }));
   const [errors, setErrors] = useState<FormErrors>({});
   // Re-seed when the modal opens (or the foster changes) so edits start fresh.
   useEffect(() => {
     if (isOpen) {
       setFormData(fromFoster(foster));
+      setShare({
+        phone: foster.share_phone ?? true,
+        email: foster.share_email ?? true,
+        address: foster.share_address ?? false
+      });
       setErrors({});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -107,29 +135,44 @@ export function EditFosterModal({
       requestAnimationFrame(() => focusFirstError(ids));
       return;
     }
-    const addr = formData.address;
-    updateFoster(foster.id, {
-      ...formData,
+    const updates: Partial<Person> = {
       first_name: formData.first_name.trim(),
       last_name: formData.last_name.trim(),
-      email: formData.email.trim(),
-      phone: formData.phone.trim(),
+      roles: formData.roles,
+      preferred_species: formData.preferred_species,
+      notes: formData.notes.trim(),
+      active: formData.active,
+      max_capacity: Number(formData.max_capacity)
+    };
+    // Only write back contact fields the editor could see — a masked field came
+    // back empty, so sending it would erase the stored value. Flags travel with
+    // their field.
+    if (canView.email) {
+      updates.email = formData.email.trim();
+      updates.share_email = share.email;
+    }
+    if (canView.phone) {
+      updates.phone = formData.phone.trim();
+      updates.share_phone = share.phone;
+    }
+    if (canView.address) {
+      const addr = formData.address;
       // Legacy single-line field + the structured components. Empty strings let
       // the API layer null out columns the picked address doesn't supply.
-      address: addr?.formatted ?? '',
-      address_google_place_id: addr?.placeId || '',
-      address_formatted: addr?.formatted || '',
-      address_street_1: addr?.street1 || '',
-      address_street_2: addr?.street2 || '',
-      address_city: addr?.city || '',
-      address_state: addr?.state || '',
-      address_postal_code: addr?.postalCode || '',
-      address_country: addr?.country || '',
-      address_latitude: addr?.latitude,
-      address_longitude: addr?.longitude,
-      notes: formData.notes.trim(),
-      max_capacity: Number(formData.max_capacity)
-    });
+      updates.address = addr?.formatted ?? '';
+      updates.address_google_place_id = addr?.placeId || '';
+      updates.address_formatted = addr?.formatted || '';
+      updates.address_street_1 = addr?.street1 || '';
+      updates.address_street_2 = addr?.street2 || '';
+      updates.address_city = addr?.city || '';
+      updates.address_state = addr?.state || '';
+      updates.address_postal_code = addr?.postalCode || '';
+      updates.address_country = addr?.country || '';
+      updates.address_latitude = addr?.latitude;
+      updates.address_longitude = addr?.longitude;
+      updates.share_address = share.address;
+    }
+    updateFoster(foster.id, updates);
     onClose();
   };
   const handleChange = (
@@ -216,9 +259,11 @@ export function EditFosterModal({
               name="email"
               type="email"
               autoComplete="off"
+              disabled={!canView.email}
               aria-invalid={Boolean(errors.email)}
               className={errors.email && 'border-red-500 focus:ring-red-500'}
-              value={formData.email}
+              value={canView.email ? formData.email : ''}
+              placeholder={canView.email ? undefined : 'Hidden by this foster'}
               onChange={handleChange} />
             <FieldError>{errors.email}</FieldError>
           </div>
@@ -229,9 +274,11 @@ export function EditFosterModal({
               name="phone"
               type="tel"
               autoComplete="off"
+              disabled={!canView.phone}
               aria-invalid={Boolean(errors.phone)}
               className={errors.phone && 'border-red-500 focus:ring-red-500'}
-              value={formData.phone}
+              value={canView.phone ? formData.phone : ''}
+              placeholder={canView.phone ? undefined : 'Hidden by this foster'}
               onChange={handleChange} />
             <FieldError>{errors.phone}</FieldError>
           </div>
@@ -239,6 +286,7 @@ export function EditFosterModal({
 
         <div>
           <Label htmlFor="address">Address</Label>
+          {canView.address ?
           <AddressAutocomplete
             id="address"
             error={Boolean(errors.address)}
@@ -248,7 +296,10 @@ export function EditFosterModal({
               if (errors.address) {
                 setErrors((prev) => ({ ...prev, address: undefined }));
               }
-            }} />
+            }} /> :
+
+          <Input id="address" disabled value="" placeholder="Hidden by this foster" />
+          }
           <FieldError>{errors.address}</FieldError>
         </div>
 
@@ -320,24 +371,45 @@ export function EditFosterModal({
             onChange={handleChange} />
         </div>
 
-        {/* Active toggle — lets coordinators retire a foster without deleting. */}
-        <label className="flex items-center gap-3 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={formData.active}
-            onChange={(e) =>
-            setFormData((prev) => ({ ...prev, active: e.target.checked }))
-            }
-            className="w-4 h-4 rounded text-primary focus:ring-primary" />
+        <ContactVisibilityFields
+          value={share}
+          onChange={setShare}
+          lockedFields={{
+            phone: !canView.phone,
+            email: !canView.email,
+            address: !canView.address
+          }} />
 
-          <span className="text-sm text-text-primary">
-            Active foster parent
-            <span className="text-text-secondary">
-              {' '}
-              — available for new placements
+        {/* Active toggle — lets coordinators retire a foster without deleting. */}
+        <div>
+          <label
+            className={`flex items-center gap-3 select-none ${
+            isOwnRecord ? 'cursor-not-allowed' : 'cursor-pointer'}`
+            }>
+
+            <input
+              type="checkbox"
+              checked={formData.active}
+              disabled={isOwnRecord}
+              onChange={(e) =>
+              setFormData((prev) => ({ ...prev, active: e.target.checked }))
+              }
+              className="w-4 h-4 rounded text-primary focus:ring-primary disabled:opacity-50" />
+
+            <span className="text-sm text-text-primary">
+              Active foster parent
+              <span className="text-text-secondary">
+                {' '}
+                — available for new placements
+              </span>
             </span>
-          </span>
-        </label>
+          </label>
+          {isOwnRecord &&
+          <p className="text-xs text-text-secondary mt-1 ml-[26px]">
+            You can't deactivate your own record.
+          </p>
+          }
+        </div>
       </form>
     </Modal>);
 

@@ -84,7 +84,8 @@ function validateForm(formData: AnimalForm, ageMode: AgeInputMode): FormErrors {
     birthdate: ageMode === 'birthdate' ? formData.birthdate : '',
     ageValue: ageMode === 'age' ? formData.ageValue : '',
     ageUnit: formData.ageUnit,
-    asOf
+    asOf,
+    unknown: ageMode === 'unknown'
   });
   if (!ageInfo.valid) {
     nextErrors.birthdate = 'Enter a birthdate or an estimated age.';
@@ -194,7 +195,8 @@ export function AddAnimalModal({
       birthdate: ageMode === 'birthdate' ? formData.birthdate : '',
       ageValue: ageMode === 'age' ? formData.ageValue : '',
       ageUnit: formData.ageUnit,
-      asOf
+      asOf,
+      unknown: ageMode === 'unknown'
     });
     const created = await addAnimal({
       name: formData.name.trim() || undefined,

@@ -307,6 +307,7 @@ export function Contacts() {
                     </a>
                   </div>
             }
+                {person.email &&
                 <div className="flex items-center gap-2 text-sm text-text-secondary">
                   <MailIcon className="w-4 h-4" />{' '}
                   <a
@@ -316,6 +317,7 @@ export function Contacts() {
                     {person.email}
                   </a>
                 </div>
+                }
               </div>
 
               {person.notes &&
@@ -441,6 +443,7 @@ export function Contacts() {
                                 </a>
                               </p>
                         }
+                            {person.email &&
                             <p className="text-sm text-text-secondary truncate max-w-[260px]">
                               <a
                             href={`mailto:${person.email}`}
@@ -449,6 +452,7 @@ export function Contacts() {
                                 {person.email}
                               </a>
                             </p>
+                            }
                           </td>
                           <td className="py-4 px-6 text-right">
                             <button

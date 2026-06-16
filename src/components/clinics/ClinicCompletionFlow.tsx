@@ -12,9 +12,12 @@ import {
   ClinicSlotStatus,
   ProcedureType,
   Procedure,
-  Sex } from
+  Sex,
+  AgeUnit,
+  Animal } from
 '../../types';
-import { cn, formatDate } from '../../lib/utils';
+import { cn, formatDate, calculateAge } from '../../lib/utils';
+import { deriveAgeInfo } from '../../lib/age';
 import { isInCare } from '../../lib/animalStatus';
 import {
   deriveProcedureName,
@@ -147,6 +150,12 @@ function isDraftComplete(d: RecordDraft): boolean {
 const isUnknownSex = (sex?: Sex | null): boolean =>
 sex !== 'Male' && sex !== 'Female';
 
+// Age is "unknown" when there's no birthdate on file (explicit 'unknown' source,
+// or simply never recorded). Like sex, the clinic is the natural place to fill
+// in an estimate from the paperwork.
+const isUnknownAge = (animal?: Animal | null): boolean =>
+!animal?.estimated_birth_date;
+
 // The Spay/Neuter subtype implied by a known sex.
 const spayNeuterForSex = (sex: Sex): Procedure =>
 sex === 'Female' ? 'spay' : 'neuter';
@@ -195,6 +204,9 @@ export function ClinicCompletionFlow({ clinicEventId, onClose }: Props) {
   // the resolver visible for these even once a sex is chosen, so a mis-click is
   // one click to correct (rather than the control vanishing on selection).
   const [sexTouched, setSexTouched] = useState<Set<string>>(new Set());
+  // Same idea for age: ferals are often intaked with age Unknown, and the clinic
+  // is where an estimate gets recorded. Keep the resolver visible once touched.
+  const [ageTouched, setAgeTouched] = useState<Set<string>>(new Set());
 
   React.useEffect(() => {
     if (!event) return;
@@ -222,6 +234,7 @@ export function ClinicCompletionFlow({ clinicEventId, onClose }: Props) {
     setPicking(false);
     setPickAnimalId('');
     setSexTouched(new Set());
+    setAgeTouched(new Set());
     setInitFor(event.id);
   }, [event, slots, clinicSlotProcedures, animals, initFor]);
 
@@ -329,6 +342,31 @@ export function ClinicCompletionFlow({ clinicEventId, onClose }: Props) {
       }
       return next;
     });
+  };
+
+  // Resolve (or re-set) an animal's age from the clinic paperwork. Pass an
+  // estimated age (value+unit, anchored to today) or null to mark Unknown.
+  // Marks the id touched so the resolver stays visible for correction.
+  const setAnimalAge = (
+  animalId: string,
+  estimate: { value: number; unit: AgeUnit } | null) =>
+  {
+    const today = new Date().toISOString().split('T')[0];
+    const info = deriveAgeInfo({
+      birthdate: '',
+      ageValue: estimate ? String(estimate.value) : '',
+      ageUnit: estimate?.unit ?? 'years',
+      asOf: today,
+      unknown: !estimate
+    });
+    updateAnimal(animalId, {
+      estimated_birth_date: info.estimated_birth_date,
+      birthdate_source: info.birthdate_source,
+      estimated_age_value: info.estimated_age_value,
+      estimated_age_unit: info.estimated_age_unit,
+      estimated_age_as_of: info.estimated_age_as_of
+    });
+    setAgeTouched((prev) => new Set(prev).add(animalId));
   };
 
   const confirmAddAnimal = () => {
@@ -614,7 +652,9 @@ export function ClinicCompletionFlow({ clinicEventId, onClose }: Props) {
             updateRecord={updateRecord}
             removeRecord={removeRecord}
             onSetSex={setAnimalSex}
-            sexTouchedIds={sexTouched} />
+            sexTouchedIds={sexTouched}
+            onSetAge={setAnimalAge}
+            ageTouchedIds={ageTouched} />
 
           }
 
@@ -913,7 +953,9 @@ function Step2({
   updateRecord,
   removeRecord,
   onSetSex,
-  sexTouchedIds
+  sexTouchedIds,
+  onSetAge,
+  ageTouchedIds
 }: {
   attendingAttendees: Attendee[];
   animals: any[];
@@ -924,6 +966,8 @@ function Step2({
   removeRecord: (key: string, id: string) => void;
   onSetSex: (animalId: string, sex: Sex) => void;
   sexTouchedIds: Set<string>;
+  onSetAge: (animalId: string, estimate: { value: number; unit: AgeUnit } | null) => void;
+  ageTouchedIds: Set<string>;
 }) {
   return (
     <div>
@@ -948,6 +992,8 @@ function Step2({
           // once touched so a mis-click stays correctable.
           const showSexResolver =
           isUnknownSex(animal?.sex) || sexTouchedIds.has(a.animal_id);
+          const showAgeResolver =
+          isUnknownAge(animal) || ageTouchedIds.has(a.animal_id);
           const hasSpayNeuter = st.records.some(
             (d) => d.procedure_type === 'spay_neuter'
           );
@@ -978,6 +1024,15 @@ function Step2({
                 sex={animal?.sex}
                 hasSpayNeuter={hasSpayNeuter}
                 onSelect={(sex) => onSetSex(a.animal_id, sex)} />
+              }
+
+                {showAgeResolver &&
+              <AgeResolver
+                animal={animal}
+                onSetEstimate={(value, unit) =>
+                onSetAge(a.animal_id, { value, unit })
+                }
+                onMarkUnknown={() => onSetAge(a.animal_id, null)} />
               }
 
                 {st.records.length > 0 &&
@@ -1133,6 +1188,116 @@ function SexSegment({
 
       {label}
     </button>);
+
+}
+
+// Mirrors SexResolver for age: amber while Unknown, green once an estimate is
+// recorded. Clinics report an estimate (e.g. "~2 years"), so the control is an
+// estimated-age value + unit; "leave Unknown" is simply not entering one.
+const AGE_UNIT_OPTIONS: AgeUnit[] = ['days', 'weeks', 'months', 'years'];
+function AgeResolver({
+  animal,
+  onSetEstimate,
+  onMarkUnknown
+}: {
+  animal?: Animal;
+  onSetEstimate: (value: number, unit: AgeUnit) => void;
+  onMarkUnknown: () => void;
+}) {
+  const unknown = isUnknownAge(animal);
+  const [value, setValue] = useState('');
+  const [unit, setUnit] = useState<AgeUnit>('years');
+  const tone = unknown ?
+  { box: 'border-[#F8E7C8] bg-[#FFF7E6]', text: 'text-[#A36B00]' } :
+  {
+    box: 'border-status-adoptable-text/25 bg-status-adoptable-bg',
+    text: 'text-status-adoptable-text'
+  };
+  const num = parseInt(value, 10);
+  const canSet = num > 0;
+  return (
+    <div className={cn('rounded-lg border p-3', tone.box)}>
+      <div className="flex items-start gap-2">
+        {unknown ?
+        <AlertTriangleIcon className={cn('w-4 h-4 mt-0.5 shrink-0', tone.text)} /> :
+        <CheckCircle2Icon className={cn('w-4 h-4 mt-0.5 shrink-0', tone.text)} />
+        }
+        <div className="space-y-2 min-w-0 flex-1">
+          <div className={cn('text-sm', tone.text)}>
+            {unknown ?
+            <>
+              <p className="font-semibold">Age is currently Unknown.</p>
+              <p className="opacity-90">
+                Set it from the clinic paperwork if an estimate was provided,
+                or leave Unknown if age could not be determined.
+              </p>
+            </> :
+            <p className="font-semibold">
+              Age set to {calculateAge(animal?.estimated_birth_date ?? '')}.{' '}
+              <span className="font-normal opacity-90">
+                Change it below if needed.
+              </span>
+            </p>
+            }
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="w-20">
+              <label className="block text-[11px] font-medium text-text-secondary mb-0.5">
+                Age
+              </label>
+              <Input
+                type="number"
+                min="1"
+                inputMode="numeric"
+                placeholder="e.g. 2"
+                value={value}
+                onChange={(e) => setValue(e.target.value)} />
+
+            </div>
+            <div className="w-28">
+              <label className="block text-[11px] font-medium text-text-secondary mb-0.5">
+                Unit
+              </label>
+              <Select
+                value={unit}
+                onChange={(e) => setUnit(e.target.value as AgeUnit)}>
+
+                {AGE_UNIT_OPTIONS.map((u) =>
+                <option key={u} value={u}>{u}</option>
+                )}
+              </Select>
+            </div>
+            <button
+              type="button"
+              disabled={!canSet}
+              onClick={() => {
+                if (canSet) {
+                  onSetEstimate(num, unit);
+                  setValue('');
+                }
+              }}
+              className={cn(
+                'inline-flex items-center px-3 h-9 rounded-lg text-xs font-semibold border transition-colors',
+                canSet ?
+                'bg-text-primary text-white border-text-primary hover:bg-text-primary/90' :
+                'bg-white text-text-secondary border-border opacity-60 cursor-not-allowed'
+              )}>
+
+              Set age
+            </button>
+            {!unknown &&
+            <button
+              type="button"
+              onClick={onMarkUnknown}
+              className="inline-flex items-center px-3 h-9 rounded-lg text-xs font-medium text-text-secondary border border-border bg-white hover:border-primary/40 transition-colors">
+
+              Mark Unknown
+            </button>
+            }
+          </div>
+        </div>
+      </div>
+    </div>);
 
 }
 

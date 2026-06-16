@@ -84,7 +84,7 @@ export function FosterProfile() {
   );
   const activeCount = activePlacements.length;
   const cap = foster.max_capacity ?? 0;
-  const isFull = activeCount >= cap;
+  const isFull = cap > 0 && activeCount >= cap; // Don't show "at maximum capacity" for a cap of zero
   const capacityPercent = cap > 0 ? activeCount / cap * 100 : 0;
   return (
     <div className="space-y-6 pb-12">
@@ -165,21 +165,27 @@ export function FosterProfile() {
               </div>
               <div className="flex items-center gap-3">
                 <PhoneIcon className="w-5 h-5 text-text-secondary shrink-0" />
+                {foster.phone ?
                 <a
                   href={`tel:${foster.phone}`}
                   className="text-primary hover:underline">
-                  
+
                   {foster.phone}
-                </a>
+                </a> :
+                <span className="text-text-primary">—</span>
+                }
               </div>
               <div className="flex items-center gap-3">
                 <MailIcon className="w-5 h-5 text-text-secondary shrink-0" />
+                {foster.email ?
                 <a
                   href={`mailto:${foster.email}`}
                   className="text-primary hover:underline">
-                  
+
                   {foster.email}
-                </a>
+                </a> :
+                <span className="text-text-primary">—</span>
+                }
               </div>
             </div>
           </Card>

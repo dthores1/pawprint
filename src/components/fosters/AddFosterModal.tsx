@@ -8,6 +8,13 @@ import { useWhisker } from '../../context/WhiskerContext';
 import { AddressValue, PersonRole } from '../../types';
 import { enabledSpeciesList } from '../../lib/orgCatalog';
 import { focusFirstError } from '../../lib/focusFirstError';
+import {
+  ContactVisibilityFields,
+  ShareState } from
+'../contacts/ContactVisibilityFields';
+
+// Product defaults: phone & email shared with members, address not.
+const DEFAULT_SHARE: ShareState = { phone: true, email: true, address: false };
 interface AddFosterModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -81,9 +88,11 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
   useWhisker();
   const enabledSpecies = enabledSpeciesList(speciesCatalog, organizationSpecies);
   const [formData, setFormData] = useState(INITIAL_FORM);
+  const [share, setShare] = useState<ShareState>(DEFAULT_SHARE);
   const [errors, setErrors] = useState<FormErrors>({});
   const handleClose = () => {
     setFormData(INITIAL_FORM);
+    setShare(DEFAULT_SHARE);
     setErrors({});
     onClose();
   };
@@ -117,7 +126,10 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
       address_latitude: addr?.latitude,
       address_longitude: addr?.longitude,
       notes: formData.notes.trim(),
-      max_capacity: Number(formData.max_capacity)
+      max_capacity: Number(formData.max_capacity),
+      share_phone: share.phone,
+      share_email: share.email,
+      share_address: share.address
     });
     handleClose();
   };
@@ -332,6 +344,8 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
             onChange={handleChange} />
 
         </div>
+
+        <ContactVisibilityFields value={share} onChange={setShare} />
       </form>
     </Modal>);
 
