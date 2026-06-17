@@ -6,11 +6,13 @@ import { Card } from '../components/ui/Card';
 import { Select } from '../components/ui/Forms';
 import { Button } from '../components/ui/Button';
 import { TraitFormModal } from '../components/settings/TraitFormModal';
+import { SavedLocationFormModal } from '../components/settings/SavedLocationFormModal';
 import { AdoptionTemplateEditor } from '../components/settings/AdoptionTemplateEditor';
 import { MemberPermissionManager } from '../components/settings/MemberPermissionManager';
+import { AddressDisplay } from '../components/ui/AddressDisplay';
 import { SpeciesIcon } from '../lib/speciesIcons';
 import { cn } from '../lib/utils';
-import { Trait } from '../types';
+import { Trait, SavedLocation } from '../types';
 
 // Organization settings:
 //  - Accepted Animal Types → organization_species (enable/disable + default)
@@ -27,7 +29,9 @@ export function Settings() {
     setDefaultSpecies,
     setAllowedBreeds,
     traits,
-    updateTrait
+    updateTrait,
+    savedLocations,
+    updateSavedLocation
   } = useWhisker();
   const { currentOrg } = useAuth();
   const isAdmin =
@@ -35,6 +39,10 @@ export function Settings() {
   const [traitForm, setTraitForm] = useState<{ open: boolean; trait?: Trait }>({
     open: false
   });
+  const [locationForm, setLocationForm] = useState<{
+    open: boolean;
+    location?: SavedLocation;
+  }>({ open: false });
 
   const rowFor = (id: string) =>
   organizationSpecies.find((r) => r.species_id === id);
@@ -334,6 +342,87 @@ export function Settings() {
         </Card>
       }
 
+      {/* Saved Locations — admin-curated places for transport pickup/dropoff. */}
+      {isAdmin &&
+      <Card className="p-0 overflow-hidden">
+          <div className="p-5 border-b border-border flex items-start justify-between gap-3">
+            <div>
+              <h2 className="font-heading font-semibold text-lg text-text-primary">
+                Saved Locations
+              </h2>
+              <p className="text-sm text-text-secondary mt-1">
+                Reusable places (clinic, common foster homes) members can pick
+                when requesting transport. Deactivate to retire one without
+                losing past requests.
+              </p>
+            </div>
+            <Button
+            size="sm"
+            onClick={() => setLocationForm({ open: true })}
+            className="shrink-0">
+
+              <PlusIcon className="w-4 h-4 mr-1.5" /> New location
+            </Button>
+          </div>
+          {savedLocations.length === 0 ?
+          <p className="px-5 py-6 text-sm text-text-secondary">
+              No saved locations yet.
+            </p> :
+
+          <ul className="divide-y divide-border max-h-[28rem] overflow-y-auto">
+            {[...savedLocations].
+            sort((a, b) => a.name.localeCompare(b.name)).
+            map((loc) =>
+            <li
+              key={loc.id}
+              className="flex items-center justify-between gap-4 px-5 py-3">
+
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                      className={cn(
+                        'font-medium',
+                        loc.active ?
+                        'text-text-primary' :
+                        'text-text-secondary line-through'
+                      )}>
+
+                        {loc.name}
+                      </span>
+                      {!loc.active &&
+                    <span className="text-xs text-text-secondary">Inactive</span>
+                    }
+                    </div>
+                    <div className="text-xs text-text-secondary mt-0.5 truncate">
+                      <AddressDisplay value={loc.address} singleLine />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <button
+                    type="button"
+                    onClick={() =>
+                    updateSavedLocation(loc.id, { active: !loc.active })
+                    }
+                    className="text-xs font-medium text-text-secondary hover:text-primary transition-colors">
+
+                      {loc.active ? 'Deactivate' : 'Reactivate'}
+                    </button>
+                    <button
+                    type="button"
+                    aria-label={`Edit ${loc.name}`}
+                    onClick={() => setLocationForm({ open: true, location: loc })}
+                    className="p-1 rounded-md text-text-secondary hover:text-text-primary hover:bg-background transition-colors">
+
+                      <PencilIcon className="w-4 h-4" />
+                    </button>
+                  </div>
+                </li>
+            )}
+            </ul>
+          }
+        </Card>
+      }
+
       {/* Adoption Profiles — admin-managed posting template. */}
       {isAdmin && <AdoptionTemplateEditor />}
 
@@ -373,6 +462,11 @@ export function Settings() {
         isOpen={traitForm.open}
         onClose={() => setTraitForm({ open: false })}
         trait={traitForm.trait} />
+
+      <SavedLocationFormModal
+        isOpen={locationForm.open}
+        onClose={() => setLocationForm({ open: false })}
+        location={locationForm.location} />
 
     </div>);
 

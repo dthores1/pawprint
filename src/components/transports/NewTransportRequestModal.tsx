@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { FieldError, Select, Textarea, Label } from '../ui/Forms';
+import { FormSection } from '../ui/FormSection';
 import { focusFirstError } from '../../lib/focusFirstError';
 import { DateTimePicker } from '../ui/DateTimePicker';
-import { AddressAutocomplete } from '../ui/AddressAutocomplete';
+import { DatePicker } from '../ui/DatePicker';
+import { LocationPicker, LocationMode } from './LocationPicker';
 import { Button } from '../ui/Button';
 import { AnimalSearchPicker } from '../ui/AnimalSearchPicker';
 import { useWhisker } from '../../context/WhiskerContext';
@@ -12,8 +14,15 @@ import {
   AddressValue,
   TransportRequest,
   TransportRequestType,
+  TransportScheduleType,
   TransportRequestUrgency } from
 '../../types';
+
+const SCHEDULE_OPTIONS: { value: TransportScheduleType; label: string }[] = [
+{ value: 'exact', label: 'Exact time' },
+{ value: 'flexible', label: 'Flexible' },
+{ value: 'asap', label: 'ASAP' },
+{ value: 'coordinate_later', label: 'Date TBD' }];
 
 interface Props {
   isOpen: boolean;
@@ -49,12 +58,20 @@ export function NewTransportRequestModal({ isOpen, onClose, request }: Props) {
   const [animalId, setAnimalId] = useState('');
   const [pickup, setPickup] = useState<AddressValue | null>(null);
   const [dropoff, setDropoff] = useState<AddressValue | null>(null);
+  const [pickupSavedLocationId, setPickupSavedLocationId] = useState<string | undefined>();
+  const [dropoffSavedLocationId, setDropoffSavedLocationId] = useState<string | undefined>();
+  const [pickupMode, setPickupMode] = useState<LocationMode>('address');
+  const [dropoffMode, setDropoffMode] = useState<LocationMode>('address');
+  const [scheduleType, setScheduleType] = useState<TransportScheduleType>('exact');
   const [pickupTime, setPickupTime] = useState('');
+  const [windowStart, setWindowStart] = useState('');
+  const [windowEnd, setWindowEnd] = useState('');
   const [errors, setErrors] = useState<{
     animalId?: string;
     pickup?: string;
     dropoff?: string;
     pickupTime?: string;
+    window?: string;
   }>({});
   const [notes, setNotes] = useState('');
 
@@ -78,7 +95,18 @@ export function NewTransportRequestModal({ isOpen, onClose, request }: Props) {
         { formatted: request.dropoff_location } as AddressValue :
         null)
       );
-      setPickupTime(toLocalInput(request.requested_pickup_time));
+      setPickupSavedLocationId(request.pickup_saved_location_id ?? undefined);
+      setDropoffSavedLocationId(request.dropoff_saved_location_id ?? undefined);
+      setPickupMode(request.pickup_saved_location_id ? 'saved' : 'address');
+      setDropoffMode(request.dropoff_saved_location_id ? 'saved' : 'address');
+      setScheduleType(request.schedule_type ?? 'exact');
+      setPickupTime(
+        request.requested_pickup_time ?
+        toLocalInput(request.requested_pickup_time) :
+        ''
+      );
+      setWindowStart(request.preferred_window_start ?? '');
+      setWindowEnd(request.preferred_window_end ?? '');
       setNotes(request.notes ?? '');
     } else {
       setType('animal');
@@ -86,7 +114,14 @@ export function NewTransportRequestModal({ isOpen, onClose, request }: Props) {
       setAnimalId('');
       setPickup(null);
       setDropoff(null);
+      setPickupSavedLocationId(undefined);
+      setDropoffSavedLocationId(undefined);
+      setPickupMode('address');
+      setDropoffMode('address');
+      setScheduleType('exact');
       setPickupTime('');
+      setWindowStart('');
+      setWindowEnd('');
       setNotes('');
     }
     setErrors({});
@@ -112,31 +147,52 @@ export function NewTransportRequestModal({ isOpen, onClose, request }: Props) {
     nextErrors.pickup = 'Pickup location is required.';
     if (!dropoff?.formatted.trim())
     nextErrors.dropoff = 'Dropoff location is required.';
-    if (!pickupTime) nextErrors.pickupTime = 'Pickup time is required.';
+    // An exact time is only required for the 'exact' schedule type.
+    if (scheduleType === 'exact' && !pickupTime) {
+      nextErrors.pickupTime = 'Pickup time is required.';
+    }
+    if (
+      scheduleType === 'flexible' &&
+      windowStart && windowEnd && windowStart > windowEnd)
+    {
+      nextErrors.window = 'The end date can’t be before the start date.';
+    }
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       const ids = [
       nextErrors.animalId && 'animal',
       nextErrors.pickup && 'pickup',
       nextErrors.dropoff && 'dropoff',
-      nextErrors.pickupTime && 'pickup_time'].
+      nextErrors.pickupTime && 'pickup_time',
+      nextErrors.window && 'window_start'].
       filter((v): v is string => Boolean(v));
       requestAnimationFrame(() => focusFirstError(ids));
       return;
     }
-    // Guard against past times — but only on changes. In edit mode, leaving
-    // the original same-day time alone shouldn't trip a "past time" error
-    // just because the form was reopened a few minutes later.
-    const pickupDate = new Date(pickupTime);
-    const originalIso = request ?
-    new Date(request.requested_pickup_time).toISOString() :
-    null;
-    const changedTime = pickupDate.toISOString() !== originalIso;
-    if (changedTime && pickupDate.getTime() < Date.now()) {
-      setErrors({ pickupTime: 'Pickup time must be in the future.' });
-      requestAnimationFrame(() => focusFirstError(['pickup_time']));
-      return;
+    // Exact time → ISO; guard against past times, but only on a real change
+    // (reopening edit mode minutes later shouldn't trip "past time").
+    let pickupIso: string | undefined;
+    if (scheduleType === 'exact') {
+      const pickupDate = new Date(pickupTime);
+      const originalIso = request?.requested_pickup_time ?
+      new Date(request.requested_pickup_time).toISOString() :
+      null;
+      const changedTime = pickupDate.toISOString() !== originalIso;
+      if (changedTime && pickupDate.getTime() < Date.now()) {
+        setErrors({ pickupTime: 'Pickup time must be in the future.' });
+        requestAnimationFrame(() => focusFirstError(['pickup_time']));
+        return;
+      }
+      pickupIso = pickupDate.toISOString();
     }
+    // Only the fields relevant to the schedule type are sent; the rest are
+    // nulled ('' → null in the API layer) so switching types stays consistent.
+    const timingFields = {
+      schedule_type: scheduleType,
+      requested_pickup_time: scheduleType === 'exact' ? pickupIso : '',
+      preferred_window_start: scheduleType === 'flexible' ? windowStart : '',
+      preferred_window_end: scheduleType === 'flexible' ? windowEnd : ''
+    };
     if (request) {
       updateTransportRequest(request.id, {
         type,
@@ -146,7 +202,9 @@ export function NewTransportRequestModal({ isOpen, onClose, request }: Props) {
         dropoff_location: dropoff?.formatted.trim() ?? '',
         pickup_address: pickup ?? undefined,
         dropoff_address: dropoff ?? undefined,
-        requested_pickup_time: pickupDate.toISOString(),
+        pickup_saved_location_id: pickupSavedLocationId ?? null,
+        dropoff_saved_location_id: dropoffSavedLocationId ?? null,
+        ...timingFields,
         notes: notes.trim() || undefined
       });
     } else {
@@ -160,7 +218,9 @@ export function NewTransportRequestModal({ isOpen, onClose, request }: Props) {
         dropoff_location: dropoff?.formatted.trim() ?? '',
         pickup_address: pickup,
         dropoff_address: dropoff,
-        requested_pickup_time: pickupDate.toISOString(),
+        pickup_saved_location_id: pickupSavedLocationId ?? null,
+        dropoff_saved_location_id: dropoffSavedLocationId ?? null,
+        ...timingFields,
         notes: notes.trim() || undefined
       });
     }
@@ -190,103 +250,197 @@ export function NewTransportRequestModal({ isOpen, onClose, request }: Props) {
         className="space-y-5"
         noValidate>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="type" required>Type</Label>
-            <Select
-              id="type"
-              value={type}
-              onChange={(e) =>
-              setType(e.target.value as TransportRequestType)
-              }>
+        <FormSection title="Request details">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="type" required>Type</Label>
+              <Select
+                id="type"
+                value={type}
+                onChange={(e) =>
+                setType(e.target.value as TransportRequestType)
+                }>
 
-              <option value="animal">Animal</option>
-              <option value="supplies">Supplies</option>
-            </Select>
+                <option value="animal">Animal</option>
+                <option value="supplies">Supplies</option>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="urgency" required>Urgency</Label>
+              <Select
+                id="urgency"
+                value={urgency}
+                onChange={(e) =>
+                setUrgency(e.target.value as TransportRequestUrgency)
+                }>
+
+                <option value="normal">Normal</option>
+                <option value="urgent">Urgent</option>
+                <option value="critical">Critical</option>
+              </Select>
+            </div>
           </div>
+
+          {showAnimalPicker &&
           <div>
-            <Label htmlFor="urgency" required>Urgency</Label>
-            <Select
-              id="urgency"
-              value={urgency}
-              onChange={(e) =>
-              setUrgency(e.target.value as TransportRequestUrgency)
-              }>
-
-              <option value="normal">Normal</option>
-              <option value="urgent">Urgent</option>
-              <option value="critical">Critical</option>
-            </Select>
-          </div>
-        </div>
-
-        {showAnimalPicker &&
-        <div>
-            <Label htmlFor="animal" required>Animal</Label>
-            <AnimalSearchPicker
-            id="animal"
-            animals={animals}
-            value={animalId}
-            onChange={(value) => {
-              setAnimalId(value);
-              if (errors.animalId) {
-                setErrors((prev) => ({ ...prev, animalId: undefined }));
-              }
-            }} />
-            <FieldError>{errors.animalId}</FieldError>
-
-          </div>
-        }
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="pickup" required>Pickup location</Label>
-            <AddressAutocomplete
-              id="pickup"
-              error={Boolean(errors.pickup)}
-              value={pickup}
-              onChange={(addr) => {
-                setPickup(addr);
-                if (errors.pickup) {
-                  setErrors((prev) => ({ ...prev, pickup: undefined }));
+              <Label htmlFor="animal" required>Animal</Label>
+              <AnimalSearchPicker
+              id="animal"
+              animals={animals}
+              value={animalId}
+              onChange={(value) => {
+                setAnimalId(value);
+                if (errors.animalId) {
+                  setErrors((prev) => ({ ...prev, animalId: undefined }));
                 }
-              }}
-              placeholder="Trap site, foster home, office…" />
-            <FieldError id="pickup_error">{errors.pickup}</FieldError>
+              }} />
+              <FieldError>{errors.animalId}</FieldError>
 
+            </div>
+          }
+        </FormSection>
+
+        <FormSection title="Route">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="pickup" required>Pickup location</Label>
+              <LocationPicker
+                id="pickup"
+                error={Boolean(errors.pickup)}
+                value={pickup}
+                savedLocationId={pickupSavedLocationId}
+                mode={pickupMode}
+                onModeChange={setPickupMode}
+                onChange={(addr, savedId) => {
+                  setPickup(addr);
+                  setPickupSavedLocationId(savedId);
+                  if (errors.pickup) {
+                    setErrors((prev) => ({ ...prev, pickup: undefined }));
+                  }
+                }}
+                placeholder="Trap site, foster home, office…" />
+              <FieldError id="pickup_error">{errors.pickup}</FieldError>
+
+            </div>
+            <div>
+              <Label htmlFor="dropoff" required>Dropoff location</Label>
+              <LocationPicker
+                id="dropoff"
+                error={Boolean(errors.dropoff)}
+                value={dropoff}
+                savedLocationId={dropoffSavedLocationId}
+                mode={dropoffMode}
+                onModeChange={setDropoffMode}
+                onChange={(addr, savedId) => {
+                  setDropoff(addr);
+                  setDropoffSavedLocationId(savedId);
+                  if (errors.dropoff) {
+                    setErrors((prev) => ({ ...prev, dropoff: undefined }));
+                  }
+                }}
+                placeholder="Vet clinic, foster home…" />
+              <FieldError id="dropoff_error">{errors.dropoff}</FieldError>
+
+            </div>
           </div>
+        </FormSection>
+
+        <FormSection title="Timing">
+          <Label required>When is this needed?</Label>
+          <div className="flex flex-wrap gap-x-5 gap-y-2">
+            {SCHEDULE_OPTIONS.map((opt) =>
+            <label
+              key={opt.value}
+              className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
+
+              <input
+                type="radio"
+                name="schedule_type"
+                checked={scheduleType === opt.value}
+                onChange={() => {
+                  setScheduleType(opt.value);
+                  setErrors((prev) => ({
+                    ...prev,
+                    pickupTime: undefined,
+                    window: undefined
+                  }));
+                }}
+                className="w-4 h-4 text-primary focus:ring-primary" />
+
+              {opt.label}
+            </label>
+            )}
+          </div>
+
+          {scheduleType === 'exact' &&
           <div>
-            <Label htmlFor="dropoff" required>Dropoff location</Label>
-            <AddressAutocomplete
-              id="dropoff"
-              error={Boolean(errors.dropoff)}
-              value={dropoff}
-              onChange={(addr) => {
-                setDropoff(addr);
-                if (errors.dropoff) {
-                  setErrors((prev) => ({ ...prev, dropoff: undefined }));
-                }
-              }}
-              placeholder="Vet clinic, foster home…" />
-            <FieldError id="dropoff_error">{errors.dropoff}</FieldError>
+            <Label htmlFor="pickup_time" required>Pickup time</Label>
+            <DateTimePicker
+              id="pickup_time"
+              required
+              value={pickupTime}
+              onChange={handlePickupTimeChange}
+              minDate={isEditMode ? undefined : new Date()}
+              error={Boolean(errors.pickupTime)} />
 
+            <FieldError>{errors.pickupTime}</FieldError>
           </div>
-        </div>
+          }
 
-        <div>
-          <Label htmlFor="pickup_time" required>Pickup time</Label>
-          <DateTimePicker
-            id="pickup_time"
-            required
-            value={pickupTime}
-            onChange={handlePickupTimeChange}
-            minDate={isEditMode ? undefined : new Date()}
-            error={Boolean(errors.pickupTime)} />
+          {scheduleType === 'flexible' &&
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="window_start">Preferred from (optional)</Label>
+              <DatePicker
+                id="window_start"
+                value={windowStart}
+                error={Boolean(errors.window)}
+                onChange={(v) => {
+                  setWindowStart(v);
+                  if (errors.window) {
+                    setErrors((prev) => ({ ...prev, window: undefined }));
+                  }
+                }} />
 
-          <FieldError>{errors.pickupTime}</FieldError>
-        </div>
+            </div>
+            <div>
+              <Label htmlFor="window_end">Preferred to (optional)</Label>
+              <DatePicker
+                id="window_end"
+                value={windowEnd}
+                align="end"
+                error={Boolean(errors.window)}
+                onChange={(v) => {
+                  setWindowEnd(v);
+                  if (errors.window) {
+                    setErrors((prev) => ({ ...prev, window: undefined }));
+                  }
+                }} />
 
-        <div>
+              <FieldError>{errors.window}</FieldError>
+            </div>
+            <p className="sm:col-span-2 text-xs text-text-secondary">
+              A soft target — flexible requests won’t auto-expire.
+            </p>
+          </div>
+          }
+
+          {scheduleType === 'asap' &&
+          <p className="text-xs text-text-secondary">
+            No fixed time. This stays open (and sorted as urgent) until it’s
+            claimed, completed, or closed.
+          </p>
+          }
+
+          {scheduleType === 'coordinate_later' &&
+          <p className="text-xs text-text-secondary">
+            No date yet — you’ll work out timing with whoever claims it. It stays
+            open until claimed, completed, or closed.
+          </p>
+          }
+        </FormSection>
+
+        <FormSection title="Notes">
           <Label htmlFor="notes">Notes (optional)</Label>
           <Textarea
             id="notes"
@@ -295,7 +449,7 @@ export function NewTransportRequestModal({ isOpen, onClose, request }: Props) {
             placeholder="Carrier needed? Special instructions?"
             rows={3} />
 
-        </div>
+        </FormSection>
       </form>
     </Modal>);
 

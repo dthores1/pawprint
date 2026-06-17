@@ -96,7 +96,9 @@ export function AnimalProfile() {
     sites,
     externalListings,
     addPhoto,
-    updateMedicalRecord
+    updateMedicalRecord,
+    updateAnimal,
+    addNote
   } = useWhisker();
   // Permission gating. Admins/owners and MANAGE_ANIMALS holders manage freely;
   // the active foster of *this* animal gets the limited care-collaboration set.
@@ -1245,7 +1247,15 @@ export function AnimalProfile() {
             animal.status !== 'adopted' &&
             <Button
               className="w-full mt-6 bg-[#DDEFE2] text-[#3E7B52] hover:bg-[#C8E6D0]"
-              onClick={() => setIsStatusModalOpen(true)}>
+              onClick={() => {
+                updateAnimal(animal.id, { status: 'adoptable' });
+                addNote({
+                  animal_id: animal.id,
+                  author_name: 'Current User',
+                  note_type: 'general',
+                  body: `status: ${animal.status} → adoptable. Marked adoptable from the readiness checklist.`
+                });
+              }}>
 
                   Mark as Adoptable
                 </Button>

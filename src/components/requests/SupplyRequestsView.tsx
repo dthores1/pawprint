@@ -358,6 +358,30 @@ export function SupplyRequestsView() {
                               {request.priority}
                             </span>
                       }
+                      {/* Requester can withdraw before it's being processed. */}
+                      {!!currentPersonId &&
+                      request.requester_person_id === currentPersonId &&
+                      request.status === 'submitted' &&
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-text-secondary hover:text-[#9B3A3A]"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (
+                            window.confirm(
+                              'Cancel this supply request? It will be marked as cancelled.'
+                            ))
+                          {
+                            updateSupplyRequest(request.id, {
+                              status: 'cancelled'
+                            });
+                          }
+                        }}>
+
+                              Cancel Request
+                            </Button>
+                      }
                       </div>
                     </div>
                   </div>

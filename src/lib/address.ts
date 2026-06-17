@@ -42,6 +42,14 @@ export function rawAddressValue(text: string): AddressValue {
   return { formatted: text };
 }
 
+// Whether an address is "resolved" to a real place (vs. free-text-only). Used to
+// flag transport legs that still need a navigable address.
+export function isResolvedAddress(a: AddressValue | null | undefined): boolean {
+  return (
+    !!a && (
+    a.latitude != null || !!a.placeId || !!a.street1));
+}
+
 // A Google Maps deep link for an address. Uses the place_id when we have it
 // (most precise), otherwise a plain text search. Returns null with no address.
 export function googleMapsUrl(a: AddressValue | null): string | null {

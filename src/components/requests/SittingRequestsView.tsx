@@ -85,21 +85,6 @@ export function SittingRequestsView() {
   // Same admin check on every card — useCanArchive doesn't depend on the row id.
   const isAdminForArchive = useCanArchive('sitting_requests', { id: 'na' });
 
-  // "Cancel till the day of": for sitting requests, the start date is the day
-  // coverage begins. Compare midnight-of-today against midnight-of-start-day
-  // so a same-day start is still cancellable until the day rolls over.
-  const startOfToday = new Date(
-    new Date().getFullYear(),
-    new Date().getMonth(),
-    new Date().getDate()
-  ).getTime();
-  const isStartDayOrLater = (yyyyMmDd: string) => {
-    // start_date is a date-only string; parse as local-midnight.
-    const [y, m, d] = yyyyMmDd.split('-').map(Number);
-    if (!y || !m || !d) return true;
-    return new Date(y, m - 1, d).getTime() >= startOfToday;
-  };
-
   const sorted = [...sittingRequests].sort(
     (a, b) =>
     new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
@@ -179,8 +164,7 @@ export function SittingRequestsView() {
               canCancel={
               !!currentPersonId &&
               s.requested_by_person_id === currentPersonId &&
-              !SITTING_TERMINAL.includes(s.status) &&
-              isStartDayOrLater(s.start_date)
+              !SITTING_TERMINAL.includes(s.status)
               }
               onCancel={() =>
               updateSittingRequest(s.id, { status: 'cancelled' })

@@ -349,6 +349,10 @@ export interface FosterInput {
   photo_url?: string;
   /** Always includes 'foster_parent'; may include other roles too. */
   roles: PersonRole[];
+  // Contact-info visibility (opt-in sharing with non-admin org members).
+  share_phone?: boolean;
+  share_email?: boolean;
+  share_address?: boolean;
 }
 
 export type PlacementType = 'foster' | 'medical_foster' | 'trial_adoption';
@@ -685,6 +689,19 @@ export interface AddressValue {
   longitude?: number;
 }
 
+// Reusable per-org operational place (e.g. "ACP Clinic", "Melissa's House"),
+// curated by admins under Settings → Locations and selectable as a transport
+// pickup/dropoff. The `address` carries the structured coordinates for maps.
+export interface SavedLocation {
+  id: string;
+  organization_id: string;
+  name: string;
+  address: AddressValue | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Person {
   id: string;
   first_name: string;
@@ -874,14 +891,23 @@ export type TransportRequestStatus =
 'claimed' |
 'in_progress' |
 'completed' |
-'cancelled';
+'cancelled' |
+'expired';
 
 export type TransportRequestUrgency = 'normal' | 'urgent' | 'critical';
+
+// When the transport is needed. Only `exact` auto-expires once its time passes.
+export type TransportScheduleType =
+'exact' |
+'flexible' |
+'asap' |
+'coordinate_later';
 
 export interface TransportRequest {
   id: string;
   type: TransportRequestType;
   status: TransportRequestStatus;
+  schedule_type: TransportScheduleType;
   requested_by_person_id: string;
   assigned_volunteer_person_id?: string;
   /** Optional links to whatever is being moved. */
@@ -894,7 +920,15 @@ export interface TransportRequest {
   /** Structured addresses from Google Places (see address.ts column mappers). */
   pickup_address?: AddressValue | null;
   dropoff_address?: AddressValue | null;
-  requested_pickup_time: string;
+  /** Optional link to the Saved Location a leg was picked from (friendly name).
+   *  `null` on update clears it (e.g. switching to a typed address). */
+  pickup_saved_location_id?: string | null;
+  dropoff_saved_location_id?: string | null;
+  /** Exact pickup datetime — set only for `exact` schedule_type. */
+  requested_pickup_time?: string;
+  /** Optional preferred date window — set only for `flexible` schedule_type. */
+  preferred_window_start?: string;
+  preferred_window_end?: string;
   completed_at?: string;
   notes?: string;
   urgency: TransportRequestUrgency;

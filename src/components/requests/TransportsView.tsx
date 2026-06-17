@@ -1,19 +1,18 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { useWhisker } from '../../context/WhiskerContext';
 import { Card } from '../ui/Card';
-import { Button } from '../ui/Button';
 import { NewTransportRequestModal } from '../transports/NewTransportRequestModal';
 import {
   TruckIcon,
   ArrowRightIcon,
   AlertCircleIcon,
   MapPinIcon,
-  PencilIcon,
-  Trash2Icon } from
+  CalendarIcon,
+  UserIcon } from
 'lucide-react';
 import { AddressDisplay } from '../ui/AddressDisplay';
 import { PillTabs } from '../ui/PillTabs';
-import { cn } from '../../lib/utils';
+import { cn, formatDate } from '../../lib/utils';
 import { useAuth } from '../../context/AuthContext';
 import {
   TransportRequest,
@@ -21,6 +20,8 @@ import {
   TransportRequestType,
   TransportRequestUrgency } from
 '../../types';
+import { effectiveStatus } from '../../lib/transportTiming';
+import { isResolvedAddress } from '../../lib/address';
 import { ArchiveConfirmDialog } from '../archive/ArchiveConfirmDialog';
 import { useCanArchive } from '../archive/useCanArchive';
 
@@ -31,15 +32,52 @@ const STATUS_LABEL: Record<TransportRequestStatus, string> = {
   claimed: 'Claimed',
   in_progress: 'In Progress',
   completed: 'Completed',
-  cancelled: 'Cancelled'
+  cancelled: 'Cancelled',
+  expired: 'Expired'
 };
 const STATUS_PILL: Record<TransportRequestStatus, string> = {
   open: 'bg-[#F8E7C8] text-[#A36B00]',
   claimed: 'bg-[#DCEAF7] text-[#356A9A]',
   in_progress: 'bg-[#E8DEEC] text-[#6E4E80]',
   completed: 'bg-[#DDEFE2] text-[#3E7B52]',
-  cancelled: 'bg-[#F5D7D7] text-[#9B3A3A]'
+  cancelled: 'bg-[#F5D7D7] text-[#9B3A3A]',
+  expired: 'bg-[#F5D7D7] text-[#9B3A3A]'
 };
+const URGENCY_RANK: Record<TransportRequestUrgency, number> = {
+  critical: 3,
+  urgent: 2,
+  normal: 1
+};
+// Human label for the request's timing, by schedule type.
+function timingLabel(r: TransportRequest): string {
+  if (r.schedule_type === 'asap') return 'ASAP';
+  if (r.schedule_type === 'coordinate_later') return 'Coordinate later';
+  if (r.schedule_type === 'flexible') {
+    if (r.preferred_window_start && r.preferred_window_end) {
+      return `Flexible · ${formatDate(r.preferred_window_start)} – ${formatDate(
+        r.preferred_window_end
+      )}`;
+    }
+    if (r.preferred_window_start) {
+      return `Flexible · from ${formatDate(r.preferred_window_start)}`;
+    }
+    return 'Flexible';
+  }
+  return r.requested_pickup_time ?
+  formatPickupTime(r.requested_pickup_time) :
+  'No time set';
+}
+// Sort key: ASAP floats to top, then soonest exact/flexible date, else created.
+function timingSortValue(r: TransportRequest): number {
+  if (r.schedule_type === 'asap') return -Infinity;
+  if (r.schedule_type === 'exact' && r.requested_pickup_time) {
+    return new Date(r.requested_pickup_time).getTime();
+  }
+  if (r.schedule_type === 'flexible' && r.preferred_window_start) {
+    return new Date(r.preferred_window_start).getTime();
+  }
+  return new Date(r.created_at).getTime();
+}
 const TYPE_LABEL: Record<TransportRequestType, string> = {
   animal: 'Animal',
   supplies: 'Supplies',
@@ -79,48 +117,43 @@ export function TransportsView() {
     transportRequests,
     peopleIndex: people,
     animalsIndex: animals,
+    savedLocations,
     claimTransportRequest,
     updateTransportRequest
   } = useWhisker();
   const { currentPersonId } = useAuth();
   const [editing, setEditing] = useState<TransportRequest | null>(null);
   const [activeTab, setActiveTab] = useState<
-    'open' | 'claimed' | 'completed'>(
+    'open' | 'claimed' | 'completed' | 'needsReview'>(
     'open');
   const [archiving, setArchiving] = useState<TransportRequest | null>(null);
   const isAdminForArchive = useCanArchive('transport_requests', { id: 'na' });
 
-  // "Cancel till the day of": pickup day is the last day you can cancel.
-  // Compare midnight-of-today against midnight-of-pickup-day so a same-day
-  // pickup is still cancellable until the day rolls over.
-  const startOfToday = new Date(
-    new Date().getFullYear(),
-    new Date().getMonth(),
-    new Date().getDate()
-  ).getTime();
-  const isPickupDayOrLater = (iso: string) => {
-    const d = new Date(iso);
-    const startOfPickup = new Date(
-      d.getFullYear(),
-      d.getMonth(),
-      d.getDate()
-    ).getTime();
-    return startOfPickup >= startOfToday;
-  };
+  const savedLocName = (id?: string | null) =>
+  id ? savedLocations.find((l) => l.id === id)?.name : undefined;
+  // A leg is resolved if it links a saved location or has a real (non-free-text)
+  // address; a request "needs address" if either leg is unresolved.
+  const needsAddress = (r: TransportRequest) =>
+  !(r.pickup_saved_location_id || isResolvedAddress(r.pickup_address)) ||
+  !(r.dropoff_saved_location_id || isResolvedAddress(r.dropoff_address));
 
-  const sorted = [...transportRequests].sort(
-    (a, b) =>
-    new Date(b.requested_pickup_time).getTime() -
-    new Date(a.requested_pickup_time).getTime()
-  );
+  // Urgent/ASAP first, then soonest timing. Bucket by EFFECTIVE status so a
+  // past open Exact request lands in Needs Review (not Open) immediately, even
+  // before the nightly cron persists 'expired'.
+  const sorted = [...transportRequests].sort((a, b) => {
+    const u = URGENCY_RANK[b.urgency] - URGENCY_RANK[a.urgency];
+    if (u !== 0) return u;
+    return timingSortValue(a) - timingSortValue(b);
+  });
   const grouped = {
-    open: sorted.filter((r) => r.status === 'open'),
+    open: sorted.filter((r) => effectiveStatus(r) === 'open'),
     claimed: sorted.filter(
       (r) => r.status === 'claimed' || r.status === 'in_progress'
     ),
     completed: sorted.filter(
       (r) => r.status === 'completed' || r.status === 'cancelled'
-    )
+    ),
+    needsReview: sorted.filter((r) => effectiveStatus(r) === 'expired')
   };
   const display = grouped[activeTab];
 
@@ -135,7 +168,11 @@ export function TransportsView() {
           key: 'claimed',
           label: `Claimed / In Progress (${grouped.claimed.length})`
         },
-        { key: 'completed', label: `Completed (${grouped.completed.length})` }]} />
+        { key: 'completed', label: `Completed (${grouped.completed.length})` },
+        {
+          key: 'needsReview',
+          label: `Needs Review (${grouped.needsReview.length})`
+        }]} />
 
       {display.length === 0 ?
       <Card className="p-10 text-center text-text-secondary">
@@ -148,6 +185,8 @@ export function TransportsView() {
           'Submit a request when someone needs a ride.' :
           activeTab === 'claimed' ?
           'No active rides at the moment.' :
+          activeTab === 'needsReview' ?
+          'No expired requests to review.' :
           'No completed transports yet.'}
           </p>
         </Card> :
@@ -173,9 +212,12 @@ export function TransportsView() {
             );
             return p ? `${p.first_name} ${p.last_name}` : undefined;
           })()}
+          pickupLabel={savedLocName(r.pickup_saved_location_id)}
+          dropoffLabel={savedLocName(r.dropoff_saved_location_id)}
+          needsAddress={needsAddress(r)}
           canClaim={
           !!currentPersonId &&
-          r.status === 'open' &&
+          effectiveStatus(r) === 'open' &&
           r.requested_by_person_id !== currentPersonId
           }
           onClaim={() =>
@@ -186,8 +228,7 @@ export function TransportsView() {
           !!currentPersonId &&
           r.requested_by_person_id === currentPersonId &&
           r.status !== 'completed' &&
-          r.status !== 'cancelled' &&
-          isPickupDayOrLater(r.requested_pickup_time)
+          r.status !== 'cancelled'
           }
           onCancel={() =>
           updateTransportRequest(r.id, { status: 'cancelled' })
@@ -195,7 +236,7 @@ export function TransportsView() {
           canEdit={
           !!currentPersonId &&
           r.requested_by_person_id === currentPersonId &&
-          r.status === 'open'
+          (effectiveStatus(r) === 'open' || effectiveStatus(r) === 'expired')
           }
           onEdit={() => setEditing(r)}
           canArchive={
@@ -234,6 +275,11 @@ interface TransportCardProps {
   animalName?: string;
   requesterName: string;
   assigneeName?: string;
+  /** Saved-location friendly names, when a leg was picked from the catalog. */
+  pickupLabel?: string;
+  dropoffLabel?: string;
+  /** Either leg is free-text-only (no address / saved location). */
+  needsAddress: boolean;
   canClaim: boolean;
   onClaim: () => void;
   canCancel: boolean;
@@ -248,6 +294,9 @@ function TransportCard({
   animalName,
   requesterName,
   assigneeName,
+  pickupLabel,
+  dropoffLabel,
+  needsAddress,
   canClaim,
   onClaim,
   canCancel,
@@ -292,28 +341,46 @@ function TransportCard({
                 {request.urgency}
               </span>
             }
+            {needsAddress &&
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-[#F8E7C8] text-[#A36B00]">
+                <AlertCircleIcon className="w-3 h-3" />
+                Needs address
+              </span>
+            }
           </div>
           <p className="text-sm text-text-secondary mt-1 flex items-center gap-1.5 min-w-0">
             <MapPinIcon className="w-3.5 h-3.5 shrink-0" />
+            {pickupLabel ?
+            <span className="text-text-primary truncate min-w-0">{pickupLabel}</span> :
             <AddressDisplay
               value={request.pickup_address ?? null}
               singleLine
               className="text-text-primary min-w-0" />
+            }
             <ArrowRightIcon className="w-3.5 h-3.5 shrink-0" />
+            {dropoffLabel ?
+            <span className="text-text-primary truncate min-w-0">{dropoffLabel}</span> :
             <AddressDisplay
               value={request.dropoff_address ?? null}
               singleLine
               className="text-text-primary min-w-0" />
+            }
           </p>
-          <p className="text-sm text-text-primary font-medium mt-1">
-            {formatPickupTime(request.requested_pickup_time)}
-          </p>
-          <p className="text-sm text-text-secondary mt-1">
-            Requested by {requesterName}
-            {assigneeName && (
-              <> · Claimed by <span className="text-text-primary font-medium">{assigneeName}</span></>
-            )}
-          </p>
+          <div className="mt-2 flex items-center gap-x-3 gap-y-1.5 flex-wrap text-sm text-text-secondary">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-background border border-border text-xs font-medium text-text-primary">
+              <CalendarIcon className="w-3.5 h-3.5 text-text-secondary shrink-0" />
+              {timingLabel(request)}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <UserIcon className="w-3.5 h-3.5 shrink-0" />
+              <span>
+                Requested by {requesterName}
+                {assigneeName &&
+                <> · Claimed by <span className="text-text-primary font-medium">{assigneeName}</span></>
+                }
+              </span>
+            </span>
+          </div>
           {request.notes &&
           <p className="text-sm text-text-secondary mt-1 italic">
               {request.notes}
@@ -321,52 +388,80 @@ function TransportCard({
           }
         </div>
 
-        <div className="flex sm:flex-col items-start sm:items-end gap-3 shrink-0">
-          <span
-            className={cn(
-              'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold',
-              STATUS_PILL[request.status]
-            )}>
+        <div className="flex sm:flex-col items-start sm:items-end gap-2 shrink-0">
+          {(() => {
+            const eff = effectiveStatus(request);
+            return (
+              <span
+                className={cn(
+                  'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold',
+                  STATUS_PILL[eff]
+                )}>
 
-            {STATUS_LABEL[request.status]}
-          </span>
-          {canClaim &&
-          <Button size="sm" onClick={onClaim}>
-              Claim Request
-            </Button>
-          }
-          {canEdit &&
-          <button
-            type="button"
-            onClick={onEdit}
-            aria-label="Edit request"
-            title="Edit request"
-            className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-background transition-colors">
+                {STATUS_LABEL[eff]}
+              </span>);
 
-              <PencilIcon className="w-4 h-4" />
-            </button>
-          }
-          {canCancel &&
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleCancel}
-            className="text-status-urgent-text hover:bg-status-urgent-bg">
+          })()}
+          {(() => {
+            // Compact inline actions: "Claim · Edit · Cancel · Archive" (only
+            // those that apply), separated by dots, to keep the card short.
+            const linkBase =
+            'text-sm font-medium hover:underline transition-colors';
+            const actions: JSX.Element[] = [];
+            if (canClaim)
+            actions.push(
+              <button
+                key="claim"
+                type="button"
+                onClick={onClaim}
+                className={cn(linkBase, 'text-primary')}>
+                Claim Request
+              </button>
+            );
+            if (canEdit)
+            actions.push(
+              <button
+                key="edit"
+                type="button"
+                onClick={onEdit}
+                className={cn(linkBase, 'text-text-secondary hover:text-text-primary')}>
+                Edit
+              </button>
+            );
+            if (canCancel)
+            actions.push(
+              <button
+                key="cancel"
+                type="button"
+                onClick={handleCancel}
+                className={cn(linkBase, 'text-text-secondary hover:text-[#9B3A3A]')}>
+                Cancel
+              </button>
+            );
+            if (canArchive)
+            actions.push(
+              <button
+                key="archive"
+                type="button"
+                onClick={onArchive}
+                className={cn(linkBase, 'text-text-secondary hover:text-[#9B3A3A]')}>
+                Archive
+              </button>
+            );
+            if (actions.length === 0) return null;
+            return (
+              <div className="flex items-center gap-2">
+                {actions.map((node, i) =>
+                <Fragment key={i}>
+                    {i > 0 &&
+                  <span className="text-text-secondary/40" aria-hidden="true">·</span>
+                  }
+                    {node}
+                  </Fragment>
+                )}
+              </div>);
 
-              Cancel Request
-            </Button>
-          }
-          {canArchive &&
-          <button
-            type="button"
-            onClick={onArchive}
-            aria-label="Archive request"
-            title="Archive request"
-            className="p-1.5 rounded-md text-text-secondary hover:text-[#9B3A3A] hover:bg-[#F5D7D7]/60 transition-colors">
-
-              <Trash2Icon className="w-4 h-4" />
-            </button>
-          }
+          })()}
         </div>
       </div>
     </Card>);

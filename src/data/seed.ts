@@ -7,6 +7,7 @@ import {
   OrganizationBreed,
   Trait,
   AnimalTrait,
+  SavedLocation,
   FosterInput,
   FosterPlacement,
   MedicalRecord,
@@ -1384,16 +1385,54 @@ export const seedSupplyRequestItems: SupplyRequestItem[] = [
   unit: 'pack'
 }];
 
+export const seedSavedLocations: SavedLocation[] = [
+{
+  id: 'sl1',
+  organization_id: 'demo-org',
+  name: 'ACP Clinic',
+  address: {
+    formatted: '1200 Clinic Way, Portland, OR 97201',
+    street1: '1200 Clinic Way',
+    city: 'Portland',
+    state: 'OR',
+    postalCode: '97201',
+    country: 'US',
+    latitude: 45.5152,
+    longitude: -122.6784
+  },
+  active: true,
+  created_at: '2026-01-10T12:00:00Z',
+  updated_at: '2026-01-10T12:00:00Z'
+},
+{
+  id: 'sl2',
+  organization_id: 'demo-org',
+  name: "Melissa's House",
+  address: {
+    formatted: '88 Maple Ave, Portland, OR 97214',
+    street1: '88 Maple Ave',
+    city: 'Portland',
+    state: 'OR',
+    postalCode: '97214',
+    country: 'US',
+    latitude: 45.5121,
+    longitude: -122.6502
+  },
+  active: true,
+  created_at: '2026-01-12T12:00:00Z',
+  updated_at: '2026-01-12T12:00:00Z'
+}];
+
 export const seedTransportRequests: TransportRequest[] = [
 {
   id: 'tr1',
   type: 'animal',
   status: 'open',
-  requested_by_person_id: 'pe3',
+  schedule_type: 'asap',
+  requested_by_person_id: 'p_dan',
   animal_id: 'a8', // Pepper
   pickup_location: '202 Birch Rd, Portland, OR (Anita Patel)',
   dropoff_location: 'Greenwood Vet Clinic',
-  requested_pickup_time: seedDateTime(1, 9, 0),
   notes: 'Needs carrier transport.',
   urgency: 'normal',
   created_at: '2026-05-17T14:00:00Z',
@@ -1403,6 +1442,7 @@ export const seedTransportRequests: TransportRequest[] = [
   id: 'tr2',
   type: 'supplies',
   status: 'claimed',
+  schedule_type: 'exact',
   requested_by_person_id: 'pe3',
   assigned_volunteer_person_id: 'pe7', // Rachel Green
   supply_request_id: 'sr4',
@@ -1418,11 +1458,13 @@ export const seedTransportRequests: TransportRequest[] = [
   id: 'tr3',
   type: 'animal',
   status: 'open',
+  schedule_type: 'exact',
   requested_by_person_id: 'pe4',
   animal_id: 'a9', // Otis
   pickup_location: "Whiskerville intake (Brian O'Connor)",
   dropoff_location: 'Bridge City Veterinary',
-  requested_pickup_time: seedDateTime(1, 11, 30),
+  // Past exact pickup → surfaces in the "Needs Review" (expired) tab.
+  requested_pickup_time: seedDateTime(-2, 11, 30),
   notes: 'Right hind leg eval; please use the larger carrier.',
   urgency: 'urgent',
   created_at: '2026-05-17T09:15:00Z',
@@ -1432,6 +1474,7 @@ export const seedTransportRequests: TransportRequest[] = [
   id: 'tr4',
   type: 'animal',
   status: 'open',
+  schedule_type: 'exact',
   requested_by_person_id: 'pe3',
   clinic_event_id: 'ce1',
   animal_id: 'a4', // Milkshake
@@ -1447,6 +1490,7 @@ export const seedTransportRequests: TransportRequest[] = [
   id: 'tr5',
   type: 'animal',
   status: 'completed',
+  schedule_type: 'exact',
   requested_by_person_id: 'pe6',
   assigned_volunteer_person_id: 'pe7',
   animal_id: 'a7', // Pip

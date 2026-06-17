@@ -16,6 +16,7 @@ import {
   OrganizationBreed,
   Trait,
   AnimalTrait,
+  SavedLocation,
   Litter,
   Sex,
   PersonRole,
@@ -62,6 +63,11 @@ import {
   traitToInsert,
   traitUpdateToRow } from
 '../lib/traitsApi';
+import {
+  rowToSavedLocation,
+  savedLocationToInsert,
+  savedLocationUpdateToRow } from
+'../lib/savedLocationsApi';
 import {
   litterToInsert,
   litterUpdateToRow,
@@ -271,6 +277,12 @@ export interface WhiskerContextType {
   }) => void;
   /** Edit a trait definition (name/description/species/active). */
   updateTrait: (id: string, updates: Partial<Trait>) => void;
+  /** Reusable per-org operational places, selectable as transport pickup/dropoff. */
+  savedLocations: SavedLocation[];
+  addSavedLocation: (
+  loc: Omit<SavedLocation, 'id' | 'organization_id' | 'created_at' | 'updated_at'>)
+  => void;
+  updateSavedLocation: (id: string, updates: Partial<SavedLocation>) => void;
   products: Product[];
   addProduct: (product: Omit<Product, 'id'>) => void;
   updateProduct: (id: string, updates: Partial<Product>) => void;
@@ -1344,19 +1356,22 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     []);
   const [traits, setTraits] = useState<Trait[]>([]);
   const [animalTraits, setAnimalTraits_] = useState<AnimalTrait[]>([]);
+  const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
   const loadOrgCatalog = useCallback(async () => {
     if (!orgId) {
       setOrganizationSpecies([]);
       setOrganizationBreeds([]);
       setTraits([]);
       setAnimalTraits_([]);
+      setSavedLocations([]);
       return;
     }
-    const [os, ob, tr, at] = await Promise.all([
+    const [os, ob, tr, at, sl] = await Promise.all([
     supabase.from('organization_species').select('*').eq('organization_id', orgId),
     supabase.from('organization_breeds').select('*').eq('organization_id', orgId),
     supabase.from('traits').select('*').eq('organization_id', orgId),
-    supabase.from('animal_traits').select('*').eq('organization_id', orgId)]
+    supabase.from('animal_traits').select('*').eq('organization_id', orgId),
+    supabase.from('saved_locations').select('*').eq('organization_id', orgId).order('name')]
     );
     if (os.error) console.error('[organization_species] load failed:', os.error.message);
     else setOrganizationSpecies((os.data ?? []).map(rowToOrgSpecies));
@@ -1366,6 +1381,8 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     else setTraits((tr.data ?? []).map(rowToTrait));
     if (at.error) console.error('[animal_traits] load failed:', at.error.message);
     else setAnimalTraits_((at.data ?? []).map(rowToAnimalTrait));
+    if (sl.error) console.error('[saved_locations] load failed:', sl.error.message);
+    else setSavedLocations((sl.data ?? []).map(rowToSavedLocation));
   }, [orgId]);
   useEffect(() => {
     loadOrgCatalog();
@@ -1550,6 +1567,46 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     });
   };
 
+  const addSavedLocation: WhiskerContextType['addSavedLocation'] = async (loc) => {
+    if (!orgId) return;
+    const { data, error } = await supabase.
+    from('saved_locations').
+    insert(savedLocationToInsert(loc, orgId)).
+    select('*').
+    single();
+    if (error) {
+      console.error('[saved_locations] create failed:', error.message);
+      return;
+    }
+    if (data)
+    setSavedLocations((prev) =>
+    [...prev, rowToSavedLocation(data)].sort((a, b) =>
+    a.name.localeCompare(b.name)
+    )
+    );
+  };
+  const updateSavedLocation = (id: string, updates: Partial<SavedLocation>) => {
+    setSavedLocations((prev) =>
+    prev.map((l) =>
+    l.id === id ?
+    { ...l, ...updates, updated_at: new Date().toISOString() } :
+    l
+    )
+    );
+    const row = savedLocationUpdateToRow(updates);
+    if (Object.keys(row).length === 0) return;
+    supabase.
+    from('saved_locations').
+    update(row).
+    eq('id', id).
+    then(({ error }) => {
+      if (error) {
+        console.error('[saved_locations] update failed:', error.message);
+        loadOrgCatalog();
+      }
+    });
+  };
+
   const addAnimal = async (
   animal: Omit<Animal, 'id' | 'created_at' | 'updated_at'>)
   : Promise<Animal | undefined> => {
@@ -1721,7 +1778,10 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       preferred_species: foster.preferred_species,
       notes: foster.notes,
       active: foster.active,
-      photo_url: foster.photo_url
+      photo_url: foster.photo_url,
+      share_phone: foster.share_phone,
+      share_email: foster.share_email,
+      share_address: foster.share_address
     } as Omit<Person, 'id' | 'created_at'>;
     const { data, error } = await supabase.
     from('people').
@@ -3491,6 +3551,9 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         setAnimalTraits,
         addTrait,
         updateTrait,
+        savedLocations,
+        addSavedLocation,
+        updateSavedLocation,
         products,
         addProduct,
         updateProduct,

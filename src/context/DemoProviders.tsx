@@ -40,6 +40,7 @@ import {
   seedOrganizationSpecies,
   seedOrganizationBreeds,
   seedTraits,
+  seedSavedLocations,
   seedAnimalTraits,
   seedPlacements,
   seedMedicalRecords,
@@ -224,6 +225,29 @@ export function DemoWhiskerProvider({
   setTraits((prev) =>
   prev.map((t) => t.id === id ? { ...t, ...updates, updated_at: now() } : t)
   );
+  const [savedLocations, setSavedLocations] = useState(seedSavedLocations);
+  const addSavedLocation = (
+  loc: Omit<
+    (typeof seedSavedLocations)[number],
+    'id' | 'organization_id' | 'created_at' | 'updated_at'>) =>
+  setSavedLocations((prev) =>
+  [
+  ...prev,
+  {
+    ...loc,
+    id: `sl_new_${prev.length}`,
+    organization_id: 'demo-org',
+    created_at: now(),
+    updated_at: now()
+  }].
+  sort((a, b) => a.name.localeCompare(b.name))
+  );
+  const updateSavedLocation = (
+  id: string,
+  updates: Partial<(typeof seedSavedLocations)[number]>) =>
+  setSavedLocations((prev) =>
+  prev.map((l) => l.id === id ? { ...l, ...updates, updated_at: now() } : l)
+  );
   const [animalTraits, setAnimalTraits_] = useState(seedAnimalTraits);
   const setAnimalTraits = (animalId: string, traitIds: string[]) =>
   setAnimalTraits_((prev) => [
@@ -354,6 +378,9 @@ export function DemoWhiskerProvider({
     setDefaultSpecies,
     setAllowedBreeds,
     traits,
+    savedLocations,
+    addSavedLocation,
+    updateSavedLocation,
     animalTraits,
     setAnimalTraits,
     addTrait,
