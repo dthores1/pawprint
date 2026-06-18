@@ -16,16 +16,6 @@ import { animalDisplayName } from '../../lib/utils';
 import { breedFieldLabel } from '../../lib/speciesIcons';
 import { enabledSpeciesList } from '../../lib/orgCatalog';
 
-function isValidUrl(value: string): boolean {
-  if (!value.trim()) return true;
-  try {
-    new URL(value);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function ConcernCheckbox({
   label,
   checked,
@@ -112,7 +102,6 @@ export function ChangeStatusModal({
   const [microchipNumber, setMicrochipNumber] = useState('');
   const [description, setDescription] = useState('');
   const [intakeDateError, setIntakeDateError] = useState<string | undefined>();
-  const [photoError, setPhotoError] = useState<string | undefined>();
   const [reason, setReason] = useState('');
   const [internalNotes, setInternalNotes] = useState('');
   // Inline action item, shown when priority is elevated — lets the user capture
@@ -181,7 +170,6 @@ export function ChangeStatusModal({
     setMicrochipNumber(animal.microchip_number ?? '');
     setDescription(animal.description ?? '');
     setIntakeDateError(undefined);
-    setPhotoError(undefined);
     setReason('');
     setInternalNotes(animal.internal_notes ?? '');
     // Prefill with the current open action item so editing priority + the next
@@ -279,11 +267,6 @@ export function ChangeStatusModal({
     if (!intakeDate) {
       setIntakeDateError('Intake date is required.');
       requestAnimationFrame(() => focusFirstError(['edit_intake_date']));
-      return;
-    }
-    if (!isValidUrl(photoUrl.trim())) {
-      setPhotoError('Enter a valid URL.');
-      requestAnimationFrame(() => focusFirstError(['edit_photo']));
       return;
     }
     // An elevated priority must carry a next step, so the Action Needed banner

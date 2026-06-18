@@ -3,7 +3,7 @@ import { Modal } from '../ui/Modal';
 import { FieldError, Input, Textarea, Label, Select } from '../ui/Forms';
 import { focusFirstError } from '../../lib/focusFirstError';
 import { DateTimePicker } from '../ui/DateTimePicker';
-import { AddressAutocomplete } from '../ui/AddressAutocomplete';
+import { LocationPicker, LocationMode } from '../transports/LocationPicker';
 import { Button } from '../ui/Button';
 import { PersonSearchPicker } from '../ui/PersonSearchPicker';
 import { AddContactModal } from '../contacts/AddContactModal';
@@ -35,6 +35,8 @@ type ClinicForm = {
   dateTime: string;
   status: ClinicEventStatus;
   location: AddressValue | null;
+  locationSavedLocationId?: string;
+  locationMode: LocationMode;
   vetId: string;
   contactId: string;
   transportId: string;
@@ -61,6 +63,8 @@ function fromEvent(e: ClinicEvent): ClinicForm {
     dateTime: toLocalInput(e.date_time),
     status: e.status,
     location: e.location_address ?? null,
+    locationSavedLocationId: e.location_saved_location_id ?? undefined,
+    locationMode: e.location_saved_location_id ? 'saved' : 'address',
     vetId: e.veterinarian_person_id ?? '',
     contactId: e.contact_person_id ?? '',
     transportId: e.transport_coordinator_person_id ?? '',
@@ -92,7 +96,7 @@ const PERSON_FIELD_META = {
 type PersonTarget = keyof typeof PERSON_FIELD_META;
 
 export function EditClinicEventModal({ isOpen, onClose, event }: Props) {
-  const { updateClinicEvent, peopleIndex: people } = useWhisker();
+  const { updateClinicEvent, peopleIndex: people, savedLocations } = useWhisker();
   const [form, setForm] = useState<ClinicForm>(() => fromEvent(event));
   const [errors, setErrors] = useState<FormErrors>({});
   const [createTarget, setCreateTarget] = useState<PersonTarget | null>(null);
@@ -129,11 +133,15 @@ export function EditClinicEventModal({ isOpen, onClose, event }: Props) {
     // person FK — `Partial<ClinicEvent>` only allows `string | undefined`,
     // and `undefined` would get dropped before reaching Postgres.
     const clear = (id: string) => id || null as any;
+    const savedLoc = form.locationSavedLocationId ?
+    savedLocations.find((l) => l.id === form.locationSavedLocationId) :
+    undefined;
     updateClinicEvent(event.id, {
       date_time: new Date(form.dateTime).toISOString(),
       status: form.status,
-      location: form.location?.formatted.trim() ?? '',
+      location: savedLoc ? savedLoc.name : form.location?.formatted.trim() ?? '',
       location_address: form.location,
+      location_saved_location_id: form.locationSavedLocationId ?? null,
       veterinarian_person_id: clear(form.vetId),
       contact_person_id: clear(form.contactId),
       transport_coordinator_person_id: clear(form.transportId),
@@ -232,12 +240,25 @@ export function EditClinicEventModal({ isOpen, onClose, event }: Props) {
           </div>
           <div>
             <Label htmlFor="location" required>Location</Label>
-            <AddressAutocomplete
+            <LocationPicker
               id="location"
               error={Boolean(errors.location)}
               value={form.location}
-              onChange={(addr) => set('location', addr)}
-              placeholder="Clinic name or address" />
+              savedLocationId={form.locationSavedLocationId}
+              mode={form.locationMode}
+              onModeChange={(m) => set('locationMode', m)}
+              onChange={(addr, savedId) => {
+                setForm((prev) => ({
+                  ...prev,
+                  location: addr,
+                  locationSavedLocationId: savedId
+                }));
+                if (errors.location) {
+                  setErrors((prev) => ({ ...prev, location: undefined }));
+                }
+              }}
+              placeholder="Clinic address…"
+              freeTextHint="No exact address — it won’t show on a map." />
 
             <FieldError id="location_error">{errors.location}</FieldError>
           </div>

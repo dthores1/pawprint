@@ -3,7 +3,7 @@ import { Modal } from '../ui/Modal';
 import { FieldError, Input, Textarea, Label } from '../ui/Forms';
 import { focusFirstError } from '../../lib/focusFirstError';
 import { DateTimePicker } from '../ui/DateTimePicker';
-import { AddressAutocomplete } from '../ui/AddressAutocomplete';
+import { LocationPicker, LocationMode } from '../transports/LocationPicker';
 import { Button } from '../ui/Button';
 import { PersonSearchPicker } from '../ui/PersonSearchPicker';
 import { AddContactModal } from '../contacts/AddContactModal';
@@ -18,6 +18,8 @@ interface Props {
 type ClinicForm = {
   dateTime: string;
   location: AddressValue | null;
+  locationSavedLocationId?: string;
+  locationMode: LocationMode;
   vetId: string;
   contactId: string;
   // `''` lets the user clear the field while typing; coerced to a number on submit.
@@ -28,6 +30,8 @@ type ClinicForm = {
 const INITIAL: ClinicForm = {
   dateTime: '',
   location: null,
+  locationSavedLocationId: undefined,
+  locationMode: 'address',
   vetId: '',
   contactId: '',
   capacity: 8,
@@ -49,7 +53,7 @@ function validateForm(form: ClinicForm): FormErrors {
 }
 
 export function NewClinicEventModal({ isOpen, onClose }: Props) {
-  const { addClinicEvent, peopleIndex: people } = useWhisker();
+  const { addClinicEvent, peopleIndex: people, savedLocations } = useWhisker();
   const [form, setForm] = useState<ClinicForm>(INITIAL);
   const [errors, setErrors] = useState<FormErrors>({});
   // Which person field (if any) is creating a new contact inline.
@@ -86,10 +90,16 @@ export function NewClinicEventModal({ isOpen, onClose }: Props) {
       requestAnimationFrame(() => focusFirstError(ids));
       return;
     }
+    // Saved location → store its friendly name as the display text; the copied
+    // address still rides along in location_address for maps.
+    const savedLoc = form.locationSavedLocationId ?
+    savedLocations.find((l) => l.id === form.locationSavedLocationId) :
+    undefined;
     addClinicEvent({
       date_time: new Date(form.dateTime).toISOString(),
-      location: form.location?.formatted.trim() ?? '',
+      location: savedLoc ? savedLoc.name : form.location?.formatted.trim() ?? '',
       location_address: form.location,
+      location_saved_location_id: form.locationSavedLocationId ?? null,
       veterinarian_person_id: form.vetId || undefined,
       contact_person_id: form.contactId || undefined,
       slot_capacity: Number(form.capacity),
@@ -157,12 +167,25 @@ export function NewClinicEventModal({ isOpen, onClose }: Props) {
 
         <div>
           <Label htmlFor="location" required>Location</Label>
-          <AddressAutocomplete
+          <LocationPicker
             id="location"
             error={Boolean(errors.location)}
             value={form.location}
-            onChange={(addr) => set('location', addr)}
-            placeholder="Clinic name or address" />
+            savedLocationId={form.locationSavedLocationId}
+            mode={form.locationMode}
+            onModeChange={(m) => set('locationMode', m)}
+            onChange={(addr, savedId) => {
+              setForm((prev) => ({
+                ...prev,
+                location: addr,
+                locationSavedLocationId: savedId
+              }));
+              if (errors.location) {
+                setErrors((prev) => ({ ...prev, location: undefined }));
+              }
+            }}
+            placeholder="Clinic address…"
+            freeTextHint="No exact address — it won’t show on a map." />
           <FieldError id="location_error">{errors.location}</FieldError>
         </div>
 

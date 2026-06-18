@@ -9,6 +9,7 @@ import { TraitFormModal } from '../components/settings/TraitFormModal';
 import { SavedLocationFormModal } from '../components/settings/SavedLocationFormModal';
 import { AdoptionTemplateEditor } from '../components/settings/AdoptionTemplateEditor';
 import { MemberPermissionManager } from '../components/settings/MemberPermissionManager';
+import { PillTabs } from '../components/ui/PillTabs';
 import { AddressDisplay } from '../components/ui/AddressDisplay';
 import { SpeciesIcon } from '../lib/speciesIcons';
 import { cn } from '../lib/utils';
@@ -43,6 +44,18 @@ export function Settings() {
     open: boolean;
     location?: SavedLocation;
   }>({ open: false });
+  // Three tabs: Animal Options (catalog/traits/adoption), Locations (saved
+  // places), and Permissions (member access grants — admin-only).
+  const [tab, setTab] = useState<'animal' | 'locations' | 'permissions'>(
+    'animal'
+  );
+  const tabs = [
+  { key: 'animal', label: 'Animal Options' },
+  ...isAdmin ?
+  [
+  { key: 'locations', label: 'Locations' },
+  { key: 'permissions', label: 'Permissions' }] :
+  []];
 
   const rowFor = (id: string) =>
   organizationSpecies.find((r) => r.species_id === id);
@@ -75,7 +88,12 @@ export function Settings() {
         </p>
       </div>
 
+      {tabs.length > 1 &&
+      <PillTabs tabs={tabs} value={tab} onChange={(k) => setTab(k as typeof tab)} />
+      }
+
       {/* Accepted Animal Types ------------------------------------------- */}
+      {tab === 'animal' &&
       <Card className="p-0 overflow-hidden">
         <div className="p-5 border-b border-border">
           <h2 className="font-heading font-semibold text-lg text-text-primary">
@@ -149,8 +167,10 @@ export function Settings() {
           })}
         </ul>
       </Card>
+      }
 
       {/* Accepted Breeds ------------------------------------------------- */}
+      {tab === 'animal' &&
       <Card className="p-0 overflow-hidden">
         <div className="p-5 border-b border-border">
           <h2 className="font-heading font-semibold text-lg text-text-primary">
@@ -259,9 +279,10 @@ export function Settings() {
           </ul>
         }
       </Card>
+      }
 
       {/* Traits — admin-managed trait definitions. */}
-      {isAdmin &&
+      {tab === 'animal' && isAdmin &&
       <Card className="p-0 overflow-hidden">
           <div className="p-5 border-b border-border flex items-start justify-between gap-3">
             <div>
@@ -343,7 +364,7 @@ export function Settings() {
       }
 
       {/* Saved Locations — admin-curated places for transport pickup/dropoff. */}
-      {isAdmin &&
+      {tab === 'locations' && isAdmin &&
       <Card className="p-0 overflow-hidden">
           <div className="p-5 border-b border-border flex items-start justify-between gap-3">
             <div>
@@ -424,10 +445,10 @@ export function Settings() {
       }
 
       {/* Adoption Profiles — admin-managed posting template. */}
-      {isAdmin && <AdoptionTemplateEditor />}
+      {tab === 'animal' && isAdmin && <AdoptionTemplateEditor />}
 
       {/* Member Permissions — grant non-admins specific management access. */}
-      {isAdmin &&
+      {tab === 'permissions' && isAdmin &&
       <Card className="p-0 overflow-hidden">
         <div className="p-5 border-b border-border">
           <h2 className="font-heading font-semibold text-lg text-text-primary">
@@ -453,6 +474,11 @@ export function Settings() {
             permissionType="MANAGE_EXTERNAL_LISTINGS"
             title="External Listings"
             description="Manage public adoption posts (Petfinder, the org site, social…)." />
+
+          <MemberPermissionManager
+            permissionType="MANAGE_SITES"
+            title="Rescue Sites"
+            description="Create and edit rescue sites — colonies, pickups, and trapping locations." />
 
         </div>
       </Card>

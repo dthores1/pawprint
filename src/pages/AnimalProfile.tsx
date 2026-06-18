@@ -5,8 +5,6 @@ import { useWhisker } from '../context/WhiskerContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { StatusBadge, PriorityBadge, AnimalFlags } from '../components/ui/Badge';
-import { SpeciesBadge } from '../components/ui/SpeciesBadge';
-import { Avatar } from '../components/ui/Avatar';
 import { AddMedicalModal } from '../components/animals/AddMedicalModal';
 import { AddNoteModal } from '../components/animals/AddNoteModal';
 import { ChangeStatusModal } from '../components/animals/ChangeStatusModal';
@@ -61,6 +59,7 @@ import { motion } from 'framer-motion';
 import { MedicalKitIcon } from '../components/ui/MedicalKitIcon';
 import { PawPrintIcon as PawPrintGlyph } from '../components/ui/PawPrintIcon';
 import { animalBreedLabel } from '../lib/breedsApi';
+import { litterLabel } from '../lib/litters';
 import { PROCEDURE_TYPE_LABELS } from '../lib/medicalOptions';
 import { speciesIconByName } from '../lib/speciesIcons';
 import {
@@ -91,6 +90,7 @@ export function AnimalProfile() {
     actionItems,
     photos,
     breeds,
+    litters,
     traits,
     animalTraits,
     sites,
@@ -217,6 +217,10 @@ export function AnimalProfile() {
   // Rescue Site this animal came from (drives the header "Origin" stat).
   const originSite = animal.site_id ?
   sites.find((s) => s.id === animal.site_id) :
+  null;
+  // The litter this animal belongs to (drives the header "Litter" stat).
+  const litter = animal.litter_id ?
+  litters.find((l) => l.id === animal.litter_id) :
   null;
   const animalAdoptions = adoptions.filter((a) => a.animal_id === animal.id);
   // At most one in-progress adoption per animal (terminal ones — completed,
@@ -890,6 +894,21 @@ export function AnimalProfile() {
 
                   <p className="font-medium text-text-primary">Up to date</p>
                   }
+                  </div>
+                </div>
+              }
+              {litter &&
+              <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 bg-primary/10 text-primary rounded-lg shrink-0">
+                    <PawPrintGlyph className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm text-text-secondary">Litter</p>
+                    <Link
+                    to={`/litters/${litter.id}`}
+                    className="font-medium text-primary hover:underline truncate block">
+                      {litterLabel(litter, breeds)}
+                    </Link>
                   </div>
                 </div>
               }

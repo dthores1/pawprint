@@ -4,6 +4,7 @@ import { useWhisker } from '../context/WhiskerContext';
 import { useAuth } from '../context/AuthContext';
 import { ArchiveConfirmDialog } from '../components/archive/ArchiveConfirmDialog';
 import { useCanArchive } from '../components/archive/useCanArchive';
+import { useCanManageMedical } from '../lib/useAnimalPermissions';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Avatar } from '../components/ui/Avatar';
@@ -122,6 +123,9 @@ export function ClinicProfile() {
     event ? { id: event.id } : null
   );
   const canArchiveSlotPerm = useCanArchive('clinic_slots', { id: 'na' });
+  // Clinic edits (edit details, complete, add animals, slot/procedure changes)
+  // require MANAGE_MEDICAL (admins included). Non-managers get a read-only view.
+  const canManageMedical = useCanManageMedical();
   const [archivingSlot, setArchivingSlot] = useState<
     {id: string;animalName: string;} | null>(
     null);
@@ -167,6 +171,7 @@ export function ClinicProfile() {
   // Any not-yet-finished clinic can be completed (including Planning — people
   // don't always advance the status). Walk-ins can be added during completion.
   const canComplete =
+  canManageMedical &&
   event.status !== 'completed' && event.status !== 'cancelled';
   // Once completed, the clinic is locked: no new reservations or inline slot/
   // procedure edits. Corrections happen on the generated medical records.
@@ -229,9 +234,11 @@ export function ClinicProfile() {
               Complete Clinic
             </Button>
           }
+          {canManageMedical &&
           <Button variant="soft" size="sm" onClick={() => setEditing(true)}>
             <Edit2Icon className="w-4 h-4 mr-2" /> Edit
           </Button>
+          }
           {canArchive &&
           <button
             type="button"
@@ -276,7 +283,17 @@ export function ClinicProfile() {
             <div className="space-y-3 pt-4 border-t border-border text-sm">
               <div className="flex items-start gap-3">
                 <MapPinIcon className="w-5 h-5 text-text-secondary shrink-0 mt-0.5" />
-                {event.location_address ?
+                {event.location_saved_location_id ?
+                // Saved location: show its friendly name, with the address below.
+                <div className="min-w-0">
+                    <p className="font-medium text-text-primary">{event.location}</p>
+                    {event.location_address &&
+                  <AddressDisplay
+                    value={event.location_address}
+                    className="text-text-secondary" />
+                  }
+                  </div> :
+                event.location_address ?
                 <AddressDisplay value={event.location_address} /> :
                 <span className="text-text-primary">{event.location}</span>
                 }
@@ -364,7 +381,7 @@ export function ClinicProfile() {
                   {filled} of {event.slot_capacity} filled
                 </span>
               </h2>
-              {!adding && !isCompleted && filled < event.slot_capacity &&
+              {canManageMedical && !adding && !isCompleted && filled < event.slot_capacity &&
               <Button size="sm" variant="outline" onClick={() => setAdding(true)}>
                   <PlusIcon className="w-4 h-4 mr-1" />
                   Add Animal
@@ -486,6 +503,7 @@ export function ClinicProfile() {
                         procedures={clinicSlotProcedures.filter(
                           (p) => p.clinic_slot_id === s.id
                         )}
+                        readOnly={!canManageMedical}
                         onToggle={(proc) =>
                         updateClinicSlotProcedure(proc.id, {
                           completed: !proc.completed
@@ -519,7 +537,7 @@ export function ClinicProfile() {
 
                       })()}
                       </div>
-                      {isCompleted ?
+                      {isCompleted || !canManageMedical ?
                     <span
                       className={cn(
                         'shrink-0 inline-flex items-center h-7 text-xs font-semibold px-2.5 rounded-full',

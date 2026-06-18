@@ -168,11 +168,11 @@ export function TransportsView() {
           key: 'claimed',
           label: `Claimed / In Progress (${grouped.claimed.length})`
         },
-        { key: 'completed', label: `Completed (${grouped.completed.length})` },
         {
           key: 'needsReview',
           label: `Needs Review (${grouped.needsReview.length})`
-        }]} />
+        },
+        { key: 'completed', label: `Completed (${grouped.completed.length})` }]} />
 
       {display.length === 0 ?
       <Card className="p-10 text-center text-text-secondary">

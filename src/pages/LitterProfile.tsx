@@ -14,7 +14,6 @@ import {
   ArrowLeftIcon,
   CalendarIcon,
   HeartIcon,
-  HomeIcon,
   PlusIcon,
   Edit2Icon,
   Trash2Icon } from

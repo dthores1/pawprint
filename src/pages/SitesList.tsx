@@ -6,11 +6,9 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { VirtualizedGrid } from '../components/ui/VirtualizedGrid';
 import { NewSiteModal } from '../components/sites/NewSiteModal';
-import { ManageSitesModal } from '../components/sites/ManageSitesModal';
 import {
   MapPinnedIcon,
   PlusIcon,
-  SettingsIcon,
   UserIcon,
   NavigationIcon } from
 'lucide-react';
@@ -18,7 +16,6 @@ import { cn } from '../lib/utils';
 import { Site } from '../types';
 import { SITE_STATUS_META } from '../lib/siteStatus';
 import { useCanManageSites } from '../lib/useSitePermissions';
-import { useIsAdmin } from '../lib/useIsAdmin';
 import { haversineMiles, formatDistance, useUserLocation } from '../lib/geo';
 
 type SitesTab = 'new' | 'nearby' | 'mine' | 'all';
@@ -32,14 +29,12 @@ export function SitesList() {
   const { sites, peopleIndex, siteVolunteers } = useWhisker();
   const { currentPersonId } = useAuth();
   const canManage = useCanManageSites();
-  const isAdmin = useIsAdmin();
   const { location } = useUserLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const param = searchParams.get('tab');
   const tab: SitesTab =
   param === 'nearby' || param === 'mine' || param === 'all' ? param : 'new';
   const [isNewOpen, setIsNewOpen] = useState(false);
-  const [isManageOpen, setIsManageOpen] = useState(false);
 
   const setTab = (next: SitesTab) =>
   setSearchParams(next === 'new' ? {} : { tab: next }, { replace: true });
@@ -158,15 +153,6 @@ export function SitesList() {
           </p>
         </div>
         <div className="flex gap-2">
-          {isAdmin &&
-          <Button
-            variant="soft"
-            className="gap-2"
-            onClick={() => setIsManageOpen(true)}>
-              <SettingsIcon className="w-4 h-4" />
-              Manage Sites
-            </Button>
-          }
           {canManage &&
           <Button onClick={() => setIsNewOpen(true)} className="gap-2">
               <PlusIcon className="w-4 h-4" />
@@ -226,9 +212,6 @@ export function SitesList() {
       }
 
       <NewSiteModal isOpen={isNewOpen} onClose={() => setIsNewOpen(false)} />
-      <ManageSitesModal
-        isOpen={isManageOpen}
-        onClose={() => setIsManageOpen(false)} />
     </div>);
 
 }

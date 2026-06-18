@@ -1002,6 +1002,9 @@ export interface ClinicEvent {
   location: string;
   /** Structured location from Google Places (see address.ts column mappers). */
   location_address?: AddressValue | null;
+  /** Optional link to the Saved Location this was picked from (friendly name).
+   *  `null` on update clears it (e.g. switching to a typed address). */
+  location_saved_location_id?: string | null;
   /** Vet performing procedures. Person with role 'vet' in `people`. */
   veterinarian_person_id?: string;
   /**
@@ -1063,6 +1066,7 @@ export type ArchiveTable =
 'animal_photos' |
 'animal_action_items' |
 'animal_relationships' |
+'animal_external_listings' |
 'people' |
 'medical_records' |
 'foster_placements' |

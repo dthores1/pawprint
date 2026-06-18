@@ -117,7 +117,7 @@ export function ClinicsView() {
         hour: 'numeric', minute: '2-digit'
       }) },
   { header: 'Location', value: (e) => e.location },
-  { header: 'Address', value: (e) => e.location_address },
+  { header: 'Address', value: (e) => e.location_address?.formatted ?? '' },
   { header: 'Veterinarian', value: (e) => vetNameFor(e) },
   { header: 'Status', value: (e) => EVENT_STATUS_LABEL[e.status] },
   { header: 'Slots Filled', value: (e) => filledFor(e) },

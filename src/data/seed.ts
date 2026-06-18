@@ -1216,7 +1216,7 @@ export const seedProducts: Product[] = [
 export const seedSupplyRequests: SupplyRequest[] = [
 {
   id: 'sr1',
-  requester_person_id: 'pe5', // Chloe (volunteer)
+  requester_person_id: 'p_dan', // demo user (so the requester actions show)
   requested_for_animal_id: 'a4', // Milkshake (critical kitten)
   status: 'submitted',
   priority: 'urgent',
@@ -1565,7 +1565,19 @@ export const seedClinicEvents: ClinicEvent[] = [
 {
   id: 'ce1',
   date_time: seedDateTime(4, 8, 0),
-  location: 'Stanton Spay/Neuter Clinic — 4205 NE Stanton, Portland OR',
+  // Picked from the "ACP Clinic" saved location (sl1): friendly name + address.
+  location: 'ACP Clinic',
+  location_saved_location_id: 'sl1',
+  location_address: {
+    formatted: '1200 Clinic Way, Portland, OR 97201',
+    street1: '1200 Clinic Way',
+    city: 'Portland',
+    state: 'OR',
+    postalCode: '97201',
+    country: 'US',
+    latitude: 45.5152,
+    longitude: -122.6784
+  },
   veterinarian_person_id: 'pe1', // Dr. Emily Smith
   contact_person_id: 'pe4', // Brian O'Connor, intake coordinator
   slot_capacity: 8,

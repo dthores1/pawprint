@@ -226,12 +226,91 @@ export function SupplyRequestDetailModal({
     });
   }
 
+  // The actionable workflow controls live in a sticky footer so they stay
+  // reachable while scrolling the fulfillment/history. `null` → no footer bar.
+  const footerActions: React.ReactNode = denyMode ?
+  <div className="space-y-2">
+      <Label htmlFor="deny_reason" required>Reason for denial</Label>
+      <Textarea
+      id="deny_reason"
+      value={denyReason}
+      onChange={(e) => setDenyReason(e.target.value)}
+      placeholder="Why is this request being denied?"
+      rows={2}
+      autoFocus />
+
+      <div className="flex justify-end gap-2">
+        <Button
+        size="sm"
+        variant="ghost"
+        onClick={() => {
+          setDenyMode(false);
+          setDenyReason('');
+        }}>
+
+          Back
+        </Button>
+        <Button
+        size="sm"
+        onClick={handleConfirmDeny}
+        disabled={!denyReason.trim()}
+        className="bg-[#9B3A3A] hover:bg-[#7d2e2e]">
+
+          <BanIcon className="w-4 h-4 mr-1.5" /> Confirm Deny
+        </Button>
+      </div>
+    </div> :
+  request.status === 'submitted' && canManage ?
+  <div className="flex flex-wrap justify-end gap-2">
+      {!isRequester &&
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => setDenyMode(true)}
+      className="text-text-secondary hover:text-[#9B3A3A]">
+
+        <BanIcon className="w-4 h-4 mr-1.5" /> Deny Request
+      </Button>
+    }
+      <Button size="sm" onClick={() => handleSetStatus('in_progress')}>
+        Start Processing
+      </Button>
+    </div> :
+  request.status === 'in_progress' && canManage ?
+  <div className="flex flex-wrap justify-end gap-2">
+      {!isRequester &&
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => setDenyMode(true)}
+      className="text-text-secondary hover:text-[#9B3A3A]">
+
+        <BanIcon className="w-4 h-4 mr-1.5" /> Deny Request
+      </Button>
+    }
+      <Button size="sm" onClick={() => handleSetStatus('fulfilled')}>
+        <CheckIcon className="w-4 h-4 mr-1.5" /> Mark Fulfilled
+      </Button>
+    </div> :
+  request.status === 'fulfilled' && canManage ?
+  <div className="flex justify-end">
+      <Button
+      size="sm"
+      variant="soft"
+      onClick={() => handleSetStatus('in_progress')}>
+
+        <RotateCcwIcon className="w-4 h-4 mr-1.5" /> Reopen
+      </Button>
+    </div> :
+  null;
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
       title="Request Details"
-      className="max-w-2xl">
+      className="max-w-2xl"
+      footer={footerActions}>
 
       <div className="space-y-6">
         {/* Header: requester + status pill */}
@@ -282,6 +361,19 @@ export function SupplyRequestDetailModal({
 
               {STATUS_LABELS[request.status]}
             </span>
+            {/* The requester can withdraw while it's still early — kept next to
+                the status so the relationship is clear. */}
+            {isRequester &&
+            (request.status === 'submitted' ||
+            request.status === 'in_progress') &&
+            <button
+              type="button"
+              onClick={() => handleSetStatus('cancelled')}
+              className="text-sm font-medium text-text-secondary hover:text-[#9B3A3A] hover:underline transition-colors">
+
+                Cancel Request
+              </button>
+            }
             {request.priority !== 'normal' &&
             <span
               className={cn(
@@ -308,142 +400,37 @@ export function SupplyRequestDetailModal({
           </div>
         </div>
 
-        {/* Primary actions — contextual to the current status + who's viewing */}
-        {denyMode ?
-        <div className="space-y-2">
-            <Label htmlFor="deny_reason" required>Reason for denial</Label>
-            <Textarea
-            id="deny_reason"
-            value={denyReason}
-            onChange={(e) => setDenyReason(e.target.value)}
-            placeholder="Why is this request being denied?"
-            rows={2}
-            autoFocus />
-
-            <div className="flex flex-wrap gap-2">
-              <Button
-              size="sm"
-              onClick={handleConfirmDeny}
-              disabled={!denyReason.trim()}
-              className="bg-[#9B3A3A] hover:bg-[#7d2e2e]">
-
-                <BanIcon className="w-4 h-4 mr-1.5" /> Confirm Deny
-              </Button>
-              <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setDenyMode(false);
-                setDenyReason('');
-              }}>
-
-                Back
-              </Button>
-            </div>
-          </div> :
-
-        <>
-            {request.status === 'submitted' &&
-          <div className="flex flex-wrap gap-2">
-                {canManage &&
-            <Button size="sm" onClick={() => handleSetStatus('in_progress')}>
-                    Start Processing
-                  </Button>
-            }
-                {isRequester &&
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleSetStatus('cancelled')}
-              className="text-text-secondary hover:text-[#9B3A3A]">
-
-                    Cancel Request
-                  </Button>
-            }
-                {canManage && !isRequester &&
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setDenyMode(true)}
-              className="text-text-secondary hover:text-[#9B3A3A]">
-
-                    <BanIcon className="w-4 h-4 mr-1.5" /> Deny Request
-                  </Button>
-            }
-              </div>
-          }
-            {request.status === 'in_progress' &&
-          <div className="flex flex-wrap gap-2">
-                {canManage &&
-            <Button size="sm" onClick={() => handleSetStatus('fulfilled')}>
-                    <CheckIcon className="w-4 h-4 mr-1.5" /> Mark Fulfilled
-                  </Button>
-            }
-                {isRequester &&
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleSetStatus('cancelled')}
-              className="text-text-secondary hover:text-[#9B3A3A]">
-
-                    Cancel Request
-                  </Button>
-            }
-                {canManage && !isRequester &&
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setDenyMode(true)}
-              className="text-text-secondary hover:text-[#9B3A3A]">
-
-                    <BanIcon className="w-4 h-4 mr-1.5" /> Deny Request
-                  </Button>
-            }
-              </div>
-          }
-            {request.status === 'fulfilled' && canManage &&
-          <div>
-                <Button
-              size="sm"
-              variant="soft"
-              onClick={() => handleSetStatus('in_progress')}>
-
-                  <RotateCcwIcon className="w-4 h-4 mr-1.5" /> Reopen
-                </Button>
-              </div>
-          }
-            {!canManage &&
-          !isRequester && (
-          request.status === 'submitted' ||
-          request.status === 'in_progress') &&
-          <p className="text-sm text-text-secondary flex items-center gap-1.5">
-                <BanIcon className="w-4 h-4 shrink-0 text-text-secondary/60" />
-                Only fulfillment members can process this request.
+        {/* Status context (actions themselves live in the sticky footer). */}
+        {!canManage &&
+        !isRequester && (
+        request.status === 'submitted' ||
+        request.status === 'in_progress') &&
+        <p className="text-sm text-text-secondary flex items-center gap-1.5">
+            <BanIcon className="w-4 h-4 shrink-0 text-text-secondary/60" />
+            Only fulfillment members can process this request.
+          </p>
+        }
+        {request.status === 'cancelled' &&
+        <div className="flex items-center gap-2 text-[#9B3A3A] bg-[#F5D7D7]/60 p-3 rounded-lg text-sm">
+            <XCircleIcon className="w-4 h-4 shrink-0" />
+            <span>This request was cancelled.</span>
+          </div>
+        }
+        {request.status === 'denied' &&
+        <div className="flex items-start gap-2 text-[#9B3A3A] bg-[#F5D7D7]/60 p-3 rounded-lg text-sm">
+            <BanIcon className="w-4 h-4 shrink-0 mt-0.5" />
+            <div className="min-w-0">
+              <p className="font-medium">
+                Denied
+                {approver ? ` by ${approver.first_name} ${approver.last_name}` : ''}
               </p>
+              {request.denial_reason &&
+          <p className="text-[#9B3A3A]/80 mt-0.5 whitespace-pre-line">
+                  {request.denial_reason}
+                </p>
           }
-            {request.status === 'cancelled' &&
-          <div className="flex items-center gap-2 text-[#9B3A3A] bg-[#F5D7D7]/60 p-3 rounded-lg text-sm">
-                <XCircleIcon className="w-4 h-4 shrink-0" />
-                <span>This request was cancelled.</span>
-              </div>
-          }
-            {request.status === 'denied' &&
-          <div className="flex items-start gap-2 text-[#9B3A3A] bg-[#F5D7D7]/60 p-3 rounded-lg text-sm">
-                <BanIcon className="w-4 h-4 shrink-0 mt-0.5" />
-                <div className="min-w-0">
-                  <p className="font-medium">
-                    Denied
-                    {approver ? ` by ${approver.first_name} ${approver.last_name}` : ''}
-                  </p>
-                  {request.denial_reason &&
-              <p className="text-[#9B3A3A]/80 mt-0.5 whitespace-pre-line">
-                      {request.denial_reason}
-                    </p>
-              }
-                </div>
-              </div>
-          }
-          </>
+            </div>
+          </div>
         }
 
         {/* Requested items */}

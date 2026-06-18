@@ -8,6 +8,7 @@ export function rowToClinicEvent(r: any): ClinicEvent {
     date_time: r.date_time,
     location: r.location ?? '',
     location_address: addressFromColumns(r, 'location', r.location),
+    location_saved_location_id: r.location_saved_location_id ?? undefined,
     veterinarian_person_id: r.veterinarian_person_id ?? undefined,
     contact_person_id: r.contact_person_id ?? undefined,
     slot_capacity: r.slot_capacity ?? 0,
@@ -24,6 +25,7 @@ export function rowToClinicEvent(r: any): ClinicEvent {
 const CLINIC_EVENT_COLUMNS = [
 'date_time',
 'location',
+'location_saved_location_id',
 'veterinarian_person_id',
 'contact_person_id',
 'slot_capacity',

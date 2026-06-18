@@ -17,6 +17,9 @@ interface Props {
   onChange: (value: AddressValue | null, savedLocationId?: string) => void;
   error?: boolean;
   placeholder?: string;
+  /** Hint shown when the value is free-text only (no saved location / address).
+   *  Defaults to the transport "Needs address" wording. */
+  freeTextHint?: string;
 }
 
 // Pickup/dropoff entry. Keeps the address picker primary; a tiny link below
@@ -31,7 +34,8 @@ export function LocationPicker({
   onModeChange,
   onChange,
   error,
-  placeholder
+  placeholder,
+  freeTextHint = 'No exact address yet — this request will be flagged “Needs address.”'
 }: Props) {
   const { savedLocations } = useWhisker();
   const active = savedLocations.filter((l) => l.active);
@@ -114,7 +118,7 @@ export function LocationPicker({
       {freeText &&
       <p className="flex items-start gap-1.5 text-xs text-[#A36B00]">
           <AlertTriangleIcon className="w-3.5 h-3.5 shrink-0 mt-px" />
-          No exact address yet — this request will be flagged “Needs address.”
+          {freeTextHint}
         </p>
       }
       {hasSaved &&

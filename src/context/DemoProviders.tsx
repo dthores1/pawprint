@@ -853,7 +853,6 @@ export function DemoWhiskerProvider({
       });
     },
 
-    adoptionTemplates,
     generateAdoptionProfile: async (
     animalId: string,
     guidance?: string,
