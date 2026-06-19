@@ -10,8 +10,7 @@ import {
   AlertCircleIcon,
   RepeatIcon,
   Trash2Icon,
-  BookmarkIcon,
-  PackageIcon } from
+  BookmarkIcon } from
 'lucide-react';
 import { formatDate, cn, animalDisplayName } from '../../lib/utils';
 import { useAuth } from '../../context/AuthContext';
@@ -281,9 +280,9 @@ export function SupplyRequestsView() {
                 onClick={() => setSelectedRequestId(request.id)}>
 
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-center gap-6 flex-1">
+                    <div className="flex items-center gap-6 flex-1 min-w-0">
                       {/* Requester */}
-                      <div className="flex items-center gap-3 min-w-[200px]">
+                      <div className="flex items-center gap-3 md:min-w-[200px] min-w-0 flex-1 md:flex-none">
                         <Avatar
                         src={requester?.photo_url}
                         type="person"
@@ -293,39 +292,38 @@ export function SupplyRequestsView() {
                         undefined
                         }
                         tone="peach"
-                        className="w-12 h-12 text-[15px]" />
+                        className="w-12 h-12 text-[15px] shrink-0" />
 
-                        <p className="font-medium text-text-primary group-hover:text-primary transition-colors">
-                          {requester?.first_name} {requester?.last_name}
-                        </p>
+                        <div className="min-w-0">
+                          <p className="font-medium text-text-primary group-hover:text-primary transition-colors truncate">
+                            {requester?.first_name} {requester?.last_name}
+                          </p>
+                          {/* On phones the item + animal columns are hidden, so
+                              surface the items and date right under the name. */}
+                          <p className="sm:hidden text-sm text-text-secondary truncate mt-0.5">
+                            {itemSummary || 'No items'}
+                          </p>
+                          <p className="sm:hidden text-xs text-text-secondary/80 mt-0.5">
+                            {formatDate(request.requested_date)}
+                          </p>
+                        </div>
                       </div>
 
-                      {/* Animal — show animal or "no animal" placeholder */}
+                      {/* Animal — only when one is attached. */}
+                      {animal &&
                       <div className="hidden sm:flex items-center gap-3 min-w-[200px] border-l border-border/60 pl-6">
-                        {animal ?
-                      <>
-                            <Avatar
+                          <Avatar
                           src={animal.primary_photo_url}
                           type="animal"
                           name={animal.name ?? undefined}
                           species={animal.species}
                           className="w-12 h-12 text-[15px]" />
 
-                            <p className="font-medium text-text-primary">
-                              {animalDisplayName(animal)}
-                            </p>
-                          </> :
-
-                      <>
-                            <div className="w-12 h-12 rounded-full bg-background flex items-center justify-center shrink-0">
-                              <PackageIcon className="w-5 h-5 text-text-secondary/50" />
-                            </div>
-                            <p className="text-sm text-text-secondary italic">
-                              General supplies
-                            </p>
-                          </>
+                          <p className="font-medium text-text-primary">
+                            {animalDisplayName(animal)}
+                          </p>
+                        </div>
                       }
-                      </div>
                     </div>
 
                     {/* Items Summary */}

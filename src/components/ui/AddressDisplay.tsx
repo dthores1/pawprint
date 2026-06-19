@@ -34,8 +34,11 @@ export function AddressDisplay({ value, className, singleLine }: Props) {
   const fallbackLine2 =
   commaIdx === -1 ? '' : value.formatted.slice(commaIdx + 1).trim();
 
+  // Single-line truncation has to clip on the element itself — a `truncate`
+  // class on an inner inline span can't constrain its width, so the nowrap text
+  // overflows its flex slot and paints over the next item.
   const body = singleLine ?
-  <span className="truncate">{value.formatted}</span> :
+  value.formatted :
   hasStructured ?
   <span className="leading-snug">
       {line1 && <span className="block">{line1}</span>}
@@ -47,8 +50,14 @@ export function AddressDisplay({ value, className, singleLine }: Props) {
       {fallbackLine2 && <span className="block">{fallbackLine2}</span>}
     </span>;
 
+  const singleLineCls = singleLine ? 'block truncate min-w-0' : undefined;
+
   if (!href) {
-    return <span className={cn('text-text-primary', className)}>{body}</span>;
+    return (
+      <span className={cn('text-text-primary', singleLineCls, className)}>
+        {body}
+      </span>);
+
   }
   return (
     <a
@@ -56,7 +65,7 @@ export function AddressDisplay({ value, className, singleLine }: Props) {
       target="_blank"
       rel="noopener noreferrer"
       title="Open in Google Maps"
-      className={cn('text-primary hover:underline', className)}>
+      className={cn('text-primary hover:underline', singleLineCls, className)}>
 
       {body}
     </a>);

@@ -35,7 +35,14 @@ export function AppShell() {
 
         {/* Mobile Nav Dropdown */}
         {mobileMenuOpen &&
-        <div className="md:hidden bg-card border-b border-border px-4 py-2 absolute top-16 left-0 right-0 z-40 shadow-soft max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain">
+        <>
+          {/* Backdrop — tapping outside the menu closes it. */}
+          <div
+            className="md:hidden fixed inset-0 top-16 z-30"
+            aria-hidden="true"
+            onClick={() => setMobileMenuOpen(false)} />
+
+          <div className="md:hidden bg-card border-b border-border px-4 py-2 absolute top-16 left-0 right-0 z-40 shadow-soft max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain">
           <nav className="space-y-1 pb-2">
             {navItems.map((item) =>
           <NavLink
@@ -107,6 +114,7 @@ export function AppShell() {
             }
           </div>
           </div>
+        </>
         }
 
         {/* Main Content Area */}

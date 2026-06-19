@@ -348,24 +348,30 @@ function TransportCard({
               </span>
             }
           </div>
-          <p className="text-sm text-text-secondary mt-1 flex items-center gap-1.5 min-w-0">
-            <MapPinIcon className="w-3.5 h-3.5 shrink-0" />
-            {pickupLabel ?
-            <span className="text-text-primary truncate min-w-0">{pickupLabel}</span> :
-            <AddressDisplay
-              value={request.pickup_address ?? null}
-              singleLine
-              className="text-text-primary min-w-0" />
-            }
-            <ArrowRightIcon className="w-3.5 h-3.5 shrink-0" />
-            {dropoffLabel ?
-            <span className="text-text-primary truncate min-w-0">{dropoffLabel}</span> :
-            <AddressDisplay
-              value={request.dropoff_address ?? null}
-              singleLine
-              className="text-text-primary min-w-0" />
-            }
-          </p>
+          {/* Pickup → dropoff. Inline on sm+, stacked on phones so the two
+              addresses never collide. Each leg gets its own truncating slot. */}
+          <div className="text-sm text-text-secondary mt-1 flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-1.5 min-w-0">
+            <span className="flex items-center gap-1.5 min-w-0 max-w-full">
+              <MapPinIcon className="w-3.5 h-3.5 shrink-0" />
+              {pickupLabel ?
+              <span className="text-text-primary truncate min-w-0">{pickupLabel}</span> :
+              <AddressDisplay
+                value={request.pickup_address ?? null}
+                singleLine
+                className="text-text-primary min-w-0" />
+              }
+            </span>
+            <span className="flex items-center gap-1.5 min-w-0 max-w-full">
+              <ArrowRightIcon className="w-3.5 h-3.5 shrink-0" />
+              {dropoffLabel ?
+              <span className="text-text-primary truncate min-w-0">{dropoffLabel}</span> :
+              <AddressDisplay
+                value={request.dropoff_address ?? null}
+                singleLine
+                className="text-text-primary min-w-0" />
+              }
+            </span>
+          </div>
           <div className="mt-2 flex items-center gap-x-3 gap-y-1.5 flex-wrap text-sm text-text-secondary">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-background border border-border text-xs font-medium text-text-primary">
               <CalendarIcon className="w-3.5 h-3.5 text-text-secondary shrink-0" />

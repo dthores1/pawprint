@@ -50,7 +50,9 @@ export function AddProductModal({ isOpen, onClose, product }: Props) {
     setNameError(undefined);
   }, [isOpen, product]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       setNameError('Name is required.');
@@ -64,13 +66,23 @@ export function AddProductModal({ isOpen, onClose, product }: Props) {
         default_unit: unit,
         active
       });
-    } else {
-      addProduct({
-        name: name.trim(),
-        category,
-        default_unit: unit,
-        active
-      });
+      onClose();
+      return;
+    }
+    // New product: await the insert so a duplicate-name rejection shows inline
+    // instead of silently closing.
+    setSubmitting(true);
+    const error = await addProduct({
+      name: name.trim(),
+      category,
+      default_unit: unit,
+      active
+    });
+    setSubmitting(false);
+    if (error) {
+      setNameError(error);
+      requestAnimationFrame(() => focusFirstError(['product_name']));
+      return;
     }
     onClose();
   };
@@ -85,8 +97,8 @@ export function AddProductModal({ isOpen, onClose, product }: Props) {
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" form="product-form">
-            {editing ? 'Save Changes' : 'Add Product'}
+          <Button type="submit" form="product-form" disabled={submitting}>
+            {editing ? 'Save Changes' : submitting ? 'Adding…' : 'Add Product'}
           </Button>
         </div>
       }>

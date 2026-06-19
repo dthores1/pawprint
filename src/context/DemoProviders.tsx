@@ -1032,11 +1032,21 @@ export function DemoWhiskerProvider({
       });
     },
 
-    addProduct: (product) =>
-    setProducts((prev) => [
-    { ...product, id: `prod${generateId()}` },
-    ...prev]
-    ),
+    addProduct: async (product) => {
+      // Mirror the server's (org, lower(name)) uniqueness guard.
+      if (
+      products.some(
+        (p) => p.name.trim().toLowerCase() === product.name.trim().toLowerCase()
+      ))
+      {
+        return 'A product with this name already exists.';
+      }
+      setProducts((prev) => [
+      { ...product, id: `prod${generateId()}` },
+      ...prev]
+      );
+      return null;
+    },
     updateProduct: (id, updates) =>
     setProducts((prev) =>
     prev.map((p) => p.id === id ? { ...p, ...updates } : p)

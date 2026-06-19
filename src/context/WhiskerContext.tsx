@@ -284,7 +284,7 @@ export interface WhiskerContextType {
   => void;
   updateSavedLocation: (id: string, updates: Partial<SavedLocation>) => void;
   products: Product[];
-  addProduct: (product: Omit<Product, 'id'>) => void;
+  addProduct: (product: Omit<Product, 'id'>) => Promise<string | null>;
   updateProduct: (id: string, updates: Partial<Product>) => void;
   supplyRequests: SupplyRequest[];
   supplyRequestItems: SupplyRequestItem[];
@@ -2872,10 +2872,14 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       current_foster_id: new_person_id
     });
   };
-  const addProduct = async (product: Omit<Product, 'id'>) => {
+  // Returns an error message string on failure, or null on success — so the
+  // Add Product form can show "already exists" inline instead of failing
+  // silently against the (organization_id, lower(name)) unique index.
+  const addProduct = async (
+  product: Omit<Product, 'id'>): Promise<string | null> => {
     if (!orgId) {
       console.error('[products] cannot create — no current organization');
-      return;
+      return 'No organization selected.';
     }
     const { data, error } = await supabase.
     from('products').
@@ -2884,9 +2888,12 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     single();
     if (error) {
       console.error('[products] create failed:', error.message);
-      return;
+      return error.code === '23505' ?
+      'A product with this name already exists.' :
+      'Could not add product. Please try again.';
     }
     if (data) setProducts((prev) => [rowToProduct(data), ...prev]);
+    return null;
   };
   const updateProduct = (id: string, updates: Partial<Product>) => {
     setProducts((prev) =>
