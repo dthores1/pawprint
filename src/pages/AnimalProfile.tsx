@@ -16,6 +16,8 @@ import { AdoptionPanel } from '../components/animals/AdoptionPanel';
 import { ActionNeededCallout } from '../components/animals/ActionNeededCallout';
 import { RelationshipsCard } from '../components/animals/RelationshipsCard';
 import { ExternalListingsCard } from '../components/animals/ExternalListingsCard';
+import { ScrollableTabs } from '../components/ui/ScrollableTabs';
+import { FilesList, AttachedFilesCard } from '../components/animals/FilesList';
 import { SummaryTab } from '../components/animals/SummaryTab';
 import { AdoptionProfileTab } from '../components/animals/AdoptionProfileTab';
 import { PhotoGallery } from '../components/animals/PhotoGallery';
@@ -50,7 +52,8 @@ import {
   MapPinnedIcon,
   CheckIcon,
   SparklesIcon,
-  MegaphoneIcon } from
+  MegaphoneIcon,
+  FolderIcon } from
 'lucide-react';
 import { format } from 'date-fns';
 import { ArchiveConfirmDialog } from '../components/archive/ArchiveConfirmDialog';
@@ -89,6 +92,7 @@ export function AnimalProfile() {
     notes,
     actionItems,
     photos,
+    animalFiles,
     breeds,
     litters,
     traits,
@@ -124,8 +128,9 @@ export function AnimalProfile() {
   const [isStartAdoptionOpen, setIsStartAdoptionOpen] = useState(false);
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
   const [isAddPhotoOpen, setIsAddPhotoOpen] = useState(false);
+  const [isAddFileOpen, setIsAddFileOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<
-    'summary' | 'timeline' | 'medical' | 'photos' | 'adoption'>(
+    'summary' | 'timeline' | 'medical' | 'photos' | 'files' | 'adoption'>(
     'summary'
   );
   const [archivingNote, setArchivingNote] = useState<
@@ -248,6 +253,9 @@ export function AnimalProfile() {
   const animalPhotosCount = photos.filter(
     (p) => p.animal_id === animal.id
   ).length;
+  const animalFilesList = animalFiles.filter((f) => f.animal_id === animal.id);
+  const animalFilesCount = animalFilesList.length;
+  const medicalFiles = animalFilesList.filter((f) => f.category === 'medical_record');
   // Build Timeline
   type TimelineEvent = {
     id: string;
@@ -942,26 +950,33 @@ export function AnimalProfile() {
         {/* Left Column: Tabs (Timeline / Medical History) */}
         <div className="lg:col-span-2 space-y-5">
           <div className="space-y-3">
-            {/* Tabs — own row; scroll horizontally on narrow widths rather than
-                pushing the per-tab action off the card. */}
-            <div className="overflow-x-auto -mx-1 px-1">
-            <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-card border border-border shadow-soft self-start">
+            {/* Tabs — own row; scroll horizontally on narrow widths (hidden
+                scrollbar + edge fades + active-tab auto-scroll via
+                ScrollableTabs) rather than wrapping or pushing the per-tab
+                action off the card. */}
+            <ScrollableTabs
+              activeKey={activeTab}
+              className="rounded-xl bg-card border border-border shadow-soft">
+              <div className="inline-flex items-center gap-1 p-1">
               <button
+                data-tabkey="summary"
                 onClick={() => setActiveTab('summary')}
                 className={`flex items-center gap-2 px-3 h-9 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'summary' ? 'bg-primary/10 text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-background'}`}>
 
                 <SparklesIcon className="w-4 h-4" /> Summary
               </button>
               <button
+                data-tabkey="timeline"
                 onClick={() => setActiveTab('timeline')}
                 className={`flex items-center gap-2 px-3 h-9 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'timeline' ? 'bg-primary/10 text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-background'}`}>
-                
+
                 <ActivityIcon className="w-4 h-4" /> Timeline
               </button>
               <button
+                data-tabkey="medical"
                 onClick={() => setActiveTab('medical')}
                 className={`flex items-center gap-2 px-3 h-9 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'medical' ? 'bg-primary/10 text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-background'}`}>
-                
+
                 <MedicalKitIcon className="w-4 h-4" /> Medical Records
                 {animalMedical.length > 0 &&
                 <span className="text-xs px-1.5 py-0.5 rounded-full bg-background text-text-secondary font-semibold">
@@ -970,9 +985,10 @@ export function AnimalProfile() {
                 }
               </button>
               <button
+                data-tabkey="photos"
                 onClick={() => setActiveTab('photos')}
                 className={`flex items-center gap-2 px-3 h-9 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'photos' ? 'bg-primary/10 text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-background'}`}>
-                
+
                 <ImageIcon className="w-4 h-4" /> Photos
                 {animalPhotosCount > 0 &&
                 <span className="text-xs px-1.5 py-0.5 rounded-full bg-background text-text-secondary font-semibold">
@@ -981,13 +997,26 @@ export function AnimalProfile() {
                 }
               </button>
               <button
+                data-tabkey="files"
+                onClick={() => setActiveTab('files')}
+                className={`flex items-center gap-2 px-3 h-9 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'files' ? 'bg-primary/10 text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-background'}`}>
+
+                <FolderIcon className="w-4 h-4" /> Files
+                {animalFilesCount > 0 &&
+                <span className="text-xs px-1.5 py-0.5 rounded-full bg-background text-text-secondary font-semibold">
+                    {animalFilesCount}
+                  </span>
+                }
+              </button>
+              <button
+                data-tabkey="adoption"
                 onClick={() => setActiveTab('adoption')}
                 className={`flex items-center gap-2 px-3 h-9 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'adoption' ? 'bg-primary/10 text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-background'}`}>
 
                 <MegaphoneIcon className="w-4 h-4" /> Adoption Profile
               </button>
-            </div>
-            </div>
+              </div>
+            </ScrollableTabs>
 
             {/* The Add button matches the active tab: each surface owns its
                 own primary action so there's no cross-tab clutter. Sits on its
@@ -1019,6 +1048,15 @@ export function AnimalProfile() {
                 onClick={() => setIsAddPhotoOpen(true)}>
 
                   <ImageIcon className="w-4 h-4 mr-2" /> Add Photo
+                </Button>
+              }
+              {activeTab === 'files' && canCollaborate &&
+              <Button
+                variant="soft"
+                size="sm"
+                onClick={() => setIsAddFileOpen(true)}>
+
+                  <FolderIcon className="w-4 h-4 mr-2" /> Add File
                 </Button>
               }
             </div>
@@ -1163,19 +1201,25 @@ export function AnimalProfile() {
           }
 
           {activeTab === 'medical' &&
-          <MedicalHistoryView
-            records={animalMedical}
-            canManage={canManageMedical}
-            onArchive={(r) =>
-            setArchivingMedical({ id: r.id, preview: r.procedure_name })
-            }
-            onEdit={(r) => setEditingMedical(r)}
-            onComplete={(r) =>
-            updateMedicalRecord(r.id, {
-              status: 'completed',
-              performed_date: format(new Date(), 'yyyy-MM-dd')
-            })
-            } />
+          <div className="space-y-5">
+            <MedicalHistoryView
+              records={animalMedical}
+              canManage={canManageMedical}
+              onArchive={(r) =>
+              setArchivingMedical({ id: r.id, preview: r.procedure_name })
+              }
+              onEdit={(r) => setEditingMedical(r)}
+              onComplete={(r) =>
+              updateMedicalRecord(r.id, {
+                status: 'completed',
+                performed_date: format(new Date(), 'yyyy-MM-dd')
+              })
+              } />
+
+            {/* Master file list lives in the Files tab; surface only the
+                medical-categorized ones here for convenience. */}
+            <AttachedFilesCard files={medicalFiles} title="Attached medical files" />
+          </div>
           }
 
           {activeTab === 'photos' &&
@@ -1184,6 +1228,14 @@ export function AnimalProfile() {
             canManage={canCollaborate}
             isAddOpen={isAddPhotoOpen}
             onAddOpenChange={setIsAddPhotoOpen} />
+          }
+
+          {activeTab === 'files' &&
+          <FilesList
+            animalId={animal.id}
+            canManage={canCollaborate}
+            isAddOpen={isAddFileOpen}
+            onAddOpenChange={setIsAddFileOpen} />
           }
 
           {activeTab === 'adoption' &&

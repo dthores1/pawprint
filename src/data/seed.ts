@@ -17,6 +17,7 @@ import {
   OrgMember,
   MemberPermission,
   AnimalPhoto,
+  AnimalFile,
   Person,
   PersonRole,
   Product,
@@ -928,6 +929,33 @@ export const seedPhotos: AnimalPhoto[] = [
   category: 'adoption_listing',
   caption: 'Going-home day with her new family!',
   uploaded_at: '2023-10-30T14:00:00Z'
+}];
+
+// Document attachments (demo). No real storage in demo mode — View/Download
+// fall back to a sample PDF; uploaded-in-session files use object URLs.
+export const seedAnimalFiles: AnimalFile[] = [
+{
+  id: 'af1',
+  animal_id: 'a2',
+  file_name: 'Spay certificate.pdf',
+  file_type: 'application/pdf',
+  file_size: 184320,
+  storage_path: 'demo/af1',
+  category: 'medical_record',
+  uploaded_by_user_id: 'demo-user',
+  created_at: '2026-06-18T16:20:00Z'
+},
+{
+  id: 'af2',
+  animal_id: 'a2',
+  file_name: 'Adoption application - Smith.pdf',
+  file_type: 'application/pdf',
+  file_size: 256000,
+  storage_path: 'demo/af2',
+  category: 'adoption_application',
+  notes: 'Submitted via website.',
+  uploaded_by_user_id: 'demo-user',
+  created_at: '2026-06-19T11:05:00Z'
 }];
 
 

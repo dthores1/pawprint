@@ -223,6 +223,33 @@ export interface AnimalPhoto {
   uploaded_at: string;
 }
 
+// Document attachments on an animal (PDFs, forms, records, legacy exports).
+// Stored in the PRIVATE `animal-files` bucket; the app serves bytes via
+// short-lived signed URLs (no public URL).
+export type AnimalFileCategory =
+'medical_record' |
+'adoption_application' |
+'legacy_export' |
+'intake_document' |
+'other';
+
+export interface AnimalFile {
+  id: string;
+  animal_id: string;
+  file_name: string;
+  /** MIME type, e.g. 'application/pdf'. */
+  file_type?: string;
+  /** Size in bytes. */
+  file_size?: number;
+  /** Path within the private `animal-files` bucket; used for signed URLs + delete. */
+  storage_path: string;
+  category: AnimalFileCategory;
+  notes?: string;
+  /** Auth user id who uploaded it (resolved to a name via peopleIndex). */
+  uploaded_by_user_id?: string;
+  created_at: string;
+}
+
 // Where an animal is posted online for adoption. Replaces the old single
 // `adoption_profile_url` field — orgs often post the same animal to several
 // platforms. Groundwork for future automated syncing (Petfinder, etc.).

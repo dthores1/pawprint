@@ -208,6 +208,13 @@ Animals can carry many photos (`AnimalPhoto` records) categorized by `PhotoCateg
 
 `primary_photo_url` on `Animal` remains the single "featured" photo used in lists and the profile hero — intentionally separate from the gallery.
 
+### Files (documents)
+Animals also carry document attachments (`AnimalFile`) — spay certificates, adoption applications, intake paperwork, legacy-system exports, etc. The Animal Profile has a **Files** tab (between Photos and Adoption Profile) listing each file with a type icon, name, `"<Category> · Uploaded <date> by <name>"`, and `[View] [Download] [Delete]`. Categories: `medical_record | adoption_application | intake_document | legacy_export | other`.
+
+Unlike the **public** `animal-photos` bucket, files live in a **private** `animal-files` bucket (migration `0071`): documents can contain PII, so reads are gated by org membership (`storage.objects` SELECT policy scoped to `is_org_member(path[1])`), and the app never stores a public URL — View/Download mint short-lived **signed URLs** on click (`getAnimalFileUrl` → `createSignedUrl(path, 60)`, with a `download` option to force an attachment). Path convention matches photos: `<org>/<animal>/<uuid>.<ext>`. Accepted: PDFs, images, Word/Excel/CSV/text, ≤ 25 MB (client-validated + a bucket `file_size_limit` backstop). Delete is a **hard delete** (row + storage object) — files aren't in the recycle-bin/archive system (v1).
+
+Files categorized `medical_record` are **also surfaced read-only** under the Medical Records tab (`AttachedFilesCard`), but the master list stays in Files. Uploaded files are **not** fed into AI summaries.
+
 ### Adoption listing
 When an animal's `status` is `adoptable`, the `AdoptionProfileCard` appears in the right sidebar with the external `adoption_profile_url` (Petfinder, Adopt-a-Pet, or the org's own site) plus Open / Copy / Edit actions. If status is adoptable but no URL is set, the card prompts to add one — same forcing-function pattern as Action Needed. The card is hidden entirely for non-adoptable statuses.
 

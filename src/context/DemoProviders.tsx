@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { AuthContext, AuthContextType, Org } from './AuthContext';
 import { WhiskerContext, WhiskerContextType } from './WhiskerContext';
 import {
@@ -13,6 +13,7 @@ import {
   MemberPermission,
   OrgMember,
   AnimalPhoto,
+  AnimalFile,
   Person,
   PersonRole,
   Product,
@@ -33,6 +34,7 @@ import {
   NotificationItem } from
 '../types';
 import { NewPhotoInput } from '../lib/photosApi';
+import { NewFileInput } from '../lib/filesApi';
 import { legacyRoleFor } from '../lib/peopleApi';
 import {
   seedAnimals,
@@ -52,6 +54,7 @@ import {
   seedOrgMembers,
   seedMemberPermissions,
   seedPhotos,
+  seedAnimalFiles,
   seedPeople,
   seedProducts,
   seedSupplyRequests,
@@ -260,6 +263,10 @@ export function DemoWhiskerProvider({
     seedMemberPermissions
   );
   const [photos, setPhotos] = useState<AnimalPhoto[]>(seedPhotos);
+  const [animalFiles, setAnimalFiles] = useState<AnimalFile[]>(seedAnimalFiles);
+  // Demo has no real storage; remember object URLs for uploaded files so View/
+  // Download work in-session. Seeded files fall back to a sample PDF.
+  const demoFileUrls = useRef<Map<string, string>>(new Map());
   const [litters, setLitters] = useState<Litter[]>(seedLitters);
   const [adoptions, setAdoptions] = useState<Adoption[]>(seedAdoptions);
   const [people, setPeople] = useState<Person[]>(seedPeople);
@@ -854,6 +861,31 @@ export function DemoWhiskerProvider({
     },
     deletePhoto: (id) =>
     setPhotos((prev) => prev.filter((p) => p.id !== id)),
+    animalFiles,
+    addAnimalFile: async (input: NewFileInput) => {
+      const id = `af${generateId()}`;
+      demoFileUrls.current.set(id, URL.createObjectURL(input.file));
+      const newFile: AnimalFile = {
+        id,
+        animal_id: input.animal_id,
+        file_name: input.file.name,
+        file_type: input.file.type || undefined,
+        file_size: input.file.size,
+        storage_path: `demo/${id}`,
+        category: input.category,
+        notes: input.notes,
+        uploaded_by_user_id: 'demo-user',
+        created_at: now()
+      };
+      setAnimalFiles((prev) => [newFile, ...prev]);
+    },
+    deleteAnimalFile: (id) => {
+      demoFileUrls.current.delete(id);
+      setAnimalFiles((prev) => prev.filter((f) => f.id !== id));
+    },
+    getAnimalFileUrl: async (file) =>
+    demoFileUrls.current.get(file.id) ??
+    'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
 
     addRelationship: (rel) =>
     setRelationships((prev) => [

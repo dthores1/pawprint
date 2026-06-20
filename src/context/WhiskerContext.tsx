@@ -35,6 +35,7 @@ import {
   MemberPermissionType,
   OrgMember,
   AnimalPhoto,
+  AnimalFile,
   Person,
   Product,
   SupplyRequest,
@@ -147,6 +148,11 @@ import {
   NewPhotoInput } from
 '../lib/photosApi';
 import {
+  rowToAnimalFile,
+  fileToInsert,
+  NewFileInput } from
+'../lib/filesApi';
+import {
   rowToProduct,
   productToInsert,
   productUpdateToRow } from
@@ -227,6 +233,7 @@ export interface WhiskerContextType {
   grantSupplyPermission: (memberId: string) => void;
   revokeSupplyPermission: (memberId: string) => void;
   photos: AnimalPhoto[];
+  animalFiles: AnimalFile[];
   /**
    * Heavy full rows loaded so far. Starts ACTIVE ONLY (+ self/account records);
    * grows on demand via ensureInactiveLoaded / ensurePerson. Do NOT assume this
@@ -378,6 +385,13 @@ export interface WhiskerContextType {
   => Promise<void>;
   addPhoto: (input: NewPhotoInput) => Promise<void>;
   deletePhoto: (id: string) => void;
+  addAnimalFile: (input: NewFileInput) => Promise<void>;
+  deleteAnimalFile: (id: string) => void;
+  /** Short-lived signed URL for a private file (View inline / Download attachment). */
+  getAnimalFileUrl: (
+  file: AnimalFile,
+  opts?: { download?: boolean })
+  => Promise<string | null>;
   addRelationship: (rel: Omit<AnimalRelationship, 'id'>) => void;
   deleteRelationship: (id: string) => void;
   addExternalListing: (
@@ -1054,6 +1068,29 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   useEffect(() => {
     loadPhotos();
   }, [loadPhotos]);
+
+  // Animal files — document attachments in the PRIVATE `animal-files` bucket.
+  const [animalFiles, setAnimalFiles] = useState<AnimalFile[]>([]);
+  const loadAnimalFiles = useCallback(async () => {
+    if (!orgId) {
+      setAnimalFiles([]);
+      return;
+    }
+    const { data, error } = await supabase.
+    from('animal_files').
+    select('*').
+    eq('organization_id', orgId).
+    order('created_at', { ascending: false });
+    if (error) {
+      console.error('[files] load failed:', error.message);
+    } else {
+      setAnimalFiles((data ?? []).map(rowToAnimalFile));
+    }
+  }, [orgId]);
+  useEffect(() => {
+    loadAnimalFiles();
+  }, [loadAnimalFiles]);
+
   // People (contacts) — Supabase-backed, org-scoped.
   // `people` holds the heavy full rows loaded so far. It starts ACTIVE ONLY
   // (plus self/account records, which must always load for attribution even if
@@ -2380,6 +2417,89 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       }
     })();
   };
+
+  // ---------- Animal files (private bucket + signed URLs) ----------
+  const addAnimalFile = async (input: NewFileInput) => {
+    if (!orgId) {
+      console.error('[files] cannot upload — no current organization');
+      return;
+    }
+    const ext = input.file.name.split('.').pop()?.toLowerCase() || 'bin';
+    const path = `${orgId}/${input.animal_id}/${crypto.randomUUID()}.${ext}`;
+    const { error: upErr } = await supabase.storage.
+    from('animal-files').
+    upload(path, input.file, { upsert: false });
+    if (upErr) {
+      console.error('[files] upload failed:', upErr.message);
+      throw upErr;
+    }
+    const { data, error } = await supabase.
+    from('animal_files').
+    insert(
+      fileToInsert(
+        {
+          animal_id: input.animal_id,
+          category: input.category,
+          notes: input.notes,
+          file_name: input.file.name,
+          file_type: input.file.type || null,
+          file_size: input.file.size ?? null,
+          storage_path: path
+        },
+        orgId,
+        user?.id ?? null
+      )
+    ).
+    select('*').
+    single();
+    if (error) {
+      console.error('[files] create failed:', error.message);
+      // Roll back the orphaned object so we don't leak storage.
+      await supabase.storage.from('animal-files').remove([path]);
+      throw error;
+    }
+    if (data) setAnimalFiles((prev) => [rowToAnimalFile(data), ...prev]);
+  };
+
+  const deleteAnimalFile = (id: string) => {
+    const target = animalFiles.find((f) => f.id === id);
+    const prev = animalFiles;
+    setAnimalFiles((cur) => cur.filter((f) => f.id !== id));
+    void (async () => {
+      if (target?.storage_path) {
+        const { error: rmErr } = await supabase.storage.
+        from('animal-files').
+        remove([target.storage_path]);
+        if (rmErr) console.error('[files] storage remove failed:', rmErr.message);
+      }
+      const { error } = await supabase.from('animal_files').delete().eq('id', id);
+      if (error) {
+        console.error('[files] delete failed:', error.message);
+        setAnimalFiles(prev); // restore
+      }
+    })();
+  };
+
+  // Short-lived signed URL for viewing (inline) or downloading (forced
+  // attachment) a private file object.
+  const getAnimalFileUrl = async (
+  file: AnimalFile,
+  opts?: { download?: boolean })
+  : Promise<string | null> => {
+    const { data, error } = await supabase.storage.
+    from('animal-files').
+    createSignedUrl(
+      file.storage_path,
+      60,
+      opts?.download ? { download: file.file_name } : undefined
+    );
+    if (error) {
+      console.error('[files] signed url failed:', error.message);
+      return null;
+    }
+    return data?.signedUrl ?? null;
+  };
+
   const addRelationship = async (rel: Omit<AnimalRelationship, 'id'>) => {
     if (!orgId) {
       console.error('[relationships] cannot create — no current organization');
@@ -3693,6 +3813,10 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         recordAdoptionReturn,
         addPhoto,
         deletePhoto,
+        animalFiles,
+        addAnimalFile,
+        deleteAnimalFile,
+        getAnimalFileUrl,
         addRelationship,
         deleteRelationship,
         addExternalListing,
