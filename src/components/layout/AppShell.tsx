@@ -1,15 +1,29 @@
-import { useState } from 'react';
-import { Outlet, NavLink, Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Outlet, NavLink, Link, useLocation } from 'react-router-dom';
 import { Sidebar, navItems } from './Sidebar';
 import { DemoBanner } from './DemoBanner';
+import { TopBar } from './TopBar';
+import { NotificationBell } from './NotificationBell';
 import { isDemoMode } from '../../lib/appMode';
 import { LogOutIcon, MenuIcon, SettingsIcon, UserCircleIcon } from 'lucide-react';
 import { LogoMark } from '../ui/Logo';
 import { useAuth } from '../../context/AuthContext';
+import { useWhisker } from '../../context/WhiskerContext';
 import { cn } from '../../lib/utils';
 export function AppShell() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { user, currentOrg, currentPersonId, signOut } = useAuth();
+  const { refreshNotifications } = useWhisker();
+  const location = useLocation();
+
+  // Refetch notifications on navigation (MVP freshness; complements the
+  // background poll in WhiskerContext). Context can't see routing, so it lives here.
+  useEffect(() => {
+    refreshNotifications();
+    // refreshNotifications is stable per render but not memoized; key on pathname.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
   return (
     <div className="flex flex-col h-screen w-full bg-background overflow-hidden">
       {isDemoMode && <DemoBanner />}
@@ -17,6 +31,9 @@ export function AppShell() {
         <Sidebar />
 
       <div className="flex-1 flex flex-col h-full overflow-hidden">
+        {/* Desktop top bar (bell + user menu) */}
+        <TopBar />
+
         {/* Mobile Header */}
         <header className="md:hidden h-16 bg-card border-b border-border flex items-center justify-between px-4 shrink-0">
           <div className="flex items-center gap-1 text-primary">
@@ -25,12 +42,16 @@ export function AppShell() {
               Whiskerville
             </span>
           </div>
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 text-text-secondary hover:bg-background rounded-lg">
-            
-            <MenuIcon className="w-7 h-7" />
-          </button>
+          <div className="flex items-center gap-1">
+            <NotificationBell />
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Open menu"
+              className="p-2 text-text-secondary hover:bg-background rounded-lg">
+
+              <MenuIcon className="w-7 h-7" />
+            </button>
+          </div>
         </header>
 
         {/* Mobile Nav Dropdown */}
