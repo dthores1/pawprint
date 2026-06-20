@@ -33,12 +33,15 @@ export function NewSittingRequestModal({ isOpen, onClose, request }: Props) {
   const { currentPersonId } = useAuth();
   const isEditMode = !!request;
 
-  // TODO(auth): scope to the signed-in user's OWN placements (match
-  // currentPersonId to placement.person_id). For now we cover all active
-  // placements in the org, so "in my care" reads as "currently in foster".
   const myPlacements = useMemo(
-    () => placements.filter((p) => p.placement_status === 'active'),
-    [placements]
+    () =>
+    currentPersonId ?
+    placements.filter(
+      (p) =>
+      p.placement_status === 'active' && p.person_id === currentPersonId
+    ) :
+    [],
+    [placements, currentPersonId]
   );
   const myAnimals = myPlacements.
   map((p) => animals.find((a) => a.id === p.animal_id)).
@@ -257,7 +260,7 @@ export function NewSittingRequestModal({ isOpen, onClose, request }: Props) {
                     </p>
                     <p className="text-sm text-text-secondary mt-0.5">
                       {myAnimals.length === 0 ?
-                    'No animals are currently in foster.' :
+                    'No animals are currently in your care.' :
                     <>Includes {namesList}</>}
                     </p>
                   </div>

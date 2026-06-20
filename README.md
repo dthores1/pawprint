@@ -332,6 +332,48 @@ The most operationally complex of the three. TNR orgs run periodic clinics (typi
 
 ---
 
+## Notifications
+
+In-app notifications tell members when something needs their attention — a volunteer claimed their transport, their supply request changed status, a medical record landed on an animal they foster, etc. A standard bell-and-badge model: a bell in the desktop **top bar** (and beside the mobile hamburger), a dropdown of recent items, and a dedicated **`/notifications`** page. The bell is the only entry point — there's no Notifications sidebar item. The desktop top bar also hosts the signed-in user's name/profile link (so "My profile" was dropped from the sidebar; it remains in the mobile menu).
+
+**Split data model (migration `0066`).** One canonical `notifications` row (the event + denormalized `title`/`body` + `metadata`) fans out to one `user_notification` row per recipient, so "read" is per-user without duplicating text:
+- `notifications`: `organization_id`, `type`, `title`, `body`, `entity_type`, `entity_id`, `actor_user_id`, `metadata jsonb`, `created_at`.
+- `user_notification`: `notification_id`, `recipient_user_id`, `read_at`, `created_at` (unique per recipient).
+
+**`entity_type`/`entity_id` is the navigation *target*, not the source row.** Foster/medical/adoption events target the *animal* (`entity_type='animal'`), so the client link is uniformly `/animals/:id`; the source record id rides in `metadata`. `src/lib/notificationLink.ts` maps the target onto routes (`transport_request → /requests?tab=transport`, `sitting_request → /requests?tab=sitting`, `supply_request → /requests`).
+
+**Creation is server-side via `SECURITY DEFINER` triggers** — the app never inserts notifications, so there are no INSERT policies and creation can't be bypassed. Recipients are resolved from `people.user_id` (people without an account get nothing), and the actor (`auth.uid()`) is never notified of their own action. Events wired in `0066`:
+- **Transport** assigned/claimed → requester ("being handled") **and** assignee ("you were assigned"); self-claim doesn't self-notify.
+- **Sitting** accepted → requester.
+- **Supply request** status changed → requester.
+- **Animal status** changed (lifecycle, e.g. adoptable → adopted; migration `0067`) → the animal's current active foster.
+- **Adoption** status changed (the `adoptions` workflow) → the animal's current active foster.
+- **Medical record** added → the animal's current active foster.
+- **Foster placement** assigned (new active placement = "animal assigned to you") / ended → the foster.
+- **Animal added to a clinic** (a `clinic_slots` insert; migration `0069`) → the animal's active foster ("Clinic Appointment Scheduled — … on June 20 at 9:00 AM", rendered in the org timezone).
+
+**RLS:** a user sees only their own `user_notification` rows (`recipient_user_id = auth.uid()`); a `notifications` row is readable only when the caller has a `user_notification` for it. Marking read is the only client write (`read_at`).
+
+**Freshness (MVP)** is fetch-on-load + refetch on navigation (`AppShell`) + a ~90s background poll, all behind `useWhisker()`'s `notifications` / `unreadNotificationCount` / `refreshNotifications` / `markNotificationRead` / `markAllNotificationsRead` — so swapping in Supabase Realtime later is a drop-in. Per the agreed read behavior: opening the bell dropdown does **not** mark anything read; the `/notifications` page marks rows read as they scroll into view; clicking a row marks it read and navigates; "Mark all as read" clears the loaded (current-org) unreads.
+
+### Scheduled reminders (migration `0068`)
+
+The events above are *reactive* (a row changed). Reminders are *proactive* — "something is about to happen, act now." An hourly `pg_cron` job, **`run_notification_reminders()`** (`'notification-reminders'`, `0 * * * *`; migration `0070`), scans for upcoming events and emits via `create_scheduled_notification()` (the 0066 fan-out plus a `dedupe_key`). Running hourly keeps same-day-created events timely; the `dedupe_key` makes over-running harmless (each reminder is created once).
+
+- **Calendar-day buckets (UTC):** the job finds events on `current_date + N`, so copy ("tomorrow", "in 2 days", "in 3 days") is exact.
+- **Idempotent:** `notifications.dedupe_key` is unique; inserts are `on conflict do nothing`, so each reminder fires once no matter how often cron runs.
+- **Local clock times (migration `0069`):** `organizations.timezone` (IANA, default `America/Los_Angeles` per migration `0070`, set on Settings → General) lets the DB render `date_time` in the org's zone, so clinic copy includes the local time ("…tomorrow at 9:00 AM — ACP Clinic"). The helpers `notif_local_datetime` / `notif_local_time` do the formatting. Sitting/placement are date-only columns; transport copy stays date-only.
+
+Reminders sent (lead times hardcoded):
+- **Clinic** (48h + 24h before): per-animal **foster** ("Marabel has a clinic appointment tomorrow at …") and one **event-level** reminder to creator + transport/intake coordinators ("Your clinic at … is tomorrow — N animals scheduled"). Target `clinic_event` → `/clinics/:id`.
+- **Transport** (24h): assigned **volunteer** and **requester** when accepted; an **unaccepted** "still needs volunteer" nudge to the requester when open. Includes the animal name when present.
+- **Sitting** (24h): **sitter** and **requester** when accepted; **unaccepted** nudge when open. Names the requester (a sitting can cover multiple animals).
+- **Foster placement ending** (72h): the foster, keyed off `expected_end_date`.
+
+**Follow-ups (deliberately deferred):** adoption-hold expiry (needs `animals.hold_until` + a hold-expiry concept); a per-org `notification_rule` config table; the "no future placement arranged" framing once scheduled future placements are modeled.
+
+---
+
 ## 12. Org-level configuration
 
 `lib/config.ts` is the seed of a future settings layer. Today it exports:

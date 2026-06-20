@@ -29,7 +29,8 @@ import {
   Site,
   SiteNote,
   SiteVolunteer,
-  Adoption } from
+  Adoption,
+  NotificationItem } from
 '../types';
 import { NewPhotoInput } from '../lib/photosApi';
 import { legacyRoleFor } from '../lib/peopleApi';
@@ -85,7 +86,8 @@ import { computeAnimalInputsFingerprint } from '../lib/aiContentFingerprint';
 const DEMO_ORG: Org = {
   id: 'demo-org',
   name: 'Alley Cat Project (Demo)',
-  role: 'owner'
+  role: 'owner',
+  timezone: 'America/Los_Angeles'
 };
 
 // 'p_dan' is a seed Person, so attribution reads as a real name.
@@ -98,6 +100,7 @@ const demoAuthValue: AuthContextType = {
   currentOrg: DEMO_ORG,
   setCurrentOrgId: () => {},
   refreshOrganizations: async () => {},
+  updateOrgTimezone: async () => {},
   currentPersonId: 'p_dan',
   currentMemberId: 'm_dan',
   signInWithGoogle: async () => {},
@@ -114,12 +117,112 @@ export function DemoAuthProvider({ children }: { children: React.ReactNode }) {
 
 }
 
+// A few example notifications so a demo visitor sees the bell badge + a
+// populated list immediately. Mix of unread/read; entity ids point at seeded
+// demo animals so clicking through navigates somewhere real.
+function makeDemoNotifications(): NotificationItem[] {
+  const ago = (mins: number) => new Date(Date.now() - mins * 60_000).toISOString();
+  const rows: Array<Omit<NotificationItem, 'user_notification_id' | 'notification_id'>> = [
+  {
+    type: 'clinic_appointment_scheduled',
+    title: 'Clinic Appointment Scheduled',
+    body: 'Marmalade has been scheduled for a clinic appointment on June 22 at 9:00 AM.',
+    entity_type: 'clinic_event',
+    entity_id: 'ce1',
+    metadata: { animal_name: 'Marmalade' },
+    created_at: ago(15)
+  },
+  {
+    type: 'clinic_appointment_reminder',
+    title: 'Upcoming Clinic Appointment',
+    body: 'Marmalade has a clinic appointment tomorrow at 9:00 AM — ACP Clinic.',
+    entity_type: 'clinic_event',
+    entity_id: 'ce1',
+    metadata: { animal_name: 'Marmalade', location: 'ACP Clinic' },
+    created_at: ago(30)
+  },
+  {
+    type: 'transport_reminder_unaccepted',
+    title: 'Transport Still Needs Volunteer',
+    body: 'Your transport request scheduled for tomorrow has not yet been accepted. Additional coordination may be needed.',
+    entity_type: 'transport_request',
+    entity_id: 'tr_demo',
+    metadata: {},
+    created_at: ago(55)
+  },
+  {
+    type: 'foster_placement_ending',
+    title: 'Foster Placement Ending Soon',
+    body: "Juniper's foster placement is scheduled to end in 3 days.",
+    entity_type: 'animal',
+    entity_id: 'a3',
+    metadata: { animal_name: 'Juniper' },
+    created_at: ago(70)
+  },
+  {
+    type: 'foster_placement_assigned',
+    title: 'New foster placement',
+    body: 'Marmalade was placed in your foster care.',
+    entity_type: 'animal',
+    entity_id: 'a2',
+    metadata: { animal_name: 'Marmalade' },
+    created_at: ago(90)
+  },
+  {
+    type: 'foster_animal_medical_record_added',
+    title: 'New medical record',
+    body: 'A new medical record was added for Duffy.',
+    entity_type: 'animal',
+    entity_id: 'a11',
+    metadata: { animal_name: 'Duffy' },
+    created_at: ago(320)
+  },
+  {
+    type: 'transport_request_assigned',
+    title: 'You were assigned a transport',
+    body: 'You were assigned to transport Juniper.',
+    entity_type: 'transport_request',
+    entity_id: 'tr_demo',
+    metadata: { animal_name: 'Juniper' },
+    created_at: ago(600)
+  },
+  {
+    type: 'supply_request_status_changed',
+    title: 'Supply request updated',
+    body: 'Your supply request status changed to approved.',
+    entity_type: 'supply_request',
+    entity_id: 'sr_demo',
+    metadata: { status: 'approved' },
+    read_at: ago(1500),
+    created_at: ago(1600)
+  },
+  {
+    type: 'foster_animal_status_changed',
+    title: 'Animal status updated',
+    body: "Juniper's status changed to adoptable.",
+    entity_type: 'animal',
+    entity_id: 'a3',
+    metadata: { animal_name: 'Juniper', status: 'adoptable' },
+    read_at: ago(2800),
+    created_at: ago(2880)
+  }];
+
+  return rows.map((r, i) => ({
+    ...r,
+    user_notification_id: `un_demo_${i}`,
+    notification_id: `n_demo_${i}`
+  }));
+}
+
 export function DemoWhiskerProvider({
   children
 }: {
   children: React.ReactNode;
 }) {
   const [animals, setAnimals] = useState<Animal[]>(seedAnimals);
+  const [notifications, setNotifications] = useState<NotificationItem[]>(
+    makeDemoNotifications
+  );
   const [placements, setPlacements] =
   useState<FosterPlacement[]>(seedPlacements);
   const [medicalRecords, setMedicalRecords] =
@@ -1134,6 +1237,24 @@ export function DemoWhiskerProvider({
     } :
     s
     )
+    ),
+
+    // Notifications: seeded in memory so the bell badge + list are populated;
+    // mark-read is interactive (no persistence — resets on refresh).
+    notifications,
+    unreadNotificationCount: notifications.filter((n) => !n.read_at).length,
+    refreshNotifications: () => {},
+    markNotificationRead: (id: string) =>
+    setNotifications((prev) =>
+    prev.map((n) =>
+    n.user_notification_id === id && !n.read_at ?
+    { ...n, read_at: now() } :
+    n
+    )
+    ),
+    markAllNotificationsRead: () =>
+    setNotifications((prev) =>
+    prev.map((n) => (n.read_at ? n : { ...n, read_at: now() }))
     ),
 
     addClinicEvent: async (event) => {

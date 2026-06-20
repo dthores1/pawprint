@@ -13,6 +13,8 @@ export interface Org {
   id: string;
   name: string;
   role: string;
+  /** IANA timezone (e.g. 'America/New_York'); used to render clinic dates/times. */
+  timezone: string;
 }
 
 export interface AuthContextType {
@@ -26,6 +28,8 @@ export interface AuthContextType {
   currentOrg: Org | null;
   setCurrentOrgId: (id: string) => void;
   refreshOrganizations: () => Promise<void>;
+  /** Update the current org's IANA timezone (admin-gated by RLS). */
+  updateOrgTimezone: (timezone: string) => Promise<void>;
 
   /**
    * The signed-in user's `people` row id in the current org, used to attribute
@@ -82,7 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setOrgsLoading(true);
     const { data, error } = await supabase.
     from('organization_members').
-    select('role, organizations ( id, name )').
+    select('role, organizations ( id, name, timezone )').
     eq('user_id', uid);
     if (!error && data) {
       const orgs: Org[] = data.
@@ -91,7 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const o = Array.isArray(row.organizations) ?
         row.organizations[0] :
         row.organizations;
-        return o ? { id: o.id, name: o.name, role: row.role } : null;
+        return o ? { id: o.id, name: o.name, role: row.role, timezone: o.timezone ?? 'America/Los_Angeles' } : null;
       }).
       filter((o): o is Org => o !== null).
       sort((a, b) => a.name.localeCompare(b.name));
@@ -160,6 +164,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   organizations.find((o) => o.id === currentOrgId) ??
   organizations[0] ??
   null;
+
+  const updateOrgTimezone = useCallback(
+    async (timezone: string) => {
+      const orgId = currentOrg?.id;
+      if (!orgId) return;
+      const { error } = await supabase.
+      from('organizations').
+      update({ timezone }).
+      eq('id', orgId);
+      if (error) {
+        console.error('[organizations] timezone update failed:', error.message);
+        return;
+      }
+      await refreshOrganizations();
+    },
+    [currentOrg?.id, refreshOrganizations]
+  );
 
   // Resolve (find-or-create) the signed-in user's person record in the org.
   const [currentPersonId, setCurrentPersonId] = useState<string | null>(null);
@@ -375,6 +396,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         currentOrg,
         setCurrentOrgId,
         refreshOrganizations,
+        updateOrgTimezone,
         currentPersonId,
         currentMemberId,
         signInWithGoogle,

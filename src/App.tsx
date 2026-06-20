@@ -26,6 +26,7 @@ import { AcceptInvitePage } from './pages/AcceptInvitePage';
 import { OrganizationPage } from './pages/OrganizationPage';
 import { Settings } from './pages/Settings';
 import { ReportsPage } from './pages/ReportsPage';
+import { Notifications } from './pages/Notifications';
 import { RecycleBin } from './pages/RecycleBin';
 import { LegalPage } from './pages/LegalPage';
 import { LandingPage } from './pages/LandingPage';
@@ -91,6 +92,7 @@ function AppRoutes() {
         <Route path="organization" element={<OrganizationPage />} />
         <Route path="settings" element={<Settings />} />
         <Route path="reports" element={<ReportsPage />} />
+        <Route path="notifications" element={<Notifications />} />
         <Route path="recycle-bin" element={<RecycleBin />} />
       </Route>
     </Routes>);

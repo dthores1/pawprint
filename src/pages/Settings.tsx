@@ -15,6 +15,18 @@ import { SpeciesIcon } from '../lib/speciesIcons';
 import { cn } from '../lib/utils';
 import { Trait, SavedLocation } from '../types';
 
+// Curated timezone list (US-focused, the app's primary audience, + UTC). Used
+// to render clinic dates/times in notifications. Expand as orgs need it.
+const TIMEZONES: { value: string; label: string }[] = [
+{ value: 'America/New_York', label: 'Eastern (New York)' },
+{ value: 'America/Chicago', label: 'Central (Chicago)' },
+{ value: 'America/Denver', label: 'Mountain (Denver)' },
+{ value: 'America/Phoenix', label: 'Mountain, no DST (Phoenix)' },
+{ value: 'America/Los_Angeles', label: 'Pacific (Los Angeles)' },
+{ value: 'America/Anchorage', label: 'Alaska (Anchorage)' },
+{ value: 'Pacific/Honolulu', label: 'Hawaii (Honolulu)' },
+{ value: 'UTC', label: 'UTC' }];
+
 // Organization settings:
 //  - Accepted Animal Types → organization_species (enable/disable + default)
 //  - Accepted Breeds → organization_breeds (opt-in: restrict a species to a
@@ -34,7 +46,7 @@ export function Settings() {
     savedLocations,
     updateSavedLocation
   } = useWhisker();
-  const { currentOrg } = useAuth();
+  const { currentOrg, updateOrgTimezone } = useAuth();
   const isAdmin =
   currentOrg?.role === 'owner' || currentOrg?.role === 'admin';
   const [traitForm, setTraitForm] = useState<{ open: boolean; trait?: Trait }>({
@@ -46,7 +58,7 @@ export function Settings() {
   }>({ open: false });
   // Three tabs: Animal Options (catalog/traits/adoption), Locations (saved
   // places), and Permissions (member access grants — admin-only).
-  const [tab, setTab] = useState<'animal' | 'locations' | 'permissions'>(
+  const [tab, setTab] = useState<'animal' | 'locations' | 'permissions' | 'general'>(
     'animal'
   );
   const tabs = [
@@ -54,7 +66,8 @@ export function Settings() {
   ...isAdmin ?
   [
   { key: 'locations', label: 'Locations' },
-  { key: 'permissions', label: 'Permissions' }] :
+  { key: 'permissions', label: 'Permissions' },
+  { key: 'general', label: 'General' }] :
   []];
 
   const rowFor = (id: string) =>
@@ -480,6 +493,38 @@ export function Settings() {
             title="Rescue Sites"
             description="Create and edit rescue sites — colonies, pickups, and trapping locations." />
 
+        </div>
+      </Card>
+      }
+
+      {/* General — org-wide settings (timezone). Admin-only. */}
+      {tab === 'general' && isAdmin &&
+      <Card className="p-0 overflow-hidden">
+        <div className="p-5 border-b border-border">
+          <h2 className="font-heading font-semibold text-lg text-text-primary">
+            Time zone
+          </h2>
+          <p className="text-sm text-text-secondary mt-1">
+            Used to show clinic dates and times in notifications (e.g. “a clinic
+            appointment on June 20 at 9:00 AM”). Set this to your rescue’s local zone.
+          </p>
+        </div>
+        <div className="p-5">
+          <Select
+            className="max-w-sm"
+            value={currentOrg?.timezone ?? 'America/Los_Angeles'}
+            onChange={(e) => updateOrgTimezone(e.target.value)}>
+            {TIMEZONES.map((tz) =>
+            <option key={tz.value} value={tz.value}>
+                {tz.label}
+              </option>
+            )}
+            {/* Surface an unrecognized stored value so it isn't silently lost. */}
+            {currentOrg?.timezone &&
+            !TIMEZONES.some((t) => t.value === currentOrg.timezone) &&
+            <option value={currentOrg.timezone}>{currentOrg.timezone}</option>
+            }
+          </Select>
         </div>
       </Card>
       }

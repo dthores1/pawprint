@@ -1094,3 +1094,58 @@ export interface ArchivedRecord {
   deleted_at: string;
   deleted_by: string | null;
 }
+
+// ---------- Notifications ----------
+// Split model: a canonical `notifications` row fans out to one
+// `user_notification` row per recipient (created exclusively by DB triggers —
+// see migration 0066). The UI works with the joined `NotificationItem`.
+
+export type NotificationType =
+// Reactive (DB-trigger) events — migrations 0066/0067
+'transport_request_claimed' |
+'transport_request_assigned' |
+'sitting_request_accepted' |
+'supply_request_status_changed' |
+'foster_animal_status_changed' |
+'foster_animal_adoption_status_changed' |
+'foster_animal_medical_record_added' |
+'foster_placement_assigned' |
+'foster_placement_ended' |
+'clinic_appointment_scheduled' |
+// Time-based reminders — scheduled pg_cron job, migration 0068
+'clinic_appointment_reminder' |
+'clinic_event_reminder' |
+'transport_reminder_volunteer' |
+'transport_reminder_requester' |
+'transport_reminder_unaccepted' |
+'sitting_reminder_volunteer' |
+'sitting_reminder_requester' |
+'sitting_reminder_unaccepted' |
+'foster_placement_ending';
+
+// The navigation target a notification links to. For foster/medical/adoption
+// events this is the animal, not the source row (whose id lives in metadata).
+export type NotificationEntityType =
+'animal' |
+'transport_request' |
+'sitting_request' |
+'supply_request' |
+'clinic_event';
+
+// One notification as the signed-in user sees it: the shared event joined with
+// this user's per-recipient read state.
+export interface NotificationItem {
+  /** user_notification.id — the per-recipient row; target of mark-read. */
+  user_notification_id: string;
+  /** notifications.id — the shared event row. */
+  notification_id: string;
+  type: NotificationType | string;
+  title: string;
+  body: string;
+  entity_type: NotificationEntityType | string;
+  entity_id: string;
+  actor_user_id?: string;
+  metadata: Record<string, any>;
+  read_at?: string;
+  created_at: string;
+}

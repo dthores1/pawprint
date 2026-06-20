@@ -50,7 +50,8 @@ import {
   SiteNote,
   SiteVolunteer,
   ArchiveTable,
-  ArchivedRecord } from
+  ArchivedRecord,
+  NotificationItem } from
 '../types';
 import { supabase } from '../lib/supabase';
 import { rowToBreed, animalBreedLabel } from '../lib/breedsApi';
@@ -129,6 +130,10 @@ import {
   DEFAULT_ADOPTION_TEMPLATE_BODY } from
 '../lib/adoptionTemplate';
 import { rowToMemberPermission } from '../lib/memberPermissionsApi';
+import {
+  NOTIFICATION_SELECT,
+  rowToNotificationItem,
+  markReadToRow } from '../lib/notificationsApi';
 import {
   rowToPerson,
   personToInsert,
@@ -482,6 +487,13 @@ export interface WhiskerContextType {
   => void;
   /** Convenience: set the sitter + flip status to claimed. */
   acceptSittingRequest: (id: string, sitter_person_id: string) => void;
+  // Notifications (created by DB triggers; clients only read + mark read)
+  notifications: NotificationItem[];
+  unreadNotificationCount: number;
+  /** Re-fetch the signed-in user's notifications for the current org. */
+  refreshNotifications: () => void;
+  markNotificationRead: (userNotificationId: string) => void;
+  markAllNotificationsRead: () => void;
   // Clinics
   clinicEvents: ClinicEvent[];
   clinicSlots: ClinicSlot[];
@@ -1387,6 +1399,93 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   useEffect(() => {
     loadOrgCatalog();
   }, [loadOrgCatalog]);
+
+  // ---------- Notifications ----------
+  // The signed-in user's notifications for the current org. Rows are created
+  // only by DB triggers (migration 0066); the client reads them (scoped by
+  // recipient_user_id + org) and marks them read. Freshness for MVP is
+  // fetch-on-load + refetch on navigation (AppShell) + a light background poll
+  // — all behind these actions, so swapping in Realtime later is a drop-in.
+  const userId = user?.id ?? null;
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const loadNotifications = useCallback(async () => {
+    if (!orgId || !userId) {
+      setNotifications([]);
+      return;
+    }
+    const { data, error } = await supabase.
+    from('user_notification').
+    select(NOTIFICATION_SELECT).
+    eq('recipient_user_id', userId).
+    eq('notification.organization_id', orgId).
+    order('created_at', { ascending: false }).
+    limit(100);
+    if (error) {
+      console.error('[notifications] load failed:', error.message);
+    } else {
+      setNotifications((data ?? []).map(rowToNotificationItem));
+    }
+  }, [orgId, userId]);
+  useEffect(() => {
+    loadNotifications();
+    if (!orgId || !userId) return;
+    const POLL_MS = 90_000;
+    const id = setInterval(loadNotifications, POLL_MS);
+    return () => clearInterval(id);
+  }, [loadNotifications, orgId, userId]);
+
+  const unreadNotificationCount = useMemo(
+    () => notifications.filter((n) => !n.read_at).length,
+    [notifications]
+  );
+
+  const refreshNotifications = () => {
+    loadNotifications();
+  };
+
+  const markNotificationRead = async (userNotificationId: string) => {
+    const target = notifications.find(
+      (n) => n.user_notification_id === userNotificationId
+    );
+    if (!target || target.read_at) return; // already read / unknown
+    const readAt = new Date().toISOString();
+    setNotifications((prev) =>
+    prev.map((n) =>
+    n.user_notification_id === userNotificationId ? { ...n, read_at: readAt } : n
+    )
+    );
+    const { error } = await supabase.
+    from('user_notification').
+    update(markReadToRow()).
+    eq('id', userNotificationId);
+    if (error) {
+      console.error('[notifications] mark read failed:', error.message);
+      loadNotifications(); // reconcile
+    }
+  };
+
+  const markAllNotificationsRead = async () => {
+    if (!userId) return;
+    // Only the rows we've loaded (which are scoped to the current org) — a
+    // blanket update would also clear unreads in the user's other orgs, since
+    // user_notification carries no organization_id.
+    const unreadIds = notifications.
+    filter((n) => !n.read_at).
+    map((n) => n.user_notification_id);
+    if (unreadIds.length === 0) return;
+    const readAt = new Date().toISOString();
+    setNotifications((prev) =>
+    prev.map((n) => (n.read_at ? n : { ...n, read_at: readAt }))
+    );
+    const { error } = await supabase.
+    from('user_notification').
+    update(markReadToRow()).
+    in('id', unreadIds);
+    if (error) {
+      console.error('[notifications] mark all read failed:', error.message);
+      loadNotifications(); // reconcile
+    }
+  };
 
   const setSpeciesEnabled = async (speciesId: string, enabled: boolean) => {
     if (!orgId) return;
@@ -3613,6 +3712,11 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         addSittingRequest,
         updateSittingRequest,
         acceptSittingRequest,
+        notifications,
+        unreadNotificationCount,
+        refreshNotifications,
+        markNotificationRead,
+        markAllNotificationsRead,
         clinicEvents,
         clinicSlots,
         clinicSlotProcedures,
