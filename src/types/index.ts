@@ -181,6 +181,17 @@ export interface OrganizationBreed {
   sort_order: number;
 }
 
+/**
+ * Per-org sidebar tab visibility (migration 0072). Sparse: a tab with no row is
+ * visible (the default). Navigation customization only — it does not change
+ * permissions or block direct-URL access. `tab_key` matches the hideable
+ * sidebar keys (fosters, medical, sites, requests, contacts, reports, adoptions).
+ */
+export interface OrganizationNavigationSetting {
+  tab_key: string;
+  is_visible: boolean;
+}
+
 // Per-org behavioral/personality labels (migration 0045). `species_id` null
 // means the trait applies to all species; set scopes it to one species.
 export interface Trait {

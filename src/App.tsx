@@ -13,6 +13,7 @@ import { FostersList } from './pages/FostersList';
 import { FosterProfile } from './pages/FosterProfile';
 import { Contacts } from './pages/Contacts';
 import { ContactProfile } from './pages/ContactProfile';
+import { Adoptions } from './pages/Adoptions';
 import { Requests } from './pages/Requests';
 import { ManageSupplyOptions } from './pages/ManageSupplyOptions';
 import { Medical } from './pages/Medical';
@@ -64,6 +65,7 @@ function AppRoutes() {
         <Route path="animals" element={<AnimalsList />} />
         <Route path="animals/:id" element={<AnimalProfile />} />
         <Route path="litters/:id" element={<LitterProfile />} />
+        <Route path="adoptions" element={<Adoptions />} />
         <Route path="fosters" element={<FostersList />} />
         <Route path="fosters/:id" element={<FosterProfile />} />
         <Route path="requests" element={<Requests />} />

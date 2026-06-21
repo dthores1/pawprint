@@ -301,6 +301,20 @@ export function DemoWhiskerProvider({
   const [organizationBreeds, setOrganizationBreeds] = useState(
     seedOrganizationBreeds
   );
+
+  // Demo mode keeps tab visibility in memory; every tab is visible by default.
+  const [navigationSettings, setNavigationSettings] = useState<
+    { tab_key: string; is_visible: boolean }[]>(
+    []);
+  const isTabVisible = (tabKey: string) =>
+  navigationSettings.find((r) => r.tab_key === tabKey)?.is_visible ?? true;
+  const setTabVisible = (tabKey: string, visible: boolean) =>
+  setNavigationSettings((prev) =>
+  prev.some((r) => r.tab_key === tabKey) ?
+  prev.map((r) => r.tab_key === tabKey ? { ...r, is_visible: visible } : r) :
+  [...prev, { tab_key: tabKey, is_visible: visible }]
+  );
+  const restoreNavigationDefaults = () => setNavigationSettings([]);
   // Mirror production: derive the species display name from species_id.
   const enrichedAnimals = useMemo(() => {
     const nameById = new Map(seedSpecies.map((s) => [s.id, s.name]));
@@ -484,6 +498,10 @@ export function DemoWhiskerProvider({
     breeds: seedBreeds,
     organizationSpecies,
     organizationBreeds,
+    navigationSettings,
+    isTabVisible,
+    setTabVisible,
+    restoreNavigationDefaults,
     setSpeciesEnabled,
     setDefaultSpecies,
     setAllowedBreeds,

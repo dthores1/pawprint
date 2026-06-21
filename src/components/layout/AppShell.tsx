@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Outlet, NavLink, Link, useLocation } from 'react-router-dom';
-import { Sidebar, navItems } from './Sidebar';
+import { Sidebar, useVisibleNavItems } from './Sidebar';
 import { DemoBanner } from './DemoBanner';
 import { TopBar } from './TopBar';
 import { NotificationBell } from './NotificationBell';
@@ -14,6 +14,7 @@ export function AppShell() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { user, currentOrg, currentPersonId, signOut } = useAuth();
   const { refreshNotifications } = useWhisker();
+  const visibleNavItems = useVisibleNavItems();
   const location = useLocation();
 
   // Refetch notifications on navigation (MVP freshness; complements the
@@ -65,7 +66,7 @@ export function AppShell() {
 
           <div className="md:hidden bg-card border-b border-border px-4 py-2 absolute top-16 left-0 right-0 z-40 shadow-soft max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain">
           <nav className="space-y-1 pb-2">
-            {navItems.map((item) =>
+            {visibleNavItems.map((item) =>
           <NavLink
             key={item.to}
             to={item.to}

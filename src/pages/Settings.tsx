@@ -10,6 +10,7 @@ import { SavedLocationFormModal } from '../components/settings/SavedLocationForm
 import { AdoptionTemplateEditor } from '../components/settings/AdoptionTemplateEditor';
 import { MemberPermissionManager } from '../components/settings/MemberPermissionManager';
 import { PillTabs } from '../components/ui/PillTabs';
+import { navItems } from '../components/layout/Sidebar';
 import { AddressDisplay } from '../components/ui/AddressDisplay';
 import { SpeciesIcon } from '../lib/speciesIcons';
 import { cn } from '../lib/utils';
@@ -44,7 +45,10 @@ export function Settings() {
     traits,
     updateTrait,
     savedLocations,
-    updateSavedLocation
+    updateSavedLocation,
+    isTabVisible,
+    setTabVisible,
+    restoreNavigationDefaults
   } = useWhisker();
   const { currentOrg, updateOrgTimezone } = useAuth();
   const isAdmin =
@@ -58,13 +62,15 @@ export function Settings() {
   }>({ open: false });
   // Three tabs: Animal Options (catalog/traits/adoption), Locations (saved
   // places), and Permissions (member access grants — admin-only).
-  const [tab, setTab] = useState<'animal' | 'locations' | 'permissions' | 'general'>(
+  const [tab, setTab] = useState<
+    'animal' | 'locations' | 'navigation' | 'permissions' | 'general'>(
     'animal'
   );
   const tabs = [
   { key: 'animal', label: 'Animal Options' },
   ...isAdmin ?
   [
+  { key: 'navigation', label: 'Navigation' },
   { key: 'locations', label: 'Locations' },
   { key: 'permissions', label: 'Permissions' },
   { key: 'general', label: 'General' }] :
@@ -89,6 +95,12 @@ export function Settings() {
   const enabledSpeciesWithBreeds = species.filter(
     (s) => isEnabled(s.id) && breeds.some((b) => b.species_id === s.id)
   );
+
+  // Navigation summary — so admins don't forget what they've hidden.
+  const visibleTabCount = navItems.filter(
+    (i) => i.locked || isTabVisible(i.key)
+  ).length;
+  const hiddenTabs = navItems.filter((i) => !i.locked && !isTabVisible(i.key));
 
   return (
     <div className="max-w-3xl mx-auto p-6 md:p-8 space-y-6">
@@ -459,6 +471,84 @@ export function Settings() {
 
       {/* Adoption Profiles — admin-managed posting template. */}
       {tab === 'animal' && isAdmin && <AdoptionTemplateEditor />}
+
+      {/* Navigation — show/hide sidebar tabs the org doesn't use. */}
+      {tab === 'navigation' && isAdmin &&
+      <Card className="p-0 overflow-hidden">
+        <div className="p-5 border-b border-border flex items-start justify-between gap-3">
+          <div>
+            <h2 className="font-heading font-semibold text-lg text-text-primary">
+              Sidebar Tabs
+            </h2>
+            <p className="text-sm text-text-secondary mt-1">
+              Hide tabs your organization doesn’t use to simplify the sidebar.
+              Hidden tabs are removed from the sidebar only — this does not change
+              user permissions or block direct access by URL.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={restoreNavigationDefaults}
+            className="shrink-0 text-xs font-medium text-text-secondary hover:text-primary transition-colors">
+            Restore defaults
+          </button>
+        </div>
+        <div className="px-5 py-3 border-b border-border bg-background/40 text-sm">
+          <span className="font-medium text-text-primary">
+            {visibleTabCount} of {navItems.length} tabs visible
+          </span>
+          {hiddenTabs.length > 0 &&
+          <span className="text-text-secondary">
+              {' '}· Hidden: {hiddenTabs.map((i) => i.label).join(', ')}
+            </span>
+          }
+        </div>
+        <ul className="divide-y divide-border">
+          {navItems.map((item) => {
+            const visible = item.locked || isTabVisible(item.key);
+            return (
+              <li
+                key={item.key}
+                className="flex items-center justify-between gap-4 px-5 py-3.5">
+
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-background text-text-secondary shrink-0">
+                    <item.icon className="w-4 h-4" />
+                  </span>
+                  <span className="font-medium text-text-primary">
+                    {item.label}
+                  </span>
+                </div>
+                {item.locked ?
+                <span className="text-xs font-medium text-text-secondary bg-background border border-border px-2 py-0.5 rounded-full shrink-0">
+                    Always on
+                  </span> :
+
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={visible}
+                  aria-label={`${visible ? 'Hide' : 'Show'} ${item.label}`}
+                  onClick={() => setTabVisible(item.key, !visible)}
+                  className={cn(
+                    'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 shrink-0',
+                    visible ? 'bg-primary' : 'bg-border'
+                  )}>
+
+                  <span
+                    className={cn(
+                      'inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform',
+                      visible ? 'translate-x-6' : 'translate-x-1'
+                    )} />
+
+                </button>
+                }
+              </li>);
+
+          })}
+        </ul>
+      </Card>
+      }
 
       {/* Member Permissions — grant non-admins specific management access. */}
       {tab === 'permissions' && isAdmin &&

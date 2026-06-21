@@ -31,6 +31,7 @@ import {
   AnimalAiContent,
   AiContentType,
   OrganizationAdoptionTemplate,
+  OrganizationNavigationSetting,
   MemberPermission,
   MemberPermissionType,
   OrgMember,
@@ -59,6 +60,10 @@ import { rowToBreed, animalBreedLabel } from '../lib/breedsApi';
 import { calculateAge, animalDisplayName } from '../lib/utils';
 import { rowToSpecies } from '../lib/speciesApi';
 import { rowToOrgSpecies, rowToOrgBreed } from '../lib/organizationCatalogApi';
+import {
+  rowToNavSetting,
+  navSettingToUpsert } from
+'../lib/navigationSettingsApi';
 import {
   rowToTrait,
   rowToAnimalTrait,
@@ -268,6 +273,14 @@ export interface WhiskerContextType {
   organizationSpecies: OrganizationSpecies[];
   /** Per-org breed restriction (opt-in; empty for a species → all allowed). */
   organizationBreeds: OrganizationBreed[];
+  /** Per-org sidebar tab visibility (migration 0072). Sparse — see isTabVisible. */
+  navigationSettings: OrganizationNavigationSetting[];
+  /** Whether a sidebar tab is visible. Defaults to true when no row exists. */
+  isTabVisible: (tabKey: string) => boolean;
+  /** Show/hide a sidebar tab for the current org (upserts the settings row). */
+  setTabVisible: (tabKey: string, visible: boolean) => void;
+  /** Clear all tab-visibility overrides (every tab back to visible). */
+  restoreNavigationDefaults: () => void;
   /** Enable/disable a species for the current org (upserts the org_species row). */
   setSpeciesEnabled: (speciesId: string, enabled: boolean) => void;
   /** Mark a species as the org's default (and ensure it's enabled). */
@@ -1436,6 +1449,69 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   useEffect(() => {
     loadOrgCatalog();
   }, [loadOrgCatalog]);
+
+  // Per-org sidebar tab visibility (migration 0072). Sparse: only explicit
+  // toggles are stored, so a missing row = visible. Navigation customization
+  // only — never gates permissions or routes.
+  const [navigationSettings, setNavigationSettings] = useState<
+    OrganizationNavigationSetting[]>(
+    []);
+  const loadNavigationSettings = useCallback(async () => {
+    if (!orgId) {
+      setNavigationSettings([]);
+      return;
+    }
+    const { data, error } = await supabase.
+    from('organization_navigation_settings').
+    select('*').
+    eq('organization_id', orgId);
+    if (error) {
+      console.error('[navigation settings] load failed:', error.message);
+    } else {
+      setNavigationSettings((data ?? []).map(rowToNavSetting));
+    }
+  }, [orgId]);
+  useEffect(() => {
+    loadNavigationSettings();
+  }, [loadNavigationSettings]);
+
+  const isTabVisible = (tabKey: string) =>
+  navigationSettings.find((r) => r.tab_key === tabKey)?.is_visible ?? true;
+
+  const setTabVisible = async (tabKey: string, visible: boolean) => {
+    if (!orgId) return;
+    // Optimistic: update the existing row or add one.
+    setNavigationSettings((prev) =>
+    prev.some((r) => r.tab_key === tabKey) ?
+    prev.map((r) =>
+    r.tab_key === tabKey ? { ...r, is_visible: visible } : r
+    ) :
+    [...prev, { tab_key: tabKey, is_visible: visible }]
+    );
+    const { error } = await supabase.
+    from('organization_navigation_settings').
+    upsert(navSettingToUpsert(orgId, tabKey, visible), {
+      onConflict: 'organization_id,tab_key'
+    });
+    if (error) {
+      console.error('[navigation settings] update failed:', error.message);
+      loadNavigationSettings(); // reconcile on failure
+    }
+  };
+
+  const restoreNavigationDefaults = async () => {
+    if (!orgId) return;
+    const prev = navigationSettings;
+    setNavigationSettings([]); // optimistic: every tab back to visible
+    const { error } = await supabase.
+    from('organization_navigation_settings').
+    delete().
+    eq('organization_id', orgId);
+    if (error) {
+      console.error('[navigation settings] restore-defaults failed:', error.message);
+      setNavigationSettings(prev);
+    }
+  };
 
   // ---------- Notifications ----------
   // The signed-in user's notifications for the current org. Rows are created
@@ -3769,6 +3845,10 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         breeds,
         organizationSpecies,
         organizationBreeds,
+        navigationSettings,
+        isTabVisible,
+        setTabVisible,
+        restoreNavigationDefaults,
         setSpeciesEnabled,
         setDefaultSpecies,
         setAllowedBreeds,
