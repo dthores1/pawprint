@@ -76,6 +76,7 @@ import {
   useIsActiveFosterOf } from
 '../lib/useAnimalPermissions';
 import { RequestReassignmentModal } from '../components/animals/RequestReassignmentModal';
+
 export function AnimalProfile() {
   const { id } = useParams<{
     id: string;
@@ -949,12 +950,9 @@ export function AnimalProfile() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Tabs (Timeline / Medical History) */}
         <div className="lg:col-span-2 space-y-5">
-          <div className="space-y-3">
-            {/* Tabs — own row; scroll horizontally on narrow widths (hidden
-                scrollbar + edge fades + active-tab auto-scroll via
-                ScrollableTabs) rather than wrapping or pushing the per-tab
-                action off the card. */}
-            <ScrollableTabs
+          {/* Tabs — scroll horizontally on narrow widths (hidden scrollbar +
+              edge fades + active-tab auto-scroll via ScrollableTabs). */}
+          <ScrollableTabs
               activeKey={activeTab}
               className="rounded-xl bg-card border border-border shadow-soft">
               <div className="inline-flex items-center gap-1 p-1">
@@ -1018,49 +1016,33 @@ export function AnimalProfile() {
               </div>
             </ScrollableTabs>
 
-            {/* The Add button matches the active tab: each surface owns its
-                own primary action so there's no cross-tab clutter. Sits on its
-                own right-aligned row under the tabs so it never overflows the
-                card as tabs grow. */}
+          {/* The per-tab "Add …" action sits just above its content and is
+              grouped with it (space-y-2) so it reads as that section's toolbar
+              rather than a button floating in the gap. Collapses entirely on
+              tabs with no primary action (empty:hidden). */}
+          <div className="space-y-2">
             <div className="flex justify-end empty:hidden">
               {activeTab === 'timeline' && canCollaborate &&
-              <Button
-                variant="soft"
-                size="sm"
-                onClick={() => setIsNoteModalOpen(true)}>
-
+              <Button variant="soft" size="sm" onClick={() => setIsNoteModalOpen(true)}>
                   <FileTextIcon className="w-4 h-4 mr-2" /> Add Note
                 </Button>
               }
               {activeTab === 'medical' && canManageMedical &&
-              <Button
-                variant="soft"
-                size="sm"
-                onClick={() => setIsMedicalModalOpen(true)}>
-
+              <Button variant="soft" size="sm" onClick={() => setIsMedicalModalOpen(true)}>
                   <SyringeIcon className="w-4 h-4 mr-2" /> Add Medical Record
                 </Button>
               }
               {activeTab === 'photos' && canCollaborate &&
-              <Button
-                variant="soft"
-                size="sm"
-                onClick={() => setIsAddPhotoOpen(true)}>
-
+              <Button variant="soft" size="sm" onClick={() => setIsAddPhotoOpen(true)}>
                   <ImageIcon className="w-4 h-4 mr-2" /> Add Photo
                 </Button>
               }
               {activeTab === 'files' && canCollaborate &&
-              <Button
-                variant="soft"
-                size="sm"
-                onClick={() => setIsAddFileOpen(true)}>
-
+              <Button variant="soft" size="sm" onClick={() => setIsAddFileOpen(true)}>
                   <FolderIcon className="w-4 h-4 mr-2" /> Add File
                 </Button>
               }
             </div>
-          </div>
 
           {activeTab === 'summary' &&
           <SummaryTab
@@ -1249,6 +1231,7 @@ export function AnimalProfile() {
             }
             medicalCount={animalMedical.length} />
           }
+          </div>
         </div>
 
         {/* Right Column: Sidebar Widgets */}
