@@ -1252,6 +1252,38 @@ export function DemoWhiskerProvider({
     t
     )
     ),
+    assignTransportRequest: (id, volunteer_person_id) =>
+    setTransportRequests((prev) =>
+    prev.map((t) =>
+    t.id === id ?
+    {
+      ...t,
+      assigned_volunteer_person_id: volunteer_person_id,
+      status: 'assigned' as const,
+      updated_at: now()
+    } :
+    t
+    )
+    ),
+    acceptTransportRequest: (id) =>
+    setTransportRequests((prev) =>
+    prev.map((t) =>
+    t.id === id ? { ...t, status: 'accepted' as const, updated_at: now() } : t
+    )
+    ),
+    unassignTransportRequest: (id) =>
+    setTransportRequests((prev) =>
+    prev.map((t) =>
+    t.id === id ?
+    {
+      ...t,
+      assigned_volunteer_person_id: null,
+      status: 'open' as const,
+      updated_at: now()
+    } :
+    t
+    )
+    ),
 
     addSittingRequest: async (req, placement_ids) => {
       const id = `sit${generateId()}`;

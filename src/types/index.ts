@@ -926,6 +926,8 @@ export type TransportRequestType = 'animal' | 'supplies' | 'emergency';
 
 export type TransportRequestStatus =
 'open' |
+'assigned' |
+'accepted' |
 'claimed' |
 'in_progress' |
 'completed' |
@@ -947,7 +949,8 @@ export interface TransportRequest {
   status: TransportRequestStatus;
   schedule_type: TransportScheduleType;
   requested_by_person_id: string;
-  assigned_volunteer_person_id?: string;
+  /** The claimed/assigned volunteer. `null` on update clears the assignment. */
+  assigned_volunteer_person_id?: string | null;
   /** Optional links to whatever is being moved. */
   animal_id?: string;
   clinic_event_id?: string;

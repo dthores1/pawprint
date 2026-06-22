@@ -495,6 +495,12 @@ export interface WhiskerContextType {
   => void;
   /** Convenience: assign a volunteer + flip status to claimed. */
   claimTransportRequest: (id: string, volunteer_person_id: string) => void;
+  /** Direct-assign (or reassign) a request to a volunteer → status 'assigned'. */
+  assignTransportRequest: (id: string, volunteer_person_id: string) => void;
+  /** The assigned volunteer commits → status 'accepted'. */
+  acceptTransportRequest: (id: string) => void;
+  /** Clear the assignment (assignee declines or admin removes) → back to 'open'. */
+  unassignTransportRequest: (id: string) => void;
   // Sitting requests
   sittingRequests: SittingRequest[];
   sittingRequestPlacements: SittingRequestPlacement[];
@@ -3310,6 +3316,26 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       status: 'claimed'
     });
   };
+  // Coordinator assigns (or reassigns) a specific volunteer; they then accept or
+  // decline. The existing notify_transport_assignment() trigger (migration 0066)
+  // fires off the assignee notification when assigned_volunteer_person_id changes.
+  const assignTransportRequest = (id: string, volunteer_person_id: string) => {
+    updateTransportRequest(id, {
+      assigned_volunteer_person_id: volunteer_person_id,
+      status: 'assigned'
+    });
+  };
+  const acceptTransportRequest = (id: string) => {
+    updateTransportRequest(id, { status: 'accepted' });
+  };
+  // Decline (by the assignee) or remove assignment (by an admin): clear the
+  // volunteer and return the request to the open pool.
+  const unassignTransportRequest = (id: string) => {
+    updateTransportRequest(id, {
+      assigned_volunteer_person_id: null,
+      status: 'open'
+    });
+  };
   // — Rescue Sites —————————————————————————————————
   const addSite = async (
   site: Omit<Site, 'id' | 'created_at' | 'updated_at'>) =>
@@ -3911,6 +3937,9 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         addTransportRequest,
         updateTransportRequest,
         claimTransportRequest,
+        assignTransportRequest,
+        acceptTransportRequest,
+        unassignTransportRequest,
         sittingRequests,
         sittingRequestPlacements,
         addSittingRequest,

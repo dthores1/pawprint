@@ -8,8 +8,10 @@ import { DatePicker } from '../ui/DatePicker';
 import { LocationPicker, LocationMode } from './LocationPicker';
 import { Button } from '../ui/Button';
 import { AnimalSearchPicker } from '../ui/AnimalSearchPicker';
+import { PersonSearchPicker } from '../ui/PersonSearchPicker';
 import { useWhisker } from '../../context/WhiskerContext';
 import { useAuth } from '../../context/AuthContext';
+import { useIsAdmin } from '../../lib/useIsAdmin';
 import {
   AddressValue,
   TransportRequest,
@@ -49,10 +51,15 @@ export function NewTransportRequestModal({ isOpen, onClose, request }: Props) {
   const {
     addTransportRequest,
     updateTransportRequest,
-    animalsIndex: animals
+    animalsIndex: animals,
+    peopleIndex: people
   } = useWhisker();
   const { currentPersonId } = useAuth();
+  const isAdmin = useIsAdmin();
   const isEditMode = !!request;
+  // Admins can direct a brand-new request at a specific volunteer instead of
+  // posting it open. Assignment of existing requests is managed on the card.
+  const canAssignOnCreate = isAdmin && !isEditMode;
   const [type, setType] = useState<TransportRequestType>('animal');
   const [urgency, setUrgency] = useState<TransportRequestUrgency>('normal');
   const [animalId, setAnimalId] = useState('');
@@ -72,8 +79,11 @@ export function NewTransportRequestModal({ isOpen, onClose, request }: Props) {
     dropoff?: string;
     pickupTime?: string;
     window?: string;
+    assignee?: string;
   }>({});
   const [notes, setNotes] = useState('');
+  const [assignMode, setAssignMode] = useState<'open' | 'assign'>('open');
+  const [assignedVolunteerId, setAssignedVolunteerId] = useState('');
 
   // Re-seed when opened (or when the editing target changes). In create mode
   // this resets to blank; in edit mode it loads the current request values.
@@ -124,6 +134,9 @@ export function NewTransportRequestModal({ isOpen, onClose, request }: Props) {
       setWindowEnd('');
       setNotes('');
     }
+    // Assignment is a create-mode concern only; always reset on open.
+    setAssignMode('open');
+    setAssignedVolunteerId('');
     setErrors({});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, request?.id]);
@@ -157,6 +170,9 @@ export function NewTransportRequestModal({ isOpen, onClose, request }: Props) {
     {
       nextErrors.window = 'The end date can’t be before the start date.';
     }
+    if (canAssignOnCreate && assignMode === 'assign' && !assignedVolunteerId) {
+      nextErrors.assignee = 'Select a volunteer, or choose Open Request.';
+    }
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       const ids = [
@@ -164,7 +180,8 @@ export function NewTransportRequestModal({ isOpen, onClose, request }: Props) {
       nextErrors.pickup && 'pickup',
       nextErrors.dropoff && 'dropoff',
       nextErrors.pickupTime && 'pickup_time',
-      nextErrors.window && 'window_start'].
+      nextErrors.window && 'window_start',
+      nextErrors.assignee && 'assign_volunteer'].
       filter((v): v is string => Boolean(v));
       requestAnimationFrame(() => focusFirstError(ids));
       return;
@@ -208,11 +225,19 @@ export function NewTransportRequestModal({ isOpen, onClose, request }: Props) {
         notes: notes.trim() || undefined
       });
     } else {
+      // Admins may direct the request at a volunteer up front; otherwise it's
+      // posted open for anyone to claim. The assignee notification fires off the
+      // assigned_volunteer_person_id change (notify_transport_assignment, 0066).
+      const directlyAssigned =
+      canAssignOnCreate && assignMode === 'assign' && Boolean(assignedVolunteerId);
       addTransportRequest({
         type,
-        status: 'open',
+        status: directlyAssigned ? 'assigned' : 'open',
         urgency,
         requested_by_person_id: currentPersonId ?? '',
+        assigned_volunteer_person_id: directlyAssigned ?
+        assignedVolunteerId :
+        undefined,
         animal_id: animalId || undefined,
         pickup_location: pickup?.formatted.trim() ?? '',
         dropoff_location: dropoff?.formatted.trim() ?? '',
@@ -439,6 +464,55 @@ export function NewTransportRequestModal({ isOpen, onClose, request }: Props) {
           </p>
           }
         </FormSection>
+
+        {canAssignOnCreate &&
+        <FormSection title="Volunteer">
+            <div className="flex flex-col gap-2">
+              <label className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
+                <input
+                type="radio"
+                name="assign_mode"
+                checked={assignMode === 'open'}
+                onChange={() => {
+                  setAssignMode('open');
+                  setErrors((prev) => ({ ...prev, assignee: undefined }));
+                }}
+                className="w-4 h-4 text-primary focus:ring-primary" />
+
+                Open Request <span className="text-text-secondary">(anyone may claim)</span>
+              </label>
+              <label className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
+                <input
+                type="radio"
+                name="assign_mode"
+                checked={assignMode === 'assign'}
+                onChange={() => setAssignMode('assign')}
+                className="w-4 h-4 text-primary focus:ring-primary" />
+
+                Assign to volunteer
+              </label>
+            </div>
+            {assignMode === 'assign' &&
+          <div id="assign_volunteer" style={{ scrollMarginTop: '1rem' }}>
+                <PersonSearchPicker
+              people={people.filter(
+                (p) => p.active !== false && p.id !== currentPersonId
+              )}
+              value={assignedVolunteerId}
+              onChange={(id) => {
+                setAssignedVolunteerId(id);
+                setErrors((prev) => ({ ...prev, assignee: undefined }));
+              }}
+              placeholder="Search volunteers by name or email…" />
+
+                <FieldError>{errors.assignee}</FieldError>
+                <p className="text-xs text-text-secondary mt-1">
+                  They’ll be notified and can accept or decline.
+                </p>
+              </div>
+          }
+          </FormSection>
+        }
 
         <FormSection title="Notes">
           <Label htmlFor="notes">Notes (optional)</Label>

@@ -2,6 +2,8 @@ import { Fragment, useState } from 'react';
 import { useWhisker } from '../../context/WhiskerContext';
 import { Card } from '../ui/Card';
 import { NewTransportRequestModal } from '../transports/NewTransportRequestModal';
+import { AssignTransportModal } from '../transports/AssignTransportModal';
+import { useIsAdmin } from '../../lib/useIsAdmin';
 import {
   TruckIcon,
   ArrowRightIcon,
@@ -12,6 +14,7 @@ import {
 'lucide-react';
 import { AddressDisplay } from '../ui/AddressDisplay';
 import { PillTabs } from '../ui/PillTabs';
+import { FilterDropdown } from '../ui/FilterDropdown';
 import { cn, formatDate } from '../../lib/utils';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -29,6 +32,8 @@ const TRANSPORT_ARCHIVABLE: TransportRequestStatus[] = ['completed', 'cancelled'
 
 const STATUS_LABEL: Record<TransportRequestStatus, string> = {
   open: 'Open',
+  assigned: 'Assigned',
+  accepted: 'Accepted',
   claimed: 'Claimed',
   in_progress: 'In Progress',
   completed: 'Completed',
@@ -37,6 +42,8 @@ const STATUS_LABEL: Record<TransportRequestStatus, string> = {
 };
 const STATUS_PILL: Record<TransportRequestStatus, string> = {
   open: 'bg-[#F8E7C8] text-[#A36B00]',
+  assigned: 'bg-[#DCEAF7] text-[#356A9A]',
+  accepted: 'bg-[#DDEFE2] text-[#3E7B52]',
   claimed: 'bg-[#DCEAF7] text-[#356A9A]',
   in_progress: 'bg-[#E8DEEC] text-[#6E4E80]',
   completed: 'bg-[#DDEFE2] text-[#3E7B52]',
@@ -112,6 +119,78 @@ function formatPickupTime(iso: string): string {
   return `${d.toLocaleString('en-US', { month: 'short', day: 'numeric' })} · ${time}`;
 }
 
+// Subtabs are organized around "what's there for me to do?" rather than raw
+// status: my active assignments, the unclaimed pool, everything assigned, and
+// the terminal archive.
+type TransportTab = 'mine' | 'unclaimed' | 'assigned' | 'completed';
+
+const DATE_OPTIONS = [
+{ value: 'all', label: 'Any Date' },
+{ value: 'today', label: 'Today' },
+{ value: 'tomorrow', label: 'Tomorrow' },
+{ value: 'this_week', label: 'This Week' },
+{ value: 'next_week', label: 'Next Week' },
+{ value: 'past_due', label: 'Past Due' }];
+
+
+function startOfDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+// Week starts Sunday (US convention), to match how rescues read a calendar.
+function startOfWeekSunday(d: Date): Date {
+  const s = startOfDay(d);
+  s.setDate(s.getDate() - s.getDay());
+  return s;
+}
+// The local date a transport is "needed", for date bucketing. Exact → its pickup
+// day; flexible → its window start; asap / coordinate_later / undated → null
+// (those only match "Any Date").
+function requestRepDate(r: TransportRequest): Date | null {
+  if (r.schedule_type === 'exact' && r.requested_pickup_time) {
+    return new Date(r.requested_pickup_time);
+  }
+  if (r.schedule_type === 'flexible' && r.preferred_window_start) {
+    return new Date(`${r.preferred_window_start}T00:00:00`);
+  }
+  return null;
+}
+// Past due = the moment it was needed has elapsed. Exact → pickup time passed;
+// flexible → end of its window day passed. Open-ended types are never past due.
+function isTransportPastDue(r: TransportRequest, now: Date): boolean {
+  if (r.schedule_type === 'exact' && r.requested_pickup_time) {
+    return new Date(r.requested_pickup_time).getTime() < now.getTime();
+  }
+  if (r.schedule_type === 'flexible') {
+    const end = r.preferred_window_end ?? r.preferred_window_start;
+    if (end) return new Date(`${end}T23:59:59`).getTime() < now.getTime();
+  }
+  return false;
+}
+function matchesDateFilter(
+r: TransportRequest,
+filter: string,
+now: Date = new Date())
+: boolean {
+  if (filter === 'all') return true;
+  if (filter === 'past_due') return isTransportPastDue(r, now);
+  const rep = requestRepDate(r);
+  if (!rep) return false; // undated requests only match "Any Date"
+  const DAY = 86400000;
+  const repDay = startOfDay(rep).getTime();
+  const today = startOfDay(now).getTime();
+  if (filter === 'today') return repDay === today;
+  if (filter === 'tomorrow') return repDay === today + DAY;
+  if (filter === 'this_week') {
+    const ws = startOfWeekSunday(now).getTime();
+    return repDay >= ws && repDay < ws + 7 * DAY;
+  }
+  if (filter === 'next_week') {
+    const ws = startOfWeekSunday(now).getTime() + 7 * DAY;
+    return repDay >= ws && repDay < ws + 7 * DAY;
+  }
+  return true;
+}
+
 export function TransportsView() {
   const {
     transportRequests,
@@ -119,14 +198,20 @@ export function TransportsView() {
     animalsIndex: animals,
     savedLocations,
     claimTransportRequest,
+    acceptTransportRequest,
+    unassignTransportRequest,
     updateTransportRequest
   } = useWhisker();
   const { currentPersonId } = useAuth();
+  const isAdmin = useIsAdmin();
   const [editing, setEditing] = useState<TransportRequest | null>(null);
-  const [activeTab, setActiveTab] = useState<
-    'open' | 'claimed' | 'completed' | 'needsReview'>(
-    'open');
+  const [assigning, setAssigning] = useState<TransportRequest | null>(null);
+  // null = no explicit choice yet → fall back to the data-driven default below.
+  const [selectedTab, setSelectedTab] = useState<TransportTab | null>(null);
   const [archiving, setArchiving] = useState<TransportRequest | null>(null);
+  const [requesterFilter, setRequesterFilter] = useState('all');
+  const [assigneeFilter, setAssigneeFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('all');
   const isAdminForArchive = useCanArchive('transport_requests', { id: 'na' });
 
   const savedLocName = (id?: string | null) =>
@@ -137,56 +222,143 @@ export function TransportsView() {
   !(r.pickup_saved_location_id || isResolvedAddress(r.pickup_address)) ||
   !(r.dropoff_saved_location_id || isResolvedAddress(r.dropoff_address));
 
-  // Urgent/ASAP first, then soonest timing. Bucket by EFFECTIVE status so a
-  // past open Exact request lands in Needs Review (not Open) immediately, even
-  // before the nightly cron persists 'expired'.
+  const personName = (id?: string | null) => {
+    if (!id) return 'Unknown';
+    const p = people.find((x) => x.id === id);
+    return p ? `${p.first_name} ${p.last_name}` : 'Unknown';
+  };
+
+  // Urgent/ASAP first, then soonest timing.
   const sorted = [...transportRequests].sort((a, b) => {
     const u = URGENCY_RANK[b.urgency] - URGENCY_RANK[a.urgency];
     if (u !== 0) return u;
     return timingSortValue(a) - timingSortValue(b);
   });
-  const grouped = {
-    open: sorted.filter((r) => effectiveStatus(r) === 'open'),
-    claimed: sorted.filter(
-      (r) => r.status === 'claimed' || r.status === 'in_progress'
+
+  // Buckets key off who owns the request (assignee) + whether it's terminal —
+  // "what's there for me to do?" rather than raw status. Past-due requests stay
+  // in Unclaimed / Assigned and are surfaced via the Past Due date filter.
+  const isTerminal = (r: TransportRequest) =>
+  r.status === 'completed' || r.status === 'cancelled';
+  const buckets: Record<TransportTab, TransportRequest[]> = {
+    mine: sorted.filter(
+      (r) =>
+      !!currentPersonId &&
+      r.assigned_volunteer_person_id === currentPersonId &&
+      !isTerminal(r)
     ),
-    completed: sorted.filter(
-      (r) => r.status === 'completed' || r.status === 'cancelled'
+    unclaimed: sorted.filter(
+      (r) => !r.assigned_volunteer_person_id && !isTerminal(r)
     ),
-    needsReview: sorted.filter((r) => effectiveStatus(r) === 'expired')
+    assigned: sorted.filter(
+      (r) => !!r.assigned_volunteer_person_id && !isTerminal(r)
+    ),
+    completed: sorted.filter(isTerminal)
   };
-  const display = grouped[activeTab];
+
+  // Default to "Assigned to Me" when the user has active assignments, else
+  // "Unclaimed". An explicit tab click (selectedTab) overrides this.
+  const defaultTab: TransportTab =
+  buckets.mine.length > 0 ? 'mine' : 'unclaimed';
+  const activeTab = selectedTab ?? defaultTab;
+
+  // Filter option lists, derived from the full request set so they're stable
+  // across tabs. Each lists only the people who actually appear.
+  const requesterOptions = [
+  { value: 'all', label: 'All Requesters' },
+  ...Array.from(
+    new Set(
+      transportRequests.
+      map((r) => r.requested_by_person_id).
+      filter((v): v is string => Boolean(v))
+    )
+  ).
+  map((id) => ({ value: id, label: personName(id) })).
+  sort((a, b) => a.label.localeCompare(b.label))];
+
+  const assigneeOptions = [
+  { value: 'all', label: 'All Assignees' },
+  ...Array.from(
+    new Set(
+      transportRequests.
+      map((r) => r.assigned_volunteer_person_id).
+      filter((v): v is string => Boolean(v))
+    )
+  ).
+  map((id) => ({ value: id, label: personName(id) })).
+  sort((a, b) => a.label.localeCompare(b.label))];
+
+  // The Assignee filter only makes sense where requests can have an assignee:
+  // "Assigned to Me" is all me, and "Unclaimed" has none by definition — so it's
+  // shown only on "Assigned" and "Completed", and ignored when bucketing.
+  const showAssigneeFilter =
+  activeTab === 'assigned' || activeTab === 'completed';
+  const filtersActive =
+  requesterFilter !== 'all' ||
+  showAssigneeFilter && assigneeFilter !== 'all' ||
+  dateFilter !== 'all';
+
+  const display = buckets[activeTab].filter(
+    (r) =>
+    (requesterFilter === 'all' ||
+    r.requested_by_person_id === requesterFilter) && (
+    !showAssigneeFilter ||
+    assigneeFilter === 'all' ||
+    r.assigned_volunteer_person_id === assigneeFilter) &&
+    matchesDateFilter(r, dateFilter)
+  );
 
   return (
     <div className="space-y-6">
       <PillTabs
         value={activeTab}
-        onChange={(k) => setActiveTab(k as typeof activeTab)}
+        onChange={(k) => setSelectedTab(k as TransportTab)}
         tabs={[
-        { key: 'open', label: `Open (${grouped.open.length})` },
+        { key: 'mine', label: `Assigned to Me (${buckets.mine.length})` },
+        { key: 'unclaimed', label: `Unclaimed (${buckets.unclaimed.length})` },
+        { key: 'assigned', label: `Assigned (${buckets.assigned.length})` },
         {
-          key: 'claimed',
-          label: `Claimed / In Progress (${grouped.claimed.length})`
-        },
-        {
-          key: 'needsReview',
-          label: `Needs Review (${grouped.needsReview.length})`
-        },
-        { key: 'completed', label: `Completed (${grouped.completed.length})` }]} />
+          key: 'completed',
+          label: `Completed (${buckets.completed.length})`
+        }]} />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <FilterDropdown
+          label="Requester"
+          value={requesterFilter}
+          options={requesterOptions}
+          onChange={setRequesterFilter} />
+
+        {showAssigneeFilter &&
+        <FilterDropdown
+          label="Assignee"
+          value={assigneeFilter}
+          options={assigneeOptions}
+          onChange={setAssigneeFilter} />
+        }
+        <FilterDropdown
+          label="Date"
+          value={dateFilter}
+          options={DATE_OPTIONS}
+          onChange={setDateFilter} />
+
+      </div>
 
       {display.length === 0 ?
       <Card className="p-10 text-center text-text-secondary">
           <TruckIcon className="w-10 h-10 mx-auto mb-3 opacity-30" />
           <p className="font-medium text-text-primary mb-1">
-            Nothing to see here
+            {filtersActive ? 'No matching requests' : 'Nothing to see here'}
           </p>
           <p className="text-sm">
-            {activeTab === 'open' ?
-          'Submit a request when someone needs a ride.' :
-          activeTab === 'claimed' ?
-          'No active rides at the moment.' :
-          activeTab === 'needsReview' ?
-          'No expired requests to review.' :
+            {filtersActive ?
+          'No requests match the current filters.' :
+          activeTab === 'mine' ?
+          'Nothing is assigned to you right now.' :
+          activeTab === 'unclaimed' ?
+          'No unclaimed requests — submit one when someone needs a ride.' :
+          activeTab === 'assigned' ?
+          'No active assigned rides at the moment.' :
           'No completed transports yet.'}
           </p>
         </Card> :
@@ -224,6 +396,23 @@ export function TransportsView() {
           currentPersonId &&
           claimTransportRequest(r.id, currentPersonId)
           }
+          canAssign={isAdmin && effectiveStatus(r) === 'open'}
+          onAssign={() => setAssigning(r)}
+          canRespond={
+          !!currentPersonId &&
+          r.status === 'assigned' &&
+          r.assigned_volunteer_person_id === currentPersonId
+          }
+          onAccept={() => acceptTransportRequest(r.id)}
+          onDecline={() => unassignTransportRequest(r.id)}
+          canReassign={
+          isAdmin &&
+          (r.status === 'assigned' ||
+          r.status === 'accepted' ||
+          r.status === 'claimed')
+          }
+          onReassign={() => setAssigning(r)}
+          onRemoveAssignment={() => unassignTransportRequest(r.id)}
           canCancel={
           !!currentPersonId &&
           r.requested_by_person_id === currentPersonId &&
@@ -256,6 +445,14 @@ export function TransportsView() {
 
       }
 
+      {assigning &&
+      <AssignTransportModal
+        isOpen={true}
+        onClose={() => setAssigning(null)}
+        request={assigning} />
+
+      }
+
       {archiving &&
       <ArchiveConfirmDialog
         isOpen={true}
@@ -282,6 +479,17 @@ interface TransportCardProps {
   needsAddress: boolean;
   canClaim: boolean;
   onClaim: () => void;
+  /** Admin may direct this open request to a specific volunteer. */
+  canAssign: boolean;
+  onAssign: () => void;
+  /** Viewer is the assigned volunteer on an awaiting-response request. */
+  canRespond: boolean;
+  onAccept: () => void;
+  onDecline: () => void;
+  /** Admin may reassign / remove the assignment on an active request. */
+  canReassign: boolean;
+  onReassign: () => void;
+  onRemoveAssignment: () => void;
   canCancel: boolean;
   onCancel: () => void;
   canEdit: boolean;
@@ -299,6 +507,14 @@ function TransportCard({
   needsAddress,
   canClaim,
   onClaim,
+  canAssign,
+  onAssign,
+  canRespond,
+  onAccept,
+  onDecline,
+  canReassign,
+  onReassign,
+  onRemoveAssignment,
   canCancel,
   onCancel,
   canEdit,
@@ -318,6 +534,24 @@ function TransportCard({
     ))
     {
       onCancel();
+    }
+  };
+  const handleDecline = () => {
+    if (
+    window.confirm(
+      'Decline this transport? It will return to the open pool for others to claim.'
+    ))
+    {
+      onDecline();
+    }
+  };
+  const handleRemoveAssignment = () => {
+    if (
+    window.confirm(
+      'Remove this volunteer’s assignment? The request returns to the open pool.'
+    ))
+    {
+      onRemoveAssignment();
     }
   };
   return (
@@ -382,7 +616,13 @@ function TransportCard({
               <span>
                 Requested by {requesterName}
                 {assigneeName &&
-                <> · Claimed by <span className="text-text-primary font-medium">{assigneeName}</span></>
+                <>
+                    {' '}·{' '}
+                    {request.status === 'assigned' || request.status === 'accepted' ?
+                  'Assigned to' :
+                  'Claimed by'}{' '}
+                    <span className="text-text-primary font-medium">{assigneeName}</span>
+                  </>
                 }
               </span>
             </span>
@@ -424,6 +664,56 @@ function TransportCard({
                 Claim Request
               </button>
             );
+            if (canAssign)
+            actions.push(
+              <button
+                key="assign"
+                type="button"
+                onClick={onAssign}
+                className={cn(linkBase, 'text-primary')}>
+                Assign…
+              </button>
+            );
+            if (canRespond) {
+              actions.push(
+                <button
+                  key="accept"
+                  type="button"
+                  onClick={onAccept}
+                  className={cn(linkBase, 'text-[#3E7B52]')}>
+                  Accept
+                </button>
+              );
+              actions.push(
+                <button
+                  key="decline"
+                  type="button"
+                  onClick={handleDecline}
+                  className={cn(linkBase, 'text-text-secondary hover:text-[#9B3A3A]')}>
+                  Decline
+                </button>
+              );
+            }
+            if (canReassign) {
+              actions.push(
+                <button
+                  key="reassign"
+                  type="button"
+                  onClick={onReassign}
+                  className={cn(linkBase, 'text-text-secondary hover:text-text-primary')}>
+                  Reassign…
+                </button>
+              );
+              actions.push(
+                <button
+                  key="remove-assignment"
+                  type="button"
+                  onClick={handleRemoveAssignment}
+                  className={cn(linkBase, 'text-text-secondary hover:text-[#9B3A3A]')}>
+                  Remove
+                </button>
+              );
+            }
             if (canEdit)
             actions.push(
               <button
