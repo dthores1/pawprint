@@ -1006,7 +1006,8 @@ export type SittingCoverageScope =
 export interface SittingRequest {
   id: string;
   requested_by_person_id: string;
-  sitter_person_id?: string;
+  /** The accepted sitter. `null` on update clears it (sitter backs out). */
+  sitter_person_id?: string | null;
   coverage_scope: SittingCoverageScope;
   start_date: string;
   end_date: string;

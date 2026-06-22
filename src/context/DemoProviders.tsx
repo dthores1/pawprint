@@ -1320,6 +1320,19 @@ export function DemoWhiskerProvider({
     s
     )
     ),
+    releaseSittingRequest: (id) =>
+    setSittingRequests((prev) =>
+    prev.map((s) =>
+    s.id === id ?
+    {
+      ...s,
+      sitter_person_id: null,
+      status: 'open' as const,
+      updated_at: now()
+    } :
+    s
+    )
+    ),
 
     // Notifications: seeded in memory so the bell badge + list are populated;
     // mark-read is interactive (no persistence — resets on refresh).

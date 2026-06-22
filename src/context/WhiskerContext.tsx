@@ -520,6 +520,8 @@ export interface WhiskerContextType {
   => void;
   /** Convenience: set the sitter + flip status to claimed. */
   acceptSittingRequest: (id: string, sitter_person_id: string) => void;
+  /** The sitter backs out: clear the sitter and reopen the request. */
+  releaseSittingRequest: (id: string) => void;
   // Notifications (created by DB triggers; clients only read + mark read)
   notifications: NotificationItem[];
   unreadNotificationCount: number;
@@ -3518,6 +3520,15 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       status: 'claimed'
     });
   };
+  // The sitter can no longer cover: clear the sitter and reopen the request.
+  // Clearing sitter_person_id fires notify_sitting_accepted() (migration 0075),
+  // which notifies the requester their sitter withdrew.
+  const releaseSittingRequest = (id: string) => {
+    updateSittingRequest(id, {
+      sitter_person_id: null,
+      status: 'open'
+    });
+  };
   // — Clinic Events / Slots ——————————————————————————————
   const addClinicEvent = async (
   event: Omit<ClinicEvent, 'id' | 'created_at' | 'updated_at'>) =>
@@ -3945,6 +3956,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         addSittingRequest,
         updateSittingRequest,
         acceptSittingRequest,
+        releaseSittingRequest,
         notifications,
         unreadNotificationCount,
         refreshNotifications,

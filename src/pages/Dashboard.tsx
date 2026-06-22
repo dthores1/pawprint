@@ -29,6 +29,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Priority, Animal } from '../types';
 import { BoneIcon } from '../components/ui/BoneIcon';
+import { HelpNeededWidget } from '../components/dashboard/HelpNeededWidget';
 const PRIORITY_RANK: Record<Priority, number> = {
   critical: 4,
   urgent: 3,
@@ -376,6 +377,11 @@ export function Dashboard() {
               }
             </Card>
           </motion.div>
+
+          {/* Help Needed — cross-type unclaimed requests. Renders nothing when
+              empty, so it's not wrapped in an animated row (which would leave a
+              gap); the widget owns its own heading + card. */}
+          <HelpNeededWidget />
 
           {/* Clinics — between Needs Action and Upcoming Medical */}
           <motion.div variants={item}>
