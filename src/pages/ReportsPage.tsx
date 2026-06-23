@@ -20,6 +20,9 @@ import {
   BarChart3Icon } from
 'lucide-react';
 import { useWhisker } from '../context/WhiskerContext';
+import { useAuth } from '../context/AuthContext';
+import { useCanManageSites } from '../lib/useSitePermissions';
+import { useCanViewSupplyFinancials } from '../lib/useSupplyPermissions';
 import { Card } from '../components/ui/Card';
 import { ReportsDateFilter } from '../components/reports/ReportsDateFilter';
 import {
@@ -235,6 +238,14 @@ export function ReportsPage() {
     sites,
     siteVolunteers
   } = useWhisker();
+
+  // Per-section visibility. Animals / Fosters / Clinics / Adoptions are visible
+  // to all members; Rescue Sites and Supply (financial) are permission-gated.
+  // The org-wide "Show All Reports to Everyone" setting opens everything.
+  const { currentOrg } = useAuth();
+  const showAllReports = !!currentOrg?.show_all_reports;
+  const canViewSites = useCanManageSites() || showAllReports;
+  const canViewSupply = useCanViewSupplyFinancials(); // already folds in showAll
 
   // Reports must cover everything, but the default loads are scoped (animals =
   // in-care, people = active) — pull the historical animals and inactive
@@ -723,7 +734,9 @@ export function ReportsPage() {
         </div>
       </section>
 
-      {/* Rescue Sites */}
+      {/* Rescue Sites — sensitive (colony/trapping locations); admins +
+          MANAGE_SITES, or everyone when "Show All Reports" is on. */}
+      {canViewSites &&
       <section>
         <SectionTitle>Rescue Sites</SectionTitle>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
@@ -803,6 +816,7 @@ export function ReportsPage() {
           </Card>
         </div>
       </section>
+      }
 
       {/* Fosters */}
       <section>
@@ -918,7 +932,10 @@ export function ReportsPage() {
         </div>
       </section>
 
-      {/* Supply Requests */}
+      {/* Supply Requests — financial data; admins + MANAGE_SUPPLY_REQUESTS, or
+          everyone when "Show All Reports" is on. For unauthorized users the
+          underlying total_cost is also absent from the data (see loadCoordination). */}
+      {canViewSupply &&
       <section>
         <SectionTitle>Supply Requests</SectionTitle>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
@@ -1000,6 +1017,7 @@ export function ReportsPage() {
           </Card>
         </div>
       </section>
+      }
     </div>);
 
 }

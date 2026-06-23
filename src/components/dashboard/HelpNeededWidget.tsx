@@ -9,8 +9,9 @@ import {
 'lucide-react';
 import { Card } from '../ui/Card';
 import { useWhisker } from '../../context/WhiskerContext';
+import { useCanManageSupplyRequests } from '../../lib/useSupplyPermissions';
 import { cn, animalDisplayName } from '../../lib/utils';
-import { TransportRequest } from '../../types';
+import { TransportRequest, SittingRequest } from '../../types';
 
 const HELP_LIMIT = 6;
 
@@ -27,7 +28,9 @@ interface HelpItem {
   sortTs: number;
 }
 
-const PILL_UNCLAIMED = 'bg-[#F8E7C8] text-[#A36B00]';
+// Blue (not amber) so "Unclaimed" reads as available — matches the Open pill on
+// the Transport/Sitting request lists, and keeps amber for warnings.
+const PILL_UNCLAIMED = 'bg-[#E3E4F2] text-[#525694]';
 const PILL_SUBMITTED = 'bg-[#E5E2DC] text-[#6B6B6B]';
 const UNDATED = Number.MAX_SAFE_INTEGER;
 
@@ -37,6 +40,26 @@ function fmtDay(d: Date): string {
 // Parse 'yyyy-MM-dd' (or ISO) at LOCAL midnight so date-only values don't shift.
 function parseLocalDate(s: string): Date {
   return new Date(`${s.slice(0, 10)}T00:00:00`);
+}
+function startOfDayMs(d: Date): number {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+// Past-due = the request's needed DAY is before today, so it's stale ("Needs
+// Review"), not actionable help. Help Needed excludes these. Open-ended types
+// (asap / coordinate_later, no date) are never past-due.
+function isTransportPastNeeded(r: TransportRequest, now: Date = new Date()): boolean {
+  const today = startOfDayMs(now);
+  if (r.schedule_type === 'exact' && r.requested_pickup_time) {
+    return startOfDayMs(new Date(r.requested_pickup_time)) < today;
+  }
+  if (r.schedule_type === 'flexible') {
+    const end = r.preferred_window_end ?? r.preferred_window_start;
+    if (end) return startOfDayMs(parseLocalDate(end)) < today;
+  }
+  return false;
+}
+function isSittingPast(s: SittingRequest, now: Date = new Date()): boolean {
+  return startOfDayMs(parseLocalDate(s.end_date || s.start_date)) < startOfDayMs(now);
 }
 
 function transportWhen(r: TransportRequest): string {
@@ -76,6 +99,8 @@ export function HelpNeededWidget() {
     peopleIndex,
     placements
   } = useWhisker();
+  // Supply requests are only shown to people who can fulfill them.
+  const canFulfillSupply = useCanManageSupplyRequests();
 
   const animalName = (id?: string | null) => {
     if (!id) return undefined;
@@ -93,7 +118,9 @@ export function HelpNeededWidget() {
     (r) =>
     !r.assigned_volunteer_person_id &&
     r.status !== 'completed' &&
-    r.status !== 'cancelled'
+    r.status !== 'cancelled' &&
+    r.status !== 'expired' &&
+    !isTransportPastNeeded(r)
   ).
   map((r) => ({
     id: `transport-${r.id}`,
@@ -119,7 +146,7 @@ export function HelpNeededWidget() {
     return names.length ? names.join(', ') : 'Sitting request';
   };
   const sittingItems: HelpItem[] = sittingRequests.
-  filter((s) => s.status === 'open').
+  filter((s) => s.status === 'open' && !isSittingPast(s)).
   map((s) => ({
     id: `sitting-${s.id}`,
     typeLabel: 'Sitter Needed',
@@ -134,7 +161,7 @@ export function HelpNeededWidget() {
     sortTs: parseLocalDate(s.start_date).getTime()
   }));
 
-  const supplyItems: HelpItem[] = supplyRequests.
+  const supplyItems: HelpItem[] = (canFulfillSupply ? supplyRequests : []).
   filter((r) => r.status === 'submitted').
   map((r) => ({
     id: `supply-${r.id}`,

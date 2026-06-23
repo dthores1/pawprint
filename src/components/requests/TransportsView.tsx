@@ -1,6 +1,9 @@
 import { Fragment, useState } from 'react';
 import { useWhisker } from '../../context/WhiskerContext';
 import { Card } from '../ui/Card';
+import { Button } from '../ui/Button';
+import { Tooltip } from '../ui/Tooltip';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { NewTransportRequestModal } from '../transports/NewTransportRequestModal';
 import { AssignTransportModal } from '../transports/AssignTransportModal';
 import { useIsAdmin } from '../../lib/useIsAdmin';
@@ -8,9 +11,13 @@ import {
   TruckIcon,
   ArrowRightIcon,
   AlertCircleIcon,
+  AlertTriangleIcon,
   MapPinIcon,
   CalendarIcon,
-  UserIcon } from
+  UserIcon,
+  PencilIcon,
+  XIcon,
+  Trash2Icon } from
 'lucide-react';
 import { AddressDisplay } from '../ui/AddressDisplay';
 import { PillTabs } from '../ui/PillTabs';
@@ -23,7 +30,12 @@ import {
   TransportRequestType,
   TransportRequestUrgency } from
 '../../types';
-import { effectiveStatus } from '../../lib/transportTiming';
+import {
+  effectiveStatus,
+  transportStaleInfo,
+  TRANSPORT_STALE_LABEL,
+  transportStaleTooltip } from
+'../../lib/transportTiming';
 import { isResolvedAddress } from '../../lib/address';
 import { ArchiveConfirmDialog } from '../archive/ArchiveConfirmDialog';
 import { useCanArchive } from '../archive/useCanArchive';
@@ -41,7 +53,9 @@ const STATUS_LABEL: Record<TransportRequestStatus, string> = {
   expired: 'Expired'
 };
 const STATUS_PILL: Record<TransportRequestStatus, string> = {
-  open: 'bg-[#F8E7C8] text-[#A36B00]',
+  // Blue (not amber) so "Open" doesn't compete with the amber warning pills
+  // (Urgent / Needs Address / Awaiting Review). Green is reserved for done states.
+  open: 'bg-[#E3E4F2] text-[#525694]',
   assigned: 'bg-[#DCEAF7] text-[#356A9A]',
   accepted: 'bg-[#DDEFE2] text-[#3E7B52]',
   claimed: 'bg-[#DCEAF7] text-[#356A9A]',
@@ -200,6 +214,7 @@ export function TransportsView() {
     claimTransportRequest,
     acceptTransportRequest,
     unassignTransportRequest,
+    completeTransportRequest,
     updateTransportRequest
   } = useWhisker();
   const { currentPersonId } = useAuth();
@@ -413,6 +428,23 @@ export function TransportsView() {
           }
           onReassign={() => setAssigning(r)}
           onRemoveAssignment={() => unassignTransportRequest(r.id)}
+          canComplete={
+          !!currentPersonId &&
+          (r.requested_by_person_id === currentPersonId ||
+          r.assigned_volunteer_person_id === currentPersonId ||
+          isAdmin) &&
+          // Only once it's committed (accepted/claimed/in progress) or it's
+          // past due. NOT while 'assigned' — that's awaiting the volunteer's
+          // Accept, so completing it then would skip the acceptance step.
+          (r.status === 'accepted' ||
+          r.status === 'claimed' ||
+          r.status === 'in_progress' ||
+          (r.status !== 'assigned' &&
+          r.status !== 'completed' &&
+          r.status !== 'cancelled' &&
+          transportStaleInfo(r) !== null))
+          }
+          onComplete={() => completeTransportRequest(r.id)}
           canCancel={
           !!currentPersonId &&
           r.requested_by_person_id === currentPersonId &&
@@ -490,6 +522,9 @@ interface TransportCardProps {
   canReassign: boolean;
   onReassign: () => void;
   onRemoveAssignment: () => void;
+  /** Confirm the transport happened (requester / assignee / admin). */
+  canComplete: boolean;
+  onComplete: () => void;
   canCancel: boolean;
   onCancel: () => void;
   canEdit: boolean;
@@ -515,6 +550,8 @@ function TransportCard({
   canReassign,
   onReassign,
   onRemoveAssignment,
+  canComplete,
+  onComplete,
   canCancel,
   onCancel,
   canEdit,
@@ -527,34 +564,48 @@ function TransportCard({
   (request.type === 'supplies' ?
   'Supply drop' :
   TYPE_LABEL[request.type]);
-  const handleCancel = () => {
-    if (
-    window.confirm(
-      'Cancel this transport request? It will be marked as cancelled for everyone.'
-    ))
-    {
-      onCancel();
+  // All confirmations route through one ConfirmDialog (polished, on-brand) —
+  // no more window.confirm. `confirm` selects which prompt is open.
+  const [confirm, setConfirm] = useState<
+    null | 'complete' | 'cancel' | 'decline' | 'remove'>(
+    null);
+  const confirmProps = {
+    complete: {
+      title: 'Mark transport complete?',
+      body: 'Only do this once the transport has actually happened — it records the request as completed.',
+      confirmLabel: 'Mark Complete',
+      cancelLabel: 'Cancel',
+      tone: 'default' as const,
+      onConfirm: onComplete
+    },
+    cancel: {
+      title: 'Cancel transport request?',
+      body: 'It will be marked as cancelled for everyone.',
+      confirmLabel: 'Cancel Request',
+      cancelLabel: 'Keep Request',
+      tone: 'danger' as const,
+      onConfirm: onCancel
+    },
+    decline: {
+      title: 'Decline this transport?',
+      body: 'It will return to the open pool for others to claim.',
+      confirmLabel: 'Decline',
+      cancelLabel: 'Never mind',
+      tone: 'danger' as const,
+      onConfirm: onDecline
+    },
+    remove: {
+      title: 'Remove assignment?',
+      body: 'This volunteer’s assignment will be removed and the request returns to the open pool.',
+      confirmLabel: 'Remove',
+      cancelLabel: 'Never mind',
+      tone: 'danger' as const,
+      onConfirm: onRemoveAssignment
     }
   };
-  const handleDecline = () => {
-    if (
-    window.confirm(
-      'Decline this transport? It will return to the open pool for others to claim.'
-    ))
-    {
-      onDecline();
-    }
-  };
-  const handleRemoveAssignment = () => {
-    if (
-    window.confirm(
-      'Remove this volunteer’s assignment? The request returns to the open pool.'
-    ))
-    {
-      onRemoveAssignment();
-    }
-  };
+  const activeConfirm = confirm ? confirmProps[confirm] : null;
   return (
+    <>
     <Card className="p-5">
       <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-6">
         <div className="flex-1 min-w-0">
@@ -636,26 +687,53 @@ function TransportCard({
 
         <div className="flex sm:flex-col items-start sm:items-end gap-2 shrink-0">
           {(() => {
+            // One status indicator: when the request is stale, the badge IS the
+            // status (Past Due red / Awaiting Review amber) — no separate
+            // "Expired" pill. Otherwise show the normal claim-state pill (never
+            // "Expired"; that meaning is carried by the badge).
+            const stale = transportStaleInfo(request);
+            if (stale) {
+              const cls =
+              stale.kind === 'past_due' ?
+              'bg-[#F5D7D7] text-[#9B3A3A]' : // red — the weight "Expired" had
+              'bg-[#F8E7C8] text-[#A36B00]'; // amber — softer "needs confirmation"
+              return (
+                <Tooltip content={transportStaleTooltip(stale)}>
+                  <span
+                    className={cn(
+                      'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide cursor-help',
+                      cls
+                    )}>
+
+                    <AlertTriangleIcon className="w-3 h-3" />
+                    {TRANSPORT_STALE_LABEL[stale.kind]} · {stale.days}D
+                  </span>
+                </Tooltip>);
+
+            }
             const eff = effectiveStatus(request);
+            const disp = eff === 'expired' ? 'open' : eff;
             return (
               <span
                 className={cn(
                   'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold',
-                  STATUS_PILL[eff]
+                  STATUS_PILL[disp]
                 )}>
 
-                {STATUS_LABEL[eff]}
+                {STATUS_LABEL[disp]}
               </span>);
 
           })()}
           {(() => {
-            // Compact inline actions: "Claim · Edit · Cancel · Archive" (only
-            // those that apply), separated by dots, to keep the card short.
             const linkBase =
             'text-sm font-medium hover:underline transition-colors';
-            const actions: JSX.Element[] = [];
+            const iconBtn =
+            'p-1 -m-1 rounded-md transition-colors text-text-secondary';
+            // "Verb" actions stay as text links; Edit/Cancel/Archive become
+            // compact controls. Mark Complete is a button (the primary action).
+            const verbs: JSX.Element[] = [];
             if (canClaim)
-            actions.push(
+            verbs.push(
               <button
                 key="claim"
                 type="button"
@@ -665,7 +743,7 @@ function TransportCard({
               </button>
             );
             if (canAssign)
-            actions.push(
+            verbs.push(
               <button
                 key="assign"
                 type="button"
@@ -675,7 +753,7 @@ function TransportCard({
               </button>
             );
             if (canRespond) {
-              actions.push(
+              verbs.push(
                 <button
                   key="accept"
                   type="button"
@@ -684,18 +762,18 @@ function TransportCard({
                   Accept
                 </button>
               );
-              actions.push(
+              verbs.push(
                 <button
                   key="decline"
                   type="button"
-                  onClick={handleDecline}
+                  onClick={() => setConfirm('decline')}
                   className={cn(linkBase, 'text-text-secondary hover:text-[#9B3A3A]')}>
                   Decline
                 </button>
               );
             }
             if (canReassign) {
-              actions.push(
+              verbs.push(
                 <button
                   key="reassign"
                   type="button"
@@ -704,62 +782,101 @@ function TransportCard({
                   Reassign…
                 </button>
               );
-              actions.push(
+              verbs.push(
                 <button
                   key="remove-assignment"
                   type="button"
-                  onClick={handleRemoveAssignment}
+                  onClick={() => setConfirm('remove')}
                   className={cn(linkBase, 'text-text-secondary hover:text-[#9B3A3A]')}>
                   Remove
                 </button>
               );
             }
-            if (canEdit)
-            actions.push(
-              <button
-                key="edit"
-                type="button"
-                onClick={onEdit}
-                className={cn(linkBase, 'text-text-secondary hover:text-text-primary')}>
-                Edit
-              </button>
-            );
-            if (canCancel)
-            actions.push(
-              <button
-                key="cancel"
-                type="button"
-                onClick={handleCancel}
-                className={cn(linkBase, 'text-text-secondary hover:text-[#9B3A3A]')}>
-                Cancel
-              </button>
-            );
-            if (canArchive)
-            actions.push(
-              <button
-                key="archive"
-                type="button"
-                onClick={onArchive}
-                className={cn(linkBase, 'text-text-secondary hover:text-[#9B3A3A]')}>
-                Archive
-              </button>
-            );
-            if (actions.length === 0) return null;
+            const hasIconRow = canEdit || canCancel || canArchive;
+            if (!canComplete && verbs.length === 0 && !hasIconRow) return null;
             return (
-              <div className="flex items-center gap-2">
-                {actions.map((node, i) =>
-                <Fragment key={i}>
-                    {i > 0 &&
+              <div className="flex flex-col sm:items-end gap-1.5">
+                {canComplete &&
+                <Button
+                  variant="soft"
+                  size="xs"
+                  onClick={() => setConfirm('complete')}>
+
+                    Mark Complete
+                  </Button>
+                }
+                {(verbs.length > 0 || hasIconRow) &&
+                <div className="flex items-center gap-2.5">
+                    {verbs.map((node, i) =>
+                  <Fragment key={i}>
+                        {i > 0 &&
+                    <span className="text-text-secondary/40" aria-hidden="true">·</span>
+                    }
+                        {node}
+                      </Fragment>
+                  )}
+                    {verbs.length > 0 && hasIconRow &&
                   <span className="text-text-secondary/40" aria-hidden="true">·</span>
                   }
-                    {node}
-                  </Fragment>
-                )}
+                    {canEdit &&
+                  <Tooltip content="Edit request">
+                        <button
+                      type="button"
+                      onClick={onEdit}
+                      aria-label="Edit request"
+                      className={cn(iconBtn, 'hover:text-text-primary hover:bg-background')}>
+
+                          <PencilIcon className="w-4 h-4" />
+                        </button>
+                      </Tooltip>
+                  }
+                    {canCancel &&
+                  <button
+                    type="button"
+                    onClick={() => setConfirm('cancel')}
+                    className={cn(
+                      linkBase,
+                      'inline-flex items-center gap-1 text-text-secondary hover:text-[#9B3A3A]'
+                    )}>
+
+                        <XIcon className="w-3.5 h-3.5" />
+                        Cancel
+                      </button>
+                  }
+                    {canArchive &&
+                  <Tooltip content="Archive request">
+                        <button
+                      type="button"
+                      onClick={onArchive}
+                      aria-label="Archive request"
+                      className={cn(iconBtn, 'hover:text-[#9B3A3A] hover:bg-[#F5D7D7]/60')}>
+
+                          <Trash2Icon className="w-4 h-4" />
+                        </button>
+                      </Tooltip>
+                  }
+                  </div>
+                }
               </div>);
 
           })()}
         </div>
       </div>
-    </Card>);
+    </Card>
+
+    {activeConfirm &&
+    <ConfirmDialog
+      isOpen={true}
+      onClose={() => setConfirm(null)}
+      onConfirm={activeConfirm.onConfirm}
+      title={activeConfirm.title}
+      confirmLabel={activeConfirm.confirmLabel}
+      cancelLabel={activeConfirm.cancelLabel}
+      tone={activeConfirm.tone}>
+
+        {activeConfirm.body}
+      </ConfirmDialog>
+    }
+    </>);
 
 }

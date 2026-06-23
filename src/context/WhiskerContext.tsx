@@ -135,7 +135,10 @@ import {
   animalTemplateVars,
   DEFAULT_ADOPTION_TEMPLATE_BODY } from
 '../lib/adoptionTemplate';
-import { rowToMemberPermission } from '../lib/memberPermissionsApi';
+import {
+  rowToMemberPermission,
+  isPermissionActive } from
+'../lib/memberPermissionsApi';
 import {
   NOTIFICATION_SELECT,
   rowToNotificationItem,
@@ -167,7 +170,8 @@ import {
   supplyRequestToInsert,
   supplyRequestUpdateToRow,
   rowToSupplyItem,
-  supplyItemToInsert } from
+  supplyItemToInsert,
+  supplySelectColumns } from
 '../lib/supplyApi';
 import {
   rowToTransport,
@@ -501,6 +505,8 @@ export interface WhiskerContextType {
   acceptTransportRequest: (id: string) => void;
   /** Clear the assignment (assignee declines or admin removes) → back to 'open'. */
   unassignTransportRequest: (id: string) => void;
+  /** Confirm the transport happened → status 'completed' (+ completed_at). */
+  completeTransportRequest: (id: string) => void;
   // Sitting requests
   sittingRequests: SittingRequest[];
   sittingRequestPlacements: SittingRequestPlacement[];
@@ -522,6 +528,8 @@ export interface WhiskerContextType {
   acceptSittingRequest: (id: string, sitter_person_id: string) => void;
   /** The sitter backs out: clear the sitter and reopen the request. */
   releaseSittingRequest: (id: string) => void;
+  /** Confirm the sitting happened → status 'completed'. */
+  completeSittingRequest: (id: string) => void;
   // Notifications (created by DB triggers; clients only read + mark read)
   notifications: NotificationItem[];
   unreadNotificationCount: number;
@@ -598,7 +606,7 @@ export const WhiskerContext = createContext<WhiskerContextType | undefined>(
 export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   // Animals and notes are now Supabase-backed (org-scoped). Other collections
   // remain on seed for now until they're ported.
-  const { currentOrg, user } = useAuth();
+  const { currentOrg, user, currentMemberId } = useAuth();
   const orgId = currentOrg?.id ?? null;
   // `animals` holds the heavy full rows we've loaded so far. It starts as
   // IN-CARE ONLY (the operational default) and grows on demand when historical
@@ -1325,6 +1333,24 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   const [sites, setSites] = useState<Site[]>([]);
   const [siteNotes, setSiteNotes] = useState<SiteNote[]>([]);
   const [siteVolunteers, setSiteVolunteers] = useState<SiteVolunteer[]>([]);
+
+  // Whether to load supply Total Cost (financial data) at all. Mirrors
+  // useCanViewSupplyFinancials: org admin OR an active MANAGE_SUPPLY_REQUESTS
+  // grant OR the org-wide "show all reports" setting. Default-deny: false until
+  // role/permissions resolve, so total_cost never leaks to the wire for others.
+  const isOrgAdmin =
+  currentOrg?.role === 'owner' || currentOrg?.role === 'admin';
+  const canViewSupplyFinancials =
+  isOrgAdmin ||
+  !!currentOrg?.show_all_reports || (
+  !!currentMemberId &&
+  memberPermissions.some(
+    (p) =>
+    p.member_id === currentMemberId &&
+    p.permission_type === 'MANAGE_SUPPLY_REQUESTS' &&
+    isPermissionActive(p)
+  ));
+
   const loadCoordination = useCallback(async () => {
     if (!orgId) {
       setProducts([]);
@@ -1385,9 +1411,15 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     const;
     await Promise.all(
       tables.map(async ([table, set]) => {
+        // Supply requests: drop the financial column (total_cost) from the
+        // SELECT for users without permission, so it never reaches the browser.
+        const columns =
+        table === 'supply_requests' ?
+        supplySelectColumns(canViewSupplyFinancials) :
+        '*';
         const { data, error } = await supabase.
         from(table).
-        select('*').
+        select(columns).
         eq('organization_id', orgId).
         eq('is_deleted', false);
         if (error) {
@@ -1410,8 +1442,10 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     }
     // currentUserLite is a fresh object each render (used only to label site
     // note authors); including it would re-create loadCoordination every render.
+    // canViewSupplyFinancials is included so supply reloads (with/without
+    // total_cost) when the user's financial permission resolves or changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orgId]);
+  }, [orgId, canViewSupplyFinancials]);
   useEffect(() => {
     loadCoordination();
   }, [loadCoordination]);
@@ -3338,6 +3372,14 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       status: 'open'
     });
   };
+  // Confirm the transport actually happened. The one terminal "success" exit —
+  // distinct from Cancel — so a past-due request can be closed honestly.
+  const completeTransportRequest = (id: string) => {
+    updateTransportRequest(id, {
+      status: 'completed',
+      completed_at: new Date().toISOString()
+    });
+  };
   // — Rescue Sites —————————————————————————————————
   const addSite = async (
   site: Omit<Site, 'id' | 'created_at' | 'updated_at'>) =>
@@ -3528,6 +3570,11 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       sitter_person_id: null,
       status: 'open'
     });
+  };
+  // Confirm the sitting actually happened — the "success" exit, distinct from
+  // Cancel. (No completed_at column on sitting_requests; updated_at captures it.)
+  const completeSittingRequest = (id: string) => {
+    updateSittingRequest(id, { status: 'completed' });
   };
   // — Clinic Events / Slots ——————————————————————————————
   const addClinicEvent = async (
@@ -3951,12 +3998,14 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         assignTransportRequest,
         acceptTransportRequest,
         unassignTransportRequest,
+        completeTransportRequest,
         sittingRequests,
         sittingRequestPlacements,
         addSittingRequest,
         updateSittingRequest,
         acceptSittingRequest,
         releaseSittingRequest,
+        completeSittingRequest,
         notifications,
         unreadNotificationCount,
         refreshNotifications,

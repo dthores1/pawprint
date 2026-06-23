@@ -22,3 +22,17 @@ export function useCanManageSupplyRequests(): boolean {
     isPermissionActive(p)
   );
 }
+
+/**
+ * True when the signed-in user may see supply FINANCIAL data — Total Cost on a
+ * supply request and the Supply spend reports. Same as managing supply requests,
+ * PLUS the org-wide "Show All Reports to Everyone" setting (full transparency).
+ * This is the single source of truth for financial visibility in the UI; the
+ * data layer (loadCoordination) mirrors the same logic to keep Total Cost off
+ * the wire for everyone else.
+ */
+export function useCanViewSupplyFinancials(): boolean {
+  const canManage = useCanManageSupplyRequests();
+  const { currentOrg } = useAuth();
+  return canManage || !!currentOrg?.show_all_reports;
+}

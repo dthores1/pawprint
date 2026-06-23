@@ -9,9 +9,15 @@ import { LocationPicker, LocationMode } from './LocationPicker';
 import { Button } from '../ui/Button';
 import { AnimalSearchPicker } from '../ui/AnimalSearchPicker';
 import { PersonSearchPicker } from '../ui/PersonSearchPicker';
+import { AlertTriangleIcon } from 'lucide-react';
 import { useWhisker } from '../../context/WhiskerContext';
 import { useAuth } from '../../context/AuthContext';
 import { useIsAdmin } from '../../lib/useIsAdmin';
+import {
+  transportStaleInfo,
+  TRANSPORT_STALE_LABEL,
+  transportStaleTooltip } from
+'../../lib/transportTiming';
 import {
   AddressValue,
   TransportRequest,
@@ -35,6 +41,12 @@ interface Props {
    * instead of addTransportRequest.
    */
   request?: TransportRequest;
+  /**
+   * Create-mode seed values (e.g. arranging transport from a sitting request).
+   * Ignored in edit mode. `sitting_request_id` is carried into the created row
+   * so the source request can link to it.
+   */
+  prefill?: Partial<TransportRequest>;
 }
 
 // `datetime-local` wants `YYYY-MM-DDTHH:mm` in local time, no zone suffix.
@@ -47,7 +59,12 @@ function toLocalInput(iso: string): string {
 
 }
 
-export function NewTransportRequestModal({ isOpen, onClose, request }: Props) {
+export function NewTransportRequestModal({
+  isOpen,
+  onClose,
+  request,
+  prefill
+}: Props) {
   const {
     addTransportRequest,
     updateTransportRequest,
@@ -84,6 +101,9 @@ export function NewTransportRequestModal({ isOpen, onClose, request }: Props) {
   const [notes, setNotes] = useState('');
   const [assignMode, setAssignMode] = useState<'open' | 'assign'>('open');
   const [assignedVolunteerId, setAssignedVolunteerId] = useState('');
+  // Carried from a create-mode prefill (e.g. the source sitting request) so the
+  // created transport links back. Edit mode preserves the row's own value.
+  const [sittingRequestId, setSittingRequestId] = useState<string | undefined>();
 
   // Re-seed when opened (or when the editing target changes). In create mode
   // this resets to blank; in edit mode it loads the current request values.
@@ -118,21 +138,26 @@ export function NewTransportRequestModal({ isOpen, onClose, request }: Props) {
       setWindowStart(request.preferred_window_start ?? '');
       setWindowEnd(request.preferred_window_end ?? '');
       setNotes(request.notes ?? '');
+      setSittingRequestId(request.sitting_request_id ?? undefined);
     } else {
-      setType('animal');
-      setUrgency('normal');
-      setAnimalId('');
+      // Create mode: blank, except where a prefill seeds known values (e.g.
+      // arranging transport from a sitting request). Route is never prefilled —
+      // the user supplies pickup/dropoff.
+      setType(prefill?.type ?? 'animal');
+      setUrgency(prefill?.urgency ?? 'normal');
+      setAnimalId(prefill?.animal_id ?? '');
       setPickup(null);
       setDropoff(null);
       setPickupSavedLocationId(undefined);
       setDropoffSavedLocationId(undefined);
       setPickupMode('address');
       setDropoffMode('address');
-      setScheduleType('exact');
+      setScheduleType(prefill?.schedule_type ?? 'exact');
       setPickupTime('');
-      setWindowStart('');
-      setWindowEnd('');
-      setNotes('');
+      setWindowStart(prefill?.preferred_window_start ?? '');
+      setWindowEnd(prefill?.preferred_window_end ?? '');
+      setNotes(prefill?.notes ?? '');
+      setSittingRequestId(prefill?.sitting_request_id ?? undefined);
     }
     // Assignment is a create-mode concern only; always reset on open.
     setAssignMode('open');
@@ -238,6 +263,7 @@ export function NewTransportRequestModal({ isOpen, onClose, request }: Props) {
         assigned_volunteer_person_id: directlyAssigned ?
         assignedVolunteerId :
         undefined,
+        sitting_request_id: sittingRequestId,
         animal_id: animalId || undefined,
         pickup_location: pickup?.formatted.trim() ?? '',
         dropoff_location: dropoff?.formatted.trim() ?? '',
@@ -274,6 +300,27 @@ export function NewTransportRequestModal({ isOpen, onClose, request }: Props) {
         onSubmit={handleSubmit}
         className="space-y-5"
         noValidate>
+
+        {(() => {
+          // Stale callout — surfaces the "why this needs attention" directly in
+          // the request (not just a list badge). Edit mode only.
+          const stale = request ? transportStaleInfo(request) : null;
+          if (!stale) return null;
+          return (
+            <div className="flex items-start gap-2.5 rounded-lg border border-[#E7D2A8] bg-[#FBF3E2] px-3.5 py-3">
+              <AlertTriangleIcon className="w-4 h-4 text-[#A36B00] shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-semibold text-[#8A5A00]">
+                  {TRANSPORT_STALE_LABEL[stale.kind]} · {stale.days}
+                  {stale.days === 1 ? ' day' : ' days'}
+                </p>
+                <p className="text-[#8A5A00]/90 mt-0.5">
+                  {transportStaleTooltip(stale)}
+                </p>
+              </div>
+            </div>);
+
+        })()}
 
         <FormSection title="Request details">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

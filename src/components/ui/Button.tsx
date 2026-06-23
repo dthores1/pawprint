@@ -2,7 +2,7 @@ import React from 'react';
 import { cn } from '../../lib/utils';
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'soft' | 'danger';
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'xs' | 'sm' | 'md' | 'lg';
 }
 export function Button({
   className,
@@ -27,6 +27,7 @@ export function Button({
     danger: 'bg-status-urgent-bg text-status-urgent-text hover:bg-[#F0C5C5]'
   };
   const sizes = {
+    xs: 'h-7 px-2.5 text-xs',
     sm: 'h-8 px-3 text-sm',
     md: 'h-10 px-4 py-2',
     lg: 'h-12 px-6 text-lg'

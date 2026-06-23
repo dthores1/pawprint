@@ -15,6 +15,9 @@ export interface Org {
   role: string;
   /** IANA timezone (e.g. 'America/New_York'); used to render clinic dates/times. */
   timezone: string;
+  /** When true, all report sections (incl. Rescue Sites + Supply spend) and
+   *  supply Total Cost are visible to every member, regardless of permissions. */
+  show_all_reports: boolean;
 }
 
 export interface AuthContextType {
@@ -30,6 +33,8 @@ export interface AuthContextType {
   refreshOrganizations: () => Promise<void>;
   /** Update the current org's IANA timezone (admin-gated by RLS). */
   updateOrgTimezone: (timezone: string) => Promise<void>;
+  /** Toggle org-wide "Show All Reports to Everyone" (admin-gated by RLS). */
+  updateOrgShowAllReports: (value: boolean) => Promise<void>;
 
   /**
    * The signed-in user's `people` row id in the current org, used to attribute
@@ -86,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setOrgsLoading(true);
     const { data, error } = await supabase.
     from('organization_members').
-    select('role, organizations ( id, name, timezone )').
+    select('role, organizations ( id, name, timezone, show_all_reports )').
     eq('user_id', uid);
     if (!error && data) {
       const orgs: Org[] = data.
@@ -95,7 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const o = Array.isArray(row.organizations) ?
         row.organizations[0] :
         row.organizations;
-        return o ? { id: o.id, name: o.name, role: row.role, timezone: o.timezone ?? 'America/Los_Angeles' } : null;
+        return o ? { id: o.id, name: o.name, role: row.role, timezone: o.timezone ?? 'America/Los_Angeles', show_all_reports: o.show_all_reports ?? false } : null;
       }).
       filter((o): o is Org => o !== null).
       sort((a, b) => a.name.localeCompare(b.name));
@@ -175,6 +180,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       eq('id', orgId);
       if (error) {
         console.error('[organizations] timezone update failed:', error.message);
+        return;
+      }
+      await refreshOrganizations();
+    },
+    [currentOrg?.id, refreshOrganizations]
+  );
+
+  const updateOrgShowAllReports = useCallback(
+    async (value: boolean) => {
+      const orgId = currentOrg?.id;
+      if (!orgId) return;
+      const { error } = await supabase.
+      from('organizations').
+      update({ show_all_reports: value }).
+      eq('id', orgId);
+      if (error) {
+        console.error('[organizations] show_all_reports update failed:', error.message);
         return;
       }
       await refreshOrganizations();
@@ -397,6 +419,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setCurrentOrgId,
         refreshOrganizations,
         updateOrgTimezone,
+        updateOrgShowAllReports,
         currentPersonId,
         currentMemberId,
         signInWithGoogle,

@@ -919,7 +919,7 @@ export interface OrgMember {
 }
 
 // — Transport Requests —————————————————————————————————————
-// Volunteers ferry animals or supplies. Common at orgs like Alley Cat Project
+// Volunteers ferry animals or supplies. Common at decentralized foster-based orgs.
 // where cats move between trap site → vet → foster, and supplies are dropped
 // off at remote foster homes.
 export type TransportRequestType = 'animal' | 'supplies' | 'emergency';
@@ -955,6 +955,8 @@ export interface TransportRequest {
   animal_id?: string;
   clinic_event_id?: string;
   supply_request_id?: string;
+  /** The sitting request this ride was arranged for (migration 0076), if any. */
+  sitting_request_id?: string;
   /** Legacy single-line locations, kept in sync with the structured addresses. */
   pickup_location: string;
   dropoff_location: string;

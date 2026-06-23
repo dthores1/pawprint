@@ -88,9 +88,10 @@ import { computeAnimalInputsFingerprint } from '../lib/aiContentFingerprint';
 
 const DEMO_ORG: Org = {
   id: 'demo-org',
-  name: 'Alley Cat Project (Demo)',
+  name: 'Second Chance Animal Rescue (Demo)',
   role: 'owner',
-  timezone: 'America/Los_Angeles'
+  timezone: 'America/Los_Angeles',
+  show_all_reports: false
 };
 
 // 'p_dan' is a seed Person, so attribution reads as a real name.
@@ -104,6 +105,7 @@ const demoAuthValue: AuthContextType = {
   setCurrentOrgId: () => {},
   refreshOrganizations: async () => {},
   updateOrgTimezone: async () => {},
+  updateOrgShowAllReports: async () => {},
   currentPersonId: 'p_dan',
   currentMemberId: 'm_dan',
   signInWithGoogle: async () => {},
@@ -1284,6 +1286,19 @@ export function DemoWhiskerProvider({
     t
     )
     ),
+    completeTransportRequest: (id) =>
+    setTransportRequests((prev) =>
+    prev.map((t) =>
+    t.id === id ?
+    {
+      ...t,
+      status: 'completed' as const,
+      completed_at: now(),
+      updated_at: now()
+    } :
+    t
+    )
+    ),
 
     addSittingRequest: async (req, placement_ids) => {
       const id = `sit${generateId()}`;
@@ -1330,6 +1345,14 @@ export function DemoWhiskerProvider({
       status: 'open' as const,
       updated_at: now()
     } :
+    s
+    )
+    ),
+    completeSittingRequest: (id) =>
+    setSittingRequests((prev) =>
+    prev.map((s) =>
+    s.id === id ?
+    { ...s, status: 'completed' as const, updated_at: now() } :
     s
     )
     ),

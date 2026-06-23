@@ -47,6 +47,19 @@ const SUPPLY_COLUMNS = [
 'common_request_last_used_at'] as
 const;
 
+// Columns to SELECT for a supply request read. `total_cost` is financial data:
+// it's dropped from the query for users without supply-management permission, so
+// the value never reaches the browser (network response omits it entirely).
+// Keep in sync with rowToSupplyRequest.
+const SUPPLY_READ_COLUMNS = ['id', ...SUPPLY_COLUMNS, 'created_at', 'updated_at'];
+
+export function supplySelectColumns(canViewFinancials: boolean): string {
+  const cols = canViewFinancials ?
+  SUPPLY_READ_COLUMNS :
+  SUPPLY_READ_COLUMNS.filter((c) => c !== 'total_cost');
+  return cols.join(',');
+}
+
 function normalize(v: any): any {
   return typeof v === 'string' && v === '' ? null : v;
 }

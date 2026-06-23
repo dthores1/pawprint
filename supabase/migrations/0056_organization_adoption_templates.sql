@@ -62,7 +62,7 @@ create trigger organization_adoption_templates_set_updated_at
 
 -- 4. Default template body --------------------------------------------------
 -- A generic, ready-to-use starting point. Orgs edit this in Settings to add
--- their own intro/fees/disclaimers (e.g. the Alley Cat Project format). The
+-- their own intro/fees/disclaimers. The
 -- bracketed lines are placeholder prompts for the org to replace.
 create or replace function public.default_adoption_template_body()
 returns text

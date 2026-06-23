@@ -3,35 +3,44 @@ import { useWhisker } from '../../context/WhiskerContext';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Avatar } from '../ui/Avatar';
-import { Modal } from '../ui/Modal';
+import { Tooltip } from '../ui/Tooltip';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { PillTabs } from '../ui/PillTabs';
 import { FilterDropdown } from '../ui/FilterDropdown';
+import { Link } from 'react-router-dom';
 import { NewSittingRequestModal } from '../sitting/NewSittingRequestModal';
+import { NewTransportRequestModal } from '../transports/NewTransportRequestModal';
+import { useIsAdmin } from '../../lib/useIsAdmin';
 import {
   HeartHandshakeIcon,
   PillIcon,
   TruckIcon,
   PackageIcon,
   PencilIcon,
-  Trash2Icon } from
+  Trash2Icon,
+  XIcon,
+  AlertTriangleIcon,
+  ArrowUpRightIcon } from
 'lucide-react';
 import { cn, animalDisplayName } from '../../lib/utils';
 import { useAuth } from '../../context/AuthContext';
 import { SittingRequest, SittingRequestStatus, Animal } from '../../types';
+import {
+  sittingStaleInfo,
+  SITTING_STALE_LABEL,
+  sittingStaleTooltip } from
+'../../lib/sittingTiming';
 import { ArchiveConfirmDialog } from '../archive/ArchiveConfirmDialog';
 import { useCanArchive } from '../archive/useCanArchive';
 
-const SITTING_ARCHIVABLE: SittingRequestStatus[] = [
-'completed',
-'cancelled',
-'expired'];
+// Only truly-finished requests are archivable (you complete/cancel a past-due
+// one first). `expired` is NOT terminal — a past-due sit stays live + actionable
+// and surfaces a "Past Due" badge, mirroring transport.
+const SITTING_ARCHIVABLE: SittingRequestStatus[] = ['completed', 'cancelled'];
 
-// Statuses that mean "this request is no longer active" — same treatment as
-// cancelled across the UI (no edit, no cancel, archivable).
-const SITTING_TERMINAL: SittingRequestStatus[] = [
-'completed',
-'cancelled',
-'expired'];
+// "No longer active" = completed or cancelled. `expired` is intentionally absent
+// (past-due is a live state, surfaced via the stale badge).
+const SITTING_TERMINAL: SittingRequestStatus[] = ['completed', 'cancelled'];
 
 const STATUS_LABEL: Record<SittingRequestStatus, string> = {
   open: 'Unclaimed',
@@ -42,7 +51,8 @@ const STATUS_LABEL: Record<SittingRequestStatus, string> = {
   expired: 'Expired'
 };
 const STATUS_PILL: Record<SittingRequestStatus, string> = {
-  open: 'bg-[#F8E7C8] text-[#A36B00]',
+  // Blue (not amber) so "Unclaimed" reads as available, not a warning.
+  open: 'bg-[#E3E4F2] text-[#525694]',
   claimed: 'bg-[#DCEAF7] text-[#356A9A]',
   in_progress: 'bg-[#E8DEEC] text-[#6E4E80]',
   completed: 'bg-[#DDEFE2] text-[#3E7B52]',
@@ -130,12 +140,16 @@ export function SittingRequestsView() {
     placements,
     animalsIndex: animals,
     peopleIndex: people,
+    transportRequests,
     acceptSittingRequest,
     releaseSittingRequest,
+    completeSittingRequest,
     updateSittingRequest
   } = useWhisker();
   const { currentPersonId } = useAuth();
+  const isAdmin = useIsAdmin();
   const [editing, setEditing] = useState<SittingRequest | null>(null);
+  const [arrangingFor, setArrangingFor] = useState<SittingRequest | null>(null);
   // null = no explicit choice yet → fall back to the data-driven default below.
   const [selectedTab, setSelectedTab] = useState<SittingTab | null>(null);
   const [archiving, setArchiving] = useState<SittingRequest | null>(null);
@@ -318,6 +332,32 @@ export function SittingRequestsView() {
               !SITTING_TERMINAL.includes(s.status)
               }
               onRelease={() => releaseSittingRequest(s.id)}
+              canComplete={
+              !!currentPersonId &&
+              (s.requested_by_person_id === currentPersonId ||
+              s.sitter_person_id === currentPersonId ||
+              isAdmin) &&
+              // Once a sitter is on it (claimed / in progress) or the coverage
+              // window has passed. Not on a still-open future request.
+              (s.status === 'claimed' ||
+              s.status === 'in_progress' ||
+              (s.status !== 'completed' &&
+              s.status !== 'cancelled' &&
+              sittingStaleInfo(s) !== null))
+              }
+              onComplete={() => completeSittingRequest(s.id)}
+              transportNeeded={s.transport_needed}
+              linkedTransportId={
+              transportRequests.find(
+                (t) =>
+                t.sitting_request_id === s.id && t.status !== 'cancelled'
+              )?.id
+              }
+              canArrangeTransport={
+              !!currentPersonId && (
+              s.requested_by_person_id === currentPersonId || isAdmin)
+              }
+              onArrangeTransport={() => setArrangingFor(s)}
               canCancel={
               !!currentPersonId &&
               s.requested_by_person_id === currentPersonId &&
@@ -329,7 +369,7 @@ export function SittingRequestsView() {
               canEdit={
               !!currentPersonId &&
               s.requested_by_person_id === currentPersonId &&
-              s.status === 'open'
+              (s.status === 'open' || s.status === 'expired')
               }
               onEdit={() => setEditing(s)}
               canArchive={
@@ -349,6 +389,27 @@ export function SittingRequestsView() {
         request={editing} />
 
       }
+
+      {arrangingFor &&
+      (() => {
+        const covered = animalsForRequest(arrangingFor.id);
+        return (
+          <NewTransportRequestModal
+            isOpen={true}
+            onClose={() => setArrangingFor(null)}
+            prefill={{
+              type: 'animal',
+              animal_id: covered.length === 1 ? covered[0].id : undefined,
+              schedule_type: 'flexible',
+              preferred_window_start: arrangingFor.start_date.slice(0, 10),
+              notes: `Transport to sitter for sitting coverage (${formatDateRange(
+                arrangingFor.start_date,
+                arrangingFor.end_date
+              )}).`,
+              sitting_request_id: arrangingFor.id
+            }} />);
+
+      })()}
 
       {archiving &&
       <ArchiveConfirmDialog
@@ -374,6 +435,15 @@ interface SittingCardProps {
   /** Viewer is the accepted sitter and can back out. */
   canRelease: boolean;
   onRelease: () => void;
+  /** Confirm the sitting happened (requester / sitter / admin). */
+  canComplete: boolean;
+  onComplete: () => void;
+  /** The request flagged "transport help needed to get to sitter". */
+  transportNeeded: boolean;
+  /** Set once a transport has been arranged for this sitting request. */
+  linkedTransportId?: string;
+  canArrangeTransport: boolean;
+  onArrangeTransport: () => void;
   canCancel: boolean;
   onCancel: () => void;
   canEdit: boolean;
@@ -390,6 +460,12 @@ function SittingCard({
   onAccept,
   canRelease,
   onRelease,
+  canComplete,
+  onComplete,
+  transportNeeded,
+  linkedTransportId,
+  canArrangeTransport,
+  onArrangeTransport,
   canCancel,
   onCancel,
   canEdit,
@@ -397,16 +473,43 @@ function SittingCard({
   canArchive,
   onArchive
 }: SittingCardProps) {
-  const [releaseOpen, setReleaseOpen] = useState(false);
-  const handleCancel = () => {
-    if (
-    window.confirm(
-      'Cancel this sitting request? It will be marked as cancelled for everyone.'
-    ))
-    {
-      onCancel();
+  // All confirmations route through one ConfirmDialog (no window.confirm).
+  const [confirm, setConfirm] = useState<
+    null | 'complete' | 'cancel' | 'release'>(
+    null);
+  const confirmProps = {
+    complete: {
+      title: 'Mark sitting complete?',
+      body: 'Only do this once the sitting has actually happened — it records the request as completed.',
+      confirmLabel: 'Mark Complete',
+      cancelLabel: 'Cancel',
+      tone: 'default' as const,
+      onConfirm: onComplete
+    },
+    cancel: {
+      title: 'Cancel sitting request?',
+      body: 'It will be marked as cancelled for everyone.',
+      confirmLabel: 'Cancel Request',
+      cancelLabel: 'Keep Request',
+      tone: 'danger' as const,
+      onConfirm: onCancel
+    },
+    release: {
+      title: 'Can’t sit anymore?',
+      body: 'No problem. We’ll notify the requester that you’re no longer available and reopen the request so another volunteer can help.',
+      confirmLabel: 'Release Assignment',
+      cancelLabel: 'Keep Assignment',
+      tone: 'default' as const,
+      onConfirm: onRelease
     }
   };
+  const activeConfirm = confirm ? confirmProps[confirm] : null;
+  const stale = sittingStaleInfo(request);
+  const showArrangeTransport =
+  transportNeeded &&
+  !linkedTransportId &&
+  canArrangeTransport &&
+  !SITTING_TERMINAL.includes(request.status);
   return (
     <>
     <Card className="p-5">
@@ -437,14 +540,30 @@ function SittingCard({
               'No animals attached' :
               coveredAnimals.map((a) => animalDisplayName(a)).join(', ')}
             </h3>
+            {stale ?
+            <Tooltip content={sittingStaleTooltip(stale)}>
+                <span
+                className={cn(
+                  'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide cursor-help',
+                  stale.kind === 'past_due' ?
+                  'bg-[#F5D7D7] text-[#9B3A3A]' : // red — the weight "Expired" had
+                  'bg-[#F8E7C8] text-[#A36B00]' // amber — softer "needs confirmation"
+                )}>
+
+                  <AlertTriangleIcon className="w-3 h-3" />
+                  {SITTING_STALE_LABEL[stale.kind]} · {stale.days}D
+                </span>
+              </Tooltip> :
+
             <span
               className={cn(
                 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold',
-                STATUS_PILL[request.status]
+                STATUS_PILL[request.status === 'expired' ? 'open' : request.status]
               )}>
 
-              {STATUS_LABEL[request.status]}
-            </span>
+                {STATUS_LABEL[request.status === 'expired' ? 'open' : request.status]}
+              </span>
+            }
           </div>
           <p className="text-sm font-medium text-text-primary">
             {formatDateRange(request.start_date, request.end_date)}
@@ -472,10 +591,20 @@ function SittingCard({
 
             }
             {request.transport_needed &&
+            (linkedTransportId ?
+            <Link
+              to="/requests?tab=transport"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-[#DDEFE2] text-[#3E7B52] hover:underline">
+
+                  <TruckIcon className="w-3.5 h-3.5" />
+                  Transport requested
+                  <ArrowUpRightIcon className="w-3 h-3" />
+                </Link> :
+
             <RequirementChip
               icon={TruckIcon}
               label="Transport needed"
-              tone="blue" />
+              tone="blue" />)
 
             }
           </div>
@@ -487,86 +616,128 @@ function SittingCard({
           }
         </div>
 
-        {(canAccept || canRelease || canCancel || canEdit || canArchive) &&
-        <div className="shrink-0 flex sm:flex-col items-start sm:items-end gap-2">
-            {canAccept &&
-          <Button size="sm" onClick={onAccept}>
-                Accept Sitting Request
-              </Button>
-          }
-            {canRelease &&
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setReleaseOpen(true)}
-            className="text-status-urgent-text hover:bg-status-urgent-bg">
-
-                Unable to Sit
-              </Button>
-          }
-            {canCancel &&
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleCancel}
-            className="text-status-urgent-text hover:bg-status-urgent-bg">
-
-                Cancel Request
-              </Button>
-          }
-            <div className="flex gap-1">
-              {canEdit &&
+        {(() => {
+          const linkBase =
+          'text-sm font-medium hover:underline transition-colors';
+          const iconBtn =
+          'p-1 -m-1 rounded-md transition-colors text-text-secondary';
+          const verbs: JSX.Element[] = [];
+          if (canAccept)
+          verbs.push(
             <button
+              key="accept"
               type="button"
-              onClick={onEdit}
-              aria-label="Edit request"
-              title="Edit request"
-              className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-background transition-colors">
-
-                  <PencilIcon className="w-4 h-4" />
-                </button>
-            }
-              {canArchive &&
+              onClick={onAccept}
+              className={cn(linkBase, 'text-primary')}>
+              Accept Request
+            </button>
+          );
+          if (showArrangeTransport)
+          verbs.push(
             <button
+              key="arrange"
               type="button"
-              onClick={onArchive}
-              aria-label="Archive request"
-              title="Archive request"
-              className="p-1.5 rounded-md text-text-secondary hover:text-[#9B3A3A] hover:bg-[#F5D7D7]/60 transition-colors">
+              onClick={onArrangeTransport}
+              className={cn(linkBase, 'inline-flex items-center gap-1 text-primary')}>
 
-                  <Trash2Icon className="w-4 h-4" />
-                </button>
-            }
-            </div>
-          </div>
-        }
+              <TruckIcon className="w-3.5 h-3.5" />
+              Arrange Transport
+            </button>
+          );
+          if (canRelease)
+          verbs.push(
+            <button
+              key="release"
+              type="button"
+              onClick={() => setConfirm('release')}
+              className={cn(linkBase, 'text-text-secondary hover:text-[#9B3A3A]')}>
+              Unable to Sit
+            </button>
+          );
+          const hasIconRow = canEdit || canCancel || canArchive;
+          if (!canComplete && verbs.length === 0 && !hasIconRow) return null;
+          return (
+            <div className="shrink-0 flex flex-col sm:items-end gap-1.5">
+              {canComplete &&
+              <Button
+                variant="soft"
+                size="xs"
+                onClick={() => setConfirm('complete')}>
+
+                  Mark Complete
+                </Button>
+              }
+              {(verbs.length > 0 || hasIconRow) &&
+              <div className="flex items-center gap-5">
+                  {verbs.map((node, i) =>
+                <React.Fragment key={i}>
+                      {i > 0 &&
+                  <span className="text-text-secondary/40" aria-hidden="true">·</span>
+                  }
+                      {node}
+                    </React.Fragment>
+                )}
+                  {verbs.length > 0 && hasIconRow &&
+                <span className="text-text-secondary/40" aria-hidden="true">·</span>
+                }
+                  {canEdit &&
+                <Tooltip content="Edit request">
+                      <button
+                    type="button"
+                    onClick={onEdit}
+                    aria-label="Edit request"
+                    className={cn(iconBtn, 'hover:text-text-primary hover:bg-background')}>
+
+                        <PencilIcon className="w-4 h-4" />
+                      </button>
+                    </Tooltip>
+                }
+                  {canCancel &&
+                <button
+                  type="button"
+                  onClick={() => setConfirm('cancel')}
+                  className={cn(
+                    linkBase,
+                    'inline-flex items-center gap-1 text-text-secondary hover:text-[#9B3A3A]'
+                  )}>
+
+                      <XIcon className="w-3.5 h-3.5" />
+                      Cancel
+                    </button>
+                }
+                  {canArchive &&
+                <Tooltip content="Archive request">
+                      <button
+                    type="button"
+                    onClick={onArchive}
+                    aria-label="Archive request"
+                    className={cn(iconBtn, 'hover:text-[#9B3A3A] hover:bg-[#F5D7D7]/60')}>
+
+                        <Trash2Icon className="w-4 h-4" />
+                      </button>
+                    </Tooltip>
+                }
+                </div>
+              }
+            </div>);
+
+        })()}
       </div>
     </Card>
 
-    <Modal
-      isOpen={releaseOpen}
-      onClose={() => setReleaseOpen(false)}
-      title="Can't Sit Anymore?"
-      footer={
-      <div className="flex justify-end gap-3">
-          <Button variant="ghost" onClick={() => setReleaseOpen(false)}>
-            Keep Assignment
-          </Button>
-          <Button
-          onClick={() => {
-            onRelease();
-            setReleaseOpen(false);
-          }}>
-            Release Assignment
-          </Button>
-        </div>
-      }>
+    {activeConfirm &&
+    <ConfirmDialog
+      isOpen={true}
+      onClose={() => setConfirm(null)}
+      onConfirm={activeConfirm.onConfirm}
+      title={activeConfirm.title}
+      confirmLabel={activeConfirm.confirmLabel}
+      cancelLabel={activeConfirm.cancelLabel}
+      tone={activeConfirm.tone}>
 
-      <p className="text-sm text-text-secondary leading-relaxed">
-        No problem. We'll notify the requester that you're no longer available and
-        reopen the request so another volunteer can help.
-      </p>
-    </Modal>
+        {activeConfirm.body}
+      </ConfirmDialog>
+    }
     </>);
 
 }

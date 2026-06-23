@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { XIcon, PlusIcon, PencilIcon } from 'lucide-react';
+import { XIcon, PlusIcon, PencilIcon, InfoIcon } from 'lucide-react';
+import { Tooltip } from '../components/ui/Tooltip';
 import { useWhisker } from '../context/WhiskerContext';
 import { useAuth } from '../context/AuthContext';
 import { Card } from '../components/ui/Card';
@@ -50,7 +51,7 @@ export function Settings() {
     setTabVisible,
     restoreNavigationDefaults
   } = useWhisker();
-  const { currentOrg, updateOrgTimezone } = useAuth();
+  const { currentOrg, updateOrgTimezone, updateOrgShowAllReports } = useAuth();
   const isAdmin =
   currentOrg?.role === 'owner' || currentOrg?.role === 'admin';
   const [traitForm, setTraitForm] = useState<{ open: boolean; trait?: Trait }>({
@@ -615,6 +616,49 @@ export function Settings() {
             <option value={currentOrg.timezone}>{currentOrg.timezone}</option>
             }
           </Select>
+        </div>
+      </Card>
+      }
+
+      {/* Reports visibility — org-wide. Admin-only. */}
+      {tab === 'general' && isAdmin &&
+      <Card className="p-0 overflow-hidden">
+        <div className="p-5 flex items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-1.5">
+              <h2 className="font-heading font-semibold text-lg text-text-primary">
+                Show All Reports to Everyone
+              </h2>
+              <Tooltip
+                content="When on, every member can see all report sections — including Rescue Sites and Supply spend (financial data). When off, report sections follow each member’s permissions; sensitive sections stay limited to owners, admins, and members granted access.">
+                <InfoIcon className="w-4 h-4 text-text-secondary" />
+              </Tooltip>
+            </div>
+            <p className="text-sm text-text-secondary mt-1">
+              Full transparency for orgs that want it. Off by default — reports
+              follow each member’s permissions.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={!!currentOrg?.show_all_reports}
+            aria-label="Show all reports to everyone"
+            onClick={() =>
+            updateOrgShowAllReports(!currentOrg?.show_all_reports)
+            }
+            className={cn(
+              'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 shrink-0',
+              currentOrg?.show_all_reports ? 'bg-primary' : 'bg-border'
+            )}>
+
+            <span
+              className={cn(
+                'inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform',
+                currentOrg?.show_all_reports ? 'translate-x-6' : 'translate-x-1'
+              )} />
+
+          </button>
         </div>
       </Card>
       }

@@ -192,7 +192,7 @@ const VET_CLINIC_NAMES = [
 ];
 
 const RESCUE_ORG_NAMES = [
-  'Alley Cat Project', 'Seattle Humane', 'PAWS',
+  'Second Chance Animal Rescue', 'Seattle Humane', 'PAWS',
   'Regional Animal Services', 'Furry Friends Foundation',
   'Second Chance Rescue', 'Hope Animal Shelter'
 ];

@@ -69,13 +69,14 @@ export function Adoptions() {
   filter((a) => matchesTab(a, tab)).
   sort((a, b) => b.created_at.localeCompare(a.created_at));
 
-  const activeFosterFor = (animalId: string) => {
-    const placement = placements.find(
-      (p) => p.animal_id === animalId && p.placement_status === 'active'
-    );
-    if (!placement) return null;
-    return peopleIndex.find((p) => p.id === placement.person_id) ?? null;
-  };
+  // TODO - REMOVE IF YOU OPT TO NOT SHOW FOSTER COLUMN
+  // const activeFosterFor = (animalId: string) => {
+  //   const placement = placements.find(
+  //     (p) => p.animal_id === animalId && p.placement_status === 'active'
+  //   );
+  //   if (!placement) return null;
+  //   return peopleIndex.find((p) => p.id === placement.person_id) ?? null;
+  // };
 
   return (
     <div className="space-y-6 pb-8">
@@ -139,7 +140,7 @@ export function Adoptions() {
                   <th className="font-medium px-5 py-3">Started</th>
                   <th className="font-medium px-5 py-3">Completed</th>
                   <th className="font-medium px-5 py-3">Fee</th>
-                  <th className="font-medium px-5 py-3">Foster</th>
+                  {/* <th className="font-medium px-5 py-3">Foster</th> */}
                   <th className="font-medium px-5 py-3 text-right">Actions</th>
                 </tr>
               </thead>
@@ -147,7 +148,8 @@ export function Adoptions() {
                 {rows.map((a) => {
                   const animal = animalsIndex.find((x) => x.id === a.animal_id);
                   const adopter = peopleIndex.find((x) => x.id === a.adopter_id);
-                  const foster = activeFosterFor(a.animal_id);
+                  // TODO - REMOVE IF YOU OPT TO NOT SHOW FOSTER COLUMN
+                  // const foster = activeFosterFor(a.animal_id);
                   const donation = formatDonation(a.donation_amount);
                   const readyToComplete = a.status === 'ready_for_placement';
                   return (
@@ -206,11 +208,12 @@ export function Adoptions() {
                       <td className="px-5 py-3 text-text-secondary whitespace-nowrap">
                         {donation ?? '—'}
                       </td>
-                      <td className="px-5 py-3 text-text-secondary truncate max-w-[10rem]">
+                      {/* TODO - REMOVE IF YOU OPT TO NOT SHOW FOSTER COLUMN */}
+                      {/* <td className="px-5 py-3 text-text-secondary truncate max-w-[10rem]">
                         {foster ?
                         `${foster.first_name} ${foster.last_name}` :
                         '—'}
-                      </td>
+                      </td> */}
                       <td className="px-5 py-3">
                         <div className="flex items-center justify-end gap-3 whitespace-nowrap">
                           {animal &&

@@ -290,7 +290,7 @@ Wherever supply requests render, **the requester and animal are the subject of t
 
 ## 11. Coordination workflows: Transports, Sitting, Clinics
 
-These three features are most common at TNR-focused orgs (e.g. Alley Cat Project) but the patterns generalize to any rescue that coordinates volunteer help over Slack and Sheets today. All three share a common shape: an authenticated requester, a definable date/time, and a "claim" or "accept" affordance for whoever picks up the work.
+These three features are most common at TNR-focused orgs but the patterns generalize to any rescue that coordinates volunteer help over Slack and Sheets today. All three share a common shape: an authenticated requester, a definable date/time, and a "claim" or "accept" affordance for whoever picks up the work.
 
 ### Transport Requests (`/transports`)
 
