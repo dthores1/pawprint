@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useWhisker } from '../context/WhiskerContext';
 import { useAuth } from '../context/AuthContext';
 import { Card } from '../components/ui/Card';
+import { GuidanceLink } from '../components/guidance/GuidanceLink';
 import { Button } from '../components/ui/Button';
 import { VirtualizedGrid } from '../components/ui/VirtualizedGrid';
 import { NewSiteModal } from '../components/sites/NewSiteModal';
@@ -151,6 +152,7 @@ export function SitesList() {
             Locations reported to the rescue — colonies, pickups, and trapping
             sites.
           </p>
+          <GuidanceLink guidanceKey="sites_intro" />
         </div>
         <div className="flex gap-2">
           {canManage &&

@@ -11,7 +11,10 @@ import { AddressValue, Person, PersonRole } from '../../types';
 import { legacyRoleFor } from '../../lib/peopleApi';
 import { focusFirstError } from '../../lib/focusFirstError';
 import { canViewContactField } from '../../lib/contactVisibility';
-import { ContactVisibilityFields, ShareState } from './ContactVisibilityFields';
+import {
+  ContactVisibilityFields,
+  ShareState } from
+'./ContactVisibilityFields';
 import {
   addressValueToPersonFields,
   personToAddressValue } from
@@ -89,6 +92,9 @@ export function EditContactModal({
   const [address, setAddress] = useState<AddressValue | null>(() =>
   personToAddressValue(person)
   );
+  // Admins can manage who sees this contact's info (everyone else manages their
+  // own visibility in My Preferences). Seeded from the record; only saved/shown
+  // for admins below.
   const [share, setShare] = useState<ShareState>(() => ({
     phone: person.share_phone ?? true,
     email: person.share_email ?? true,
@@ -132,17 +138,21 @@ export function EditContactModal({
     };
     // Only write back the contact fields the editor could actually see — a
     // hidden field arrived masked (empty), so sending it would erase the value.
-    // Each field's share flag travels with it for the same reason.
+    // (Share/visibility flags are managed in My Preferences, not here.)
     if (canView.email) {
       updates.email = form.email.trim();
-      updates.share_email = share.email;
     }
     if (canView.phone) {
       updates.phone = form.phone.trim() || undefined;
-      updates.share_phone = share.phone;
     }
     if (canView.address) {
       Object.assign(updates, addressValueToPersonFields(address));
+    }
+    // Admins manage this contact's visibility from here; everyone else's own
+    // visibility is set in My Preferences.
+    if (isAdmin) {
+      updates.share_phone = share.phone;
+      updates.share_email = share.email;
       updates.share_address = share.address;
     }
     updatePerson(person.id, updates);
@@ -272,14 +282,9 @@ export function EditContactModal({
             onChange={(e) => set('notes', e.target.value)} />
         </div>
 
-        <ContactVisibilityFields
-          value={share}
-          onChange={setShare}
-          lockedFields={{
-            phone: !canView.phone,
-            email: !canView.email,
-            address: !canView.address
-          }} />
+        {isAdmin &&
+        <ContactVisibilityFields value={share} onChange={setShare} />
+        }
 
         <div>
           <label

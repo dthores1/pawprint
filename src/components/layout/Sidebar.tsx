@@ -59,7 +59,7 @@ export const navItems: NavItem[] = [
 {
   to: '/fosters',
   icon: HomeIcon,
-  label: 'Foster Parents',
+  label: 'Foster Network',
   key: 'fosters'
 },
 {

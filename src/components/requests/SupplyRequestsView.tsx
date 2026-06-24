@@ -13,6 +13,7 @@ import {
   BookmarkIcon } from
 'lucide-react';
 import { formatDate, cn, animalDisplayName } from '../../lib/utils';
+import { GuidanceEmptyState } from '../guidance/GuidanceEmptyState';
 import { useAuth } from '../../context/AuthContext';
 import { SupplyRequest, SupplyRequestStatus } from '../../types';
 import { motion } from 'framer-motion';
@@ -217,16 +218,20 @@ export function SupplyRequestsView() {
         )}
         </div> :
       displayRequests.length === 0 ?
+      activeTab === 'active' ?
+      <GuidanceEmptyState
+        guidanceKey="supply_empty"
+        fallback={{
+          title: 'No active requests',
+          body: 'All caught up! Fosters and animals have what they need.'
+        }} /> :
+
       <Card className="p-12 text-center">
           <PackageOpenIcon className="w-12 h-12 text-border mx-auto mb-4" />
           <h3 className="text-lg font-heading font-bold text-text-primary mb-2">
-            No {activeTab} requests
+            No completed requests
           </h3>
-          <p className="text-text-secondary">
-            {activeTab === 'active' ?
-          'All caught up! Fosters and animals have what they need.' :
-          'No completed requests yet.'}
-          </p>
+          <p className="text-text-secondary">No completed requests yet.</p>
         </Card> :
 
       <div className="grid gap-4">

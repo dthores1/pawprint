@@ -9,10 +9,15 @@ import { AddressValue, Person, PersonRole } from '../../types';
 import { legacyRoleFor } from '../../lib/peopleApi';
 import { addressValueToPersonFields } from '../../lib/address';
 import { focusFirstError } from '../../lib/focusFirstError';
-import { ContactVisibilityFields, ShareState } from './ContactVisibilityFields';
+import { useIsAdmin } from '../../lib/useIsAdmin';
+import {
+  ContactVisibilityFields,
+  ShareState } from
+'./ContactVisibilityFields';
 
 // Product defaults: phone & email shared with members, address not.
 const DEFAULT_SHARE: ShareState = { phone: true, email: true, address: false };
+
 interface AddContactModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -65,8 +70,11 @@ export function AddContactModal({
   onCreated
 }: AddContactModalProps) {
   const { addPerson } = useWhisker();
+  const isAdmin = useIsAdmin();
   const [form, setForm] = useState(INITIAL);
   const [address, setAddress] = useState<AddressValue | null>(null);
+  // Admins can set who sees this contact's info at creation; everyone else's
+  // own visibility is managed in My Preferences (new contacts get the defaults).
   const [share, setShare] = useState<ShareState>(DEFAULT_SHARE);
   const [errors, setErrors] = useState<FormErrors>({});
   // Seed the default roles each time the modal opens (the form otherwise resets
@@ -106,9 +114,13 @@ export function AddContactModal({
       undefined,
       notes: form.notes.trim() || undefined,
       active: true,
-      share_phone: share.phone,
-      share_email: share.email,
-      share_address: share.address,
+      ...(isAdmin ?
+      {
+        share_phone: share.phone,
+        share_email: share.email,
+        share_address: share.address
+      } :
+      {}),
       ...addressValueToPersonFields(address)
     });
     if (created && onCreated) onCreated(created);
@@ -238,7 +250,9 @@ export function AddContactModal({
 
         </div>
 
+        {isAdmin &&
         <ContactVisibilityFields value={share} onChange={setShare} />
+        }
       </form>
     </Modal>);
 

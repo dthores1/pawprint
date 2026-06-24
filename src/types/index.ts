@@ -1178,6 +1178,47 @@ export type NotificationEntityType =
 
 // One notification as the signed-in user sees it: the shared event joined with
 // this user's per-recipient read state.
+// ── In-app guidance (inline help links + drawers + empty-state copy) ─────────
+// 'page'  → tiny inline "Learn how it works" link that opens a help drawer.
+// 'empty' → empty-state copy shown when a collection has no records.
+export type GuidancePlacement = 'page' | 'empty';
+export type GuidanceVariant = 'info' | 'success' | 'warning';
+
+/** A row from the global `guidance_messages` catalog. */
+export interface GuidanceMessage {
+  id: string;
+  /** Stable identifier wired per-page in code, e.g. 'animals_intro'. */
+  key: string;
+  placement: GuidancePlacement;
+  /** Informational route/page grouping (for a future Help Center). */
+  page?: string;
+  /** For 'page': drawer heading. For 'empty': empty-state heading. */
+  title: string;
+  /** Drawer / empty-state body. Line breaks render as written. */
+  body: string;
+  /** Inline link text for 'page' rows; undefined → default ("Learn how it works"). */
+  link_label?: string;
+  /** Icon-registry name; undefined → default glyph. */
+  icon?: string;
+  variant: GuidanceVariant;
+  enabled: boolean;
+  /** Bumping this re-flags the inline link as "New" for everyone. */
+  version: number;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A per-user `user_guidance_state` "seen" marker — one per (user, key, version). */
+export interface GuidanceSeen {
+  id: string;
+  user_id: string;
+  guidance_key: string;
+  version: number;
+  /** When the user first acknowledged this message (column name is historical). */
+  dismissed_at: string;
+}
+
 export interface NotificationItem {
   /** user_notification.id — the per-recipient row; target of mark-read. */
   user_notification_id: string;

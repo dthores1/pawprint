@@ -8,6 +8,7 @@ import { MedicalRecordsView } from '../components/medical/MedicalRecordsView';
 import { AddMedicalRecordModal } from '../components/medical/AddMedicalRecordModal';
 import { NewClinicEventModal } from '../components/clinics/NewClinicEventModal';
 import { useCanManageMedical } from '../lib/useAnimalPermissions';
+import { GuidanceLink } from '../components/guidance/GuidanceLink';
 
 type MedicalTab = 'clinics' | 'records';
 const TABS: { key: MedicalTab; label: string }[] = [
@@ -36,6 +37,7 @@ export function Medical() {
           <p className="text-text-secondary mt-1">
             Track medical records and plan spay/neuter and vaccine clinics.
           </p>
+          <GuidanceLink guidanceKey="medical_intro" />
         </div>
         {canManageMedical && (
         tab === 'clinics' ?

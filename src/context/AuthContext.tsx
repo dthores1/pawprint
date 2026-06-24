@@ -18,6 +18,9 @@ export interface Org {
   /** When true, all report sections (incl. Rescue Sites + Supply spend) and
    *  supply Total Cost are visible to every member, regardless of permissions. */
   show_all_reports: boolean;
+  /** Org-wide kill switch for in-app guidance banners/empty-state copy.
+   *  Default true; admins turn it off on Settings. */
+  show_guidance: boolean;
 }
 
 export interface AuthContextType {
@@ -35,6 +38,8 @@ export interface AuthContextType {
   updateOrgTimezone: (timezone: string) => Promise<void>;
   /** Toggle org-wide "Show All Reports to Everyone" (admin-gated by RLS). */
   updateOrgShowAllReports: (value: boolean) => Promise<void>;
+  /** Toggle org-wide in-app guidance banners (admin-gated by RLS). */
+  updateOrgShowGuidance: (value: boolean) => Promise<void>;
 
   /**
    * The signed-in user's `people` row id in the current org, used to attribute
@@ -91,7 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setOrgsLoading(true);
     const { data, error } = await supabase.
     from('organization_members').
-    select('role, organizations ( id, name, timezone, show_all_reports )').
+    select('role, organizations ( id, name, timezone, show_all_reports, show_guidance )').
     eq('user_id', uid);
     if (!error && data) {
       const orgs: Org[] = data.
@@ -100,7 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const o = Array.isArray(row.organizations) ?
         row.organizations[0] :
         row.organizations;
-        return o ? { id: o.id, name: o.name, role: row.role, timezone: o.timezone ?? 'America/Los_Angeles', show_all_reports: o.show_all_reports ?? false } : null;
+        return o ? { id: o.id, name: o.name, role: row.role, timezone: o.timezone ?? 'America/Los_Angeles', show_all_reports: o.show_all_reports ?? false, show_guidance: o.show_guidance ?? true } : null;
       }).
       filter((o): o is Org => o !== null).
       sort((a, b) => a.name.localeCompare(b.name));
@@ -197,6 +202,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       eq('id', orgId);
       if (error) {
         console.error('[organizations] show_all_reports update failed:', error.message);
+        return;
+      }
+      await refreshOrganizations();
+    },
+    [currentOrg?.id, refreshOrganizations]
+  );
+
+  const updateOrgShowGuidance = useCallback(
+    async (value: boolean) => {
+      const orgId = currentOrg?.id;
+      if (!orgId) return;
+      const { error } = await supabase.
+      from('organizations').
+      update({ show_guidance: value }).
+      eq('id', orgId);
+      if (error) {
+        console.error('[organizations] show_guidance update failed:', error.message);
         return;
       }
       await refreshOrganizations();
@@ -420,6 +442,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         refreshOrganizations,
         updateOrgTimezone,
         updateOrgShowAllReports,
+        updateOrgShowGuidance,
         currentPersonId,
         currentMemberId,
         signInWithGoogle,
