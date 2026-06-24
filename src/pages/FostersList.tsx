@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useWhisker } from '../context/WhiskerContext';
 import { Card } from '../components/ui/Card';
+import { GuidanceLink } from '../components/guidance/GuidanceLink';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Forms';
 import { Avatar } from '../components/ui/Avatar';
@@ -176,6 +177,7 @@ export function FostersList() {
           <p className="text-text-secondary">
             Manage foster homes and capacity.
           </p>
+          <GuidanceLink guidanceKey="fosters_intro" />
         </div>
         <div className="flex items-center gap-2">
           <ExportButton

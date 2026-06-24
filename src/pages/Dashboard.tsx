@@ -2,6 +2,7 @@ import React from 'react';
 import { useWhisker } from '../context/WhiskerContext';
 import { useAuth } from '../context/AuthContext';
 import { Card } from '../components/ui/Card';
+import { GettingStartedChecklist } from '../components/guidance/GettingStartedChecklist';
 import { PriorityBadge } from '../components/ui/Badge';
 import { SpeciesBadge } from '../components/ui/SpeciesBadge';
 import { Avatar } from '../components/ui/Avatar';
@@ -213,6 +214,8 @@ export function Dashboard() {
         </div>
         <GlobalSearch />
       </motion.div>
+
+      <GettingStartedChecklist />
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">

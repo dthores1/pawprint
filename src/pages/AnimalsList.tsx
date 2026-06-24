@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useWhisker } from '../context/WhiskerContext';
 import { useAuth } from '../context/AuthContext';
 import { Card } from '../components/ui/Card';
+import { GuidanceLink } from '../components/guidance/GuidanceLink';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Forms';
 import { StatusBadge } from '../components/ui/Badge';
@@ -566,6 +567,7 @@ export function AnimalsList() {
           <p className="text-text-secondary">
             Track animals from intake through adoption.
           </p>
+          <GuidanceLink guidanceKey="animals_intro" />
         </div>
         <div className="flex items-center gap-2">
           {view === 'animals' &&

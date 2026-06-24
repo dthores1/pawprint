@@ -106,6 +106,8 @@ export function EditFosterModal({
   // directories/attribution).
   const isOwnRecord = !!currentUserId && foster.user_id === currentUserId;
   const [formData, setFormData] = useState<FosterForm>(() => fromFoster(foster));
+  // Admins can manage who sees this foster's info (everyone else manages their
+  // own visibility in My Preferences). Only saved/shown for admins below.
   const [share, setShare] = useState<ShareState>(() => ({
     phone: foster.share_phone ?? true,
     email: foster.share_email ?? true,
@@ -149,11 +151,9 @@ export function EditFosterModal({
     // their field.
     if (canView.email) {
       updates.email = formData.email.trim();
-      updates.share_email = share.email;
     }
     if (canView.phone) {
       updates.phone = formData.phone.trim();
-      updates.share_phone = share.phone;
     }
     if (canView.address) {
       const addr = formData.address;
@@ -170,6 +170,12 @@ export function EditFosterModal({
       updates.address_country = addr?.country || '';
       updates.address_latitude = addr?.latitude;
       updates.address_longitude = addr?.longitude;
+    }
+    // Admins manage this foster's visibility here; everyone else's own
+    // visibility is set in My Preferences.
+    if (isAdmin) {
+      updates.share_phone = share.phone;
+      updates.share_email = share.email;
       updates.share_address = share.address;
     }
     updateFoster(foster.id, updates);
@@ -371,14 +377,9 @@ export function EditFosterModal({
             onChange={handleChange} />
         </div>
 
-        <ContactVisibilityFields
-          value={share}
-          onChange={setShare}
-          lockedFields={{
-            phone: !canView.phone,
-            email: !canView.email,
-            address: !canView.address
-          }} />
+        {isAdmin &&
+        <ContactVisibilityFields value={share} onChange={setShare} />
+        }
 
         {/* Active toggle — lets coordinators retire a foster without deleting. */}
         <div>

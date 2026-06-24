@@ -53,7 +53,9 @@ import {
   SiteVolunteer,
   ArchiveTable,
   ArchivedRecord,
-  NotificationItem } from
+  NotificationItem,
+  GuidanceMessage,
+  GuidanceSeen } from
 '../types';
 import { supabase } from '../lib/supabase';
 import { rowToBreed, animalBreedLabel } from '../lib/breedsApi';
@@ -125,6 +127,10 @@ import {
   externalListingUpdateToRow } from
 '../lib/externalListingsApi';
 import { rowToAiContent, aiContentToUpsert } from '../lib/aiContentApi';
+import {
+  rowToGuidanceMessage,
+  rowToGuidanceSeen } from
+'../lib/guidanceApi';
 import { computeAnimalInputsFingerprint } from '../lib/aiContentFingerprint';
 import {
   rowToAdoptionTemplate,
@@ -537,6 +543,20 @@ export interface WhiskerContextType {
   refreshNotifications: () => void;
   markNotificationRead: (userNotificationId: string) => void;
   markAllNotificationsRead: () => void;
+  // Guidance (inline help links + drawers + empty-state copy)
+  guidanceMessages: GuidanceMessage[];
+  /** Per-user "seen" markers (key + version) driving the link "New" affordance. */
+  guidanceSeen: GuidanceSeen[];
+  /** Per-user global switch — when true, hide inline tips + onboarding checklist. */
+  tipsHidden: boolean;
+  /** Per-user flag — onboarding checklist dismissed/completed. */
+  checklistDismissed: boolean;
+  /** Mark a page's guidance seen for this user at the given version. */
+  markGuidanceSeen: (key: string, version: number) => void;
+  /** "Hide Tips" / "Show Tips" — global per-user guidance switch. */
+  setTipsHidden: (value: boolean) => void;
+  /** Dismiss the Dashboard onboarding checklist for this user. */
+  dismissChecklist: () => void;
   // Clinics
   clinicEvents: ClinicEvent[];
   clinicSlots: ClinicSlot[];
@@ -1640,6 +1660,138 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       console.error('[notifications] mark all read failed:', error.message);
       loadNotifications(); // reconcile
     }
+  };
+
+  // ── In-app guidance (inline help links + drawers + empty-state copy) ──────
+  // Messages are a small GLOBAL catalog (no org scope); the per-user "seen"
+  // markers and the Hide-Tips / checklist switches are keyed to the user.
+  const [guidanceMessages, setGuidanceMessages] = useState<GuidanceMessage[]>([]);
+  const [guidanceSeen, setGuidanceSeen] = useState<GuidanceSeen[]>([]);
+  const [tipsHidden, setTipsHiddenState] = useState(false);
+  const [checklistDismissed, setChecklistDismissedState] = useState(false);
+
+  const loadGuidanceMessages = useCallback(async () => {
+    const { data, error } = await supabase.
+    from('guidance_messages').
+    select('*').
+    eq('enabled', true).
+    order('sort_order', { ascending: true });
+    if (error) {
+      console.error('[guidance] load messages failed:', error.message);
+    } else {
+      setGuidanceMessages((data ?? []).map(rowToGuidanceMessage));
+    }
+  }, []);
+
+  const loadGuidanceState = useCallback(async () => {
+    if (!userId) {
+      setGuidanceSeen([]);
+      setTipsHiddenState(false);
+      setChecklistDismissedState(false);
+      return;
+    }
+    const [seenRes, prefsRes] = await Promise.all([
+    supabase.from('user_guidance_state').select('*').eq('user_id', userId),
+    supabase.
+    from('user_guidance_prefs').
+    select('banners_hidden, checklist_dismissed').
+    eq('user_id', userId).
+    maybeSingle()]
+    );
+    if (seenRes.error) {
+      console.error('[guidance] load seen failed:', seenRes.error.message);
+    } else {
+      setGuidanceSeen((seenRes.data ?? []).map(rowToGuidanceSeen));
+    }
+    if (prefsRes.error) {
+      console.error('[guidance] load prefs failed:', prefsRes.error.message);
+    } else {
+      setTipsHiddenState(!!prefsRes.data?.banners_hidden);
+      setChecklistDismissedState(!!prefsRes.data?.checklist_dismissed);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    loadGuidanceMessages();
+  }, [loadGuidanceMessages]);
+  useEffect(() => {
+    loadGuidanceState();
+  }, [loadGuidanceState]);
+
+  // Mark a page's guidance as seen for this user at the message's current
+  // version (opening the drawer / "Got It"). Drives the inline link's "New"
+  // affordance; idempotent, and a later version re-flags as new.
+  const markGuidanceSeen = (key: string, version: number) => {
+    if (!userId) return;
+    if (guidanceSeen.some((s) => s.guidance_key === key && s.version === version)) {
+      return;
+    }
+    const optimistic: GuidanceSeen = {
+      id: `temp-${key}-${version}`,
+      user_id: userId,
+      guidance_key: key,
+      version,
+      dismissed_at: new Date().toISOString()
+    };
+    setGuidanceSeen((prev) => [...prev, optimistic]);
+    supabase.
+    from('user_guidance_state').
+    upsert(
+      { user_id: userId, guidance_key: key, version },
+      { onConflict: 'user_id,guidance_key,version' }
+    ).
+    then(({ error }) => {
+      if (error) {
+        console.error('[guidance] mark seen failed:', error.message);
+        loadGuidanceState(); // reconcile
+      }
+    });
+  };
+
+  // Global per-user "Hide Tips" / "Show Tips" switch (user menu). Suppresses the
+  // inline page links and the onboarding checklist.
+  const setTipsHidden = (value: boolean) => {
+    if (!userId) return;
+    setTipsHiddenState(value);
+    supabase.
+    from('user_guidance_prefs').
+    upsert(
+      {
+        user_id: userId,
+        banners_hidden: value,
+        updated_at: new Date().toISOString()
+      },
+      { onConflict: 'user_id' }
+    ).
+    then(({ error }) => {
+      if (error) {
+        console.error('[guidance] set tips hidden failed:', error.message);
+        loadGuidanceState(); // reconcile
+      }
+    });
+  };
+
+  // Hide the Dashboard onboarding checklist for this user (dismissed early or
+  // auto-dismissed once every step is complete).
+  const dismissChecklist = () => {
+    if (!userId || checklistDismissed) return;
+    setChecklistDismissedState(true);
+    supabase.
+    from('user_guidance_prefs').
+    upsert(
+      {
+        user_id: userId,
+        checklist_dismissed: true,
+        updated_at: new Date().toISOString()
+      },
+      { onConflict: 'user_id' }
+    ).
+    then(({ error }) => {
+      if (error) {
+        console.error('[guidance] dismiss checklist failed:', error.message);
+        loadGuidanceState(); // reconcile
+      }
+    });
   };
 
   const setSpeciesEnabled = async (speciesId: string, enabled: boolean) => {
@@ -4011,6 +4163,13 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         refreshNotifications,
         markNotificationRead,
         markAllNotificationsRead,
+        guidanceMessages,
+        guidanceSeen,
+        tipsHidden,
+        checklistDismissed,
+        markGuidanceSeen,
+        setTipsHidden,
+        dismissChecklist,
         clinicEvents,
         clinicSlots,
         clinicSlotProcedures,

@@ -5,13 +5,21 @@ import { DemoBanner } from './DemoBanner';
 import { TopBar } from './TopBar';
 import { NotificationBell } from './NotificationBell';
 import { isDemoMode } from '../../lib/appMode';
-import { LogOutIcon, MenuIcon, SettingsIcon, UserCircleIcon } from 'lucide-react';
+import {
+  LogOutIcon,
+  MenuIcon,
+  SettingsIcon,
+  UserCircleIcon,
+  SlidersHorizontalIcon } from
+'lucide-react';
 import { LogoMark } from '../ui/Logo';
+import { PreferencesModal } from './PreferencesModal';
 import { useAuth } from '../../context/AuthContext';
 import { useWhisker } from '../../context/WhiskerContext';
 import { cn } from '../../lib/utils';
 export function AppShell() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
   const { user, currentOrg, currentPersonId, signOut } = useAuth();
   const { refreshNotifications } = useWhisker();
   const visibleNavItems = useVisibleNavItems();
@@ -33,7 +41,7 @@ export function AppShell() {
 
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         {/* Desktop top bar (bell + user menu) */}
-        <TopBar />
+        <TopBar onOpenPreferences={() => setPreferencesOpen(true)} />
 
         {/* Mobile Header */}
         <header className="md:hidden h-16 bg-card border-b border-border flex items-center justify-between px-4 shrink-0">
@@ -122,6 +130,16 @@ export function AppShell() {
               </p> :
             null
             }
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                setPreferencesOpen(true);
+              }}
+              className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm font-medium text-text-secondary hover:bg-background hover:text-text-primary transition-colors">
+
+                <SlidersHorizontalIcon className="w-4 h-4" />
+                Preferences
+              </button>
             {!isDemoMode &&
             <button
               onClick={() => {
@@ -129,7 +147,7 @@ export function AppShell() {
                 signOut();
               }}
               className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm font-medium text-text-secondary hover:bg-background hover:text-text-primary transition-colors">
-              
+
                 <LogOutIcon className="w-4 h-4" />
                 Sign out
               </button>
@@ -147,6 +165,11 @@ export function AppShell() {
         </main>
         </div>
       </div>
+
+      <PreferencesModal
+        isOpen={preferencesOpen}
+        onClose={() => setPreferencesOpen(false)} />
+
     </div>);
 
 }

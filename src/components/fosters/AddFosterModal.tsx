@@ -8,6 +8,7 @@ import { useWhisker } from '../../context/WhiskerContext';
 import { AddressValue, PersonRole } from '../../types';
 import { enabledSpeciesList } from '../../lib/orgCatalog';
 import { focusFirstError } from '../../lib/focusFirstError';
+import { useIsAdmin } from '../../lib/useIsAdmin';
 import {
   ContactVisibilityFields,
   ShareState } from
@@ -15,6 +16,7 @@ import {
 
 // Product defaults: phone & email shared with members, address not.
 const DEFAULT_SHARE: ShareState = { phone: true, email: true, address: false };
+
 interface AddFosterModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -87,7 +89,10 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
   const { addFoster, species: speciesCatalog, organizationSpecies } =
   useWhisker();
   const enabledSpecies = enabledSpeciesList(speciesCatalog, organizationSpecies);
+  const isAdmin = useIsAdmin();
   const [formData, setFormData] = useState(INITIAL_FORM);
+  // Admins can set who sees this foster's info at creation; everyone else's own
+  // visibility is managed in My Preferences (new records get the defaults).
   const [share, setShare] = useState<ShareState>(DEFAULT_SHARE);
   const [errors, setErrors] = useState<FormErrors>({});
   const handleClose = () => {
@@ -127,9 +132,13 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
       address_longitude: addr?.longitude,
       notes: formData.notes.trim(),
       max_capacity: Number(formData.max_capacity),
-      share_phone: share.phone,
-      share_email: share.email,
-      share_address: share.address
+      ...(isAdmin ?
+      {
+        share_phone: share.phone,
+        share_email: share.email,
+        share_address: share.address
+      } :
+      {})
     });
     handleClose();
   };
@@ -345,7 +354,9 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
 
         </div>
 
+        {isAdmin &&
         <ContactVisibilityFields value={share} onChange={setShare} />
+        }
       </form>
     </Modal>);
 

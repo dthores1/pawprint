@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { HeartIcon, PlusIcon } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { GuidanceLink } from '../components/guidance/GuidanceLink';
 import { Avatar } from '../components/ui/Avatar';
 import { useWhisker } from '../context/WhiskerContext';
 import { useCanManageAnimals } from '../lib/useAnimalPermissions';
@@ -89,6 +90,7 @@ export function Adoptions() {
           <p className="text-text-secondary mt-1">
             Track pending and completed adoptions across the organization.
           </p>
+          <GuidanceLink guidanceKey="adoptions_intro" />
         </div>
         {canManage &&
         <Button onClick={() => setIsStartOpen(true)} className="gap-2">

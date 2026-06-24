@@ -31,7 +31,8 @@ import {
   SiteNote,
   SiteVolunteer,
   Adoption,
-  NotificationItem } from
+  NotificationItem,
+  GuidanceSeen } from
 '../types';
 import { NewPhotoInput } from '../lib/photosApi';
 import { NewFileInput } from '../lib/filesApi';
@@ -72,6 +73,7 @@ import {
   seedAdoptions } from
 '../data/seed';
 import { generateId } from '../lib/utils';
+import { DEFAULT_GUIDANCE } from '../lib/guidanceContent';
 import { adoptionStatusPatch } from '../lib/adoptions';
 import {
   assembleAdoptionProfile,
@@ -91,7 +93,8 @@ const DEMO_ORG: Org = {
   name: 'Second Chance Animal Rescue (Demo)',
   role: 'owner',
   timezone: 'America/Los_Angeles',
-  show_all_reports: false
+  show_all_reports: false,
+  show_guidance: true
 };
 
 // 'p_dan' is a seed Person, so attribution reads as a real name.
@@ -106,6 +109,7 @@ const demoAuthValue: AuthContextType = {
   refreshOrganizations: async () => {},
   updateOrgTimezone: async () => {},
   updateOrgShowAllReports: async () => {},
+  updateOrgShowGuidance: async () => {},
   currentPersonId: 'p_dan',
   currentMemberId: 'm_dan',
   signInWithGoogle: async () => {},
@@ -425,6 +429,12 @@ export function DemoWhiskerProvider({
   a.id === id ? { ...a, ...updates, updated_at: now() } : a
   )
   );
+
+  // Guidance: demo holds the seen-markers + switches in memory so inline links,
+  // help drawers, and the onboarding checklist all behave like production.
+  const [guidanceSeen, setGuidanceSeen] = useState<GuidanceSeen[]>([]);
+  const [tipsHidden, setTipsHiddenState] = useState(false);
+  const [checklistDismissed, setChecklistDismissedState] = useState(false);
 
   const value: WhiskerContextType = {
     animals: enrichedAnimals,
@@ -1374,6 +1384,29 @@ export function DemoWhiskerProvider({
     setNotifications((prev) =>
     prev.map((n) => (n.read_at ? n : { ...n, read_at: now() }))
     ),
+    // Guidance: same content as production (from the shared seed) so the inline
+    // links, drawers, and checklist render for portfolio visitors.
+    guidanceMessages: DEFAULT_GUIDANCE,
+    guidanceSeen,
+    tipsHidden,
+    checklistDismissed,
+    markGuidanceSeen: (key: string, version: number) =>
+    setGuidanceSeen((prev) =>
+    prev.some((s) => s.guidance_key === key && s.version === version) ?
+    prev :
+    [
+    ...prev,
+    {
+      id: `demo-${key}-${version}`,
+      user_id: 'demo-user',
+      guidance_key: key,
+      version,
+      dismissed_at: now()
+    }]
+
+    ),
+    setTipsHidden: (v: boolean) => setTipsHiddenState(v),
+    dismissChecklist: () => setChecklistDismissedState(true),
 
     addClinicEvent: async (event) => {
       const id = `ce${generateId()}`;

@@ -10,6 +10,7 @@ import { NewSupplyRequestModal } from '../components/supplies/NewSupplyRequestMo
 import { NewTransportRequestModal } from '../components/transports/NewTransportRequestModal';
 import { NewSittingRequestModal } from '../components/sitting/NewSittingRequestModal';
 import { useCanManageSupplyRequests } from '../lib/useSupplyPermissions';
+import { GuidanceLink } from '../components/guidance/GuidanceLink';
 
 type RequestsTab = 'supply' | 'transport' | 'sitting';
 const TABS: { key: RequestsTab; label: string }[] = [
@@ -46,6 +47,7 @@ export function Requests() {
           <p className="text-text-secondary mt-1">
             Coordinate supplies, transportation, and sitting across the org.
           </p>
+          <GuidanceLink guidanceKey="requests_intro" />
         </div>
         <div className="flex gap-2">
           {tab === 'supply' && canManageSupply &&

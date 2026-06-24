@@ -51,7 +51,12 @@ export function Settings() {
     setTabVisible,
     restoreNavigationDefaults
   } = useWhisker();
-  const { currentOrg, updateOrgTimezone, updateOrgShowAllReports } = useAuth();
+  const {
+    currentOrg,
+    updateOrgTimezone,
+    updateOrgShowAllReports,
+    updateOrgShowGuidance
+  } = useAuth();
   const isAdmin =
   currentOrg?.role === 'owner' || currentOrg?.role === 'admin';
   const [traitForm, setTraitForm] = useState<{ open: boolean; trait?: Trait }>({
@@ -656,6 +661,52 @@ export function Settings() {
               className={cn(
                 'inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform',
                 currentOrg?.show_all_reports ? 'translate-x-6' : 'translate-x-1'
+              )} />
+
+          </button>
+        </div>
+      </Card>
+      }
+
+      {/* In-app guidance — org-wide kill switch. Admin-only. */}
+      {tab === 'general' && isAdmin &&
+      <Card className="p-0 overflow-hidden">
+        <div className="p-5 flex items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-1.5">
+              <h2 className="font-heading font-semibold text-lg text-text-primary">
+                Show Guidance Tips
+              </h2>
+              <Tooltip
+                content="When on, members see a small “Learn how it works” link on each page (opening a help panel), an onboarding checklist on the dashboard, and guidance on empty screens. Each member can hide tips from their own account via the menu. Turn this off to remove guidance for the whole org.">
+                <InfoIcon className="w-4 h-4 text-text-secondary" />
+              </Tooltip>
+            </div>
+            <p className="text-sm text-text-secondary mt-1">
+              Subtle “Learn how it works” links and a getting-started checklist
+              for new volunteers. On by default — members can hide tips on their
+              own.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={currentOrg?.show_guidance !== false}
+            aria-label="Show guidance tips"
+            onClick={() =>
+            updateOrgShowGuidance(!(currentOrg?.show_guidance !== false))
+            }
+            className={cn(
+              'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 shrink-0',
+              currentOrg?.show_guidance !== false ? 'bg-primary' : 'bg-border'
+            )}>
+
+            <span
+              className={cn(
+                'inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform',
+                currentOrg?.show_guidance !== false ?
+                'translate-x-6' :
+                'translate-x-1'
               )} />
 
           </button>
