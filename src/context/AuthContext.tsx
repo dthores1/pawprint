@@ -82,13 +82,33 @@ export interface PasskeyInfo {
   last_used_at?: string;
 }
 
-// WebAuthn ceremonies fail in mundane ways (user dismissed the prompt, timed
-// out). Turn those into a calm message instead of a raw browser error.
-function friendlyPasskeyError(message: string): string {
-  if (/cancel|not allowed|timed out|abort|denied/i.test(message)) {
-    return 'Passkey prompt was dismissed. Please try again.';
+// Supabase passkey errors are a WebAuthnError (browser ceremony — carries a
+// spec `code` like ERROR_INVALID_RP_ID) or an AuthError/AuthApiError (server —
+// carries an HTTP `status` like 400 + a `code`). We were surfacing only
+// `.message` ("Credential verification failed"), which hides the actual cause
+// (e.g. an origin/RP-ID config mismatch). This extracts the diagnostic bits.
+function describePasskeyError(error: unknown): string {
+  const e = error as {
+    message?: string;
+    code?: string;
+    status?: number;
+    name?: string;
+  } | null;
+  const message = e?.message || 'Something went wrong with the passkey.';
+  // A dismissed/aborted OS prompt is mundane — keep it calm, not alarming.
+  if (
+    e?.name === 'NotAllowedError' ||
+    e?.code === 'ERROR_CEREMONY_ABORTED' ||
+    /cancel|not allowed|timed out|abort|denied/i.test(message)
+  ) {
+    return 'Passkey prompt was dismissed or timed out. Please try again.';
   }
-  return message || 'Something went wrong with the passkey.';
+  // Append the error code + HTTP status so a config problem (origin/RP-ID
+  // mismatch, etc.) is identifiable straight from the UI, not just DevTools.
+  const detail = [e?.code, e?.status ? `HTTP ${e.status}` : null].
+  filter(Boolean).
+  join(' · ');
+  return detail ? `${message} (${detail})` : message;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(
@@ -459,23 +479,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // the gate — nothing to set here beyond surfacing an error string.
   const signInWithPasskey = useCallback(async () => {
     const { error } = await supabase.auth.signInWithPasskey();
-    return { error: error ? friendlyPasskeyError(error.message) : null };
+    if (error) {
+      console.error('[passkey] sign-in failed:', error);
+      return { error: describePasskeyError(error) };
+    }
+    return { error: null };
   }, []);
 
   const registerPasskey = useCallback(async () => {
     const { error } = await supabase.auth.registerPasskey();
-    return { error: error ? friendlyPasskeyError(error.message) : null };
+    if (error) {
+      console.error('[passkey] register failed:', error);
+      return { error: describePasskeyError(error) };
+    }
+    return { error: null };
   }, []);
 
   const listPasskeys = useCallback(async () => {
     const { data, error } = await supabase.auth.passkey.list();
-    if (error) return { data: [] as PasskeyInfo[], error: error.message };
+    if (error) {
+      console.error('[passkey] list failed:', error);
+      return { data: [] as PasskeyInfo[], error: describePasskeyError(error) };
+    }
     return { data: (data ?? []) as PasskeyInfo[], error: null };
   }, []);
 
   const deletePasskey = useCallback(async (passkeyId: string) => {
     const { error } = await supabase.auth.passkey.delete({ passkeyId });
-    return { error: error ? error.message : null };
+    if (error) {
+      console.error('[passkey] delete failed:', error);
+      return { error: describePasskeyError(error) };
+    }
+    return { error: null };
   }, []);
 
   return (
