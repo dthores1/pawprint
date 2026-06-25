@@ -115,7 +115,13 @@ const demoAuthValue: AuthContextType = {
   signInWithGoogle: async () => {},
   signInWithPassword: async () => ({ error: null }),
   signUpWithPassword: async () => ({ error: null, needsConfirmation: false }),
-  signOut: async () => {}
+  signOut: async () => {},
+  // Passkeys need real Supabase auth; demo mode exposes inert stubs (the UI that
+  // calls these is hidden in demo).
+  signInWithPasskey: async () => ({ error: null }),
+  registerPasskey: async () => ({ error: null }),
+  listPasskeys: async () => ({ data: [], error: null }),
+  deletePasskey: async () => ({ error: null })
 };
 
 export function DemoAuthProvider({ children }: { children: React.ReactNode }) {

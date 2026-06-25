@@ -64,6 +64,31 @@ export interface AuthContextType {
   fullName?: string)
   => Promise<{ error: string | null; needsConfirmation: boolean }>;
   signOut: () => Promise<void>;
+  /** Sign in with a registered passkey (discoverable — no email needed). */
+  signInWithPasskey: () => Promise<{ error: string | null }>;
+  /** Register a passkey for the signed-in user. */
+  registerPasskey: () => Promise<{ error: string | null }>;
+  /** List the signed-in user's registered passkeys. */
+  listPasskeys: () => Promise<{ data: PasskeyInfo[]; error: string | null }>;
+  /** Delete one of the signed-in user's passkeys. */
+  deletePasskey: (passkeyId: string) => Promise<{ error: string | null }>;
+}
+
+/** A registered passkey (mirrors auth-js PasskeyListItem). */
+export interface PasskeyInfo {
+  id: string;
+  friendly_name?: string;
+  created_at: string;
+  last_used_at?: string;
+}
+
+// WebAuthn ceremonies fail in mundane ways (user dismissed the prompt, timed
+// out). Turn those into a calm message instead of a raw browser error.
+function friendlyPasskeyError(message: string): string {
+  if (/cancel|not allowed|timed out|abort|denied/i.test(message)) {
+    return 'Passkey prompt was dismissed. Please try again.';
+  }
+  return message || 'Something went wrong with the passkey.';
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(
@@ -429,6 +454,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setCurrentOrgIdState(null);
   }, []);
 
+  // ── Passkeys (experimental Supabase API; enabled in lib/supabase.ts) ───────
+  // On success signInWithPasskey emits SIGNED_IN, so onAuthStateChange advances
+  // the gate — nothing to set here beyond surfacing an error string.
+  const signInWithPasskey = useCallback(async () => {
+    const { error } = await supabase.auth.signInWithPasskey();
+    return { error: error ? friendlyPasskeyError(error.message) : null };
+  }, []);
+
+  const registerPasskey = useCallback(async () => {
+    const { error } = await supabase.auth.registerPasskey();
+    return { error: error ? friendlyPasskeyError(error.message) : null };
+  }, []);
+
+  const listPasskeys = useCallback(async () => {
+    const { data, error } = await supabase.auth.passkey.list();
+    if (error) return { data: [] as PasskeyInfo[], error: error.message };
+    return { data: (data ?? []) as PasskeyInfo[], error: null };
+  }, []);
+
+  const deletePasskey = useCallback(async (passkeyId: string) => {
+    const { error } = await supabase.auth.passkey.delete({ passkeyId });
+    return { error: error ? error.message : null };
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -448,7 +497,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signInWithGoogle,
         signInWithPassword,
         signUpWithPassword,
-        signOut
+        signOut,
+        signInWithPasskey,
+        registerPasskey,
+        listPasskeys,
+        deletePasskey
       }}>
 
       {children}

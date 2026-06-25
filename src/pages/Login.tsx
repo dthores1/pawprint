@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, FingerprintIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Input, Label } from '../components/ui/Forms';
 import { Button } from '../components/ui/Button';
 import { LogoHero } from '../components/ui/Logo';
+import { passkeysSupported } from '../lib/supabase';
 
 // Minimum password length for sign-up. Mirror this with the Supabase Dashboard
 // setting (Authentication → Providers → Email → "Minimum password length") so
@@ -90,7 +91,7 @@ function PasswordField({
 }
 
 export function Login() {
-  const { signInWithGoogle, signInWithPassword, signUpWithPassword } =
+  const { signInWithGoogle, signInWithPassword, signUpWithPassword, signInWithPasskey } =
   useAuth();
   // When arriving from an invite link (AcceptInvitePage), prefill the invited
   // email and start in sign-up mode — most invitees are creating a new account.
@@ -121,6 +122,15 @@ export function Login() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmSent, setConfirmSent] = useState(false);
+
+  const handlePasskey = async () => {
+    setBusy(true);
+    setError(null);
+    const { error } = await signInWithPasskey();
+    if (error) setError(error);
+    // On success, SIGNED_IN fires and the auth gate advances away from /login.
+    setBusy(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,6 +211,19 @@ export function Login() {
                 <GoogleGlyph className="w-4 h-4" />
                 Continue with Google
               </Button>
+
+              {mode === 'signin' && passkeysSupported &&
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handlePasskey}
+                disabled={busy}
+                className="w-full gap-2.5 mt-3">
+
+                  <FingerprintIcon className="w-4 h-4" />
+                  Continue with passkey
+                </Button>
+              }
 
               <div className="flex items-center gap-3 my-5">
                 <div className="flex-1 h-px bg-border" />
