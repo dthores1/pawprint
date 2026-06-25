@@ -24,6 +24,7 @@ import {
 'lucide-react';
 import { ArchiveConfirmDialog } from '../components/archive/ArchiveConfirmDialog';
 import { useCanArchive } from '../components/archive/useCanArchive';
+import { useCanManageFosters } from '../lib/useAnimalPermissions';
 import { InviteToAppModal } from '../components/people/InviteToAppModal';
 import { useAuth } from '../context/AuthContext';
 import { Send as SendIcon } from 'lucide-react';
@@ -47,6 +48,7 @@ export function FosterProfile() {
   const canArchiveBase = useCanArchive('people', { id: id ?? 'na' });
   const { currentOrg, currentPersonId } = useAuth();
   const isAdmin = currentOrg?.role === 'owner' || currentOrg?.role === 'admin';
+  const canManageFosters = useCanManageFosters();
   // Block self-archive even for admins — there's no sensible recovery path
   // if an admin removes their own contact / member record from the UI.
   const isSelf = !!currentPersonId && currentPersonId === id;
@@ -105,6 +107,7 @@ export function FosterProfile() {
               <SendIcon className="w-4 h-4 mr-2" /> Invite to Whiskerville
             </Button>
           }
+          {canManageFosters &&
           <Button
             variant="soft"
             size="sm"
@@ -112,6 +115,7 @@ export function FosterProfile() {
 
             <Edit2Icon className="w-4 h-4 mr-2" /> Edit
           </Button>
+          }
           {canArchive &&
           <button
             type="button"
@@ -262,6 +266,7 @@ export function FosterProfile() {
                 <HomeIcon className="w-5 h-5 text-primary" />
                 Current Placements
               </h2>
+              {canManageFosters &&
               <Button
                 variant="primary"
                 size="sm"
@@ -271,6 +276,7 @@ export function FosterProfile() {
                 <HomeIcon className="w-4 h-4 mr-2" />
                 Place Animal
               </Button>
+              }
             </div>
             {!foster.active &&
             <p className="text-sm text-text-secondary mb-4">

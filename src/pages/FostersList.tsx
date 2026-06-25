@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useWhisker } from '../context/WhiskerContext';
 import { Card } from '../components/ui/Card';
 import { GuidanceLink } from '../components/guidance/GuidanceLink';
+import { useCanManageFosters } from '../lib/useAnimalPermissions';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Forms';
 import { Avatar } from '../components/ui/Avatar';
@@ -57,6 +58,7 @@ export function FostersList() {
     organizationSpecies, ensureInactiveLoaded, inactiveLoaded } =
   useWhisker();
   const enabledSpecies = enabledSpeciesList(speciesCatalog, organizationSpecies);
+  const canManageFosters = useCanManageFosters();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [view, setView] = useState<'table' | 'grid'>('table');
@@ -192,10 +194,12 @@ export function FostersList() {
             }
             allComplete={inactiveLoaded}
             ensureAllLoaded={ensureInactiveLoaded} />
+          {canManageFosters &&
           <Button onClick={() => setIsAddModalOpen(true)} className="gap-2">
             <PlusIcon className="w-4 h-4" />
             Add Foster
           </Button>
+          }
         </div>
       </div>
 

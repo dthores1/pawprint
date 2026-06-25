@@ -6,7 +6,7 @@ import { Card } from '../components/ui/Card';
 import { GuidanceLink } from '../components/guidance/GuidanceLink';
 import { Avatar } from '../components/ui/Avatar';
 import { useWhisker } from '../context/WhiskerContext';
-import { useCanManageAnimals } from '../lib/useAnimalPermissions';
+import { useCanManageAdoptions } from '../lib/useAnimalPermissions';
 import { animalDisplayName, formatDate, cn } from '../lib/utils';
 import {
   ADOPTION_STATUS_LABELS,
@@ -51,7 +51,7 @@ null;
 
 export function Adoptions() {
   const { adoptions, animalsIndex, peopleIndex, placements } = useWhisker();
-  const canManage = useCanManageAnimals();
+  const canManage = useCanManageAdoptions();
   const [searchParams, setSearchParams] = useSearchParams();
   const param = searchParams.get('tab');
   const tab: AdoptionsTab =

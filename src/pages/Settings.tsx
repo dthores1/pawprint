@@ -575,6 +575,16 @@ export function Settings() {
             description="Add, edit, and delete animals and litters, and manage relationships." />
 
           <MemberPermissionManager
+            permissionType="MANAGE_FOSTERS"
+            title="Foster Management"
+            description="Place animals with fosters, reassign, and end placements. Also includes Animal Management." />
+
+          <MemberPermissionManager
+            permissionType="MANAGE_ADOPTIONS"
+            title="Adoption Management"
+            description="Start, complete, and process returns for adoptions. Also includes Animal Management." />
+
+          <MemberPermissionManager
             permissionType="MANAGE_MEDICAL"
             title="Medical & Clinics"
             description="Add and edit medical records and run spay/neuter & vaccine clinics." />

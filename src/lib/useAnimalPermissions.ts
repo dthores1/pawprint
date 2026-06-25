@@ -5,12 +5,12 @@ import { isPermissionActive } from './memberPermissionsApi';
 import type { MemberPermissionType } from '../types';
 
 /**
- * True when the signed-in user holds an active grant of `type` (or is an org
- * admin/owner). Shared by the animal-management permission hooks. These gate UI
- * affordances only — the server (RLS + grant/revoke RPCs) is the source of truth
- * for actual writes.
+ * True when the signed-in user holds an active grant of ANY of `types` (or is an
+ * org admin/owner). Shared by the animal-management permission hooks. These gate
+ * UI affordances only — the server (RLS + grant/revoke RPCs) is the source of
+ * truth for actual writes.
  */
-function useHasPermission(type: MemberPermissionType): boolean {
+function useHasAnyPermission(types: MemberPermissionType[]): boolean {
   const isAdmin = useIsAdmin();
   const { currentMemberId } = useAuth();
   const { memberPermissions } = useWhisker();
@@ -19,17 +19,28 @@ function useHasPermission(type: MemberPermissionType): boolean {
   return memberPermissions.some(
     (p) =>
     p.member_id === currentMemberId &&
-    p.permission_type === type &&
+    types.includes(p.permission_type) &&
     isPermissionActive(p)
   );
 }
 
+function useHasPermission(type: MemberPermissionType): boolean {
+  return useHasAnyPermission([type]);
+}
+
 /**
  * May create/edit/delete animals & litters and manage relationships: org
- * admin/owner OR an active MANAGE_ANIMALS grant. Everyone else can still READ.
+ * admin/owner OR an active MANAGE_ANIMALS grant. MANAGE_FOSTERS and
+ * MANAGE_ADOPTIONS each also confer this (managing placements/adoptions touches
+ * the animal record) — mirrors the has_member_permission implication in the DB.
+ * Everyone else can still READ.
  */
 export function useCanManageAnimals(): boolean {
-  return useHasPermission('MANAGE_ANIMALS');
+  return useHasAnyPermission([
+  'MANAGE_ANIMALS',
+  'MANAGE_FOSTERS',
+  'MANAGE_ADOPTIONS']
+  );
 }
 
 /** May add/edit/complete medical records (and Clinics): admin OR MANAGE_MEDICAL. */
@@ -40,6 +51,22 @@ export function useCanManageMedical(): boolean {
 /** May manage external adoption listings: admin OR MANAGE_EXTERNAL_LISTINGS. */
 export function useCanManageExternalListings(): boolean {
   return useHasPermission('MANAGE_EXTERNAL_LISTINGS');
+}
+
+/**
+ * May manage foster placements (place / reassign / end): admin OR MANAGE_FOSTERS.
+ * Holders also pass useCanManageAnimals() via the implication above.
+ */
+export function useCanManageFosters(): boolean {
+  return useHasPermission('MANAGE_FOSTERS');
+}
+
+/**
+ * May manage the adoption workflow (start / complete / return): admin OR
+ * MANAGE_ADOPTIONS. Holders also pass useCanManageAnimals() via the implication.
+ */
+export function useCanManageAdoptions(): boolean {
+  return useHasPermission('MANAGE_ADOPTIONS');
 }
 
 /**

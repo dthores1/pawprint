@@ -898,7 +898,11 @@ export type MemberPermissionType =
 'MANAGE_SITES' |
 'MANAGE_ANIMALS' |
 'MANAGE_MEDICAL' |
-'MANAGE_EXTERNAL_LISTINGS';
+'MANAGE_EXTERNAL_LISTINGS' |
+// MANAGE_FOSTERS / MANAGE_ADOPTIONS each also confer MANAGE_ANIMALS (the
+// implication is enforced in has_member_permission + useCanManageAnimals).
+'MANAGE_FOSTERS' |
+'MANAGE_ADOPTIONS';
 
 export interface MemberPermission {
   id: string;

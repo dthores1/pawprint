@@ -73,6 +73,8 @@ import {
   useCanManageAnimals,
   useCanManageMedical,
   useCanManageExternalListings,
+  useCanManageFosters,
+  useCanManageAdoptions,
   useIsActiveFosterOf } from
 '../lib/useAnimalPermissions';
 import { RequestReassignmentModal } from '../components/animals/RequestReassignmentModal';
@@ -111,6 +113,8 @@ export function AnimalProfile() {
   const canManageAnimals = useCanManageAnimals();
   const canManageMedical = useCanManageMedical();
   const canManageListings = useCanManageExternalListings();
+  const canManageFosters = useCanManageFosters();
+  const canManageAdoptions = useCanManageAdoptions();
   const isActiveFoster = useIsActiveFosterOf(id);
   // "Foster-only": the current user is the assigned foster but cannot manage
   // animals outright — they get the limited edit/care scope, not full control.
@@ -683,7 +687,7 @@ export function AnimalProfile() {
                   })()}
                 </div>
                 <div className="flex flex-wrap gap-2 sm:shrink-0">
-                  {canManageAnimals && animal.status === 'adoptable' && !activeAdoption &&
+                  {canManageAdoptions && animal.status === 'adoptable' && !activeAdoption &&
                   <Button
                     variant="primary"
                     size="sm"
@@ -693,7 +697,7 @@ export function AnimalProfile() {
                       Start Adoption
                     </Button>
                   }
-                  {canManageAnimals && !isAdopted &&
+                  {canManageFosters && !isAdopted &&
                   <Button
                     variant={
                     animal.status === 'adoptable' ? 'outline' : 'primary'
@@ -717,7 +721,7 @@ export function AnimalProfile() {
                       Request Reassignment
                     </Button>
                   }
-                  {canManageAnimals && isAdopted &&
+                  {canManageAdoptions && isAdopted &&
                   <Button
                     variant="primary"
                     size="sm"
@@ -945,7 +949,7 @@ export function AnimalProfile() {
         priority={animal.priority}
         canManage={canCollaborate} />
 
-      {activeAdoption && <AdoptionPanel adoptionId={activeAdoption.id} canManage={canManageAnimals} />}
+      {activeAdoption && <AdoptionPanel adoptionId={activeAdoption.id} canManage={canManageAdoptions} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Tabs (Timeline / Medical History) */}
