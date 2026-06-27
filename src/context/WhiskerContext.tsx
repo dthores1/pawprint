@@ -41,6 +41,11 @@ import {
   Product,
   SupplyRequest,
   SupplyRequestItem,
+  SupportTicket,
+  NewSupportTicketInput,
+  SupportAccessStatus,
+  SupportAccessDuration,
+  AuditEvent,
   TransportRequest,
   TransportRequestAnimal,
   SittingRequest,
@@ -188,6 +193,13 @@ import {
   supplyItemToInsert,
   supplySelectColumns } from
 '../lib/supplyApi';
+import {
+  rowToSupportTicket,
+  supportTicketToInsert,
+  supportAttachmentToInsert,
+  rowToAuditEvent,
+  rowsToSupportAccessStatus } from
+'../lib/supportApi';
 import {
   rowToTransport,
   rowToTransportAnimal,
@@ -340,6 +352,27 @@ export interface WhiskerContextType {
   supplyHistoryLoaded: boolean;
   /** Pull closed supply requests (+ items) into state; call when the History tab opens. */
   ensureSupplyHistoryLoaded: () => Promise<void>;
+  /**
+   * Support tickets the current user can see (their own; all org tickets for
+   * admins). Loaded lazily — call `ensureSupportTicketsLoaded` when the Support
+   * page mounts rather than on every org load.
+   */
+  supportTickets: SupportTicket[];
+  supportTicketsLoaded: boolean;
+  ensureSupportTicketsLoaded: () => Promise<void>;
+  /** File a new support ticket (uploads the optional attachment + emails support). */
+  addSupportTicket: (input: NewSupportTicketInput) => Promise<string | null>;
+  /** The current org's active support-access grant (loaded with tickets). */
+  supportAccess: SupportAccessStatus;
+  /** Org activity log (support-access events); admin-readable, loaded with tickets. */
+  auditEvents: AuditEvent[];
+  /** Grant temporary support-team access. Returns an error string or null. */
+  grantSupportAccess: (
+  duration: SupportAccessDuration,
+  ticketId?: string)
+  => Promise<string | null>;
+  /** End any active support-team access for the current org. */
+  revokeSupportAccess: () => Promise<string | null>;
   addAnimal: (
   animal: Omit<Animal, 'id' | 'created_at' | 'updated_at'>)
   => Promise<Animal | undefined>;
@@ -650,10 +683,60 @@ export interface WhiskerContextType {
 export const WhiskerContext = createContext<WhiskerContextType | undefined>(
   undefined
 );
+
+// Mutating actions disabled while "viewing as" another member (read-only), so an
+// action is never mis-attributed to the impersonated person. Read state, loaders
+// (ensure*/refresh*/fetch*/get*), and local-only draft helpers are NOT listed —
+// those must keep working so the impersonated view renders fully.
+const VIEW_AS_BLOCKED_ACTIONS: (keyof WhiskerContextType)[] = [
+'generateAiSummary', 'generateAdoptionProfile',
+'updateAdoptionTemplate', 'addAdoptionTemplate', 'setDefaultAdoptionTemplate',
+'deleteAdoptionTemplate', 'grantSupplyPermission', 'revokeSupplyPermission',
+'setTabVisible', 'restoreNavigationDefaults', 'setSpeciesEnabled',
+'setDefaultSpecies', 'setAllowedBreeds', 'setAnimalTraits', 'addTrait',
+'updateTrait', 'addSavedLocation', 'updateSavedLocation', 'addProduct',
+'updateProduct', 'addSupportTicket', 'grantSupportAccess', 'revokeSupportAccess',
+'addAnimal', 'updateAnimal', 'deleteAnimal', 'addLitter', 'updateLitter',
+'addFoster', 'updateFoster', 'addMedicalRecord', 'updateMedicalRecord', 'addNote',
+'addActionItem', 'updateActionItem', 'completeActionItem', 'cancelActionItem',
+'addPlacement', 'updatePlacement', 'addPerson', 'updatePerson',
+'uploadPersonPhoto', 'addAdoption', 'updateAdoption', 'setAdoptionStatus',
+'completeAdoption', 'cancelAdoption', 'returnAdoption', 'recordAdoptionReturn',
+'addPhoto', 'deletePhoto', 'addAnimalFile', 'deleteAnimalFile', 'addRelationship',
+'deleteRelationship', 'addExternalListing', 'updateExternalListing',
+'deleteExternalListing', 'placeAnimal', 'reassignFoster', 'addSupplyRequest',
+'updateSupplyRequest', 'addSupplyRequestItem', 'addTransportRequest',
+'updateTransportRequest', 'claimTransportRequest', 'assignTransportRequest',
+'acceptTransportRequest', 'unassignTransportRequest', 'completeTransportRequest',
+'addSittingRequest', 'updateSittingRequest', 'acceptSittingRequest',
+'releaseSittingRequest', 'completeSittingRequest', 'markNotificationRead',
+'markAllNotificationsRead', 'markGuidanceSeen', 'setTipsHidden',
+'dismissChecklist', 'addClinicEvent', 'updateClinicEvent', 'addClinicSlot',
+'updateClinicSlot', 'deleteClinicSlot', 'addClinicSlotProcedure',
+'updateClinicSlotProcedure', 'deleteClinicSlotProcedure', 'addSite', 'updateSite',
+'deleteSite', 'addSiteNote', 'addSiteVolunteer', 'removeSiteVolunteer',
+'grantSitePermission', 'revokeSitePermission', 'grantPermission',
+'revokePermission', 'archiveRecord', 'restoreRecord'];
+
+// Replace each blocked action with a logging no-op. Args are ignored and the
+// result is null (benign for the `Promise<…|null>` / void contracts in view-as).
+function readOnlyOverrides(): Partial<WhiskerContextType> {
+  const noop = async () => {
+    console.warn(
+      '[view-as] Writes are disabled while viewing as another member.'
+    );
+    return null;
+  };
+  const out: Record<string, unknown> = {};
+  for (const key of VIEW_AS_BLOCKED_ACTIONS) out[key] = noop;
+  return out as Partial<WhiskerContextType>;
+}
+
 export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   // Animals and notes are now Supabase-backed (org-scoped). Other collections
   // remain on seed for now until they're ported.
-  const { currentOrg, user, currentMemberId } = useAuth();
+  const { currentOrg, user, currentMemberId, currentPersonId, isViewingAs } =
+  useAuth();
   const orgId = currentOrg?.id ?? null;
   // `animals` holds the heavy full rows we've loaded so far. It starts as
   // IN-CARE ONLY (the operational default) and grows on demand when historical
@@ -1362,6 +1445,14 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   // — Coordination collections — all Supabase-backed, org-scoped. —————
   const [products, setProducts] = useState<Product[]>([]);
   const [supplyRequests, setSupplyRequests] = useState<SupplyRequest[]>([]);
+  // Support tickets are loaded lazily (Support page mount), not on org load.
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
+  const [supportTicketsLoaded, setSupportTicketsLoaded] = useState(false);
+  const [supportAccess, setSupportAccess] = useState<SupportAccessStatus>({
+    active: false,
+    expires_at: null
+  });
+  const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
   const [supplyRequestItems, setSupplyRequestItems] = useState<
     SupplyRequestItem[]>(
     []);
@@ -1412,6 +1503,10 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     if (!orgId) {
       setProducts([]);
       setSupplyRequests([]);
+      setSupportTickets([]);
+      setSupportTicketsLoaded(false);
+      setSupportAccess({ active: false, expires_at: null });
+      setAuditEvents([]);
       setSupplyRequestItems([]);
       setTransportRequests([]);
       setTransportRequestAnimals([]);
@@ -1435,6 +1530,11 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     setSupplyHistoryLoaded(false);
     setTransportHistoryLoaded(false);
     setSittingHistoryLoaded(false);
+    // Support tickets are lazy; drop the prior org's so the Support page refetches.
+    setSupportTickets([]);
+    setSupportTicketsLoaded(false);
+    setSupportAccess({ active: false, expires_at: null });
+    setAuditEvents([]);
     const tables = [
     ['products', (rows: any[]) => setProducts(rows.map(rowToProduct))],
     [
@@ -3698,6 +3798,191 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       }
     });
   };
+  // ---------- Support tickets + access ----------
+  // Support-access status + audit log refresh together (after a grant/revoke and
+  // on initial load). Non-admins get an empty audit log via RLS — that's fine.
+  const loadSupportMeta = useCallback(async (org: string) => {
+    const [accessRes, auditRes] = await Promise.all([
+    supabase.
+    from('organization_members').
+    select('is_support, expires_at, support_ticket_id').
+    eq('organization_id', org).
+    eq('is_support', true),
+    supabase.
+    from('audit_events').
+    select('*').
+    eq('organization_id', org).
+    order('created_at', { ascending: false }).
+    limit(50)]
+    );
+    if (accessRes.error) {
+      console.error('[support] access load failed:', accessRes.error.message);
+    } else {
+      setSupportAccess(
+        rowsToSupportAccessStatus(accessRes.data ?? [], Date.now())
+      );
+    }
+    if (auditRes.error) {
+      console.error('[support] audit load failed:', auditRes.error.message);
+    } else {
+      setAuditEvents((auditRes.data ?? []).map(rowToAuditEvent));
+    }
+  }, []);
+
+  const ensureSupportTicketsLoaded = useCallback(async () => {
+    if (!orgId || supportTicketsLoaded) return;
+    const { data, error } = await supabase.
+    from('support_tickets').
+    select('*').
+    eq('organization_id', orgId).
+    order('created_at', { ascending: false });
+    if (error) {
+      console.error('[support] load failed:', error.message);
+      return;
+    }
+    setSupportTickets((data ?? []).map(rowToSupportTicket));
+    setSupportTicketsLoaded(true);
+    void loadSupportMeta(orgId);
+  }, [orgId, supportTicketsLoaded, loadSupportMeta]);
+
+  const grantSupportAccess = async (
+  duration: SupportAccessDuration,
+  ticketId?: string): Promise<string | null> => {
+    if (!orgId) return 'No organization selected.';
+    const { error } = await supabase.rpc('grant_support_access', {
+      p_org_id: orgId,
+      p_duration: duration,
+      p_ticket_id: ticketId ?? null
+    });
+    if (error) {
+      console.error('[support] grant failed:', error.message);
+      return error.message;
+    }
+    // The grant clears the ticket's request flag, so refresh tickets too.
+    if (ticketId) {
+      setSupportTickets((prev) =>
+      prev.map((t) =>
+      t.id === ticketId ? { ...t, support_access_requested: false } : t
+      )
+      );
+    }
+    await loadSupportMeta(orgId);
+    return null;
+  };
+
+  const revokeSupportAccess = async (): Promise<string | null> => {
+    if (!orgId) return 'No organization selected.';
+    const { error } = await supabase.rpc('revoke_support_access', {
+      p_org_id: orgId
+    });
+    if (error) {
+      console.error('[support] revoke failed:', error.message);
+      return error.message;
+    }
+    await loadSupportMeta(orgId);
+    return null;
+  };
+
+  const addSupportTicket = async (
+  input: NewSupportTicketInput): Promise<string | null> => {
+    if (!orgId) {
+      console.error('[support] cannot create — no current organization');
+      return 'No organization selected.';
+    }
+    // Auto-attached client context (best-effort).
+    const insert = supportTicketToInsert(
+      {
+        category: input.category,
+        subject: input.subject,
+        description: input.description,
+        steps_to_reproduce: input.steps_to_reproduce,
+        page_path: window.location.pathname + window.location.search,
+        user_agent: navigator.userAgent,
+        app_version:
+        typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : undefined
+      },
+      orgId,
+      currentPersonId,
+      user?.id ?? null
+    );
+    const { data, error } = await supabase.
+    from('support_tickets').
+    insert(insert).
+    select('*').
+    single();
+    if (error || !data) {
+      console.error('[support] create failed:', error?.message);
+      return 'Could not submit your request. Please try again.';
+    }
+    const ticket = rowToSupportTicket(data);
+    setSupportTickets((prev) => [ticket, ...prev]);
+
+    // Optional attachment: upload bytes to the private bucket, record metadata,
+    // and mint a signed URL to embed in the support email.
+    let attachmentUrl: string | undefined;
+    let attachmentName: string | undefined;
+    if (input.file) {
+      const ext = input.file.name.split('.').pop()?.toLowerCase() || 'bin';
+      const path = `${orgId}/${ticket.id}/${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await supabase.storage.
+      from('support-attachments').
+      upload(path, input.file, { upsert: false });
+      if (upErr) {
+        // Non-fatal: the ticket exists; just log the attachment failure.
+        console.error('[support] attachment upload failed:', upErr.message);
+      } else {
+        await supabase.
+        from('support_ticket_attachments').
+        insert(
+          supportAttachmentToInsert(
+            {
+              ticket_id: ticket.id,
+              file_name: input.file.name,
+              file_type: input.file.type || null,
+              file_size: input.file.size ?? null,
+              storage_path: path
+            },
+            orgId,
+            user?.id ?? null
+          )
+        );
+        // 7-day signed URL so support can open the screenshot from the email.
+        const { data: signed } = await supabase.storage.
+        from('support-attachments').
+        createSignedUrl(path, 60 * 60 * 24 * 7);
+        attachmentUrl = signed?.signedUrl;
+        attachmentName = input.file.name;
+      }
+    }
+
+    // Best-effort email to the support team. The row is the source of truth, so
+    // a failed/unconfigured send never blocks the report.
+    const reporter = people.find((p) => p.id === currentPersonId);
+    const reporterName = reporter ?
+    `${reporter.first_name} ${reporter.last_name}`.trim() :
+    undefined;
+    supabase.functions.
+    invoke('send-support-email', {
+      body: {
+        ticket_number: ticket.ticket_number,
+        category: ticket.category,
+        subject: ticket.subject,
+        description: ticket.description,
+        steps_to_reproduce: ticket.steps_to_reproduce,
+        organization_name: currentOrg?.name,
+        reporter_name: reporterName,
+        reporter_email: reporter?.email || user?.email,
+        page_path: ticket.page_path,
+        user_agent: ticket.user_agent,
+        app_version: ticket.app_version,
+        attachment_url: attachmentUrl,
+        attachment_name: attachmentName
+      }
+    }).
+    catch((err) => console.warn('[support] email send failed:', err));
+    return null;
+  };
+
   const addSupplyRequest = async (
   req: Omit<SupplyRequest, 'id' | 'created_at' | 'updated_at'>) =>
   {
@@ -4399,9 +4684,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     return merged.map(enrichSpecies);
   }, [animalsIndex, animals, enrichSpecies]);
 
-  return (
-    <WhiskerContext.Provider
-      value={{
+  const baseValue: WhiskerContextType = {
         animals: enrichedAnimals,
         animalsLoading,
         animalsIndex: enrichedAnimalsIndex,
@@ -4470,6 +4753,14 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         supplyRequestItems,
         supplyHistoryLoaded,
         ensureSupplyHistoryLoaded,
+        supportTickets,
+        supportTicketsLoaded,
+        ensureSupportTicketsLoaded,
+        addSupportTicket,
+        supportAccess,
+        auditEvents,
+        grantSupportAccess,
+        revokeSupportAccess,
         addAnimal,
         updateAnimal,
         deleteAnimal,
@@ -4571,8 +4862,14 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         archiveRecord,
         restoreRecord,
         fetchArchived
-      }}>
-      
+  };
+  // While viewing as another member, disable every write so nothing is
+  // mis-attributed to them. Normal mode passes baseValue through untouched.
+  const value: WhiskerContextType = isViewingAs ?
+  { ...baseValue, ...readOnlyOverrides() } :
+  baseValue;
+  return (
+    <WhiskerContext.Provider value={value}>
       {children}
     </WhiskerContext.Provider>);
 

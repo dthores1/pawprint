@@ -1,6 +1,17 @@
-import React, { useState } from 'react';
-import { XIcon, PlusIcon, PencilIcon, InfoIcon } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import {
+  XIcon,
+  PlusIcon,
+  PencilIcon,
+  InfoIcon,
+  BugIcon,
+  LightbulbIcon,
+  LifeBuoyIcon } from
+'lucide-react';
 import { Tooltip } from '../components/ui/Tooltip';
+import { NewSupportTicketModal } from '../components/support/NewSupportTicketModal';
+import { SupportAccessCard } from '../components/support/SupportAccessCard';
+import { SupportRequestAccessBanner } from '../components/support/SupportRequestAccessBanner';
 import { useWhisker } from '../context/WhiskerContext';
 import { useAuth } from '../context/AuthContext';
 import { Card } from '../components/ui/Card';
@@ -14,8 +25,14 @@ import { PillTabs } from '../components/ui/PillTabs';
 import { navItems } from '../components/layout/Sidebar';
 import { AddressDisplay } from '../components/ui/AddressDisplay';
 import { SpeciesIcon } from '../lib/speciesIcons';
-import { cn } from '../lib/utils';
-import { Trait, SavedLocation } from '../types';
+import { cn, formatDate } from '../lib/utils';
+import {
+  Trait,
+  SavedLocation,
+  SupportTicket,
+  SupportTicketCategory,
+  SupportTicketStatus } from
+'../types';
 
 // Curated timezone list (US-focused, the app's primary audience, + UTC). Used
 // to render clinic dates/times in notifications. Expand as orgs need it.
@@ -28,6 +45,52 @@ const TIMEZONES: { value: string; label: string }[] = [
 { value: 'America/Anchorage', label: 'Alaska (Anchorage)' },
 { value: 'Pacific/Honolulu', label: 'Hawaii (Honolulu)' },
 { value: 'UTC', label: 'UTC' }];
+
+// Support entry points — each opens the ticket form preset to its category.
+const SUPPORT_CARDS: {
+  category: SupportTicketCategory;
+  icon: typeof BugIcon;
+  title: string;
+  description: string;
+}[] = [
+{
+  category: 'bug',
+  icon: BugIcon,
+  title: 'Report a Bug',
+  description: 'Something isn’t working right? Let us know what happened.'
+},
+{
+  category: 'feature',
+  icon: LightbulbIcon,
+  title: 'Suggest a Feature',
+  description: 'Tell us what would make Whiskerville better for your rescue.'
+},
+{
+  category: 'question',
+  icon: LifeBuoyIcon,
+  title: 'Contact Support',
+  description: 'Have a question or need a hand? Reach the support team.'
+}];
+
+const STATUS_META: Record<
+  SupportTicketStatus,
+  { label: string; className: string }> =
+{
+  open: { label: 'Open', className: 'bg-blue-100 text-blue-700' },
+  in_progress: { label: 'In progress', className: 'bg-amber-100 text-amber-700' },
+  waiting: {
+    label: 'Waiting for response',
+    className: 'bg-purple-100 text-purple-700'
+  },
+  resolved: { label: 'Resolved', className: 'bg-green-100 text-green-700' },
+  closed: { label: 'Closed', className: 'bg-gray-100 text-gray-600' }
+};
+
+const CATEGORY_LABEL: Record<SupportTicketCategory, string> = {
+  bug: 'Bug',
+  feature: 'Feature',
+  question: 'Question'
+};
 
 // Organization settings:
 //  - Accepted Animal Types → organization_species (enable/disable + default)
@@ -49,7 +112,10 @@ export function Settings() {
     updateSavedLocation,
     isTabVisible,
     setTabVisible,
-    restoreNavigationDefaults
+    restoreNavigationDefaults,
+    supportTickets,
+    supportTicketsLoaded,
+    ensureSupportTicketsLoaded
   } = useWhisker();
   const {
     currentOrg,
@@ -66,12 +132,18 @@ export function Settings() {
     open: boolean;
     location?: SavedLocation;
   }>({ open: false });
+  const [ticketModal, setTicketModal] = useState<{
+    open: boolean;
+    category?: SupportTicketCategory;
+  }>({ open: false });
   // Three tabs: Animal Options (catalog/traits/adoption), Locations (saved
   // places), and Permissions (member access grants — admin-only).
   const [tab, setTab] = useState<
-    'animal' | 'locations' | 'navigation' | 'permissions' | 'general'>(
+    'animal' | 'locations' | 'navigation' | 'permissions' | 'general' | 'support'>(
     'animal'
   );
+  // Support is available to every member (bug reports can't be admin-gated);
+  // the rest stay admin-only.
   const tabs = [
   { key: 'animal', label: 'Animal Options' },
   ...isAdmin ?
@@ -80,7 +152,13 @@ export function Settings() {
   { key: 'locations', label: 'Locations' },
   { key: 'permissions', label: 'Permissions' },
   { key: 'general', label: 'General' }] :
-  []];
+  [],
+  { key: 'support', label: 'Support' }];
+
+  // Tickets load lazily — only when the Support tab is first opened.
+  useEffect(() => {
+    if (tab === 'support') void ensureSupportTicketsLoaded();
+  }, [tab, ensureSupportTicketsLoaded]);
 
   const rowFor = (id: string) =>
   organizationSpecies.find((r) => r.species_id === id);
@@ -723,6 +801,108 @@ export function Settings() {
         </div>
       </Card>
       }
+
+      {/* Support — file a ticket + see your recent requests. All members. */}
+      {tab === 'support' &&
+      <Card className="p-0 overflow-hidden">
+          <div className="p-5 border-b border-border">
+            <h2 className="font-heading font-semibold text-lg text-text-primary">
+              How can we help?
+            </h2>
+            <p className="text-sm text-text-secondary mt-1">
+              Report a problem, request a feature, or reach the support team.
+              We’ll email you back and you can track each request below.
+            </p>
+          </div>
+          <div className="p-5 grid gap-3 sm:grid-cols-3">
+            {SUPPORT_CARDS.map((c) =>
+          <button
+            key={c.category}
+            type="button"
+            onClick={() => setTicketModal({ open: true, category: c.category })}
+            className="text-left rounded-xl border border-border bg-background hover:border-primary hover:shadow-soft transition-all p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+                <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-primary/10 text-primary mb-3">
+                  <c.icon className="w-5 h-5" />
+                </span>
+                <div className="font-medium text-text-primary">{c.title}</div>
+                <p className="text-xs text-text-secondary mt-1">
+                  {c.description}
+                </p>
+              </button>
+          )}
+          </div>
+        </Card>
+      }
+
+      {/* Support Access — admin-only: grant the support team temporary access. */}
+      {tab === 'support' && isAdmin && <SupportAccessCard />}
+
+      {tab === 'support' &&
+      <Card className="p-0 overflow-hidden">
+          <div className="p-5 border-b border-border">
+            <h2 className="font-heading font-semibold text-lg text-text-primary">
+              My Support Requests
+            </h2>
+            <p className="text-sm text-text-secondary mt-1">
+              {isAdmin ?
+            'All requests submitted by your organization.' :
+            'Requests you’ve submitted.'}
+            </p>
+          </div>
+          {!supportTicketsLoaded ?
+        <p className="px-5 py-6 text-sm text-text-secondary">Loading…</p> :
+        supportTickets.length === 0 ?
+        <p className="px-5 py-6 text-sm text-text-secondary">
+              No requests yet. Use the options above to send us your first one.
+            </p> :
+
+        <ul className="divide-y divide-border max-h-[28rem] overflow-y-auto">
+              {[...supportTickets].
+          sort(
+            (a: SupportTicket, b: SupportTicket) =>
+            b.created_at.localeCompare(a.created_at)
+          ).
+          map((t) => {
+            const meta = STATUS_META[t.status];
+            return (
+              <li key={t.id} className="px-5 py-3.5">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-mono text-text-secondary">
+                            #{t.ticket_number}
+                          </span>
+                          <span className="font-medium text-text-primary truncate">
+                            {t.subject}
+                          </span>
+                        </div>
+                        <div className="text-xs text-text-secondary mt-0.5">
+                          {CATEGORY_LABEL[t.category]} · {formatDate(t.created_at)}
+                        </div>
+                      </div>
+                      <span
+                    className={cn(
+                      'shrink-0 text-xs font-medium px-2 py-0.5 rounded-full',
+                      meta.className
+                    )}>
+                        {meta.label}
+                      </span>
+                    </div>
+                    {t.support_access_requested &&
+                <SupportRequestAccessBanner ticket={t} isAdmin={isAdmin} />
+                }
+                  </li>);
+
+          })}
+            </ul>
+        }
+        </Card>
+      }
+
+      <NewSupportTicketModal
+        isOpen={ticketModal.open}
+        onClose={() => setTicketModal({ open: false })}
+        category={ticketModal.category} />
 
       <TraitFormModal
         isOpen={traitForm.open}

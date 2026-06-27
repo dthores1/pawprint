@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Outlet, NavLink, Link, useLocation } from 'react-router-dom';
 import { Sidebar, useVisibleNavItems } from './Sidebar';
 import { DemoBanner } from './DemoBanner';
+import { ViewAsBanner } from './ViewAsBanner';
 import { TopBar } from './TopBar';
 import { NotificationBell } from './NotificationBell';
 import { isDemoMode } from '../../lib/appMode';
@@ -36,6 +37,7 @@ export function AppShell() {
   return (
     <div className="flex flex-col h-screen w-full bg-background overflow-hidden">
       {isDemoMode && <DemoBanner />}
+      <ViewAsBanner />
       <div className="flex flex-1 min-h-0 w-full">
         <Sidebar />
 

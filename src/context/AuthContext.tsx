@@ -9,6 +9,17 @@ import React, {
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
+/** A member of the current org that the signed-in user can "view as". */
+export interface ViewAsMember {
+  /** organization_members.id of the member being impersonated. */
+  memberId: string;
+  userId: string;
+  role: string;
+  /** people.id — drives attribution + foster-collab fidelity (may be null). */
+  personId: string | null;
+  name: string;
+}
+
 export interface Org {
   id: string;
   name: string;
@@ -53,6 +64,21 @@ export interface AuthContextType {
    * user + org are known.
    */
   currentMemberId: string | null;
+  /**
+   * "View as" (support/admin impersonation). When active, `currentOrg.role`,
+   * `currentMemberId`, and `currentPersonId` above reflect the IMPERSONATED
+   * member — so every permission/nav/affordance renders as that member sees it —
+   * and all writes are disabled (read-only) to avoid mis-attribution.
+   */
+  isViewingAs: boolean;
+  /** Display name of the member being viewed as, or null when not viewing-as. */
+  viewingAsName: string | null;
+  /** Whether the real signed-in user may use "View as" (owners/admins/support). */
+  canViewAs: boolean;
+  /** Enter read-only "view as" mode for a member of the current org. */
+  viewAsMember: (member: ViewAsMember) => void;
+  /** Exit "view as" and return to the real account. */
+  exitViewAs: () => void;
   signInWithGoogle: () => Promise<void>;
   signInWithPassword: (
   email: string,
@@ -279,6 +305,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // attach to it). Read-only lookup — membership is created elsewhere (invite
   // accept / onboarding), not here.
   const [currentMemberId, setCurrentMemberId] = useState<string | null>(null);
+
+  // ── "View as" (read-only impersonation) ──────────────────────────────────
+  // Holds the member being viewed as, or null. The exposed currentOrg.role /
+  // currentMemberId / currentPersonId become this member's so the whole app
+  // renders from their vantage point; WhiskerContext blocks writes meanwhile.
+  const [viewAs, setViewAs] = useState<ViewAsMember | null>(null);
+  // Real role decides who may impersonate (owners/admins — support holds admin
+  // while its access grant is live). Computed from the real currentOrg below.
+  const exitViewAs = useCallback(() => setViewAs(null), []);
+  const viewAsMember = useCallback(
+    (member: ViewAsMember) => setViewAs(member),
+    []
+  );
+  // Impersonation can't span orgs — drop it whenever the active org changes.
+  useEffect(() => {
+    setViewAs(null);
+  }, [currentOrgId]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -513,6 +557,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: null };
   }, []);
 
+  // Effective identity surfaced to the app: the impersonated member while
+  // viewing-as, otherwise the real signed-in user. `currentOrg` keeps its id
+  // (data stays scoped to the same org) — only the role label is swapped.
+  const realRole = currentOrg?.role;
+  const canViewAs = realRole === 'owner' || realRole === 'admin';
+  const effectiveCurrentOrg =
+  viewAs && currentOrg ? { ...currentOrg, role: viewAs.role } : currentOrg;
+  const effectiveMemberId = viewAs ? viewAs.memberId : currentMemberId;
+  const effectivePersonId = viewAs ? viewAs.personId : currentPersonId;
+
   return (
     <AuthContext.Provider
       value={{
@@ -521,14 +575,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         orgsLoading,
         organizations,
-        currentOrg,
+        currentOrg: effectiveCurrentOrg,
         setCurrentOrgId,
         refreshOrganizations,
         updateOrgTimezone,
         updateOrgShowAllReports,
         updateOrgShowGuidance,
-        currentPersonId,
-        currentMemberId,
+        currentPersonId: effectivePersonId,
+        currentMemberId: effectiveMemberId,
+        isViewingAs: !!viewAs,
+        viewingAsName: viewAs?.name ?? null,
+        canViewAs,
+        viewAsMember,
+        exitViewAs,
         signInWithGoogle,
         signInWithPassword,
         signUpWithPassword,
