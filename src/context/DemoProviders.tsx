@@ -114,6 +114,12 @@ const demoAuthValue: AuthContextType = {
   updateOrgShowGuidance: async () => {},
   currentPersonId: 'p_dan',
   currentMemberId: 'm_dan',
+  // "View as" needs real multi-member orgs + auth; inert in demo.
+  isViewingAs: false,
+  viewingAsName: null,
+  canViewAs: false,
+  viewAsMember: () => {},
+  exitViewAs: () => {},
   signInWithGoogle: async () => {},
   signInWithPassword: async () => ({ error: null }),
   signUpWithPassword: async () => ({ error: null, needsConfirmation: false }),
@@ -542,6 +548,16 @@ export function DemoWhiskerProvider({
     // the *HistoryLoaded flags are pre-true and the ensure* helpers are no-ops.
     supplyHistoryLoaded: true,
     ensureSupplyHistoryLoaded: async () => {},
+    // Support tickets aren't part of the demo dataset — no-op surface so the
+    // Support page renders an empty "no requests yet" state.
+    supportTickets: [],
+    supportTicketsLoaded: true,
+    ensureSupportTicketsLoaded: async () => {},
+    addSupportTicket: async () => null,
+    supportAccess: { active: false, expires_at: null },
+    auditEvents: [],
+    grantSupportAccess: async () => null,
+    revokeSupportAccess: async () => null,
     transportRequests,
     transportRequestAnimals,
     transportHistoryLoaded: true,

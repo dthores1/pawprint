@@ -16,6 +16,7 @@ import {
   CheckIcon,
   XIcon,
   BuildingIcon,
+  EyeIcon,
   TrashIcon } from
 'lucide-react';
 import { formatDate } from '../lib/utils';
@@ -57,7 +58,7 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 export function OrganizationPage() {
-  const { currentOrg } = useAuth();
+  const { currentOrg, user, canViewAs, viewAsMember } = useAuth();
   const { people } = useWhisker();
   const isAdmin = currentOrg?.role === 'owner' || currentOrg?.role === 'admin';
 
@@ -445,6 +446,24 @@ export function OrganizationPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
+                    {canViewAs && m.user_id !== user?.id &&
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                    viewAsMember({
+                      memberId: m.id,
+                      userId: m.user_id,
+                      role: m.role,
+                      personId: p?.id ?? null,
+                      name
+                    })
+                    }
+                    aria-label={`View as ${name}`}>
+
+                        <EyeIcon className="w-4 h-4 mr-1.5" /> View as
+                      </Button>
+                  }
                     {isAdmin ?
                   <Select
                     value={m.role}

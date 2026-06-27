@@ -1,9 +1,8 @@
 import React from 'react';
-import { Cat, Dog, Rabbit, Bird, PawPrint } from 'lucide-react';
+import { Cat, Dog, Rabbit, Bird, Rat, PawPrint } from 'lucide-react';
 import { ReptileIcon } from '../components/icons/ReptileIcon';
 import { HorseIcon } from '../components/icons/HorseIcon';
 import { PigIcon } from '../components/icons/PigIcon';
-import { RatIcon } from '../components/icons/RatIcon';
 
 export type SpeciesIconComponent = React.ComponentType<{ className?: string }>;
 
@@ -17,7 +16,7 @@ const ICON_BY_NAME: Record<string, SpeciesIconComponent> = {
   bird: Bird,
   reptile: ReptileIcon,
   turtle: ReptileIcon,
-  rat: RatIcon,
+  rat: Rat,
   pig: PigIcon,
   horse: HorseIcon,
   'paw-print': PawPrint

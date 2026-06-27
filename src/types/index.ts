@@ -885,6 +885,80 @@ export interface SupplyRequestItem {
   product_url?: string;
 }
 
+// ---- Support tickets -------------------------------------------------------
+// A member's bug report / feature request / contact-support message, tracked as
+// a ticket (status set support-side; the customer UI is read-only over it).
+export type SupportTicketCategory = 'bug' | 'feature' | 'question';
+
+export type SupportTicketStatus =
+  'open' |
+  'in_progress' |
+  'waiting' |
+  'resolved' |
+  'closed';
+
+export interface SupportTicketAttachment {
+  id: string;
+  ticket_id: string;
+  file_name: string;
+  file_type?: string;
+  file_size?: number;
+  storage_path: string;
+  uploaded_at: string;
+}
+
+export interface SupportTicket {
+  id: string;
+  /** Global, human-friendly reference number ("Ticket #482"). */
+  ticket_number: number;
+  created_by_person_id?: string;
+  category: SupportTicketCategory;
+  subject: string;
+  description: string;
+  steps_to_reproduce?: string;
+  status: SupportTicketStatus;
+  /** Set support-side: the team has asked to access this org for this ticket. */
+  support_access_requested?: boolean;
+  /** Auto-attached browser context (best-effort). */
+  page_path?: string;
+  user_agent?: string;
+  app_version?: string;
+  resolved_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** How long a support-access grant lasts. */
+export type SupportAccessDuration = '24h' | '7d' | 'until_resolved';
+
+/** The current org's active support-access grant (null when none/expired). */
+export interface SupportAccessStatus {
+  active: boolean;
+  /** null = no fixed expiry (e.g. "until the ticket is resolved"). */
+  expires_at: string | null;
+  ticket_id?: string;
+}
+
+/** An immutable org activity record (first use: support-access events). */
+export interface AuditEvent {
+  id: string;
+  actor_label?: string;
+  action: string;
+  ticket_id?: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+/** Form payload for filing a new ticket (context is auto-attached at submit). */
+export interface NewSupportTicketInput {
+  category: SupportTicketCategory;
+  subject: string;
+  description: string;
+  steps_to_reproduce?: string;
+  /** Optional single screenshot / file attachment. */
+  file?: File;
+}
+
 // ---- Member permissions ----------------------------------------------------
 // A restricted action is allowed when the member is an org admin/owner OR holds
 // an active grant for the matching permission type. Grants attach to an
