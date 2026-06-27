@@ -20,6 +20,8 @@ import {
 'lucide-react';
 import { ArchiveConfirmDialog } from '../archive/ArchiveConfirmDialog';
 import { useCanArchive } from '../archive/useCanArchive';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { cancelRequestConfirm } from '../../lib/requestCopy';
 
 interface SupplyRequestDetailModalProps {
   isOpen: boolean;
@@ -82,6 +84,7 @@ export function SupplyRequestDetailModal({
   const [denyMode, setDenyMode] = useState(false);
   const [denyReason, setDenyReason] = useState('');
   const [archiving, setArchiving] = useState(false);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
   // Status blockers mirror the server-side rule in archive_record. Admin gate
   // comes from useCanArchive; the status guard is layered on top so the
   // button doesn't appear while the request is still in flight.
@@ -149,6 +152,8 @@ export function SupplyRequestDetailModal({
     updateSupplyRequest(request.id, patch);
     setDenyMode(false);
     setDenyReason('');
+    // Denial is terminal — close the detail modal so the user returns to the list.
+    onClose();
   };
 
   const saveSupplier = (val: string) => {
@@ -262,8 +267,7 @@ export function SupplyRequestDetailModal({
     </div> :
   request.status === 'submitted' && canManage ?
   <div className="flex flex-wrap justify-end gap-2">
-      {!isRequester &&
-    <Button
+      <Button
       variant="ghost"
       size="sm"
       onClick={() => setDenyMode(true)}
@@ -271,15 +275,13 @@ export function SupplyRequestDetailModal({
 
         <BanIcon className="w-4 h-4 mr-1.5" /> Deny Request
       </Button>
-    }
       <Button size="sm" onClick={() => handleSetStatus('in_progress')}>
         Start Processing
       </Button>
     </div> :
   request.status === 'in_progress' && canManage ?
   <div className="flex flex-wrap justify-end gap-2">
-      {!isRequester &&
-    <Button
+      <Button
       variant="ghost"
       size="sm"
       onClick={() => setDenyMode(true)}
@@ -287,7 +289,6 @@ export function SupplyRequestDetailModal({
 
         <BanIcon className="w-4 h-4 mr-1.5" /> Deny Request
       </Button>
-    }
       <Button size="sm" onClick={() => handleSetStatus('fulfilled')}>
         <CheckIcon className="w-4 h-4 mr-1.5" /> Mark Fulfilled
       </Button>
@@ -368,7 +369,7 @@ export function SupplyRequestDetailModal({
             request.status === 'in_progress') &&
             <button
               type="button"
-              onClick={() => handleSetStatus('cancelled')}
+              onClick={() => setConfirmingCancel(true)}
               className="text-sm font-medium text-text-secondary hover:text-[#9B3A3A] hover:underline transition-colors">
 
                 Cancel Request
@@ -588,6 +589,25 @@ export function SupplyRequestDetailModal({
         onArchived={onClose} />
 
       }
+      {confirmingCancel && (() => {
+        const copy = cancelRequestConfirm('supply request');
+        return (
+          <ConfirmDialog
+            isOpen={true}
+            onClose={() => setConfirmingCancel(false)}
+            onConfirm={() => {
+              handleSetStatus('cancelled');
+              setConfirmingCancel(false);
+            }}
+            title={copy.title}
+            confirmLabel={copy.confirmLabel}
+            cancelLabel={copy.cancelLabel}
+            tone={copy.tone}>
+
+            {copy.body}
+          </ConfirmDialog>);
+
+      })()}
     </Modal>);
 
 }

@@ -24,6 +24,7 @@ import {
   SupplyRequest,
   SupplyRequestItem,
   TransportRequest,
+  TransportRequestAnimal,
   SittingRequest,
   SittingRequestPlacement,
   ClinicEvent,
@@ -1458,7 +1459,6 @@ export const seedTransportRequests: TransportRequest[] = [
   status: 'open',
   schedule_type: 'asap',
   requested_by_person_id: 'p_dan',
-  animal_id: 'a8', // Pepper
   pickup_location: '202 Birch Rd, Portland, OR (Anita Patel)',
   dropoff_location: 'Greenwood Vet Clinic',
   notes: 'Needs carrier transport.',
@@ -1488,7 +1488,6 @@ export const seedTransportRequests: TransportRequest[] = [
   status: 'open',
   schedule_type: 'exact',
   requested_by_person_id: 'pe4',
-  animal_id: 'a9', // Otis
   pickup_location: "Whiskerville intake (Brian O'Connor)",
   dropoff_location: 'Bridge City Veterinary',
   // Past exact pickup → surfaces in the "Needs Review" (expired) tab.
@@ -1505,7 +1504,6 @@ export const seedTransportRequests: TransportRequest[] = [
   schedule_type: 'exact',
   requested_by_person_id: 'pe3',
   clinic_event_id: 'ce1',
-  animal_id: 'a4', // Milkshake
   pickup_location: 'Foster home (TBD)',
   dropoff_location: 'Stanton Spay/Neuter Clinic',
   requested_pickup_time: seedDateTime(4, 7, 30),
@@ -1521,7 +1519,6 @@ export const seedTransportRequests: TransportRequest[] = [
   schedule_type: 'exact',
   requested_by_person_id: 'pe6',
   assigned_volunteer_person_id: 'pe7',
-  animal_id: 'a7', // Pip
   pickup_location: 'Columbia City trap site',
   dropoff_location: 'Anita Patel (foster)',
   requested_pickup_time: '2025-08-13T19:00:00Z',
@@ -1531,6 +1528,14 @@ export const seedTransportRequests: TransportRequest[] = [
   created_at: '2025-08-13T17:00:00Z',
   updated_at: '2025-08-13T20:45:00Z'
 }];
+
+// The animals on each transport (multi-animal child rows, migration 0085).
+export const seedTransportRequestAnimals: TransportRequestAnimal[] = [
+{ id: 'tra1', transport_request_id: 'tr1', animal_id: 'a8' }, // Pepper
+{ id: 'tra3', transport_request_id: 'tr3', animal_id: 'a9' }, // Otis
+{ id: 'tra4', transport_request_id: 'tr4', animal_id: 'a4' }, // Milkshake
+{ id: 'tra5', transport_request_id: 'tr5', animal_id: 'a7' } // Pip
+];
 
 export const seedSittingRequests: SittingRequest[] = [
 {

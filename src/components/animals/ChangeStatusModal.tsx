@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Modal } from '../ui/Modal';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Input, Select, Textarea, Label, FieldError } from '../ui/Forms';
 import { DatePicker } from '../ui/DatePicker';
 import { FormSection } from '../ui/FormSection';
@@ -103,6 +104,7 @@ export function ChangeStatusModal({
   const [description, setDescription] = useState('');
   const [intakeDateError, setIntakeDateError] = useState<string | undefined>();
   const [reason, setReason] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [internalNotes, setInternalNotes] = useState('');
   // Inline action item, shown when priority is elevated — lets the user capture
   // the next step in the same save (rather than a second trip to the profile).
@@ -356,19 +358,16 @@ export function ChangeStatusModal({
     onClose();
   };
 
-  const handleDelete = () => {
-    if (
-    window.confirm(
-      `Delete ${animalDisplayName(animal)}? This permanently removes the animal record and can't be undone.`
-    ))
-    {
-      deleteAnimal(animalId);
-      onClose();
-      navigate('/animals');
-    }
+  const handleDelete = () => setConfirmDelete(true);
+  const performDelete = () => {
+    deleteAnimal(animalId);
+    setConfirmDelete(false);
+    onClose();
+    navigate('/animals');
   };
 
   return (
+    <>
     <Modal
       isOpen={isOpen}
       onClose={onClose}
@@ -748,6 +747,21 @@ export function ChangeStatusModal({
         </FormSection>
 
       </form>
-    </Modal>);
+    </Modal>
+    {confirmDelete &&
+    <ConfirmDialog
+      isOpen={true}
+      onClose={() => setConfirmDelete(false)}
+      onConfirm={performDelete}
+      title="Delete animal?"
+      confirmLabel="Delete"
+      cancelLabel="Keep"
+      tone="danger">
+
+        Permanently removes {animalDisplayName(animal)}’s record. This can’t be
+        undone.
+      </ConfirmDialog>
+    }
+    </>);
 
 }

@@ -6,6 +6,7 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input, Select, Label, FieldError } from '../components/ui/Forms';
 import { Avatar } from '../components/ui/Avatar';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { RolesPickerPopover } from '../components/ui/RolesPickerPopover';
 import { PersonRole } from '../types';
 import {
@@ -70,6 +71,9 @@ export function OrganizationPage() {
   const [submitting, setSubmitting] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [memberActionError, setMemberActionError] = useState<string | null>(null);
+  // Pending destructive actions, surfaced through ConfirmDialog.
+  const [revoking, setRevoking] = useState<Invite | null>(null);
+  const [removingMember, setRemovingMember] = useState<OrgMember | null>(null);
 
   const loadMembers = useCallback(async () => {
     if (!currentOrg) {
@@ -171,7 +175,6 @@ export function OrganizationPage() {
   };
 
   const revoke = async (inv: Invite) => {
-    if (!window.confirm(`Revoke invite for ${inv.email}?`)) return;
     const { error } = await supabase.rpc('revoke_org_invite', {
       p_invite_id: inv.id
     });
@@ -195,11 +198,6 @@ export function OrganizationPage() {
     loadMembers();
   };
   const removeMember = async (member: OrgMember) => {
-    const person = people.find((p) => p.user_id === member.user_id);
-    const label = person ?
-    `${person.first_name} ${person.last_name}` :
-    'this member';
-    if (!window.confirm(`Remove ${label} from the organization?`)) return;
     setMemberActionError(null);
     const { error } = await supabase.rpc('remove_member', {
       p_member_id: member.id
@@ -358,7 +356,7 @@ export function OrganizationPage() {
                     <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => revoke(inv)}
+                onClick={() => setRevoking(inv)}
                 className="text-[#9B3A3A] hover:bg-[#F5D7D7]/60 hover:text-[#9B3A3A]">
 
                       <XIcon className="w-4 h-4 mr-1.5" />
@@ -468,7 +466,7 @@ export function OrganizationPage() {
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => removeMember(m)}
+                    onClick={() => setRemovingMember(m)}
                     className="text-[#9B3A3A] hover:bg-[#F5D7D7]/60 hover:text-[#9B3A3A]"
                     aria-label={`Remove ${name}`}>
 
@@ -487,6 +485,47 @@ export function OrganizationPage() {
           </p>
         }
       </Card>
+
+      {revoking &&
+      <ConfirmDialog
+        isOpen={true}
+        onClose={() => setRevoking(null)}
+        onConfirm={() => {
+          revoke(revoking);
+          setRevoking(null);
+        }}
+        title="Revoke invite?"
+        confirmLabel="Revoke"
+        cancelLabel="Keep"
+        tone="danger">
+
+          The invite for {revoking.email} will no longer be usable.
+        </ConfirmDialog>
+      }
+      {removingMember &&
+      <ConfirmDialog
+        isOpen={true}
+        onClose={() => setRemovingMember(null)}
+        onConfirm={() => {
+          removeMember(removingMember);
+          setRemovingMember(null);
+        }}
+        title="Remove member?"
+        confirmLabel="Remove"
+        cancelLabel="Keep"
+        tone="danger">
+
+          {(() => {
+            const person = people.find(
+              (p) => p.user_id === removingMember.user_id
+            );
+            const label = person ?
+            `${person.first_name} ${person.last_name}` :
+            'This member';
+            return `${label} will lose access to this organization.`;
+          })()}
+        </ConfirmDialog>
+      }
     </div>);
 
 }

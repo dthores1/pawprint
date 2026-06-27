@@ -92,6 +92,7 @@ function transportSortTs(r: TransportRequest): number {
 export function HelpNeededWidget() {
   const {
     transportRequests,
+    transportRequestAnimals,
     sittingRequests,
     sittingRequestPlacements,
     supplyRequests,
@@ -106,6 +107,14 @@ export function HelpNeededWidget() {
     if (!id) return undefined;
     const a = animalsIndex.find((x) => x.id === id);
     return a ? animalDisplayName(a) : undefined;
+  };
+  // Comma-joined names of the animals on a transport (undefined when none).
+  const transportAnimalNames = (transportId: string): string | undefined => {
+    const names = transportRequestAnimals.
+    filter((ta) => ta.transport_request_id === transportId).
+    map((ta) => animalName(ta.animal_id)).
+    filter((n): n is string => !!n);
+    return names.length > 0 ? names.join(', ') : undefined;
   };
   const personName = (id?: string | null) => {
     if (!id) return 'Unknown';
@@ -127,7 +136,7 @@ export function HelpNeededWidget() {
     typeLabel: 'Transport Needed',
     icon: TruckIcon,
     subject: `${
-    animalName(r.animal_id) ?? (
+    transportAnimalNames(r.id) ?? (
     r.type === 'supplies' ? 'Supply drop' : 'Transport')
     } → ${r.dropoff_location || 'Destination TBD'}`,
     detail: transportWhen(r),

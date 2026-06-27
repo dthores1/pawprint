@@ -244,6 +244,15 @@ export function NewSupplyRequestModal({
       requestAnimationFrame(() => focusFirstError(['supply_items']));
       return;
     }
+    // Custom items (no catalog product) must describe what's needed in Notes.
+    const customMissingNotes = validItems.some(
+      (i) => !i.product_id && i.custom_item_name && !i.notes?.trim()
+    );
+    if (customMissingNotes) {
+      setItemsError('Add a note describing each custom item.');
+      requestAnimationFrame(() => focusFirstError(['supply_items']));
+      return;
+    }
     // Don't create a duplicate template: if "save as common" is on but the
     // content already matches one of the user's common requests, treat it as a
     // reuse of that one (bump its last-used) instead of saving a new copy.
@@ -416,6 +425,9 @@ export function NewSupplyRequestModal({
 
           <div className="space-y-3">
             {items.map((item, index) => {
+              // A custom ("Other") item has no catalog product — Notes is then
+              // required so the requester describes what's actually needed.
+              const isCustom = !item.product_id && !!item.custom_item_name;
               return (
                 <div
                   key={index}
@@ -494,14 +506,22 @@ export function NewSupplyRequestModal({
                     </div>
                   </div>
 
-                  {/* Notes */}
+                  {/* Notes — required for custom ("Other") items. */}
                   <div>
-                    <Label htmlFor={`notes-${index}`} className="text-xs">
-                      Notes (optional)
+                    <Label
+                      htmlFor={`notes-${index}`}
+                      className="text-xs"
+                      required={isCustom}>
+
+                      {isCustom ? 'Notes' : 'Notes (optional)'}
                     </Label>
                     <Input
                       id={`notes-${index}`}
-                      placeholder="Brand preference, dietary notes…"
+                      placeholder={
+                      isCustom ?
+                      'Describe the item you need (product, brand, etc.)…' :
+                      'Brand preference, dietary notes…'
+                      }
                       value={item.notes || ''}
                       onChange={(e) =>
                       handleItemChange(index, 'notes', e.target.value)

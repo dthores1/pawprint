@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useWhisker } from '../../context/WhiskerContext';
 import { Card } from '../ui/Card';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Button } from '../ui/Button';
 import { Select } from '../ui/Forms';
 import {
@@ -50,6 +51,7 @@ export function AdoptionTemplateEditor() {
   const [length, setLength] = useState<AdoptionProfileLength>('standard');
   const [styleNotes, setStyleNotes] = useState('');
   const [saved, setSaved] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Seed the form whenever the selected template changes (incl. first load).
   const loadedId = useRef<string | null>(null);
@@ -124,11 +126,14 @@ export function AdoptionTemplateEditor() {
 
   const handleDelete = () => {
     if (template.is_default) return;
-    if (!window.confirm(`Delete the "${template.name}" template?`)) return;
+    setConfirmDelete(true);
+  };
+  const performDelete = () => {
     const fallback = adoptionTemplates.find((t) => t.id !== template.id);
     deleteAdoptionTemplate(template.id);
     loadedId.current = null;
     setSelectedId(fallback?.id ?? null);
+    setConfirmDelete(false);
   };
 
   return (
@@ -325,6 +330,20 @@ export function AdoptionTemplateEditor() {
           }
         </div>
       </div>
+
+      {confirmDelete &&
+      <ConfirmDialog
+        isOpen={true}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={performDelete}
+        title="Delete template?"
+        confirmLabel="Delete"
+        cancelLabel="Keep"
+        tone="danger">
+
+          The “{template.name}” template will be permanently deleted.
+        </ConfirmDialog>
+      }
     </Card>);
 
 }

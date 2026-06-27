@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useWhisker } from '../../context/WhiskerContext';
 import { Card } from '../ui/Card';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Button } from '../ui/Button';
 import { formatDate } from '../../lib/utils';
 import {
@@ -111,6 +112,7 @@ export function SummaryTab({
   const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [draftValue, setDraftValue] = useState('');
+  const [confirmRegen, setConfirmRegen] = useState(false);
 
   const runGenerate = async () => {
     setError(null);
@@ -118,8 +120,7 @@ export function SummaryTab({
     try {
       await generateAiSummary(animalId);
       setIsEditing(false);
-    } catch (e) {
-      //setError(e instanceof Error ? e.message : 'Failed to generate the summary.');
+    } catch {
       setError("There was an issue generating the summary. Please try again later.");
     } finally {
       setIsGenerating(false);
@@ -127,12 +128,8 @@ export function SummaryTab({
   };
 
   const handleRegenerate = () => {
-    if (
-    summary?.user_edited &&
-    !window.confirm(
-      'Regenerating will replace your edited summary with a fresh AI version. Continue?'
-    ))
-    {
+    if (summary?.user_edited) {
+      setConfirmRegen(true);
       return;
     }
     runGenerate();
@@ -238,6 +235,7 @@ export function SummaryTab({
   filter(Boolean);
 
   return (
+    <>
     <Card className="p-6">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2">
@@ -350,6 +348,23 @@ export function SummaryTab({
         {summary.model ? ` · ${summary.model}` : ''}. AI-generated drafts should
         be reviewed before publishing.
       </p>
-    </Card>);
+    </Card>
+    {confirmRegen &&
+    <ConfirmDialog
+      isOpen={true}
+      onClose={() => setConfirmRegen(false)}
+      onConfirm={() => {
+        setConfirmRegen(false);
+        runGenerate();
+      }}
+      title="Regenerate summary?"
+      confirmLabel="Regenerate"
+      cancelLabel="Keep mine"
+      tone="danger">
+
+        Regenerating will replace your edited summary with a fresh AI version.
+      </ConfirmDialog>
+    }
+    </>);
 
 }

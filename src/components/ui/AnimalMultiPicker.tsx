@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { SearchIcon, XIcon } from 'lucide-react';
+import { CalendarPopover } from './CalendarPopover';
 import { Input } from './Forms';
 import { Avatar } from './Avatar';
 import { SpeciesBadge } from './SpeciesBadge';
@@ -37,6 +37,11 @@ export function AnimalMultiPicker({
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  // Match the dropdown width to the input. Measured when it opens.
+  const [menuWidth, setMenuWidth] = useState<number>();
+  useLayoutEffect(() => {
+    if (open && wrapperRef.current) setMenuWidth(wrapperRef.current.offsetWidth);
+  }, [open]);
 
   const universe = scope ?? animals;
   const selectedAnimals = selectedIds.
@@ -55,19 +60,6 @@ export function AnimalMultiPicker({
     }).
     slice(0, 12);
   }, [universe, query, selectedIds]);
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (
-      wrapperRef.current &&
-      !wrapperRef.current.contains(e.target as Node))
-      {
-        setOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
 
   const add = (animalId: string) => {
     if (!selectedIds.includes(animalId)) {
@@ -137,15 +129,17 @@ export function AnimalMultiPicker({
           className="pl-9" />
 
 
-        <AnimatePresence>
-          {open &&
-          <motion.div
+        {/* Rendered in a portal so the modal's overflow can't clip it. */}
+        <CalendarPopover
+          anchorRef={wrapperRef}
+          open={open}
+          onClose={() => setOpen(false)}
+          padded={false}>
+
+          <div
             ref={menuRef}
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.15 }}
-            className="absolute z-10 mt-1.5 w-full bg-card border border-border rounded-xl shadow-soft-lg overflow-hidden max-h-72 overflow-y-auto">
+            style={{ width: menuWidth }}
+            className="max-h-72 overflow-y-auto">
 
               {results.length === 0 ?
             <div className="p-4 text-sm text-text-secondary text-center">
@@ -202,9 +196,8 @@ export function AnimalMultiPicker({
               )}
                 </ul>
             }
-            </motion.div>
-          }
-        </AnimatePresence>
+          </div>
+        </CalendarPopover>
       </div>
     </div>);
 

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useWhisker } from '../../context/WhiskerContext';
 import { Card } from '../ui/Card';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Button } from '../ui/Button';
 import { Select } from '../ui/Forms';
 import { formatDate } from '../../lib/utils';
@@ -173,6 +174,7 @@ export function AdoptionProfileTab({
   const [guidance, setGuidance] = useState('');
   const [showGuidance, setShowGuidance] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [confirmRegen, setConfirmRegen] = useState(false);
   const [templateId, setTemplateId] = useState('');
   // Which template to generate with — the explicit choice, else the org default.
   const effectiveTemplateId =
@@ -200,12 +202,8 @@ export function AdoptionProfileTab({
   };
 
   const handleRegenerate = () => {
-    if (
-    profile?.user_edited &&
-    !window.confirm(
-      'Regenerating will replace your edited profile with a fresh AI version. Continue?'
-    ))
-    {
+    if (profile?.user_edited) {
+      setConfirmRegen(true);
       return;
     }
     runGenerate();
@@ -344,6 +342,7 @@ export function AdoptionProfileTab({
   filter(Boolean);
 
   return (
+    <>
     <Card className="p-6">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2">
@@ -493,6 +492,23 @@ export function AdoptionProfileTab({
         {profile.model ? ` · ${profile.model}` : ''}. Fixed sections come from
         your organization's template. Review before publishing.
       </p>
-    </Card>);
+    </Card>
+    {confirmRegen &&
+    <ConfirmDialog
+      isOpen={true}
+      onClose={() => setConfirmRegen(false)}
+      onConfirm={() => {
+        setConfirmRegen(false);
+        runGenerate();
+      }}
+      title="Regenerate profile?"
+      confirmLabel="Regenerate"
+      cancelLabel="Keep mine"
+      tone="danger">
+
+        Regenerating will replace your edited profile with a fresh AI version.
+      </ConfirmDialog>
+    }
+    </>);
 
 }

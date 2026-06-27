@@ -20,6 +20,7 @@ import {
   SupplyRequest,
   SupplyRequestItem,
   TransportRequest,
+  TransportRequestAnimal,
   SittingRequest,
   SittingRequestPlacement,
   ClinicEvent,
@@ -61,6 +62,7 @@ import {
   seedSupplyRequests,
   seedSupplyRequestItems,
   seedTransportRequests,
+  seedTransportRequestAnimals,
   seedSittingRequests,
   seedSittingRequestPlacements,
   seedClinicEvents,
@@ -291,6 +293,8 @@ export function DemoWhiskerProvider({
   useState<SupplyRequestItem[]>(seedSupplyRequestItems);
   const [transportRequests, setTransportRequests] =
   useState<TransportRequest[]>(seedTransportRequests);
+  const [transportRequestAnimals, setTransportRequestAnimals] =
+  useState<TransportRequestAnimal[]>(seedTransportRequestAnimals);
   const [sittingRequests, setSittingRequests] =
   useState<SittingRequest[]>(seedSittingRequests);
   const [sittingRequestPlacements, setSittingRequestPlacements] =
@@ -534,9 +538,18 @@ export function DemoWhiskerProvider({
     products,
     supplyRequests,
     supplyRequestItems,
+    // Demo holds every request in memory, so closed history is already present —
+    // the *HistoryLoaded flags are pre-true and the ensure* helpers are no-ops.
+    supplyHistoryLoaded: true,
+    ensureSupplyHistoryLoaded: async () => {},
     transportRequests,
+    transportRequestAnimals,
+    transportHistoryLoaded: true,
+    ensureTransportHistoryLoaded: async () => {},
     sittingRequests,
     sittingRequestPlacements,
+    sittingHistoryLoaded: true,
+    ensureSittingHistoryLoaded: async () => {},
     clinicEvents,
     clinicSlots,
 
@@ -1243,20 +1256,39 @@ export function DemoWhiskerProvider({
     ...prev]
     ),
 
-    addTransportRequest: async (req) => {
+    addTransportRequest: async (req, animalIds = []) => {
       const id = `tr${generateId()}`;
       setTransportRequests((prev) => [
       { ...req, id, created_at: now(), updated_at: now() },
       ...prev]
       );
+      setTransportRequestAnimals((prev) => [
+      ...animalIds.map((aid) => ({
+        id: `tra${generateId()}`,
+        transport_request_id: id,
+        animal_id: aid
+      })),
+      ...prev]
+      );
       return id;
     },
-    updateTransportRequest: (id, updates) =>
-    setTransportRequests((prev) =>
-    prev.map((t) =>
-    t.id === id ? { ...t, ...updates, updated_at: now() } : t
-    )
-    ),
+    updateTransportRequest: (id, updates, animalIds) => {
+      setTransportRequests((prev) =>
+      prev.map((t) =>
+      t.id === id ? { ...t, ...updates, updated_at: now() } : t
+      )
+      );
+      if (animalIds) {
+        setTransportRequestAnimals((prev) => [
+        ...prev.filter((ta) => ta.transport_request_id !== id),
+        ...animalIds.map((aid) => ({
+          id: `tra${generateId()}`,
+          transport_request_id: id,
+          animal_id: aid
+        }))]
+        );
+      }
+    },
     claimTransportRequest: (id, volunteer_person_id) =>
     setTransportRequests((prev) =>
     prev.map((t) =>

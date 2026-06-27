@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Card } from '../ui/Card';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { useWhisker } from '../../context/WhiskerContext';
 import {
   AddExternalListingModal,
@@ -50,19 +51,12 @@ export function ExternalListingsCard({ animalId, canManage = true }: Props) {
   const listings = externalListings.filter((l) => l.animal_id === animalId);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editing, setEditing] = useState<AnimalExternalListing | null>(null);
+  const [removing, setRemoving] = useState<AnimalExternalListing | null>(null);
 
   // Nothing to show and nothing the viewer can do — don't render an empty card.
   if (!canManage && listings.length === 0) return null;
 
-  const remove = (listing: AnimalExternalListing) => {
-    if (
-    window.confirm(
-      `Remove this ${PROVIDER_LABEL[listing.provider]} listing? This only removes it from Whiskerville — it won't take down the public post.`
-    ))
-    {
-      deleteExternalListing(listing.id);
-    }
-  };
+  const remove = (listing: AnimalExternalListing) => setRemoving(listing);
 
   return (
     <>
@@ -163,6 +157,24 @@ export function ExternalListingsCard({ animalId, canManage = true }: Props) {
         onClose={() => setEditing(null)}
         animalId={animalId}
         listing={editing} />
+      }
+
+      {removing &&
+      <ConfirmDialog
+        isOpen={true}
+        onClose={() => setRemoving(null)}
+        onConfirm={() => {
+          deleteExternalListing(removing.id);
+          setRemoving(null);
+        }}
+        title="Remove listing?"
+        confirmLabel="Remove"
+        cancelLabel="Keep"
+        tone="danger">
+
+          This removes the {PROVIDER_LABEL[removing.provider]} listing from
+          Whiskerville only — it won’t take down the public post.
+        </ConfirmDialog>
       }
     </>);
 

@@ -226,6 +226,7 @@ export function ReportsPage() {
     animals,
     ensureHistoricalLoaded,
     ensureInactiveLoaded,
+    ensureSupplyHistoryLoaded,
     adoptions,
     fosters,
     placements,
@@ -248,12 +249,14 @@ export function ReportsPage() {
   const canViewSupply = useCanViewSupplyFinancials(); // already folds in showAll
 
   // Reports must cover everything, but the default loads are scoped (animals =
-  // in-care, people = active) — pull the historical animals and inactive
-  // contacts in on mount.
+  // in-care, people = active, supply requests = operational only) — pull the
+  // historical animals, inactive contacts, and closed supply requests in on
+  // mount so the supply report counts fulfilled/denied requests.
   useEffect(() => {
     ensureHistoricalLoaded();
     ensureInactiveLoaded();
-  }, [ensureHistoricalLoaded, ensureInactiveLoaded]);
+    ensureSupplyHistoryLoaded();
+  }, [ensureHistoricalLoaded, ensureInactiveLoaded, ensureSupplyHistoryLoaded]);
 
   const [preset, setPreset] = useState<RangePreset>('month');
   const [range, setRange] = useState<DateRange>(thisMonthRange);

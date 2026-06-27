@@ -67,7 +67,7 @@ cross join (values
   ('Chihuahua Mix'), ('Cocker Spaniel'), ('Corgi'), ('Dachshund'),
   ('Doberman Pinscher'), ('French Bulldog'), ('German Shepherd'),
   ('German Shepherd Mix'), ('Golden Retriever'), ('Golden Retriever Mix'),
-  ('Great Pyrenees'), ('Great Dane'), ('Hound Mix'), ('Husky'), ('Husky Mix'),
+  ('Great Pyrenees'), ('Hound Mix'), ('Husky'), ('Husky Mix'),
   ('Jack Russell Terrier'), ('Labrador Mix'), ('Labrador Retriever'),
   ('Mastiff'), ('Miniature Poodle'), ('Mixed Breed'), ('Pit Bull'),
   ('Pit Bull Mix'), ('Pomeranian'), ('Poodle'), ('Rottweiler'),

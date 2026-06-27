@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useWhisker } from '../../context/WhiskerContext';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
@@ -17,12 +17,14 @@ import {
   UserIcon,
   PencilIcon,
   XIcon,
+  ExternalLinkIcon,
   Trash2Icon } from
 'lucide-react';
-import { AddressDisplay } from '../ui/AddressDisplay';
 import { PillTabs } from '../ui/PillTabs';
 import { FilterDropdown } from '../ui/FilterDropdown';
+import { VirtualizedGrid } from '../ui/VirtualizedGrid';
 import { cn, formatDate } from '../../lib/utils';
+import { cancelRequestConfirm } from '../../lib/requestCopy';
 import { useAuth } from '../../context/AuthContext';
 import {
   TransportRequest,
@@ -208,6 +210,7 @@ now: Date = new Date())
 export function TransportsView() {
   const {
     transportRequests,
+    transportRequestAnimals,
     peopleIndex: people,
     animalsIndex: animals,
     savedLocations,
@@ -215,7 +218,9 @@ export function TransportsView() {
     acceptTransportRequest,
     unassignTransportRequest,
     completeTransportRequest,
-    updateTransportRequest
+    updateTransportRequest,
+    transportHistoryLoaded,
+    ensureTransportHistoryLoaded
   } = useWhisker();
   const { currentPersonId } = useAuth();
   const isAdmin = useIsAdmin();
@@ -277,6 +282,12 @@ export function TransportsView() {
   buckets.mine.length > 0 ? 'mine' : 'unclaimed';
   const activeTab = selectedTab ?? defaultTab;
 
+  // Closed transports aren't loaded upfront — pull them in when the Completed
+  // tab opens (idempotent). Until then the Completed bucket is empty.
+  useEffect(() => {
+    if (activeTab === 'completed') ensureTransportHistoryLoaded();
+  }, [activeTab, ensureTransportHistoryLoaded]);
+
   // Filter option lists, derived from the full request set so they're stable
   // across tabs. Each lists only the people who actually appear.
   const requesterOptions = [
@@ -334,7 +345,11 @@ export function TransportsView() {
         { key: 'assigned', label: `Assigned (${buckets.assigned.length})` },
         {
           key: 'completed',
-          label: `Completed (${buckets.completed.length})`
+          // Count is unknown until the deferred history loads, so omit it
+          // until then rather than showing a misleading "(0)".
+          label: transportHistoryLoaded ?
+          `Completed (${buckets.completed.length})` :
+          'Completed'
         }]} />
 
       <div className="flex flex-wrap items-center gap-2">
@@ -359,7 +374,11 @@ export function TransportsView() {
 
       </div>
 
-      {display.length === 0 ?
+      {activeTab === 'completed' && !transportHistoryLoaded ?
+      <Card className="p-10 text-center text-text-secondary">
+          <p>Loading history…</p>
+        </Card> :
+      display.length === 0 ?
       <Card className="p-10 text-center text-text-secondary">
           <TruckIcon className="w-10 h-10 mx-auto mb-3 opacity-30" />
           <p className="font-medium text-text-primary mb-1">
@@ -378,16 +397,19 @@ export function TransportsView() {
           </p>
         </Card> :
 
-      <div className="space-y-3">
-          {display.map((r) =>
+      <VirtualizedGrid
+        items={display}
+        columns={1}
+        gap={12}
+        estimateRowHeight={220}
+        getKey={(r) => r.id}
+        renderItem={(r) =>
         <TransportCard
-          key={r.id}
           request={r}
-          animalName={
-          r.animal_id ?
-          animals.find((a) => a.id === r.animal_id)?.name :
-          undefined
-          }
+          animalNames={transportRequestAnimals.
+          filter((ta) => ta.transport_request_id === r.id).
+          map((ta) => animals.find((a) => a.id === ta.animal_id)?.name).
+          filter((n): n is string => !!n)}
           requesterName={(() => {
             const p = people.find((p) => p.id === r.requested_by_person_id);
             return p ? `${p.first_name} ${p.last_name}` : 'Unknown';
@@ -399,7 +421,6 @@ export function TransportsView() {
             );
             return p ? `${p.first_name} ${p.last_name}` : undefined;
           })()}
-          pickupLabel={savedLocName(r.pickup_saved_location_id)}
           dropoffLabel={savedLocName(r.dropoff_saved_location_id)}
           needsAddress={needsAddress(r)}
           canClaim={
@@ -464,9 +485,8 @@ export function TransportsView() {
           isAdminForArchive && TRANSPORT_ARCHIVABLE.includes(r.status)
           }
           onArchive={() => setArchiving(r)} />
+        } />
 
-        )}
-        </div>
       }
 
       {editing &&
@@ -501,11 +521,10 @@ export function TransportsView() {
 
 interface TransportCardProps {
   request: TransportRequest;
-  animalName?: string;
+  animalNames?: string[];
   requesterName: string;
   assigneeName?: string;
   /** Saved-location friendly names, when a leg was picked from the catalog. */
-  pickupLabel?: string;
   dropoffLabel?: string;
   /** Either leg is free-text-only (no address / saved location). */
   needsAddress: boolean;
@@ -534,10 +553,9 @@ interface TransportCardProps {
 }
 function TransportCard({
   request,
-  animalName,
+  animalNames,
   requesterName,
   assigneeName,
-  pickupLabel,
   dropoffLabel,
   needsAddress,
   canClaim,
@@ -560,10 +578,24 @@ function TransportCard({
   onArchive
 }: TransportCardProps) {
   const subject =
-  animalName ||
-  (request.type === 'supplies' ?
+  (animalNames && animalNames.length > 0 ? animalNames.join(', ') : null) || (
+  request.type === 'supplies' ?
   'Supply drop' :
   TYPE_LABEL[request.type]);
+  // Title shows the destination's friendly shorthand when it's a saved location,
+  // else the address text. The full addresses move to the map-pin row below.
+  const dropoffTitle = dropoffLabel ?? request.dropoff_location;
+  // The map-pin row links to a Google Maps route (full pickup → dropoff), using
+  // the structured formatted address when present, else the legacy single-line.
+  const mapsOrigin = request.pickup_address?.formatted || request.pickup_location;
+  const mapsDest =
+  request.dropoff_address?.formatted || request.dropoff_location;
+  const mapsHref =
+  mapsOrigin && mapsDest ?
+  `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(
+      mapsOrigin
+    )}&destination=${encodeURIComponent(mapsDest)}` :
+  null;
   // All confirmations route through one ConfirmDialog (polished, on-brand) —
   // no more window.confirm. `confirm` selects which prompt is open.
   const [confirm, setConfirm] = useState<
@@ -578,14 +610,7 @@ function TransportCard({
       tone: 'default' as const,
       onConfirm: onComplete
     },
-    cancel: {
-      title: 'Cancel transport request?',
-      body: 'It will be marked as cancelled for everyone.',
-      confirmLabel: 'Cancel Request',
-      cancelLabel: 'Keep Request',
-      tone: 'danger' as const,
-      onConfirm: onCancel
-    },
+    cancel: { ...cancelRequestConfirm('transport request'), onConfirm: onCancel },
     decline: {
       title: 'Decline this transport?',
       body: 'It will return to the open pool for others to claim.',
@@ -607,13 +632,11 @@ function TransportCard({
   return (
     <>
     <Card className="p-5">
-      <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-6">
+      <div className="flex flex-col sm:flex-row sm:items-stretch gap-4 sm:gap-6">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1.5">
-            <h3 className="text-lg font-heading font-bold text-text-primary flex items-center gap-2 min-w-0">
-              <span className="truncate">{subject}</span>
-              <ArrowRightIcon className="w-4 h-4 text-text-secondary shrink-0" />
-              <span className="truncate">{request.dropoff_location}</span>
+            <h3 className="text-lg font-heading font-bold text-text-primary truncate min-w-0">
+              {subject} to {dropoffTitle}
             </h3>
             {request.urgency !== 'normal' &&
             <span
@@ -633,30 +656,48 @@ function TransportCard({
               </span>
             }
           </div>
-          {/* Pickup → dropoff. Inline on sm+, stacked on phones so the two
-              addresses never collide. Each leg gets its own truncating slot. */}
-          <div className="text-sm text-text-secondary mt-1 flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-1.5 min-w-0">
-            <span className="flex items-center gap-1.5 min-w-0 max-w-full">
-              <MapPinIcon className="w-3.5 h-3.5 shrink-0" />
-              {pickupLabel ?
-              <span className="text-text-primary truncate min-w-0">{pickupLabel}</span> :
-              <AddressDisplay
-                value={request.pickup_address ?? null}
-                singleLine
-                className="text-text-primary min-w-0" />
-              }
-            </span>
-            <span className="flex items-center gap-1.5 min-w-0 max-w-full">
-              <ArrowRightIcon className="w-3.5 h-3.5 shrink-0" />
-              {dropoffLabel ?
-              <span className="text-text-primary truncate min-w-0">{dropoffLabel}</span> :
-              <AddressDisplay
-                value={request.dropoff_address ?? null}
-                singleLine
-                className="text-text-primary min-w-0" />
-              }
-            </span>
-          </div>
+          {/* Full pickup → dropoff addresses (the friendly shorthand is in the
+              title above). The row links to a Google Maps route; the external-link
+              icon reveals on hover. Inline on sm+, stacked on phones. */}
+          {(() => {
+            const rowCls =
+            'text-sm text-text-secondary mt-1 flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-1.5 min-w-0';
+            // Plain text (not AddressDisplay) because the whole row is already a
+            // Maps link — AddressDisplay renders its own <a> and would nest.
+            const legs =
+            <>
+              <span className="flex items-center gap-1.5 min-w-0 max-w-full">
+                <MapPinIcon className="w-3.5 h-3.5 shrink-0" />
+                <span className="text-text-primary truncate min-w-0">
+                  {request.pickup_address?.formatted || request.pickup_location}
+                </span>
+              </span>
+              <span className="flex items-center gap-1.5 min-w-0 max-w-full">
+                <ArrowRightIcon className="w-3.5 h-3.5 shrink-0" />
+                <span className="text-text-primary truncate min-w-0">
+                  {request.dropoff_address?.formatted ||
+                  request.dropoff_location}
+                </span>
+                {mapsHref &&
+                <ExternalLinkIcon className="w-3.5 h-3.5 shrink-0 opacity-0 group-hover/maps:opacity-100 transition-opacity" />
+                }
+              </span>
+            </>;
+
+            return mapsHref ?
+            <a
+              href={mapsHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open route in Google Maps"
+              className={cn(rowCls, 'group/maps hover:text-primary')}>
+
+                {legs}
+              </a> :
+
+            <div className={rowCls}>{legs}</div>;
+
+          })()}
           <div className="mt-2 flex items-center gap-x-3 gap-y-1.5 flex-wrap text-sm text-text-secondary">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-background border border-border text-xs font-medium text-text-primary">
               <CalendarIcon className="w-3.5 h-3.5 text-text-secondary shrink-0" />
@@ -724,6 +765,8 @@ function TransportCard({
               </span>);
 
           })()}
+          {/* Actions sit vertically centered in the card (status stays at top). */}
+          <div className="sm:flex-1 sm:flex sm:items-center">
           {(() => {
             const linkBase =
             'text-sm font-medium hover:underline transition-colors';
@@ -860,6 +903,7 @@ function TransportCard({
               </div>);
 
           })()}
+          </div>
         </div>
       </div>
     </Card>

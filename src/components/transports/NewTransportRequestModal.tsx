@@ -7,9 +7,10 @@ import { DateTimePicker } from '../ui/DateTimePicker';
 import { DatePicker } from '../ui/DatePicker';
 import { LocationPicker, LocationMode } from './LocationPicker';
 import { Button } from '../ui/Button';
-import { AnimalSearchPicker } from '../ui/AnimalSearchPicker';
+import { AnimalMultiPicker } from '../ui/AnimalMultiPicker';
 import { PersonSearchPicker } from '../ui/PersonSearchPicker';
 import { AlertTriangleIcon } from 'lucide-react';
+import { animalDisplayName } from '../../lib/utils';
 import { useWhisker } from '../../context/WhiskerContext';
 import { useAuth } from '../../context/AuthContext';
 import { useIsAdmin } from '../../lib/useIsAdmin';
@@ -46,7 +47,7 @@ interface Props {
    * Ignored in edit mode. `sitting_request_id` is carried into the created row
    * so the source request can link to it.
    */
-  prefill?: Partial<TransportRequest>;
+  prefill?: Partial<TransportRequest> & { animal_ids?: string[] };
 }
 
 // `datetime-local` wants `YYYY-MM-DDTHH:mm` in local time, no zone suffix.
@@ -68,18 +69,33 @@ export function NewTransportRequestModal({
   const {
     addTransportRequest,
     updateTransportRequest,
+    transportRequestAnimals,
     animalsIndex: animals,
-    peopleIndex: people
+    peopleIndex: people,
+    placements
   } = useWhisker();
   const { currentPersonId } = useAuth();
   const isAdmin = useIsAdmin();
   const isEditMode = !!request;
+  // "All animals in my care" snapshots the current user's active placements at
+  // submit time. (The "specific" picker is intentionally NOT limited to these —
+  // you may coordinate a ride for an animal you don't foster.)
+  const myPlacements = placements.filter(
+    (p) => p.placement_status === 'active' && p.person_id === currentPersonId
+  );
+  const myAnimalIds = myPlacements.map((p) => p.animal_id);
+  const myAnimals = myAnimalIds.
+  map((id) => animals.find((a) => a.id === id)).
+  filter((a): a is NonNullable<typeof a> => !!a);
   // Admins can direct a brand-new request at a specific volunteer instead of
   // posting it open. Assignment of existing requests is managed on the card.
   const canAssignOnCreate = isAdmin && !isEditMode;
   const [type, setType] = useState<TransportRequestType>('animal');
   const [urgency, setUrgency] = useState<TransportRequestUrgency>('normal');
-  const [animalId, setAnimalId] = useState('');
+  const [animalScope, setAnimalScope] = useState<'all_my_care' | 'specific'>(
+    'specific'
+  );
+  const [selectedAnimalIds, setSelectedAnimalIds] = useState<string[]>([]);
   const [pickup, setPickup] = useState<AddressValue | null>(null);
   const [dropoff, setDropoff] = useState<AddressValue | null>(null);
   const [pickupSavedLocationId, setPickupSavedLocationId] = useState<string | undefined>();
@@ -112,7 +128,12 @@ export function NewTransportRequestModal({
     if (request) {
       setType(request.type);
       setUrgency(request.urgency);
-      setAnimalId(request.animal_id ?? '');
+      setAnimalScope('specific');
+      setSelectedAnimalIds(
+        transportRequestAnimals.
+        filter((ta) => ta.transport_request_id === request.id).
+        map((ta) => ta.animal_id)
+      );
       setPickup(
         request.pickup_address ??
         (request.pickup_location ?
@@ -145,7 +166,8 @@ export function NewTransportRequestModal({
       // the user supplies pickup/dropoff.
       setType(prefill?.type ?? 'animal');
       setUrgency(prefill?.urgency ?? 'normal');
-      setAnimalId(prefill?.animal_id ?? '');
+      setAnimalScope('specific');
+      setSelectedAnimalIds(prefill?.animal_ids ?? []);
       setPickup(null);
       setDropoff(null);
       setPickupSavedLocationId(undefined);
@@ -177,9 +199,19 @@ export function NewTransportRequestModal({
   };
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // The animals being moved — "all my care" snapshots my active placements.
+    const animalIds =
+    type === 'animal' ?
+    animalScope === 'all_my_care' ?
+    myAnimalIds :
+    selectedAnimalIds :
+    [];
     const nextErrors: typeof errors = {};
-    if (type === 'animal' && !animalId) {
-      nextErrors.animalId = 'Animal is required.';
+    if (type === 'animal' && animalIds.length === 0) {
+      nextErrors.animalId =
+      animalScope === 'all_my_care' ?
+      'No animals are currently in your care.' :
+      'Select at least one animal.';
     }
     if (!pickup?.formatted.trim())
     nextErrors.pickup = 'Pickup location is required.';
@@ -236,44 +268,49 @@ export function NewTransportRequestModal({
       preferred_window_end: scheduleType === 'flexible' ? windowEnd : ''
     };
     if (request) {
-      updateTransportRequest(request.id, {
-        type,
-        urgency,
-        animal_id: animalId || undefined,
-        pickup_location: pickup?.formatted.trim() ?? '',
-        dropoff_location: dropoff?.formatted.trim() ?? '',
-        pickup_address: pickup ?? undefined,
-        dropoff_address: dropoff ?? undefined,
-        pickup_saved_location_id: pickupSavedLocationId ?? null,
-        dropoff_saved_location_id: dropoffSavedLocationId ?? null,
-        ...timingFields,
-        notes: notes.trim() || undefined
-      });
+      updateTransportRequest(
+        request.id,
+        {
+          type,
+          urgency,
+          pickup_location: pickup?.formatted.trim() ?? '',
+          dropoff_location: dropoff?.formatted.trim() ?? '',
+          pickup_address: pickup ?? undefined,
+          dropoff_address: dropoff ?? undefined,
+          pickup_saved_location_id: pickupSavedLocationId ?? null,
+          dropoff_saved_location_id: dropoffSavedLocationId ?? null,
+          ...timingFields,
+          notes: notes.trim() || undefined
+        },
+        animalIds
+      );
     } else {
       // Admins may direct the request at a volunteer up front; otherwise it's
       // posted open for anyone to claim. The assignee notification fires off the
       // assigned_volunteer_person_id change (notify_transport_assignment, 0066).
       const directlyAssigned =
       canAssignOnCreate && assignMode === 'assign' && Boolean(assignedVolunteerId);
-      addTransportRequest({
-        type,
-        status: directlyAssigned ? 'assigned' : 'open',
-        urgency,
-        requested_by_person_id: currentPersonId ?? '',
-        assigned_volunteer_person_id: directlyAssigned ?
-        assignedVolunteerId :
-        undefined,
-        sitting_request_id: sittingRequestId,
-        animal_id: animalId || undefined,
-        pickup_location: pickup?.formatted.trim() ?? '',
-        dropoff_location: dropoff?.formatted.trim() ?? '',
-        pickup_address: pickup,
-        dropoff_address: dropoff,
-        pickup_saved_location_id: pickupSavedLocationId ?? null,
-        dropoff_saved_location_id: dropoffSavedLocationId ?? null,
-        ...timingFields,
-        notes: notes.trim() || undefined
-      });
+      addTransportRequest(
+        {
+          type,
+          status: directlyAssigned ? 'assigned' : 'open',
+          urgency,
+          requested_by_person_id: currentPersonId ?? '',
+          assigned_volunteer_person_id: directlyAssigned ?
+          assignedVolunteerId :
+          undefined,
+          sitting_request_id: sittingRequestId,
+          pickup_location: pickup?.formatted.trim() ?? '',
+          dropoff_location: dropoff?.formatted.trim() ?? '',
+          pickup_address: pickup,
+          dropoff_address: dropoff,
+          pickup_saved_location_id: pickupSavedLocationId ?? null,
+          dropoff_saved_location_id: dropoffSavedLocationId ?? null,
+          ...timingFields,
+          notes: notes.trim() || undefined
+        },
+        animalIds
+      );
     }
     handleClose();
   };
@@ -354,20 +391,77 @@ export function NewTransportRequestModal({
           </div>
 
           {showAnimalPicker &&
-          <div>
-              <Label htmlFor="animal" required>Animal</Label>
-              <AnimalSearchPicker
-              id="animal"
-              animals={animals}
-              value={animalId}
-              onChange={(value) => {
-                setAnimalId(value);
-                if (errors.animalId) {
-                  setErrors((prev) => ({ ...prev, animalId: undefined }));
-                }
-              }} />
-              <FieldError>{errors.animalId}</FieldError>
+          <div id="animal">
+              <Label required>Animals</Label>
+              <div className="space-y-2">
+                <label
+                className={`block p-4 rounded-xl border cursor-pointer transition-colors ${animalScope === 'all_my_care' ? 'border-primary bg-primary/5' : 'border-border hover:bg-background/60'}`}>
 
+                  <div className="flex items-start gap-3">
+                    <input
+                    type="radio"
+                    name="animal_scope"
+                    checked={animalScope === 'all_my_care'}
+                    onChange={() => {
+                      setAnimalScope('all_my_care');
+                      if (errors.animalId) {
+                        setErrors((prev) => ({ ...prev, animalId: undefined }));
+                      }
+                    }}
+                    className="mt-1 w-4 h-4 text-primary focus:ring-primary" />
+
+                    <div className="min-w-0">
+                      <p className="font-medium text-text-primary">
+                        All animals currently in my care
+                      </p>
+                      <p className="text-sm text-text-secondary mt-0.5">
+                        {myAnimals.length === 0 ?
+                        'No animals are currently in your care.' :
+                        `Includes ${myAnimals.
+                        map((a) => animalDisplayName(a)).
+                        join(', ')}`}
+                      </p>
+                    </div>
+                  </div>
+                </label>
+                <label
+                className={`block p-4 rounded-xl border cursor-pointer transition-colors ${animalScope === 'specific' ? 'border-primary bg-primary/5' : 'border-border hover:bg-background/60'}`}>
+
+                  <div className="flex items-start gap-3">
+                    <input
+                    type="radio"
+                    name="animal_scope"
+                    checked={animalScope === 'specific'}
+                    onChange={() => setAnimalScope('specific')}
+                    className="mt-1 w-4 h-4 text-primary focus:ring-primary" />
+
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-text-primary">
+                        Select specific animals
+                      </p>
+                      {animalScope === 'specific' &&
+                      <div className="mt-3">
+                          <AnimalMultiPicker
+                          animals={animals}
+                          selectedIds={selectedAnimalIds}
+                          onChange={(ids) => {
+                            setSelectedAnimalIds(ids);
+                            if (errors.animalId) {
+                              setErrors((prev) => ({
+                                ...prev,
+                                animalId: undefined
+                              }));
+                            }
+                          }}
+                          placeholder="Search all animals…" />
+
+                        </div>
+                      }
+                    </div>
+                  </div>
+                </label>
+              </div>
+              <FieldError>{errors.animalId}</FieldError>
             </div>
           }
         </FormSection>

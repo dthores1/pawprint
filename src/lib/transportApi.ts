@@ -1,4 +1,4 @@
-import { TransportRequest } from '../types';
+import { TransportRequest, TransportRequestAnimal } from '../types';
 import { addressFromColumns, addressToColumns } from './address';
 
 export function rowToTransport(r: any): TransportRequest {
@@ -10,7 +10,6 @@ export function rowToTransport(r: any): TransportRequest {
     schedule_type: r.schedule_type ?? 'exact',
     requested_by_person_id: r.requested_by_person_id ?? '',
     assigned_volunteer_person_id: r.assigned_volunteer_person_id ?? undefined,
-    animal_id: r.animal_id ?? undefined,
     clinic_event_id: r.clinic_event_id ?? undefined,
     supply_request_id: r.supply_request_id ?? undefined,
     sitting_request_id: r.sitting_request_id ?? undefined,
@@ -37,7 +36,6 @@ const TRANSPORT_COLUMNS = [
 'schedule_type',
 'requested_by_person_id',
 'assigned_volunteer_person_id',
-'animal_id',
 'clinic_event_id',
 'supply_request_id',
 'sitting_request_id',
@@ -52,6 +50,14 @@ const TRANSPORT_COLUMNS = [
 'notes',
 'urgency'] as
 const;
+
+export function rowToTransportAnimal(r: any): TransportRequestAnimal {
+  return {
+    id: r.id,
+    transport_request_id: r.transport_request_id,
+    animal_id: r.animal_id
+  };
+}
 
 function normalize(v: any): any {
   return typeof v === 'string' && v === '' ? null : v;

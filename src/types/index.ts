@@ -955,8 +955,9 @@ export interface TransportRequest {
   requested_by_person_id: string;
   /** The claimed/assigned volunteer. `null` on update clears the assignment. */
   assigned_volunteer_person_id?: string | null;
-  /** Optional links to whatever is being moved. */
-  animal_id?: string;
+  /** Optional links to whatever is being moved. The animals being transported
+   *  live in the transport_request_animals child table (migration 0085); see
+   *  `TransportRequestAnimal` and the `transportRequestAnimals` collection. */
   clinic_event_id?: string;
   supply_request_id?: string;
   /** The sitting request this ride was arranged for (migration 0076), if any. */
@@ -981,6 +982,14 @@ export interface TransportRequest {
   urgency: TransportRequestUrgency;
   created_at: string;
   updated_at: string;
+}
+
+/** One animal linked to a transport request (migration 0085). A transport can
+ *  move several animals; this is the join row. */
+export interface TransportRequestAnimal {
+  id: string;
+  transport_request_id: string;
+  animal_id: string;
 }
 
 // — Sitting Requests —————————————————————————————————————

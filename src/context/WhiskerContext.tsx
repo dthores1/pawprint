@@ -42,6 +42,7 @@ import {
   SupplyRequest,
   SupplyRequestItem,
   TransportRequest,
+  TransportRequestAnimal,
   SittingRequest,
   SittingRequestPlacement,
   ClinicEvent,
@@ -101,6 +102,14 @@ import {
   IN_CARE_STATUSES,
   HISTORICAL_STATUSES } from
 '../lib/animalStatus';
+import {
+  SUPPLY_OPEN_STATUSES,
+  SUPPLY_TERMINAL_STATUSES,
+  TRANSPORT_OPEN_STATUSES,
+  TRANSPORT_TERMINAL_STATUSES,
+  SITTING_OPEN_STATUSES,
+  SITTING_TERMINAL_STATUSES } from
+'../lib/requestStatus';
 import { rowToNote, noteToInsert } from '../lib/notesApi';
 import {
   rowToActionItem,
@@ -181,6 +190,7 @@ import {
 '../lib/supplyApi';
 import {
   rowToTransport,
+  rowToTransportAnimal,
   transportToInsert,
   transportUpdateToRow } from
 '../lib/transportApi';
@@ -321,8 +331,15 @@ export interface WhiskerContextType {
   products: Product[];
   addProduct: (product: Omit<Product, 'id'>) => Promise<string | null>;
   updateProduct: (id: string, updates: Partial<Product>) => void;
+  /**
+   * Operational supply requests load upfront; closed/terminal ones are deferred.
+   * `supplyHistoryLoaded` is true once ensureSupplyHistoryLoaded has merged them.
+   */
   supplyRequests: SupplyRequest[];
   supplyRequestItems: SupplyRequestItem[];
+  supplyHistoryLoaded: boolean;
+  /** Pull closed supply requests (+ items) into state; call when the History tab opens. */
+  ensureSupplyHistoryLoaded: () => Promise<void>;
   addAnimal: (
   animal: Omit<Animal, 'id' | 'created_at' | 'updated_at'>)
   => Promise<Animal | undefined>;
@@ -496,12 +513,19 @@ export interface WhiskerContextType {
   addSupplyRequestItem: (item: Omit<SupplyRequestItem, 'id'>) => void;
   // Transport requests
   transportRequests: TransportRequest[];
+  /** The animals on each transport (multi-animal child rows, migration 0085). */
+  transportRequestAnimals: TransportRequestAnimal[];
+  transportHistoryLoaded: boolean;
+  /** Pull closed transport requests (+ their animals) into state; call when the Completed tab opens. */
+  ensureTransportHistoryLoaded: () => Promise<void>;
   addTransportRequest: (
-  req: Omit<TransportRequest, 'id' | 'created_at' | 'updated_at'>)
+  req: Omit<TransportRequest, 'id' | 'created_at' | 'updated_at'>,
+  animalIds?: string[])
   => Promise<string>;
   updateTransportRequest: (
   id: string,
-  updates: Partial<TransportRequest>)
+  updates: Partial<TransportRequest>,
+  animalIds?: string[])
   => void;
   /** Convenience: assign a volunteer + flip status to claimed. */
   claimTransportRequest: (id: string, volunteer_person_id: string) => void;
@@ -516,6 +540,9 @@ export interface WhiskerContextType {
   // Sitting requests
   sittingRequests: SittingRequest[];
   sittingRequestPlacements: SittingRequestPlacement[];
+  sittingHistoryLoaded: boolean;
+  /** Pull closed sitting requests (+ placements) into state; call when the Completed tab opens. */
+  ensureSittingHistoryLoaded: () => Promise<void>;
   /**
    * Create a sitting request along with its placement snapshot. Even when
    * `coverage_scope === 'all_current_placements'`, callers should resolve
@@ -1341,10 +1368,20 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   const [transportRequests, setTransportRequests] = useState<
     TransportRequest[]>(
     []);
+  const [transportRequestAnimals, setTransportRequestAnimals] = useState<
+    TransportRequestAnimal[]>(
+    []);
   const [sittingRequests, setSittingRequests] = useState<SittingRequest[]>([]);
   const [sittingRequestPlacements, setSittingRequestPlacements] = useState<
     SittingRequestPlacement[]>(
     []);
+  // Closed/terminal requests accumulate unbounded over a rescue's lifetime, so —
+  // like animals' historical rows — they're NOT loaded on org load. The upfront
+  // load fetches only operational statuses; these flags gate the on-demand
+  // ensure*HistoryLoaded() merges (fired when a Completed/History tab opens).
+  const [supplyHistoryLoaded, setSupplyHistoryLoaded] = useState(false);
+  const [transportHistoryLoaded, setTransportHistoryLoaded] = useState(false);
+  const [sittingHistoryLoaded, setSittingHistoryLoaded] = useState(false);
   const [clinicEvents, setClinicEvents] = useState<ClinicEvent[]>([]);
   const [clinicSlots, setClinicSlots] = useState<ClinicSlot[]>([]);
   const [clinicSlotProcedures, setClinicSlotProcedures] = useState<
@@ -1377,8 +1414,12 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       setSupplyRequests([]);
       setSupplyRequestItems([]);
       setTransportRequests([]);
+      setTransportRequestAnimals([]);
       setSittingRequests([]);
       setSittingRequestPlacements([]);
+      setSupplyHistoryLoaded(false);
+      setTransportHistoryLoaded(false);
+      setSittingHistoryLoaded(false);
       setClinicEvents([]);
       setClinicSlots([]);
       setClinicSlotProcedures([]);
@@ -1387,29 +1428,15 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       setSiteVolunteers([]);
       return;
     }
+    // A fresh coordination load re-defers the closed/terminal request history
+    // (re-fetched on demand by ensure*HistoryLoaded), mirroring how loadAnimals
+    // resets historicalLoaded. The supply/transport/sitting requests (and their
+    // children) are loaded scoped-to-operational below, NOT in this batch.
+    setSupplyHistoryLoaded(false);
+    setTransportHistoryLoaded(false);
+    setSittingHistoryLoaded(false);
     const tables = [
     ['products', (rows: any[]) => setProducts(rows.map(rowToProduct))],
-    [
-    'supply_requests',
-    (rows: any[]) => setSupplyRequests(rows.map(rowToSupplyRequest))],
-
-    [
-    'supply_request_items',
-    (rows: any[]) => setSupplyRequestItems(rows.map(rowToSupplyItem))],
-
-    [
-    'transport_requests',
-    (rows: any[]) => setTransportRequests(rows.map(rowToTransport))],
-
-    [
-    'sitting_requests',
-    (rows: any[]) => setSittingRequests(rows.map(rowToSitting))],
-
-    [
-    'sitting_request_placements',
-    (rows: any[]) =>
-    setSittingRequestPlacements(rows.map(rowToSittingPlacement))],
-
     [
     'clinic_events',
     (rows: any[]) => setClinicEvents(rows.map(rowToClinicEvent))],
@@ -1460,6 +1487,125 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     } else {
       setSiteVolunteers((sv.data ?? []).map(rowToSiteVolunteer));
     }
+    // Requests: load ONLY operational statuses upfront (terminal/closed history
+    // is deferred to ensure*HistoryLoaded). Children (supply items, sitting
+    // placements) are scoped to the loaded parents. fetchAllPages avoids the
+    // PostgREST 1000-row cap the old uniform batch silently hit.
+    await Promise.all([
+    (async () => {
+      const { data, error } = await fetchAllPages((from, to) =>
+      supabase.
+      from('supply_requests').
+      select(supplySelectColumns(canViewSupplyFinancials)).
+      eq('organization_id', orgId).
+      eq('is_deleted', false).
+      in('status', SUPPLY_OPEN_STATUSES).
+      order('created_at', { ascending: false }).
+      range(from, to)
+      );
+      if (error) {
+        console.error('[supply_requests] load failed:', error.message);
+        return;
+      }
+      setSupplyRequests(data.map(rowToSupplyRequest));
+      const ids = data.map((r: any) => r.id);
+      if (ids.length === 0) {
+        setSupplyRequestItems([]);
+        return;
+      }
+      const items = await fetchAllPages((from, to) =>
+      supabase.
+      from('supply_request_items').
+      select('*').
+      eq('organization_id', orgId).
+      eq('is_deleted', false).
+      in('supply_request_id', ids).
+      range(from, to)
+      );
+      if (items.error) {
+        console.error('[supply_request_items] load failed:', items.error.message);
+        return;
+      }
+      setSupplyRequestItems(items.data.map(rowToSupplyItem));
+    })(),
+    (async () => {
+      const { data, error } = await fetchAllPages((from, to) =>
+      supabase.
+      from('transport_requests').
+      select('*').
+      eq('organization_id', orgId).
+      eq('is_deleted', false).
+      in('status', TRANSPORT_OPEN_STATUSES).
+      order('created_at', { ascending: false }).
+      range(from, to)
+      );
+      if (error) {
+        console.error('[transport_requests] load failed:', error.message);
+        return;
+      }
+      setTransportRequests(data.map(rowToTransport));
+      const ids = data.map((r: any) => r.id);
+      if (ids.length === 0) {
+        setTransportRequestAnimals([]);
+        return;
+      }
+      const tra = await fetchAllPages((from, to) =>
+      supabase.
+      from('transport_request_animals').
+      select('*').
+      eq('organization_id', orgId).
+      in('transport_request_id', ids).
+      range(from, to)
+      );
+      if (tra.error) {
+        console.error(
+          '[transport_request_animals] load failed:',
+          tra.error.message
+        );
+        return;
+      }
+      setTransportRequestAnimals(tra.data.map(rowToTransportAnimal));
+    })(),
+    (async () => {
+      const { data, error } = await fetchAllPages((from, to) =>
+      supabase.
+      from('sitting_requests').
+      select('*').
+      eq('organization_id', orgId).
+      eq('is_deleted', false).
+      in('status', SITTING_OPEN_STATUSES).
+      order('created_at', { ascending: false }).
+      range(from, to)
+      );
+      if (error) {
+        console.error('[sitting_requests] load failed:', error.message);
+        return;
+      }
+      setSittingRequests(data.map(rowToSitting));
+      const ids = data.map((r: any) => r.id);
+      if (ids.length === 0) {
+        setSittingRequestPlacements([]);
+        return;
+      }
+      const placements = await fetchAllPages((from, to) =>
+      supabase.
+      from('sitting_request_placements').
+      select('*').
+      eq('organization_id', orgId).
+      eq('is_deleted', false).
+      in('sitting_request_id', ids).
+      range(from, to)
+      );
+      if (placements.error) {
+        console.error(
+          '[sitting_request_placements] load failed:',
+          placements.error.message
+        );
+        return;
+      }
+      setSittingRequestPlacements(placements.data.map(rowToSittingPlacement));
+    })()]
+    );
     // currentUserLite is a fresh object each render (used only to label site
     // note authors); including it would re-create loadCoordination every render.
     // canViewSupplyFinancials is included so supply reloads (with/without
@@ -1469,6 +1615,157 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   useEffect(() => {
     loadCoordination();
   }, [loadCoordination]);
+
+  // Pull closed/terminal supply requests (+ their items) into state on demand,
+  // idempotent — drives the Supply Requests "History" tab and the Reports page.
+  // Mirrors ensureHistoricalLoaded for animals.
+  const ensureSupplyHistoryLoaded = useCallback(async () => {
+    if (!orgId || supplyHistoryLoaded) return;
+    const { data, error } = await fetchAllPages((from, to) =>
+    supabase.
+    from('supply_requests').
+    select(supplySelectColumns(canViewSupplyFinancials)).
+    eq('organization_id', orgId).
+    eq('is_deleted', false).
+    in('status', SUPPLY_TERMINAL_STATUSES).
+    order('created_at', { ascending: false }).
+    range(from, to)
+    );
+    if (error) {
+      console.error('[supply_requests] history load failed:', error.message);
+      return;
+    }
+    const terminal = data.map(rowToSupplyRequest);
+    setSupplyRequests((cur) => {
+      const have = new Set(cur.map((r) => r.id));
+      return [...cur, ...terminal.filter((r) => !have.has(r.id))];
+    });
+    const ids = data.map((r: any) => r.id);
+    if (ids.length > 0) {
+      const items = await fetchAllPages((from, to) =>
+      supabase.
+      from('supply_request_items').
+      select('*').
+      eq('organization_id', orgId).
+      eq('is_deleted', false).
+      in('supply_request_id', ids).
+      range(from, to)
+      );
+      if (items.error) {
+        console.error(
+          '[supply_request_items] history load failed:',
+          items.error.message
+        );
+      } else {
+        const terminalItems = items.data.map(rowToSupplyItem);
+        setSupplyRequestItems((cur) => {
+          const have = new Set(cur.map((r) => r.id));
+          return [...cur, ...terminalItems.filter((r) => !have.has(r.id))];
+        });
+      }
+    }
+    setSupplyHistoryLoaded(true);
+  }, [orgId, supplyHistoryLoaded, canViewSupplyFinancials]);
+
+  // Pull closed/terminal transport requests into state on demand (idempotent).
+  const ensureTransportHistoryLoaded = useCallback(async () => {
+    if (!orgId || transportHistoryLoaded) return;
+    const { data, error } = await fetchAllPages((from, to) =>
+    supabase.
+    from('transport_requests').
+    select('*').
+    eq('organization_id', orgId).
+    eq('is_deleted', false).
+    in('status', TRANSPORT_TERMINAL_STATUSES).
+    order('created_at', { ascending: false }).
+    range(from, to)
+    );
+    if (error) {
+      console.error('[transport_requests] history load failed:', error.message);
+      return;
+    }
+    const terminal = data.map(rowToTransport);
+    setTransportRequests((cur) => {
+      const have = new Set(cur.map((r) => r.id));
+      return [...cur, ...terminal.filter((r) => !have.has(r.id))];
+    });
+    const ids = data.map((r: any) => r.id);
+    if (ids.length > 0) {
+      const tra = await fetchAllPages((from, to) =>
+      supabase.
+      from('transport_request_animals').
+      select('*').
+      eq('organization_id', orgId).
+      in('transport_request_id', ids).
+      range(from, to)
+      );
+      if (tra.error) {
+        console.error(
+          '[transport_request_animals] history load failed:',
+          tra.error.message
+        );
+      } else {
+        const terminalAnimals = tra.data.map(rowToTransportAnimal);
+        setTransportRequestAnimals((cur) => {
+          const have = new Set(cur.map((r) => r.id));
+          return [...cur, ...terminalAnimals.filter((r) => !have.has(r.id))];
+        });
+      }
+    }
+    setTransportHistoryLoaded(true);
+  }, [orgId, transportHistoryLoaded]);
+
+  // Pull closed/terminal sitting requests (+ their placements) on demand.
+  const ensureSittingHistoryLoaded = useCallback(async () => {
+    if (!orgId || sittingHistoryLoaded) return;
+    const { data, error } = await fetchAllPages((from, to) =>
+    supabase.
+    from('sitting_requests').
+    select('*').
+    eq('organization_id', orgId).
+    eq('is_deleted', false).
+    in('status', SITTING_TERMINAL_STATUSES).
+    order('created_at', { ascending: false }).
+    range(from, to)
+    );
+    if (error) {
+      console.error('[sitting_requests] history load failed:', error.message);
+      return;
+    }
+    const terminal = data.map(rowToSitting);
+    setSittingRequests((cur) => {
+      const have = new Set(cur.map((r) => r.id));
+      return [...cur, ...terminal.filter((r) => !have.has(r.id))];
+    });
+    const ids = data.map((r: any) => r.id);
+    if (ids.length > 0) {
+      const placements = await fetchAllPages((from, to) =>
+      supabase.
+      from('sitting_request_placements').
+      select('*').
+      eq('organization_id', orgId).
+      eq('is_deleted', false).
+      in('sitting_request_id', ids).
+      range(from, to)
+      );
+      if (placements.error) {
+        console.error(
+          '[sitting_request_placements] history load failed:',
+          placements.error.message
+        );
+      } else {
+        const terminalPlacements = placements.data.map(rowToSittingPlacement);
+        setSittingRequestPlacements((cur) => {
+          const have = new Set(cur.map((r) => r.id));
+          return [
+          ...cur,
+          ...terminalPlacements.filter((r) => !have.has(r.id))];
+
+        });
+      }
+    }
+    setSittingHistoryLoaded(true);
+  }, [orgId, sittingHistoryLoaded]);
 
   // Per-org species/breed enablement (migration 0042). Org-scoped, no is_deleted
   // column, so loaded separately from loadCoordination.
@@ -3455,28 +3752,92 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     if (data) setSupplyRequestItems((prev) => [rowToSupplyItem(data), ...prev]);
   };
   // — Transport Requests —————————————————————————————————
+  // Replace a transport's child animal rows with the given set (delete-all +
+  // insert-desired). Optimistic; reconciles on error. Animals live in the
+  // transport_request_animals child table (migration 0085).
+  const setTransportAnimals = async (
+  transportId: string,
+  animalIds: string[]) =>
+  {
+    if (!orgId) return;
+    setTransportRequestAnimals((prev) => [
+    ...prev.filter((ta) => ta.transport_request_id !== transportId),
+    ...animalIds.map((aid) => ({
+      id: `temp-${transportId}-${aid}`,
+      transport_request_id: transportId,
+      animal_id: aid
+    }))]
+    );
+    const { error: delErr } = await supabase.
+    from('transport_request_animals').
+    delete().
+    eq('transport_request_id', transportId);
+    if (delErr) {
+      console.error('[transport_request_animals] clear failed:', delErr.message);
+      loadCoordination();
+      return;
+    }
+    if (animalIds.length === 0) return;
+    const rows = animalIds.map((aid) => ({
+      organization_id: orgId,
+      transport_request_id: transportId,
+      animal_id: aid
+    }));
+    const { data, error } = await supabase.
+    from('transport_request_animals').
+    insert(rows).
+    select('*');
+    if (error || !data) {
+      console.error('[transport_request_animals] create failed:', error?.message);
+      loadCoordination();
+      return;
+    }
+    setTransportRequestAnimals((prev) => [
+    ...prev.filter((ta) => ta.transport_request_id !== transportId),
+    ...data.map(rowToTransportAnimal)]
+    );
+  };
   const addTransportRequest = async (
-  req: Omit<TransportRequest, 'id' | 'created_at' | 'updated_at'>) =>
+  req: Omit<TransportRequest, 'id' | 'created_at' | 'updated_at'>,
+  animalIds: string[] = []) =>
   {
     if (!orgId) {
       console.error('[transport] cannot create — no current organization');
       return '';
     }
+    // Insert UNASSIGNED first: the assignment notification names the child
+    // animals, so we add the animals, then set the assignee via an update —
+    // by then the child rows exist for notify_transport_assignment() to read.
+    const wantsAssignee = !!req.assigned_volunteer_person_id;
+    const insertReq = {
+      ...req,
+      assigned_volunteer_person_id: null,
+      status: wantsAssignee ? ('open' as const) : req.status
+    };
     const { data, error } = await supabase.
     from('transport_requests').
-    insert(transportToInsert(req, orgId)).
+    insert(transportToInsert(insertReq, orgId)).
     select('*').
     single();
     if (error || !data) {
       console.error('[transport] create failed:', error?.message);
       return '';
     }
+    const newId = data.id as string;
     setTransportRequests((prev) => [rowToTransport(data), ...prev]);
-    return data.id as string;
+    await setTransportAnimals(newId, animalIds);
+    if (wantsAssignee) {
+      updateTransportRequest(newId, {
+        assigned_volunteer_person_id: req.assigned_volunteer_person_id,
+        status: req.status
+      });
+    }
+    return newId;
   };
   const updateTransportRequest = (
   id: string,
-  updates: Partial<TransportRequest>) =>
+  updates: Partial<TransportRequest>,
+  animalIds?: string[]) =>
   {
     setTransportRequests((prev) =>
     prev.map((tr) =>
@@ -3485,6 +3846,8 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     tr
     )
     );
+    // When the editor passes a new animal set, reconcile the child rows.
+    if (animalIds) setTransportAnimals(id, animalIds);
     const row = transportUpdateToRow(updates);
     if (Object.keys(row).length === 0) return;
     supabase.
@@ -3957,7 +4320,11 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       case 'products': setProducts((p) => p.filter((r) => r.id !== id)); break;
       case 'supply_requests': setSupplyRequests((p) => p.filter((r) => r.id !== id)); break;
       case 'supply_request_items': setSupplyRequestItems((p) => p.filter((r) => r.id !== id)); break;
-      case 'transport_requests': setTransportRequests((p) => p.filter((r) => r.id !== id)); break;
+      case 'transport_requests':
+        setTransportRequests((p) => p.filter((r) => r.id !== id));
+        // The DB cascades the child rows; mirror that locally.
+        setTransportRequestAnimals((p) => p.filter((r) => r.transport_request_id !== id));
+        break;
       case 'sitting_requests': setSittingRequests((p) => p.filter((r) => r.id !== id)); break;
       case 'sitting_request_placements': setSittingRequestPlacements((p) => p.filter((r) => r.id !== id)); break;
     }
@@ -4101,6 +4468,8 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         updateProduct,
         supplyRequests,
         supplyRequestItems,
+        supplyHistoryLoaded,
+        ensureSupplyHistoryLoaded,
         addAnimal,
         updateAnimal,
         deleteAnimal,
@@ -4144,6 +4513,9 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         updateSupplyRequest,
         addSupplyRequestItem,
         transportRequests,
+        transportRequestAnimals,
+        transportHistoryLoaded,
+        ensureTransportHistoryLoaded,
         addTransportRequest,
         updateTransportRequest,
         claimTransportRequest,
@@ -4153,6 +4525,8 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         completeTransportRequest,
         sittingRequests,
         sittingRequestPlacements,
+        sittingHistoryLoaded,
+        ensureSittingHistoryLoaded,
         addSittingRequest,
         updateSittingRequest,
         acceptSittingRequest,

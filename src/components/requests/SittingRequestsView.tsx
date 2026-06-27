@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useWhisker } from '../../context/WhiskerContext';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
@@ -7,6 +7,7 @@ import { Tooltip } from '../ui/Tooltip';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { PillTabs } from '../ui/PillTabs';
 import { FilterDropdown } from '../ui/FilterDropdown';
+import { VirtualizedGrid } from '../ui/VirtualizedGrid';
 import { Link } from 'react-router-dom';
 import { NewSittingRequestModal } from '../sitting/NewSittingRequestModal';
 import { NewTransportRequestModal } from '../transports/NewTransportRequestModal';
@@ -23,6 +24,7 @@ import {
   ArrowUpRightIcon } from
 'lucide-react';
 import { cn, animalDisplayName } from '../../lib/utils';
+import { cancelRequestConfirm } from '../../lib/requestCopy';
 import { useAuth } from '../../context/AuthContext';
 import { SittingRequest, SittingRequestStatus, Animal } from '../../types';
 import {
@@ -144,7 +146,9 @@ export function SittingRequestsView() {
     acceptSittingRequest,
     releaseSittingRequest,
     completeSittingRequest,
-    updateSittingRequest
+    updateSittingRequest,
+    sittingHistoryLoaded,
+    ensureSittingHistoryLoaded
   } = useWhisker();
   const { currentPersonId } = useAuth();
   const isAdmin = useIsAdmin();
@@ -187,6 +191,12 @@ export function SittingRequestsView() {
 
   const defaultTab: SittingTab = buckets.mine.length > 0 ? 'mine' : 'unclaimed';
   const activeTab = selectedTab ?? defaultTab;
+
+  // Closed sittings aren't loaded upfront — pull them in when the Completed tab
+  // opens (idempotent). Until then the Completed bucket is empty.
+  useEffect(() => {
+    if (activeTab === 'completed') ensureSittingHistoryLoaded();
+  }, [activeTab, ensureSittingHistoryLoaded]);
 
   const requesterOptions = [
   { value: 'all', label: 'All Requesters' },
@@ -255,7 +265,11 @@ export function SittingRequestsView() {
         { key: 'assigned', label: `Assigned (${buckets.assigned.length})` },
         {
           key: 'completed',
-          label: `Completed (${buckets.completed.length})`
+          // Count is unknown until the deferred history loads, so omit it
+          // until then rather than showing a misleading "(0)".
+          label: sittingHistoryLoaded ?
+          `Completed (${buckets.completed.length})` :
+          'Completed'
         }]} />
 
       <div className="flex flex-wrap items-center gap-2">
@@ -280,7 +294,11 @@ export function SittingRequestsView() {
 
       </div>
 
-      {display.length === 0 ?
+      {activeTab === 'completed' && !sittingHistoryLoaded ?
+      <Card className="p-10 text-center text-text-secondary">
+          <p>Loading history…</p>
+        </Card> :
+      display.length === 0 ?
       <Card className="p-10 text-center text-text-secondary">
           <HeartHandshakeIcon className="w-10 h-10 mx-auto mb-3 opacity-30" />
           <p className="font-medium text-text-primary mb-1">
@@ -296,8 +314,13 @@ export function SittingRequestsView() {
           </p>
         </Card> :
 
-      <div className="space-y-3">
-          {display.map((s) => {
+      <VirtualizedGrid
+        items={display}
+        columns={1}
+        gap={12}
+        estimateRowHeight={200}
+        getKey={(s) => s.id}
+        renderItem={(s) => {
           const requester = people.find(
             (p) => p.id === s.requested_by_person_id
           );
@@ -306,7 +329,6 @@ export function SittingRequestsView() {
           undefined;
           return (
             <SittingCard
-              key={s.id}
               request={s}
               coveredAnimals={animalsForRequest(s.id)}
               requesterName={
@@ -378,8 +400,8 @@ export function SittingRequestsView() {
               onArchive={() => setArchiving(s)} />);
 
 
-        })}
-        </div>
+        }} />
+
       }
 
       {editing &&
@@ -399,7 +421,7 @@ export function SittingRequestsView() {
             onClose={() => setArrangingFor(null)}
             prefill={{
               type: 'animal',
-              animal_id: covered.length === 1 ? covered[0].id : undefined,
+              animal_ids: covered.map((c) => c.id),
               schedule_type: 'flexible',
               preferred_window_start: arrangingFor.start_date.slice(0, 10),
               notes: `Transport to sitter for sitting coverage (${formatDateRange(
@@ -486,14 +508,7 @@ function SittingCard({
       tone: 'default' as const,
       onConfirm: onComplete
     },
-    cancel: {
-      title: 'Cancel sitting request?',
-      body: 'It will be marked as cancelled for everyone.',
-      confirmLabel: 'Cancel Request',
-      cancelLabel: 'Keep Request',
-      tone: 'danger' as const,
-      onConfirm: onCancel
-    },
+    cancel: { ...cancelRequestConfirm('sitting request'), onConfirm: onCancel },
     release: {
       title: 'Can’t sit anymore?',
       body: 'No problem. We’ll notify the requester that you’re no longer available and reopen the request so another volunteer can help.',
@@ -513,7 +528,7 @@ function SittingCard({
   return (
     <>
     <Card className="p-5">
-      <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-6">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
         {/* Up to 3 stacked avatars; +N indicator if more. */}
         <div className="flex -space-x-3 shrink-0">
           {coveredAnimals.slice(0, 3).map((a) =>
