@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
 import { InboxIcon, PlusIcon, PackageIcon } from 'lucide-react';
@@ -30,12 +30,24 @@ export function Requests() {
   const tab: RequestsTab =
   param === 'transport' || param === 'sitting' ? param : 'supply';
   const [isNewOpen, setIsNewOpen] = useState(false);
-  // Set when the new-request duplicate warning asks to open an existing request.
-  const [viewRequestId, setViewRequestId] = useState<string | null>(null);
   const canManageSupply = useCanManageSupplyRequests();
+  // Deep-link target: ?request=<id> asks the active tab's view to focus/open that
+  // request (from the dashboard "Help Needed" widget or a duplicate warning).
+  const requestParam = searchParams.get('request');
   const setTab = (next: RequestsTab) => {
     setIsNewOpen(false);
     setSearchParams(next === 'supply' ? {} : { tab: next }, { replace: true });
+  };
+  // Consume the request param once the view has focused it, keeping the tab.
+  const clearRequestParam = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('request');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+  // The duplicate-request warning opens the existing request via the same param.
+  const openRequest = (id: string) => {
+    setIsNewOpen(false);
+    setSearchParams({ request: id }, { replace: true });
   };
 
   return (
@@ -87,20 +99,25 @@ export function Requests() {
 
       {tab === 'supply' &&
       <SupplyRequestsView
-        openRequestId={viewRequestId}
-        onOpenedRequest={() => setViewRequestId(null)} />
+        openRequestId={requestParam}
+        onOpenedRequest={clearRequestParam} />
       }
-      {tab === 'transport' && <TransportsView />}
-      {tab === 'sitting' && <SittingRequestsView />}
+      {tab === 'transport' &&
+      <TransportsView
+        focusRequestId={requestParam}
+        onFocusedRequest={clearRequestParam} />
+      }
+      {tab === 'sitting' &&
+      <SittingRequestsView
+        focusRequestId={requestParam}
+        onFocusedRequest={clearRequestParam} />
+      }
 
       {tab === 'supply' &&
       <NewSupplyRequestModal
         isOpen={isNewOpen}
         onClose={() => setIsNewOpen(false)}
-        onViewExisting={(id) => {
-          setIsNewOpen(false);
-          setViewRequestId(id);
-        }} />
+        onViewExisting={openRequest} />
       }
       {tab === 'transport' &&
       <NewTransportRequestModal

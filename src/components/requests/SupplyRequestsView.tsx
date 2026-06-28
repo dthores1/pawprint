@@ -123,6 +123,13 @@ export function SupplyRequestsView({
   useEffect(() => {
     if (activeTab === 'completed') ensureSupplyHistoryLoaded();
   }, [activeTab, ensureSupplyHistoryLoaded]);
+  // Active list groups by urgency so nothing gets buried: urgent submissions,
+  // then plain submissions, then in-progress — oldest first WITHIN each group
+  // (so the longest-waiting requests surface). History keeps newest-first below.
+  const activeRank = (r: SupplyRequest): number => {
+    if (r.status === 'submitted') return r.priority !== 'normal' ? 0 : 1;
+    return 2; // in_progress (and any other non-terminal status)
+  };
   const activeRequests = supplyRequests.
   filter(
     (r) =>
@@ -130,11 +137,15 @@ export function SupplyRequestsView({
     r.status !== 'cancelled' &&
     r.status !== 'denied'
   ).
-  sort(
-    (a, b) =>
-    new Date(b.requested_date).getTime() -
-    new Date(a.requested_date).getTime()
-  );
+  sort((a, b) => {
+    const rank = activeRank(a) - activeRank(b);
+    if (rank !== 0) return rank;
+    // Oldest first within a group.
+    return (
+      new Date(a.requested_date).getTime() -
+      new Date(b.requested_date).getTime());
+
+  });
   const completedRequests = supplyRequests.
   filter(
     (r) =>

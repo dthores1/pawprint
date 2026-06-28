@@ -24,6 +24,7 @@ import {
   ArrowUpRightIcon } from
 'lucide-react';
 import { cn, animalDisplayName } from '../../lib/utils';
+import { useFocusRequest } from '../../lib/useFocusRequest';
 import { cancelRequestConfirm } from '../../lib/requestCopy';
 import { useAuth } from '../../context/AuthContext';
 import { SittingRequest, SittingRequestStatus, Animal } from '../../types';
@@ -135,7 +136,15 @@ now: Date = new Date())
   return true;
 }
 
-export function SittingRequestsView() {
+interface SittingRequestsViewProps {
+  /** ?request=<id> deep-link: switch to its sub-tab, highlight + scroll to it. */
+  focusRequestId?: string | null;
+  onFocusedRequest?: () => void;
+}
+export function SittingRequestsView({
+  focusRequestId,
+  onFocusedRequest
+}: SittingRequestsViewProps = {}) {
   const {
     sittingRequests,
     sittingRequestPlacements,
@@ -191,6 +200,17 @@ export function SittingRequestsView() {
 
   const defaultTab: SittingTab = buckets.mine.length > 0 ? 'mine' : 'unclaimed';
   const activeTab = selectedTab ?? defaultTab;
+
+  // Deep-link focus (from the dashboard "Help Needed" widget).
+  const highlightedId = useFocusRequest<SittingTab>({
+    focusRequestId,
+    onFocusedRequest,
+    resolveTab: (id) =>
+    (['mine', 'unclaimed', 'assigned', 'completed'] as SittingTab[]).find(
+      (t) => buckets[t].some((s) => s.id === id)
+    ) ?? null,
+    setSelectedTab
+  });
 
   // Closed sittings aren't loaded upfront — pull them in when the Completed tab
   // opens (idempotent). Until then the Completed bucket is empty.
@@ -328,7 +348,15 @@ export function SittingRequestsView() {
           people.find((p) => p.id === s.sitter_person_id) :
           undefined;
           return (
-            <SittingCard
+            <div
+              id={`req-${s.id}`}
+              className={cn(
+                'rounded-2xl transition-shadow',
+                highlightedId === s.id &&
+                'ring-2 ring-primary ring-offset-2 ring-offset-background'
+              )}>
+
+              <SittingCard
               request={s}
               coveredAnimals={animalsForRequest(s.id)}
               requesterName={
@@ -397,7 +425,8 @@ export function SittingRequestsView() {
               canArchive={
               isAdminForArchive && SITTING_ARCHIVABLE.includes(s.status)
               }
-              onArchive={() => setArchiving(s)} />);
+              onArchive={() => setArchiving(s)} />
+            </div>);
 
 
         }} />

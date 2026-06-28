@@ -142,7 +142,7 @@ export function HelpNeededWidget() {
     detail: transportWhen(r),
     statusLabel: 'Unclaimed',
     pill: PILL_UNCLAIMED,
-    to: '/requests?tab=transport',
+    to: `/requests?tab=transport&request=${r.id}`,
     sortTs: transportSortTs(r)
   }));
 
@@ -166,7 +166,7 @@ export function HelpNeededWidget() {
     }`,
     statusLabel: 'Unclaimed',
     pill: PILL_UNCLAIMED,
-    to: '/requests?tab=sitting',
+    to: `/requests?tab=sitting&request=${s.id}`,
     sortTs: parseLocalDate(s.start_date).getTime()
   }));
 
@@ -180,7 +180,7 @@ export function HelpNeededWidget() {
     detail: `Requested by ${personName(r.requester_person_id)}`,
     statusLabel: 'Submitted',
     pill: PILL_SUBMITTED,
-    to: '/requests',
+    to: `/requests?request=${r.id}`,
     sortTs: r.needed_by_date ?
     parseLocalDate(r.needed_by_date).getTime() :
     r.requested_date ?

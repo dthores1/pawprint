@@ -24,6 +24,7 @@ import { PillTabs } from '../ui/PillTabs';
 import { FilterDropdown } from '../ui/FilterDropdown';
 import { VirtualizedGrid } from '../ui/VirtualizedGrid';
 import { cn, formatDate } from '../../lib/utils';
+import { useFocusRequest } from '../../lib/useFocusRequest';
 import { cancelRequestConfirm } from '../../lib/requestCopy';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -207,7 +208,15 @@ now: Date = new Date())
   return true;
 }
 
-export function TransportsView() {
+interface TransportsViewProps {
+  /** ?request=<id> deep-link: switch to its sub-tab, highlight + scroll to it. */
+  focusRequestId?: string | null;
+  onFocusedRequest?: () => void;
+}
+export function TransportsView({
+  focusRequestId,
+  onFocusedRequest
+}: TransportsViewProps = {}) {
   const {
     transportRequests,
     transportRequestAnimals,
@@ -281,6 +290,17 @@ export function TransportsView() {
   const defaultTab: TransportTab =
   buckets.mine.length > 0 ? 'mine' : 'unclaimed';
   const activeTab = selectedTab ?? defaultTab;
+
+  // Deep-link focus (from the dashboard "Help Needed" widget).
+  const highlightedId = useFocusRequest<TransportTab>({
+    focusRequestId,
+    onFocusedRequest,
+    resolveTab: (id) =>
+    (['mine', 'unclaimed', 'assigned', 'completed'] as TransportTab[]).find(
+      (t) => buckets[t].some((r) => r.id === id)
+    ) ?? null,
+    setSelectedTab
+  });
 
   // Closed transports aren't loaded upfront — pull them in when the Completed
   // tab opens (idempotent). Until then the Completed bucket is empty.
@@ -404,7 +424,15 @@ export function TransportsView() {
         estimateRowHeight={220}
         getKey={(r) => r.id}
         renderItem={(r) =>
-        <TransportCard
+        <div
+          id={`req-${r.id}`}
+          className={cn(
+            'rounded-2xl transition-shadow',
+            highlightedId === r.id &&
+            'ring-2 ring-primary ring-offset-2 ring-offset-background'
+          )}>
+
+          <TransportCard
           request={r}
           animalNames={transportRequestAnimals.
           filter((ta) => ta.transport_request_id === r.id).
@@ -485,6 +513,7 @@ export function TransportsView() {
           isAdminForArchive && TRANSPORT_ARCHIVABLE.includes(r.status)
           }
           onArchive={() => setArchiving(r)} />
+        </div>
         } />
 
       }
