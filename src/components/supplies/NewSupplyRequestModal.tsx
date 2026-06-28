@@ -11,7 +11,14 @@ import {
   SupplyRequestPriority,
   SupplyRequestItem } from
 '../../types';
-import { PlusIcon, Trash2Icon, BookmarkIcon, BookmarkCheckIcon, RepeatIcon } from 'lucide-react';
+import {
+  PlusIcon,
+  Trash2Icon,
+  BookmarkIcon,
+  BookmarkCheckIcon,
+  RepeatIcon,
+  AlertTriangleIcon } from
+'lucide-react';
 
 // Cap how many common requests one person keeps; saving a new one beyond this
 // demotes their least-recently-used template.
@@ -20,6 +27,8 @@ const MAX_COMMON_REQUESTS = 5;
 interface NewSupplyRequestModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Open an existing request's detail (used by the duplicate-request warning). */
+  onViewExisting?: (requestId: string) => void;
 }
 // Common units used across the catalog plus a few useful extras.
 // Kept singular for consistency in display ("2 can", "1 case") — could
@@ -83,7 +92,8 @@ notes?: string)
 }
 export function NewSupplyRequestModal({
   isOpen,
-  onClose
+  onClose,
+  onViewExisting
 }: NewSupplyRequestModalProps) {
   const {
     addSupplyRequest,
@@ -120,6 +130,23 @@ export function NewSupplyRequestModal({
 
   const itemsForRequest = (requestId: string) =>
   supplyRequestItems.filter((i) => i.supply_request_id === requestId);
+
+  // Warn (don't block) on a likely duplicate: an existing OPEN request by the
+  // same requester that already includes this catalog product. Custom ("Other")
+  // items have no product id, so they're never flagged.
+  const existingOpenRequestFor = (
+  productId?: string): SupplyRequest | undefined => {
+    if (!productId) return undefined;
+    return supplyRequests.find(
+      (r) =>
+      !r.is_common_request &&
+      r.requester_person_id === currentPersonId &&
+      (r.status === 'submitted' || r.status === 'in_progress') &&
+      supplyRequestItems.some(
+        (i) => i.supply_request_id === r.id && i.product_id === productId
+      )
+    );
+  };
   const itemLabel = (it: { product_id?: string; custom_item_name?: string }) =>
   it.product_id ?
   products.find((p) => p.id === it.product_id)?.name ?? 'Item' :
@@ -464,6 +491,35 @@ export function NewSupplyRequestModal({
                       }}
                       onChange={(next) => handleProductChange(index, next)} />
 
+                    {/* Duplicate warning — informational, never blocks submit. */}
+                    {(() => {
+                      const dup = existingOpenRequestFor(item.product_id);
+                      if (!dup) return null;
+                      const pname =
+                      products.find((p) => p.id === item.product_id)?.name ??
+                      'this item';
+                      return (
+                        <div className="mt-2 flex items-start gap-2 rounded-lg border border-[#F8E7C8] bg-[#FBF3E2] px-3 py-2 text-xs text-[#7A5A12]">
+                          <AlertTriangleIcon className="w-3.5 h-3.5 mt-px shrink-0 text-[#A36B00]" />
+                          <span>
+                            You already have an open request for{' '}
+                            <span className="font-semibold">{pname}</span>.
+                            {onViewExisting &&
+                            <>
+                                {' '}
+                                <button
+                                  type="button"
+                                  onClick={() => onViewExisting(dup.id)}
+                                  className="font-semibold underline hover:no-underline">
+
+                                  View existing request
+                                </button>
+                              </>
+                            }
+                          </span>
+                        </div>);
+
+                    })()}
                   </div>
 
                   {/* Quantity + Unit */}

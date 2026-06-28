@@ -30,6 +30,8 @@ export function Requests() {
   const tab: RequestsTab =
   param === 'transport' || param === 'sitting' ? param : 'supply';
   const [isNewOpen, setIsNewOpen] = useState(false);
+  // Set when the new-request duplicate warning asks to open an existing request.
+  const [viewRequestId, setViewRequestId] = useState<string | null>(null);
   const canManageSupply = useCanManageSupplyRequests();
   const setTab = (next: RequestsTab) => {
     setIsNewOpen(false);
@@ -83,14 +85,22 @@ export function Requests() {
         )}
       </div>
 
-      {tab === 'supply' && <SupplyRequestsView />}
+      {tab === 'supply' &&
+      <SupplyRequestsView
+        openRequestId={viewRequestId}
+        onOpenedRequest={() => setViewRequestId(null)} />
+      }
       {tab === 'transport' && <TransportsView />}
       {tab === 'sitting' && <SittingRequestsView />}
 
       {tab === 'supply' &&
       <NewSupplyRequestModal
         isOpen={isNewOpen}
-        onClose={() => setIsNewOpen(false)} />
+        onClose={() => setIsNewOpen(false)}
+        onViewExisting={(id) => {
+          setIsNewOpen(false);
+          setViewRequestId(id);
+        }} />
       }
       {tab === 'transport' &&
       <NewTransportRequestModal

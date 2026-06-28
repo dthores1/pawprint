@@ -2,24 +2,23 @@ import { useEffect, useState } from 'react';
 import { useWhisker } from '../../context/WhiskerContext';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
-import { Avatar } from '../ui/Avatar';
 import { PillTabs } from '../ui/PillTabs';
 import { VirtualizedGrid } from '../ui/VirtualizedGrid';
 import { FilterDropdown } from '../ui/FilterDropdown';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { cancelRequestConfirm } from '../../lib/requestCopy';
 import { SupplyRequestDetailModal } from '../supplies/SupplyRequestDetailModal';
+import { SupplyRequestCard } from './SupplyRequestCard';
 import {
   PackageOpenIcon,
-  AlertCircleIcon,
   RepeatIcon,
   Trash2Icon,
   BookmarkIcon } from
 'lucide-react';
-import { formatDate, cn, animalDisplayName } from '../../lib/utils';
+import { formatDate, animalDisplayName } from '../../lib/utils';
 import { GuidanceEmptyState } from '../guidance/GuidanceEmptyState';
 import { useAuth } from '../../context/AuthContext';
-import { SupplyRequest, SupplyRequestStatus } from '../../types';
+import { SupplyRequest } from '../../types';
 
 const PRIORITY_OPTIONS = [
 { value: 'all', label: 'All Priorities' },
@@ -73,21 +72,16 @@ now: Date = new Date())
   return true;
 }
 
-const STATUS_LABELS: Record<SupplyRequestStatus, string> = {
-  submitted: 'Submitted',
-  in_progress: 'In Progress',
-  fulfilled: 'Fulfilled',
-  cancelled: 'Cancelled',
-  denied: 'Denied'
-};
-const STATUS_COLORS: Record<SupplyRequestStatus, string> = {
-  submitted: 'bg-[#E5E2DC] text-[#6B6B6B]',
-  in_progress: 'bg-[#F8E7C8] text-[#A36B00]',
-  fulfilled: 'bg-[#DDEFE2] text-[#3E7B52]',
-  cancelled: 'bg-[#F5D7D7] text-[#9B3A3A]',
-  denied: 'bg-[#F5D7D7] text-[#9B3A3A]'
-};
-export function SupplyRequestsView() {
+interface SupplyRequestsViewProps {
+  /** When set, open this request's detail modal (e.g. from a duplicate warning). */
+  openRequestId?: string | null;
+  /** Called once the requested detail has been opened, so the trigger can clear. */
+  onOpenedRequest?: () => void;
+}
+export function SupplyRequestsView({
+  openRequestId,
+  onOpenedRequest
+}: SupplyRequestsViewProps = {}) {
   const {
     supplyRequests,
     peopleIndex: people,
@@ -114,6 +108,15 @@ export function SupplyRequestsView() {
   const [requesterFilter, setRequesterFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [neededByFilter, setNeededByFilter] = useState('all');
+
+  // External trigger (e.g. the new-request modal's duplicate warning) asking us
+  // to open a specific request's detail. Clear the trigger once handled.
+  useEffect(() => {
+    if (openRequestId) {
+      setSelectedRequestId(openRequestId);
+      onOpenedRequest?.();
+    }
+  }, [openRequestId, onOpenedRequest]);
 
   // Closed requests aren't loaded upfront — pull them in when the History tab
   // opens (idempotent). Until then the History list is empty.
@@ -247,140 +250,50 @@ export function SupplyRequestsView() {
     setRemoveCommonId(template.id);
   };
 
+  // Resolve a request's items into hero rows: resolved product/custom name plus
+  // a preformatted quantity ("each" is implied, so it's shown as a bare number).
+  const itemRowsFor = (requestId: string) =>
+  supplyRequestItems.
+  filter((i) => i.supply_request_id === requestId).
+  map((item) => {
+    const name =
+    (item.product_id ?
+    products.find((p) => p.id === item.product_id)?.name :
+    item.custom_item_name) ||
+    item.custom_item_name ||
+    'Item';
+    const qty =
+    !item.unit || item.unit === 'each' ?
+    `${item.quantity}` :
+    `${item.quantity} ${item.unit}`;
+    return { id: item.id, name, qty, notes: item.notes ?? undefined };
+  });
+
   // One request row. Rendered via VirtualizedGrid (no per-item entrance
   // animation — it would replay each time a row scrolls back into view).
   const renderRequestCard = (request: SupplyRequest) => {
-    const requester = people.find(
-      (p) => p.id === request.requester_person_id
-    );
+    const requester = people.find((p) => p.id === request.requester_person_id);
     const animal = request.requested_for_animal_id ?
     animals.find((a) => a.id === request.requested_for_animal_id) :
     null;
-    const items = supplyRequestItems.filter(
-      (i) => i.supply_request_id === request.id
-    );
-    // Generate a summary string of items
-    const itemSummary =
-    items.
-    slice(0, 2).
-    map((item) => {
-      const product = item.product_id ?
-      products.find((p) => p.id === item.product_id) :
-      null;
-      return product ? product.name : item.custom_item_name;
-    }).
-    join(', ') + (
-    items.length > 2 ? ` +${items.length - 2} more` : '');
     return (
-      <Card
-        className={cn(
-          'p-5 hover:border-primary/30 transition-colors cursor-pointer group',
-          request.priority !== 'normal' &&
-          request.status !== 'fulfilled' &&
-          request.status !== 'cancelled' &&
-          request.status !== 'denied' ?
-          'border-[#9B3A3A]/30 bg-[#F5D7D7]/10' :
-          ''
-        )}
-        onClick={() => setSelectedRequestId(request.id)}>
-
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-6 flex-1 min-w-0">
-            {/* Requester */}
-            <div className="flex items-center gap-3 md:min-w-[200px] min-w-0 flex-1 md:flex-none">
-              <Avatar
-                src={requester?.photo_url}
-                type="person"
-                name={
-                requester ?
-                `${requester.first_name} ${requester.last_name}` :
-                undefined
-                }
-                tone="peach"
-                className="w-12 h-12 text-[15px] shrink-0" />
-
-              <div className="min-w-0">
-                <p className="font-medium text-text-primary group-hover:text-primary transition-colors truncate">
-                  {requester?.first_name} {requester?.last_name}
-                </p>
-                {/* On phones the item + animal columns are hidden, so
-                    surface the items and date right under the name. */}
-                <p className="sm:hidden text-sm text-text-secondary truncate mt-0.5">
-                  {itemSummary || 'No items'}
-                </p>
-                <p className="sm:hidden text-xs text-text-secondary/80 mt-0.5">
-                  {formatDate(request.requested_date)}
-                </p>
-              </div>
-            </div>
-
-            {/* Animal — only when one is attached. */}
-            {animal &&
-            <div className="hidden sm:flex items-center gap-3 min-w-[200px] border-l border-border/60 pl-6">
-                <Avatar
-                src={animal.primary_photo_url}
-                type="animal"
-                name={animal.name ?? undefined}
-                species={animal.species}
-                className="w-12 h-12 text-[15px]" />
-
-                <p className="font-medium text-text-primary">
-                  {animalDisplayName(animal)}
-                </p>
-              </div>
-            }
-          </div>
-
-          {/* Items Summary */}
-          <div className="flex-1 text-sm text-text-secondary hidden md:block">
-            <p className="truncate max-w-[250px]">{itemSummary}</p>
-          </div>
-
-          {/* Status & Date */}
-          <div className="flex items-center gap-4 md:min-w-[200px] justify-end">
-            <div className="text-right hidden sm:block">
-              <p className="text-xs text-text-secondary">
-                {formatDate(request.requested_date)}
-              </p>
-            </div>
-            <div className="flex flex-col items-end gap-1.5">
-              <span
-                className={cn(
-                  'px-2.5 py-1 rounded-full text-xs font-medium',
-                  STATUS_COLORS[request.status]
-                )}>
-
-                {STATUS_LABELS[request.status]}
-              </span>
-              {request.priority !== 'normal' &&
-              request.status !== 'fulfilled' &&
-              request.status !== 'cancelled' &&
-              request.status !== 'denied' &&
-              <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[#9B3A3A]">
-                    <AlertCircleIcon className="w-3 h-3" />
-                    {request.priority}
-                  </span>
-              }
-              {/* Requester can withdraw before it's being processed. */}
-              {!!currentPersonId &&
-              request.requester_person_id === currentPersonId &&
-              request.status === 'submitted' &&
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-text-secondary hover:text-[#9B3A3A]"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCancelId(request.id);
-                }}>
-
-                    Cancel Request
-                  </Button>
-              }
-            </div>
-          </div>
-        </div>
-      </Card>);
+      <SupplyRequestCard
+        request={request}
+        items={itemRowsFor(request.id)}
+        requesterName={
+        requester ?
+        `${requester.first_name} ${requester.last_name}` :
+        'Unknown'
+        }
+        requesterPhoto={requester?.photo_url}
+        animalName={animal ? animalDisplayName(animal) : undefined}
+        canCancel={
+        !!currentPersonId &&
+        request.requester_person_id === currentPersonId &&
+        request.status === 'submitted'
+        }
+        onOpen={() => setSelectedRequestId(request.id)}
+        onCancel={() => setCancelId(request.id)} />);
 
   };
   return (
@@ -510,7 +423,7 @@ export function SupplyRequestsView() {
         items={displayRequests}
         columns={1}
         gap={16}
-        estimateRowHeight={120}
+        estimateRowHeight={150}
         getKey={(r) => r.id}
         renderItem={renderRequestCard} />
 
