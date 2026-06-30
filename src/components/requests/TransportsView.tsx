@@ -91,6 +91,22 @@ function timingLabel(r: TransportRequest): string {
   formatPickupTime(r.requested_pickup_time) :
   'No time set';
 }
+// What to show in the timing pill. ASAP / Coordinate-later requests carry no
+// inherent date, so once they're closed we stamp when that happened (their last
+// update) instead of leaving a bare "ASAP" / "Coordinate later" with no date.
+function pillTimingLabel(r: TransportRequest): string {
+  const noInherentDate =
+  r.schedule_type === 'asap' || r.schedule_type === 'coordinate_later';
+  if (r.status === 'completed' && noInherentDate) {
+    // completed_at is stamped on completion; fall back to updated_at defensively.
+    return `Completed ${formatPickupTime(r.completed_at ?? r.updated_at)}`;
+  }
+  if (r.status === 'cancelled' && noInherentDate) {
+    // No dedicated cancelled_at column — updated_at is when it was closed.
+    return `Cancelled ${formatPickupTime(r.updated_at)}`;
+  }
+  return timingLabel(r);
+}
 // Sort key: ASAP floats to top, then soonest exact/flexible date, else created.
 function timingSortValue(r: TransportRequest): number {
   if (r.schedule_type === 'asap') return -Infinity;
@@ -139,7 +155,7 @@ function formatPickupTime(iso: string): string {
 // Subtabs are organized around "what's there for me to do?" rather than raw
 // status: my active assignments, the unclaimed pool, everything assigned, and
 // the terminal archive.
-type TransportTab = 'mine' | 'unclaimed' | 'assigned' | 'completed';
+type TransportTab = 'mine' | 'unclaimed' | 'myRequests' | 'completed';
 
 const DATE_OPTIONS = [
 { value: 'all', label: 'Any Date' },
@@ -279,8 +295,13 @@ export function TransportsView({
     unclaimed: sorted.filter(
       (r) => !r.assigned_volunteer_person_id && !isTerminal(r)
     ),
-    assigned: sorted.filter(
-      (r) => !!r.assigned_volunteer_person_id && !isTerminal(r)
+    // "My Requests" = open requests I raised (regardless of who's claimed them),
+    // so the requester can keep an eye on what they've asked for.
+    myRequests: sorted.filter(
+      (r) =>
+      !!currentPersonId &&
+      r.requested_by_person_id === currentPersonId &&
+      !isTerminal(r)
     ),
     completed: sorted.filter(isTerminal)
   };
@@ -296,7 +317,7 @@ export function TransportsView({
     focusRequestId,
     onFocusedRequest,
     resolveTab: (id) =>
-    (['mine', 'unclaimed', 'assigned', 'completed'] as TransportTab[]).find(
+    (['mine', 'unclaimed', 'myRequests', 'completed'] as TransportTab[]).find(
       (t) => buckets[t].some((r) => r.id === id)
     ) ?? null,
     setSelectedTab
@@ -334,11 +355,12 @@ export function TransportsView({
   map((id) => ({ value: id, label: personName(id) })).
   sort((a, b) => a.label.localeCompare(b.label))];
 
-  // The Assignee filter only makes sense where requests can have an assignee:
-  // "Assigned to Me" is all me, and "Unclaimed" has none by definition — so it's
-  // shown only on "Assigned" and "Completed", and ignored when bucketing.
+  // The Assignee filter only makes sense where requests can have varied
+  // assignees: "Assigned to Me" is all me, and "Unclaimed" has none by
+  // definition — so it's shown only on "My Requests" (others may have claimed
+  // them) and "Closed", and ignored when bucketing.
   const showAssigneeFilter =
-  activeTab === 'assigned' || activeTab === 'completed';
+  activeTab === 'myRequests' || activeTab === 'completed';
   const filtersActive =
   requesterFilter !== 'all' ||
   showAssigneeFilter && assigneeFilter !== 'all' ||
@@ -362,14 +384,14 @@ export function TransportsView({
         tabs={[
         { key: 'mine', label: `Assigned to Me (${buckets.mine.length})` },
         { key: 'unclaimed', label: `Unclaimed (${buckets.unclaimed.length})` },
-        { key: 'assigned', label: `Assigned (${buckets.assigned.length})` },
+        { key: 'myRequests', label: `My Requests (${buckets.myRequests.length})` },
         {
           key: 'completed',
-          // Count is unknown until the deferred history loads, so omit it
-          // until then rather than showing a misleading "(0)".
+          // "Closed" covers both completed and cancelled. Count is unknown until
+          // the deferred history loads, so omit it rather than show a "(0)".
           label: transportHistoryLoaded ?
-          `Completed (${buckets.completed.length})` :
-          'Completed'
+          `Closed (${buckets.completed.length})` :
+          'Closed'
         }]} />
 
       <div className="flex flex-wrap items-center gap-2">
@@ -411,9 +433,9 @@ export function TransportsView({
           'Nothing is assigned to you right now.' :
           activeTab === 'unclaimed' ?
           'No unclaimed requests — submit one when someone needs a ride.' :
-          activeTab === 'assigned' ?
-          'No active assigned rides at the moment.' :
-          'No completed transports yet.'}
+          activeTab === 'myRequests' ?
+          "You haven't raised any open transport requests." :
+          'No closed transports yet.'}
           </p>
         </Card> :
 
@@ -423,6 +445,7 @@ export function TransportsView({
         gap={12}
         estimateRowHeight={220}
         getKey={(r) => r.id}
+        pageScroll
         renderItem={(r) =>
         <div
           id={`req-${r.id}`}
@@ -730,7 +753,7 @@ function TransportCard({
           <div className="mt-2 flex items-center gap-x-3 gap-y-1.5 flex-wrap text-sm text-text-secondary">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-background border border-border text-xs font-medium text-text-primary">
               <CalendarIcon className="w-3.5 h-3.5 text-text-secondary shrink-0" />
-              {timingLabel(request)}
+              {pillTimingLabel(request)}
             </span>
             <span className="inline-flex items-center gap-1.5">
               <UserIcon className="w-3.5 h-3.5 shrink-0" />

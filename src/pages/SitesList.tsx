@@ -210,7 +210,8 @@ export function SitesList() {
       <VirtualizedGrid
         items={visible}
         getKey={(s) => s.id}
-        renderItem={renderCard} />
+        renderItem={renderCard}
+        pageScroll />
       }
 
       <NewSiteModal isOpen={isNewOpen} onClose={() => setIsNewOpen(false)} />

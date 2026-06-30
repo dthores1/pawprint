@@ -104,7 +104,7 @@ export function Contacts() {
   }, [filteredPeople, sort]);
 
   // Virtualized table rows in a self-scrolling container. ~73px per row.
-  const tableRows = useWindowRowVirtualizer(sortedPeople.length, 73);
+  const tableRows = useWindowRowVirtualizer(sortedPeople.length, 73, true);
   const humanizeRole = (r: PersonRole) => r.replace('_', ' ');
 
   // CSV export columns for the current contacts view.
@@ -250,6 +250,7 @@ export function Contacts() {
         minColumnWidth={300}
         estimateRowHeight={210}
         gap={24}
+        pageScroll
         renderItem={(person) =>
         <Card className="h-full flex flex-col p-6">
               <div className="flex items-start justify-between gap-3 mb-4">
@@ -334,8 +335,7 @@ export function Contacts() {
       <Card className="overflow-hidden">
           <div
           ref={tableRows.scrollRef}
-          className="overflow-auto"
-          style={{ maxHeight: '70vh' }}>
+          className="overflow-x-auto overflow-y-hidden">
 
             <table className="w-full text-left border-collapse">
               <thead className="sticky top-0 z-10">

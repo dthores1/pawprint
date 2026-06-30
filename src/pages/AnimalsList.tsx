@@ -436,7 +436,7 @@ export function AnimalsList() {
 
   // Virtualized table rows in a self-scrolling container (~73px/row). The mobile
   // card layout uses VirtualizedGrid instead, so this is desktop-only.
-  const rows = useWindowRowVirtualizer(sortedAnimals.length, 73);
+  const rows = useWindowRowVirtualizer(sortedAnimals.length, 73, true);
   // Filter option lists. Status options follow the historical toggle: in-care
   // statuses only by default, all 7 once historical animals are included.
   const statusOptions: FilterOption[] = useMemo(
@@ -811,15 +811,15 @@ export function AnimalsList() {
         gap={12}
         estimateRowHeight={172}
         getKey={(a) => a.id}
-        renderItem={(a) => renderAnimalCard(a)} /> :
+        renderItem={(a) => renderAnimalCard(a)}
+        pageScroll /> :
 
 
       // Desktop: virtualized table.
       <Card className="overflow-hidden">
           <div
           ref={rows.scrollRef}
-          className="overflow-auto"
-          style={{ maxHeight: '70vh' }}>
+          className="overflow-x-auto overflow-y-hidden">
 
             <table className="w-full text-left border-collapse">
               <thead className="sticky top-0 z-10">

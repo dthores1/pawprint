@@ -168,7 +168,7 @@ export function FostersList() {
   { header: 'Created At', value: (f) => f.created_at }];
 
   // Virtualized table rows in a self-scrolling container. ~73px per row.
-  const tableRows = useWindowRowVirtualizer(sortedFosters.length, 73);
+  const tableRows = useWindowRowVirtualizer(sortedFosters.length, 73, true);
   return (
     <div className="space-y-5 pb-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -329,6 +329,7 @@ export function FostersList() {
         minColumnWidth={300}
         estimateRowHeight={260}
         gap={24}
+        pageScroll
         renderItem={(foster) => {
           const activeCount = getActivePlacementsCount(foster.id);
           const cap = foster.max_capacity ?? 0;
@@ -402,8 +403,7 @@ export function FostersList() {
       <Card className="overflow-hidden">
           <div
           ref={tableRows.scrollRef}
-          className="overflow-auto"
-          style={{ maxHeight: '70vh' }}>
+          className="overflow-x-auto overflow-y-hidden">
 
             <table className="w-full text-left border-collapse">
               <thead className="sticky top-0 z-10">

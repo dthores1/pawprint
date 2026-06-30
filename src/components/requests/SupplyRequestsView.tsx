@@ -6,6 +6,7 @@ import { PillTabs } from '../ui/PillTabs';
 import { VirtualizedGrid } from '../ui/VirtualizedGrid';
 import { FilterDropdown } from '../ui/FilterDropdown';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { Modal } from '../ui/Modal';
 import { cancelRequestConfirm } from '../../lib/requestCopy';
 import { SupplyRequestDetailModal } from '../supplies/SupplyRequestDetailModal';
 import { SupplyRequestCard } from './SupplyRequestCard';
@@ -18,7 +19,7 @@ import {
 import { formatDate, animalDisplayName } from '../../lib/utils';
 import { GuidanceEmptyState } from '../guidance/GuidanceEmptyState';
 import { useAuth } from '../../context/AuthContext';
-import { SupplyRequest } from '../../types';
+import { SupplyRequest, SupplyRequestStatus } from '../../types';
 
 const PRIORITY_OPTIONS = [
 { value: 'all', label: 'All Priorities' },
@@ -91,6 +92,7 @@ export function SupplyRequestsView({
     addSupplyRequest,
     addSupplyRequestItem,
     updateSupplyRequest,
+    cancelSupplyRequest,
     supplyHistoryLoaded,
     ensureSupplyHistoryLoaded
   } = useWhisker();
@@ -100,6 +102,10 @@ export function SupplyRequestsView({
   );
   // The supply request id pending a cancel confirmation (null = dialog closed).
   const [cancelId, setCancelId] = useState<string | null>(null);
+  // Set when a cancel was blocked because the request's live status had moved on
+  // (e.g. another user started it) — drives an informational notice.
+  const [cancelBlockedStatus, setCancelBlockedStatus] =
+  useState<SupplyRequestStatus | null>(null);
   // The common-request template id pending a remove confirmation.
   const [removeCommonId, setRemoveCommonId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'active' | 'completed' | 'common'>(
@@ -436,7 +442,8 @@ export function SupplyRequestsView({
         gap={16}
         estimateRowHeight={150}
         getKey={(r) => r.id}
-        renderItem={renderRequestCard} />
+        renderItem={renderRequestCard}
+        pageScroll />
 
       }
 
@@ -447,13 +454,16 @@ export function SupplyRequestsView({
 
       {cancelId && (() => {
         const copy = cancelRequestConfirm('supply request');
+        const pendingId = cancelId;
         return (
           <ConfirmDialog
             isOpen={true}
             onClose={() => setCancelId(null)}
-            onConfirm={() => {
-              updateSupplyRequest(cancelId, { status: 'cancelled' });
-              setCancelId(null);
+            onConfirm={async () => {
+              const result = await cancelSupplyRequest(pendingId);
+              if (!result.ok) {
+                setCancelBlockedStatus(result.status ?? 'in_progress');
+              }
             }}
             title={copy.title}
             confirmLabel={copy.confirmLabel}
@@ -464,6 +474,33 @@ export function SupplyRequestsView({
           </ConfirmDialog>);
 
       })()}
+
+      {/* Cancel was blocked: the request's live status had moved past `submitted`
+          (e.g. another user started it). Local state was already reconciled, so
+          the stale Cancel control is gone — this just explains why. */}
+      {cancelBlockedStatus &&
+      <Modal
+        isOpen={true}
+        onClose={() => setCancelBlockedStatus(null)}
+        title="Request can no longer be cancelled"
+        footer={
+        <div className="flex justify-end">
+              <Button onClick={() => setCancelBlockedStatus(null)}>Got it</Button>
+            </div>
+        }>
+
+          <p className="text-sm text-text-secondary leading-relaxed">
+            {cancelBlockedStatus === 'cancelled' ?
+          'This request has already been cancelled.' :
+          cancelBlockedStatus === 'fulfilled' ?
+          'This request has already been fulfilled.' :
+          cancelBlockedStatus === 'denied' ?
+          'This request has already been denied.' :
+          'Someone has started working on this request, so it can no longer be cancelled.'}{' '}
+            The list has been updated with its current status.
+          </p>
+        </Modal>
+      }
 
       {removeCommonId &&
       <ConfirmDialog

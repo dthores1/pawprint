@@ -85,7 +85,7 @@ function formatDateRange(startISO: string, endISO: string) {
 
 // Subtabs mirror Transport: my active sits, the unclaimed pool, everything with
 // a sitter, and the terminal archive.
-type SittingTab = 'mine' | 'unclaimed' | 'assigned' | 'completed';
+type SittingTab = 'mine' | 'unclaimed' | 'myRequests' | 'completed';
 
 const DATE_OPTIONS = [
 { value: 'all', label: 'Any Date' },
@@ -194,7 +194,14 @@ export function SittingRequestsView({
       !isTerminal(s)
     ),
     unclaimed: sorted.filter((s) => !s.sitter_person_id && !isTerminal(s)),
-    assigned: sorted.filter((s) => !!s.sitter_person_id && !isTerminal(s)),
+    // "My Requests" = open requests I raised (regardless of who's sitting), so
+    // the requester can keep an eye on what they've asked for.
+    myRequests: sorted.filter(
+      (s) =>
+      !!currentPersonId &&
+      s.requested_by_person_id === currentPersonId &&
+      !isTerminal(s)
+    ),
     completed: sorted.filter(isTerminal)
   };
 
@@ -206,7 +213,7 @@ export function SittingRequestsView({
     focusRequestId,
     onFocusedRequest,
     resolveTab: (id) =>
-    (['mine', 'unclaimed', 'assigned', 'completed'] as SittingTab[]).find(
+    (['mine', 'unclaimed', 'myRequests', 'completed'] as SittingTab[]).find(
       (t) => buckets[t].some((s) => s.id === id)
     ) ?? null,
     setSelectedTab
@@ -242,11 +249,12 @@ export function SittingRequestsView({
   map((id) => ({ value: id, label: personName(id) })).
   sort((a, b) => a.label.localeCompare(b.label))];
 
-  // The Assignee filter only makes sense where requests can have a sitter:
+  // The Assignee filter only makes sense where requests can have varied sitters:
   // "Assigned to Me" is all me, "Unclaimed" has none — so show it only on
-  // "Assigned" and "Completed", and ignore it when bucketing.
+  // "My Requests" (others may have claimed them) and "Closed", and ignore it
+  // when bucketing.
   const showAssigneeFilter =
-  activeTab === 'assigned' || activeTab === 'completed';
+  activeTab === 'myRequests' || activeTab === 'completed';
   const filtersActive =
   requesterFilter !== 'all' ||
   showAssigneeFilter && assigneeFilter !== 'all' ||
@@ -282,14 +290,14 @@ export function SittingRequestsView({
         tabs={[
         { key: 'mine', label: `Assigned to Me (${buckets.mine.length})` },
         { key: 'unclaimed', label: `Unclaimed (${buckets.unclaimed.length})` },
-        { key: 'assigned', label: `Assigned (${buckets.assigned.length})` },
+        { key: 'myRequests', label: `My Requests (${buckets.myRequests.length})` },
         {
           key: 'completed',
-          // Count is unknown until the deferred history loads, so omit it
-          // until then rather than showing a misleading "(0)".
+          // "Closed" covers both completed and cancelled. Count is unknown until
+          // the deferred history loads, so omit it rather than show a "(0)".
           label: sittingHistoryLoaded ?
-          `Completed (${buckets.completed.length})` :
-          'Completed'
+          `Closed (${buckets.completed.length})` :
+          'Closed'
         }]} />
 
       <div className="flex flex-wrap items-center gap-2">
@@ -328,9 +336,9 @@ export function SittingRequestsView({
           'Nothing is assigned to you right now' :
           activeTab === 'unclaimed' ?
           'No coverage needed right now' :
-          activeTab === 'assigned' ?
-          'No active sitting assignments at the moment' :
-          'No completed sitting requests yet'}
+          activeTab === 'myRequests' ?
+          "You haven't raised any open sitting requests" :
+          'No closed sitting requests yet'}
           </p>
         </Card> :
 
@@ -340,6 +348,7 @@ export function SittingRequestsView({
         gap={12}
         estimateRowHeight={200}
         getKey={(s) => s.id}
+        pageScroll
         renderItem={(s) => {
           const requester = people.find(
             (p) => p.id === s.requested_by_person_id

@@ -31,7 +31,7 @@ const STATUS_COLORS: Record<SupplyRequestStatus, string> = {
 
 // Cap the visible rows so a pathologically long list can't make one card huge;
 // the rest are summarized and viewable in the detail modal (card click).
-const MAX_VISIBLE_ITEMS = 6;
+const MAX_VISIBLE_ITEMS = 3;
 
 interface Props {
   request: SupplyRequest;

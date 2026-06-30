@@ -133,7 +133,7 @@ export function LittersView() {
     return sortItems(filtered, getValue, sort.dir);
   }, [filtered, sort]);
 
-  const rows = useWindowRowVirtualizer(sorted.length, 60);
+  const rows = useWindowRowVirtualizer(sorted.length, 60, true);
 
   if (littersLoading && litters.length === 0) {
     return (
@@ -350,14 +350,14 @@ export function LittersView() {
         minColumnWidth={320}
         estimateRowHeight={240}
         gap={16}
-        renderItem={renderCard} /> :
+        renderItem={renderCard}
+        pageScroll /> :
 
 
       <Card className="overflow-hidden">
           <div
           ref={rows.scrollRef}
-          className="overflow-auto"
-          style={{ maxHeight: '70vh' }}>
+          className="overflow-x-auto overflow-y-hidden">
 
             <table className="w-full text-left border-collapse">
               <thead className="sticky top-0 z-10">

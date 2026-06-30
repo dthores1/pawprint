@@ -126,6 +126,9 @@ export function PersonSearchPicker({
         id={id}
         type="text"
         autoComplete="off"
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
         placeholder={placeholder}
         value={query}
         onChange={(e) => {

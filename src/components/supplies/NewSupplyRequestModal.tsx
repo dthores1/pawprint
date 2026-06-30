@@ -503,7 +503,7 @@ export function NewSupplyRequestModal({
                           <AlertTriangleIcon className="w-3.5 h-3.5 mt-px shrink-0 text-[#A36B00]" />
                           <span>
                             You already have an open request for{' '}
-                            <span className="font-semibold">{pname}</span>.
+                            <span className="font-semibold">{pname}</span>.  You can still submit another request if needed. &nbsp;
                             {onViewExisting &&
                             <>
                                 {' '}

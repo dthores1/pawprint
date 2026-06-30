@@ -41,6 +41,7 @@ import {
   Product,
   SupplyRequest,
   SupplyRequestItem,
+  SupplyRequestStatus,
   SupportTicket,
   NewSupportTicketInput,
   SupportAccessStatus,
@@ -543,6 +544,15 @@ export interface WhiskerContextType {
   req: Omit<SupplyRequest, 'id' | 'created_at' | 'updated_at'>)
   => Promise<string>;
   updateSupplyRequest: (id: string, updates: Partial<SupplyRequest>) => void;
+  /**
+   * Cancel a supply request, but only after re-reading its live status from the
+   * DB — guards against cancelling one another user has already moved off
+   * `submitted` (there's no realtime sync, so the local copy can be stale).
+   * On a stale hit it reconciles local state to the truth and reports back.
+   */
+  cancelSupplyRequest: (
+  id: string)
+  => Promise<{ ok: boolean; status?: SupplyRequestStatus }>;
   addSupplyRequestItem: (item: Omit<SupplyRequestItem, 'id'>) => void;
   // Transport requests
   transportRequests: TransportRequest[];
@@ -4023,6 +4033,36 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       }
     });
   };
+  const cancelSupplyRequest = async (
+  id: string)
+  : Promise<{ ok: boolean; status?: SupplyRequestStatus }> => {
+    // Re-read the live status: another user may have moved this off `submitted`
+    // since we loaded it, and there's no realtime sync to refresh us.
+    const { data, error } = await supabase.
+    from('supply_requests').
+    select('status').
+    eq('id', id).
+    maybeSingle();
+    if (error) {
+      console.error('[supply] cancel status check failed:', error.message);
+      return { ok: false };
+    }
+    const status = data?.status as SupplyRequestStatus | undefined;
+    if (status !== 'submitted') {
+      // Reconcile local state to the truth so the stale "Cancel" control clears.
+      if (status) {
+        setSupplyRequests((prev) =>
+        prev.map((sr) => sr.id === id ? { ...sr, status } : sr)
+        );
+      } else {
+        // Row is gone (deleted) — drop it locally.
+        setSupplyRequests((prev) => prev.filter((sr) => sr.id !== id));
+      }
+      return { ok: false, status };
+    }
+    updateSupplyRequest(id, { status: 'cancelled' });
+    return { ok: true };
+  };
   const addSupplyRequestItem = async (item: Omit<SupplyRequestItem, 'id'>) => {
     if (!orgId) return;
     const { data, error } = await supabase.
@@ -4802,6 +4842,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         reassignFoster,
         addSupplyRequest,
         updateSupplyRequest,
+        cancelSupplyRequest,
         addSupplyRequestItem,
         transportRequests,
         transportRequestAnimals,

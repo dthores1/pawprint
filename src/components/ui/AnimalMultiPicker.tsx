@@ -13,6 +13,11 @@ import {
   cn } from
 '../../lib/utils';
 import { useTypeaheadKeyboard } from '../../lib/useTypeaheadKeyboard';
+import { HISTORICAL_STATUSES } from '../../lib/animalStatus';
+
+// Historical lifecycle stages (adopted/released/deceased) are never valid
+// transport/sitting targets, so they're excluded from the search results.
+const HISTORICAL_SET = new Set(HISTORICAL_STATUSES);
 
 // Multi-select typeahead — used by the Sitting Request form when the
 // foster wants to scope coverage to specific animals.
@@ -53,6 +58,7 @@ export function AnimalMultiPicker({
     const picked = new Set(selectedIds);
     return universe.
     filter((a) => !picked.has(a.id)).
+    filter((a) => !HISTORICAL_SET.has(a.status)).
     filter((a) => {
       if (!q) return true;
       const hay = `${a.name ?? ''} ${a.rescue_id ?? ''} ${a.id}`.toLowerCase();
@@ -118,6 +124,9 @@ export function AnimalMultiPicker({
           id={id}
           type="text"
           autoComplete="off"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           placeholder={placeholder}
           value={query}
           onChange={(e) => {

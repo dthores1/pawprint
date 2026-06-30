@@ -1266,6 +1266,21 @@ export function DemoWhiskerProvider({
     s.id === id ? { ...s, ...updates, updated_at: now() } : s
     )
     ),
+    cancelSupplyRequest: async (id) => {
+      // In-memory mirror of the real status re-check (here local state IS the
+      // source of truth, so it just gates on the current status).
+      const current = supplyRequests.find((s) => s.id === id);
+      if (!current) return { ok: false };
+      if (current.status !== 'submitted') {
+        return { ok: false, status: current.status };
+      }
+      setSupplyRequests((prev) =>
+      prev.map((s) =>
+      s.id === id ? { ...s, status: 'cancelled', updated_at: now() } : s
+      )
+      );
+      return { ok: true };
+    },
     addSupplyRequestItem: (item) =>
     setSupplyRequestItems((prev) => [
     { ...item, id: `sri${generateId()}` },
