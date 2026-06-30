@@ -35,11 +35,17 @@ export function useWindowRowVirtualizer(
   // virtual rows land in the right place (pageScroll mode only).
   const [scrollMargin, setScrollMargin] = useState(0);
 
-  // Locate the page scroll container once mounted (pageScroll mode).
+  // Locate the page scroll container (pageScroll mode). Re-runs when `count`
+  // changes because this hook is called at the page level, but the <table> it
+  // scopes is only rendered once there are rows: on a direct URL load the rows
+  // arrive after mount, so `scrollRef` is null on the first pass. Without the
+  // `count` dep we'd cache that null and the virtualizer would render nothing
+  // until a remount (e.g. navigating away and back).
   useLayoutEffect(() => {
     if (!pageScroll) return;
-    setScrollEl(getScrollParent(scrollRef.current));
-  }, [pageScroll]);
+    const found = getScrollParent(scrollRef.current);
+    if (found) setScrollEl(found);
+  }, [pageScroll, count]);
 
   // Measure the table's offset within the page scroll content, re-measuring when
   // the scroller resizes or the content above the table changes height.
