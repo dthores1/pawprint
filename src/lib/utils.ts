@@ -58,14 +58,19 @@ export function calculateAge(birthDate: string): string {
   }
 }
 
-export function formatDate(dateString: string): string {
-  // Date-only strings (yyyy-MM-dd) must parse as LOCAL midnight — otherwise
-  // `new Date('2026-06-24')` is UTC midnight and renders as the previous day in
-  // negative-offset timezones. Full ISO timestamps parse as-is.
-  const d = /^\d{4}-\d{2}-\d{2}$/.test(dateString) ?
+// Date-only strings (yyyy-MM-dd) must parse as LOCAL midnight — otherwise
+// `new Date('2026-06-24')` is UTC midnight and renders as the previous day in
+// negative-offset timezones. Full ISO timestamps parse as-is. Use this anywhere
+// a stored date-only value (start_date, end_date, needed_by_date…) is turned
+// into a Date for display, so ranges don't drift a day earlier.
+export function parseLocalDate(dateString: string): Date {
+  return /^\d{4}-\d{2}-\d{2}$/.test(dateString) ?
   new Date(`${dateString}T00:00:00`) :
   new Date(dateString);
-  return d.toLocaleDateString('en-US', {
+}
+
+export function formatDate(dateString: string): string {
+  return parseLocalDate(dateString).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric'
@@ -79,10 +84,7 @@ export function formatDatesInText(text: string): string {
 
 /** Like formatDate but with the full month name, e.g. "June 11, 2026". */
 export function formatDateLong(dateString: string): string {
-  const d = /^\d{4}-\d{2}-\d{2}$/.test(dateString) ?
-  new Date(`${dateString}T00:00:00`) :
-  new Date(dateString);
-  return d.toLocaleDateString('en-US', {
+  return parseLocalDate(dateString).toLocaleDateString('en-US', {
     month: 'long',
     day: 'numeric',
     year: 'numeric'

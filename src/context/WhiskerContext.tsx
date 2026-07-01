@@ -351,6 +351,12 @@ export interface WhiskerContextType {
   supplyRequests: SupplyRequest[];
   supplyRequestItems: SupplyRequestItem[];
   supplyHistoryLoaded: boolean;
+  /**
+   * True while the initial coordination load (supply/transport/sitting requests)
+   * is in flight, so the Requests views can show skeletons instead of flashing
+   * an empty state before the data arrives.
+   */
+  requestsLoading: boolean;
   /** Pull closed supply requests (+ items) into state; call when the History tab opens. */
   ensureSupplyHistoryLoaded: () => Promise<void>;
   /**
@@ -1481,6 +1487,9 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   // load fetches only operational statuses; these flags gate the on-demand
   // ensure*HistoryLoaded() merges (fired when a Completed/History tab opens).
   const [supplyHistoryLoaded, setSupplyHistoryLoaded] = useState(false);
+  // Starts true so the Requests views render skeletons on first paint rather
+  // than an empty state; cleared once the initial coordination load resolves.
+  const [requestsLoading, setRequestsLoading] = useState(true);
   const [transportHistoryLoaded, setTransportHistoryLoaded] = useState(false);
   const [sittingHistoryLoaded, setSittingHistoryLoaded] = useState(false);
   const [clinicEvents, setClinicEvents] = useState<ClinicEvent[]>([]);
@@ -1531,8 +1540,10 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       setSites([]);
       setSiteNotes([]);
       setSiteVolunteers([]);
+      setRequestsLoading(false);
       return;
     }
+    setRequestsLoading(true);
     // A fresh coordination load re-defers the closed/terminal request history
     // (re-fetched on demand by ensure*HistoryLoaded), mirroring how loadAnimals
     // resets historicalLoaded. The supply/transport/sitting requests (and their
@@ -1716,6 +1727,8 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       setSittingRequestPlacements(placements.data.map(rowToSittingPlacement));
     })()]
     );
+    // The request collections are now in state — drop the skeletons.
+    setRequestsLoading(false);
     // currentUserLite is a fresh object each render (used only to label site
     // note authors); including it would re-create loadCoordination every render.
     // canViewSupplyFinancials is included so supply reloads (with/without
@@ -4792,6 +4805,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         supplyRequests,
         supplyRequestItems,
         supplyHistoryLoaded,
+        requestsLoading,
         ensureSupplyHistoryLoaded,
         supportTickets,
         supportTicketsLoaded,

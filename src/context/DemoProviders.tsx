@@ -547,6 +547,8 @@ export function DemoWhiskerProvider({
     // Demo holds every request in memory, so closed history is already present —
     // the *HistoryLoaded flags are pre-true and the ensure* helpers are no-ops.
     supplyHistoryLoaded: true,
+    // Demo data is synchronous, so requests are never in a loading state.
+    requestsLoading: false,
     ensureSupplyHistoryLoaded: async () => {},
     // Support tickets aren't part of the demo dataset — no-op surface so the
     // Support page renders an empty "no requests yet" state.

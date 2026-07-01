@@ -10,6 +10,7 @@ import { Modal } from '../ui/Modal';
 import { cancelRequestConfirm } from '../../lib/requestCopy';
 import { SupplyRequestDetailModal } from '../supplies/SupplyRequestDetailModal';
 import { SupplyRequestCard } from './SupplyRequestCard';
+import { RequestsSkeleton } from './RequestsSkeleton';
 import {
   PackageOpenIcon,
   RepeatIcon,
@@ -94,7 +95,8 @@ export function SupplyRequestsView({
     updateSupplyRequest,
     cancelSupplyRequest,
     supplyHistoryLoaded,
-    ensureSupplyHistoryLoaded
+    ensureSupplyHistoryLoaded,
+    requestsLoading
   } = useWhisker();
   const { currentPersonId } = useAuth();
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(
@@ -347,7 +349,9 @@ export function SupplyRequestsView({
         </div>
       }
 
-      {activeTab === 'common' ?
+      {requestsLoading && supplyRequests.length === 0 ?
+      <RequestsSkeleton /> :
+      activeTab === 'common' ?
       myCommonRequests.length === 0 ?
       <Card className="p-12 text-center">
           <BookmarkIcon className="w-12 h-12 text-border mx-auto mb-4" />

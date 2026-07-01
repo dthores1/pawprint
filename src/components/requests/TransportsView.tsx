@@ -41,6 +41,7 @@ import {
 '../../lib/transportTiming';
 import { isResolvedAddress } from '../../lib/address';
 import { ArchiveConfirmDialog } from '../archive/ArchiveConfirmDialog';
+import { RequestsSkeleton } from './RequestsSkeleton';
 import { useCanArchive } from '../archive/useCanArchive';
 
 const TRANSPORT_ARCHIVABLE: TransportRequestStatus[] = ['completed', 'cancelled'];
@@ -245,7 +246,8 @@ export function TransportsView({
     completeTransportRequest,
     updateTransportRequest,
     transportHistoryLoaded,
-    ensureTransportHistoryLoaded
+    ensureTransportHistoryLoaded,
+    requestsLoading
   } = useWhisker();
   const { currentPersonId } = useAuth();
   const isAdmin = useIsAdmin();
@@ -416,7 +418,9 @@ export function TransportsView({
 
       </div>
 
-      {activeTab === 'completed' && !transportHistoryLoaded ?
+      {requestsLoading && transportRequests.length === 0 ?
+      <RequestsSkeleton /> :
+      activeTab === 'completed' && !transportHistoryLoaded ?
       <Card className="p-10 text-center text-text-secondary">
           <p>Loading history…</p>
         </Card> :

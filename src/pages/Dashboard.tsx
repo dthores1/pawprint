@@ -24,7 +24,8 @@ import {
   formatDate,
   formatDatesInText,
   getGreeting,
-  animalDisplayName } from
+  animalDisplayName,
+  parseLocalDate } from
 '../lib/utils';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -697,8 +698,8 @@ export function Dashboard() {
                   `${lead.name} + ${moreCount} more` :
                   lead.name :
                   'Unknown';
-                  const start = new Date(s.start_date);
-                  const end = new Date(s.end_date);
+                  const start = parseLocalDate(s.start_date);
+                  const end = parseLocalDate(s.end_date);
                   const sameYear = start.getFullYear() === end.getFullYear();
                   const startStr = start.toLocaleString('en-US', {
                     month: 'short',

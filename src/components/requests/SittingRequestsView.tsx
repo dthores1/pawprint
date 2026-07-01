@@ -23,7 +23,7 @@ import {
   AlertTriangleIcon,
   ArrowUpRightIcon } from
 'lucide-react';
-import { cn, animalDisplayName } from '../../lib/utils';
+import { cn, animalDisplayName, parseLocalDate } from '../../lib/utils';
 import { useFocusRequest } from '../../lib/useFocusRequest';
 import { cancelRequestConfirm } from '../../lib/requestCopy';
 import { useAuth } from '../../context/AuthContext';
@@ -35,6 +35,7 @@ import {
 '../../lib/sittingTiming';
 import { ArchiveConfirmDialog } from '../archive/ArchiveConfirmDialog';
 import { useCanArchive } from '../archive/useCanArchive';
+import { RequestsSkeleton } from './RequestsSkeleton';
 
 // Only truly-finished requests are archivable (you complete/cancel a past-due
 // one first). `expired` is NOT terminal — a past-due sit stays live + actionable
@@ -65,8 +66,8 @@ const STATUS_PILL: Record<SittingRequestStatus, string> = {
 };
 
 function formatDateRange(startISO: string, endISO: string) {
-  const start = new Date(startISO);
-  const end = endISO ? new Date(endISO) : undefined;
+  const start = parseLocalDate(startISO);
+  const end = endISO ? parseLocalDate(endISO) : undefined;
   const sameYear = end && start.getFullYear() === end.getFullYear();
 
   const startStr = start.toLocaleString('en-US', {
@@ -103,11 +104,6 @@ function startOfWeekSunday(d: Date): Date {
   const s = startOfDay(d);
   s.setDate(s.getDate() - s.getDay());
   return s;
-}
-// Parse a 'yyyy-MM-dd' (or ISO) date string at LOCAL midnight, so date-only
-// values don't shift a day in US timezones.
-function parseLocalDate(s: string): Date {
-  return new Date(`${s.slice(0, 10)}T00:00:00`);
 }
 // A sitting request covers a date RANGE, so date filters match by window overlap
 // (Past Due = the whole window has elapsed).
@@ -157,7 +153,8 @@ export function SittingRequestsView({
     completeSittingRequest,
     updateSittingRequest,
     sittingHistoryLoaded,
-    ensureSittingHistoryLoaded
+    ensureSittingHistoryLoaded,
+    requestsLoading
   } = useWhisker();
   const { currentPersonId } = useAuth();
   const isAdmin = useIsAdmin();
@@ -322,7 +319,9 @@ export function SittingRequestsView({
 
       </div>
 
-      {activeTab === 'completed' && !sittingHistoryLoaded ?
+      {requestsLoading && sittingRequests.length === 0 ?
+      <RequestsSkeleton /> :
+      activeTab === 'completed' && !sittingHistoryLoaded ?
       <Card className="p-10 text-center text-text-secondary">
           <p>Loading history…</p>
         </Card> :
