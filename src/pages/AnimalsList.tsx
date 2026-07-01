@@ -346,8 +346,11 @@ export function AnimalsList() {
       !flagFilters.includes('my_animals') ||
       currentPersonId != null &&
       fosterByAnimal.get(animal.id)?.id === currentPersonId;
-      // Special conditions — match ALL selected.
-      const matchesConditions = specialConditions.every((c) => {
+      // Special conditions — match ANY selected (OR). These are independent
+      // labels, so checking two means "show animals with either", not both.
+      const matchesConditions =
+      specialConditions.length === 0 ||
+      specialConditions.some((c) => {
         switch (c) {
           case 'on_hold':
             return !!animal.is_on_hold;
@@ -356,18 +359,19 @@ export function AnimalsList() {
           case 'medical':
             return !!animal.has_medical_concern;
           default:
-            return true;
+            return false;
         }
       });
       // Age group — match ANY selected (groups are mutually exclusive).
       const matchesAge =
       ageGroups.length === 0 ||
       ageGroups.includes(ageGroupOf(animal.estimated_birth_date) ?? '');
-      // Match ALL selected traits.
+      // Match ANY selected trait (OR) — traits are independent labels, so
+      // checking two means "has either", not "has both".
       const animalTraitSet = traitIdsByAnimal.get(animal.id);
       const matchesTraits =
       traitFilter.length === 0 ||
-      traitFilter.every((tid) => animalTraitSet?.has(tid));
+      traitFilter.some((tid) => animalTraitSet?.has(tid));
       return (
         matchesSearch &&
         matchesInCare &&
@@ -520,8 +524,13 @@ export function AnimalsList() {
     setAgeGroups([]);
   };
   // Only worth showing when the org accepts multiple species AND the results
-  // actually span more than one species.
-  const showSpeciesFilter = enabledSpecies.length > 1 && distinctSpeciesInPool > 1;
+  // actually span more than one species — EXCEPT keep it visible whenever a
+  // species is already selected, otherwise narrowing the pool (e.g. adding a
+  // Trait filter that leaves one species) would strand the active filter with no
+  // way to see or change it beyond the chip.
+  const showSpeciesFilter =
+  enabledSpecies.length > 1 && (
+  distinctSpeciesInPool > 1 || speciesFilter.length > 0);
   const showTraitFilter = traitOptions.length > 0;
   // Count of active filter selections — shown on the mobile "Filters" toggle so
   // a collapsed panel still signals that filters are applied.

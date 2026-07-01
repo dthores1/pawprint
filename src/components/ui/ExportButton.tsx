@@ -75,7 +75,17 @@ export function ExportButton<T>({
     setScope('current');
   };
 
+  // When the current view already shows every org row (e.g. historical toggle on,
+  // no filters), the two options are identical — collapse to a single confirm and
+  // export `current`, which by definition holds the full set.
+  const currentIsAll = allCount > 0 && current.length === allCount;
+
   const handleExport = () => {
+    if (currentIsAll) {
+      downloadCsv(`${filenameBase}-all`, columns, current);
+      close();
+      return;
+    }
     if (scope === 'current') {
       downloadCsv(`${filenameBase}-current-view`, columns, current);
       close();
@@ -91,7 +101,11 @@ export function ExportButton<T>({
     }
   };
 
-  const noData = scope === 'current' ? current.length === 0 : allCount === 0;
+  const noData = currentIsAll ?
+  current.length === 0 :
+  scope === 'current' ?
+  current.length === 0 :
+  allCount === 0;
 
   return (
     <>
@@ -119,23 +133,31 @@ export function ExportButton<T>({
           </div>
         }>
 
-        <p className="text-sm text-text-secondary mb-3">
-          What do you want to export?
-        </p>
-        <div className="space-y-2">
-          <ScopeOption
-            selected={scope === 'current'}
-            onSelect={() => setScope('current')}
-            title="Current view"
-            description={`${current.length} ${noun} matching your current filters`} />
+        {currentIsAll ?
+        <p className="text-sm text-text-secondary">
+            This will export all {allCount} {noun} in your organization.
+          </p> :
 
-          <ScopeOption
-            selected={scope === 'all'}
-            onSelect={() => setScope('all')}
-            title={`All ${noun}`}
-            description={`${allCount} ${noun} in this organization`} />
+        <>
+            <p className="text-sm text-text-secondary mb-3">
+              What do you want to export?
+            </p>
+            <div className="space-y-2">
+              <ScopeOption
+              selected={scope === 'current'}
+              onSelect={() => setScope('current')}
+              title="Current view"
+              description={`${current.length} ${noun} matching your current filters`} />
 
-        </div>
+              <ScopeOption
+              selected={scope === 'all'}
+              onSelect={() => setScope('all')}
+              title={`All ${noun}`}
+              description={`${allCount} ${noun} in this organization`} />
+
+            </div>
+          </>
+        }
       </Modal>
     </>);
 

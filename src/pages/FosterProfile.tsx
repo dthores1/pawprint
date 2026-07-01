@@ -354,15 +354,24 @@ export function FosterProfile() {
                             
                               {animalDisplayName(animal)}
                             </Link>
+
                             <p className="text-sm text-text-secondary">
                               {new Date(
                               placement.start_date
-                            ).toLocaleDateString()}{' '}
+                            ).toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric'
+                              })}{' '}
                               -{' '}
                               {placement.end_date ?
                             new Date(
                               placement.end_date
-                            ).toLocaleDateString() :
+                            ).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric'
+                            }) :
                             'Unknown'}
                             </p>
                           </div>
