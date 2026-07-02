@@ -7,6 +7,14 @@ import { Person, PersonRole } from '../../types';
 import { cn } from '../../lib/utils';
 import { useTypeaheadKeyboard } from '../../lib/useTypeaheadKeyboard';
 
+// Support accounts (e.g. support@whiskerville.app) are added to an org's people
+// only so Whiskerville support can access it — they aren't real org contacts, so
+// they should never be offered in a contact picker. They're identified by the
+// vendor email domain, which no genuine rescue contact would use.
+function isSupportContact(p: Person): boolean {
+  return (p.email ?? '').toLowerCase().endsWith('@whiskerville.app');
+}
+
 // Single-select typeahead for picking a Person. Optionally filter to a role
 // (e.g. vets only for the clinic form). Mirrors AnimalSearchPicker.
 interface Props {
@@ -48,6 +56,7 @@ export function PersonSearchPicker({
     const excluded = new Set(excludeIds);
     return people.
     filter((p) => !excluded.has(p.id)).
+    filter((p) => !isSupportContact(p)).
     filter((p) => (role ? p.roles.includes(role) : true)).
     filter((p) => p.active).
     filter((p) => {

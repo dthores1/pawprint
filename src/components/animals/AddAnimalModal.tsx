@@ -163,6 +163,14 @@ export function AddAnimalModal({
     if (isOpen) {
       setMode(initialMode);
       setSiteId(initialSiteId ?? '');
+      // Launched from a Rescue Site → default the intake source to match (unless
+      // the user has already typed something).
+      if (initialSiteId) {
+        setFormData((prev) => ({
+          ...prev,
+          intake_source: prev.intake_source || 'Rescue Site'
+        }));
+      }
     }
   }, [isOpen, initialMode, initialSiteId]);
   const handleClose = () => {

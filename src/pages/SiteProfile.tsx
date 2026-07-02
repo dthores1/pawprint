@@ -24,6 +24,7 @@ import {
   LogOutIcon,
   CheckIcon,
   NavigationIcon,
+  StickyNoteIcon,
   PawPrintIcon } from
 'lucide-react';
 import { cn, animalDisplayName, formatDateLong } from '../lib/utils';
@@ -54,6 +55,8 @@ export function SiteProfile() {
   const [addAnimalMode, setAddAnimalMode] = useState<null | 'single' | 'litter'>(null);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [noteBody, setNoteBody] = useState('');
+  // The note composer is hidden until "+ Note" is clicked (matches Animal/Litter).
+  const [isAddingNote, setIsAddingNote] = useState(false);
 
   const site = sites.find((s) => s.id === id);
 
@@ -120,6 +123,7 @@ export function SiteProfile() {
     if (!noteBody.trim()) return;
     addSiteNote({ site_id: site.id, body: noteBody.trim() });
     setNoteBody('');
+    setIsAddingNote(false);
   };
 
   const handleDelete = async () => {
@@ -354,24 +358,54 @@ export function SiteProfile() {
 
           {/* Notes */}
           <Card className="p-5 space-y-4">
-            <h2 className="font-heading font-bold text-text-primary">Notes</h2>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-heading font-bold text-text-primary">Notes</h2>
+              {!isAddingNote &&
+              <Button
+                size="sm"
+                variant="soft"
+                className="gap-1.5"
+                onClick={() => setIsAddingNote(true)}>
+                  <PlusIcon className="w-4 h-4" /> Note
+                </Button>
+              }
+            </div>
+            {isAddingNote &&
             <div className="space-y-2">
-              <Textarea
+                <Textarea
                 value={noteBody}
                 onChange={(e) => setNoteBody(e.target.value)}
                 placeholder="Add a note about this site…"
-                rows={2} />
-              <div className="flex justify-end">
-                <Button
+                rows={2}
+                autoFocus />
+
+                <div className="flex justify-end gap-2">
+                  <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setIsAddingNote(false);
+                    setNoteBody('');
+                  }}>
+                    Cancel
+                  </Button>
+                  <Button
                   size="sm"
                   onClick={handleAddNote}
                   disabled={!noteBody.trim()}>
-                  Add Note
-                </Button>
+                    Add Note
+                  </Button>
+                </div>
               </div>
-            </div>
+            }
             {siteNotesForSite.length === 0 ?
-            <p className="text-sm text-text-secondary">No notes yet.</p> :
+            <div className="py-8 text-center text-text-secondary">
+                <StickyNoteIcon className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                <p className="text-sm">No notes yet.</p>
+                <p className="text-xs mt-1">
+                  Add the first note to keep the team in the loop about this site.
+                </p>
+              </div> :
 
             <ul className="divide-y divide-border">
                 {siteNotesForSite.map((n) =>
@@ -401,6 +435,7 @@ export function SiteProfile() {
               latitude={site.address?.latitude}
               longitude={site.address?.longitude}
               label={site.name}
+              address={site.address}
               className="h-72" />
           </Card>
 
