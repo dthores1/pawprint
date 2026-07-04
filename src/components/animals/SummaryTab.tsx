@@ -19,6 +19,9 @@ interface SummaryTabProps {
   /** Whether the viewer may generate/edit/regenerate the summary (MANAGE_ANIMALS,
    *  admin, or the active foster). When false the tab is read-only. Defaults to true. */
   canManage?: boolean;
+  /** Reframe the copy as a "Case Summary" for a released/deceased animal (the
+   *  summary is still useful as historical/handoff context). */
+  caseMode?: boolean;
   /** Counts that drive the "Summary Inputs" data-quality card. */
   traitCount: number;
   noteCount: number;
@@ -86,11 +89,15 @@ function SummaryInputsCard({
 export function SummaryTab({
   animalId,
   canManage = true,
+  caseMode = false,
   traitCount,
   noteCount,
   medicalCount,
   fosterNoteCount
 }: SummaryTabProps) {
+  // Status-aware wording: "Case Summary" for released/deceased, else "Summary".
+  const label = caseMode ? 'Case Summary' : 'Summary';
+  const lowerLabel = caseMode ? 'case summary' : 'summary';
   const {
     aiContent,
     generateAiSummary,
@@ -153,7 +160,7 @@ export function SummaryTab({
       <Card className="p-8 text-center">
         <SparklesIcon className="w-8 h-8 mx-auto mb-3 text-text-secondary opacity-40" />
         <p className="font-medium text-text-primary mb-1">
-          No summary has been generated yet.
+          No {lowerLabel} has been generated yet.
         </p>
         <p className="text-sm text-text-secondary">
           A coordinator or this animal's foster can generate one.
@@ -171,7 +178,7 @@ export function SummaryTab({
             <SparklesIcon className="w-6 h-6" />
           </div>
           <h3 className="text-lg font-heading font-bold text-text-primary mb-2">
-            No summary has been generated yet.
+            No {lowerLabel} has been generated yet.
           </h3>
           <p className="text-sm text-text-secondary leading-relaxed mb-1">
             AI summaries are based on personality traits, notes, medical records,
@@ -219,7 +226,7 @@ export function SummaryTab({
               </> :
 
             <>
-                <SparklesIcon className="w-4 h-4 mr-2" /> Generate Summary
+                <SparklesIcon className="w-4 h-4 mr-2" /> Generate {label}
               </>
             }
           </Button>
@@ -241,7 +248,7 @@ export function SummaryTab({
         <div className="flex items-center gap-2">
           <SparklesIcon className="w-5 h-5 text-primary" />
           <h3 className="text-lg font-heading font-bold text-text-primary">
-            Summary
+            {label}
           </h3>
           {summary.user_edited &&
           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#F8E7C8] text-[#A36B00]">
@@ -357,12 +364,12 @@ export function SummaryTab({
         setConfirmRegen(false);
         runGenerate();
       }}
-      title="Regenerate summary?"
+      title={`Regenerate ${lowerLabel}?`}
       confirmLabel="Regenerate"
       cancelLabel="Keep mine"
       tone="danger">
 
-        Regenerating will replace your edited summary with a fresh AI version.
+        Regenerating will replace your edited {lowerLabel} with a fresh AI version.
       </ConfirmDialog>
     }
     </>);

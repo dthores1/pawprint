@@ -36,7 +36,11 @@ const WRITABLE_COLUMNS = [
 'has_behavior_concern',
 'has_medical_concern',
 'adopted_by_id',
-'adopted_at'] as
+'adopted_at',
+'released_at',
+'date_of_death',
+'cause_of_death',
+'death_notes'] as
 const;
 
 // uuid columns referencing people; skip non-uuid values (e.g. seed ids).
@@ -47,7 +51,9 @@ const DATE_COLUMNS = new Set([
 'estimated_birth_date',
 'estimated_age_as_of',
 'intake_date',
-'adopted_at']
+'adopted_at',
+'released_at',
+'date_of_death']
 );
 
 // Keep the age-estimate columns consistent with birthdate_source: they're only
@@ -96,6 +102,10 @@ export function rowToAnimal(r: any): Animal {
     has_medical_concern: r.has_medical_concern ?? false,
     adopted_by_id: r.adopted_by_id ?? undefined,
     adopted_at: r.adopted_at ?? undefined,
+    released_at: r.released_at ?? undefined,
+    date_of_death: r.date_of_death ?? undefined,
+    cause_of_death: r.cause_of_death ?? undefined,
+    death_notes: r.death_notes ?? undefined,
     internal_notes: r.internal_notes ?? undefined,
     birthdate_source: r.birthdate_source ?? 'estimated_birthdate',
     estimated_age_value: r.estimated_age_value ?? undefined,

@@ -53,6 +53,7 @@ import {
   CheckIcon,
   SparklesIcon,
   MegaphoneIcon,
+  CalendarIcon,
   FolderIcon } from
 'lucide-react';
 import { format } from 'date-fns';
@@ -63,6 +64,7 @@ import { MedicalKitIcon } from '../components/ui/MedicalKitIcon';
 import { PawPrintIcon as PawPrintGlyph } from '../components/ui/PawPrintIcon';
 import { animalBreedLabel } from '../lib/breedsApi';
 import { litterLabel } from '../lib/litters';
+import { isInCare } from '../lib/animalStatus';
 import { PROCEDURE_TYPE_LABELS } from '../lib/medicalOptions';
 import { speciesIconByName } from '../lib/speciesIcons';
 import {
@@ -78,6 +80,43 @@ import {
   useIsActiveFosterOf } from
 '../lib/useAnimalPermissions';
 import { RequestReassignmentModal } from '../components/animals/RequestReassignmentModal';
+
+// A done/pending checklist row, shared by the outcome summary cards below.
+function SummaryCheckRow({ done, label }: { done: boolean; label: string }) {
+  return (
+    <div className="flex items-start gap-3">
+      {done ?
+      <CheckCircle2Icon className="w-5 h-5 text-[#3E7B52] shrink-0" /> :
+      <PawPrintGlyph className="w-5 h-5 text-border shrink-0" />}
+      <span className={done ? 'text-text-primary' : 'text-text-secondary'}>
+        {label}
+      </span>
+    </div>);
+
+}
+
+// An icon + label + value row for the outcome summaries (e.g. "Adopted — Jun 4").
+function SummaryValueRow({
+  icon,
+  label,
+  value
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="text-text-secondary shrink-0 mt-0.5">{icon}</span>
+      <div className="min-w-0">
+        <p className="text-xs uppercase tracking-wide text-text-secondary">
+          {label}
+        </p>
+        <p className="text-text-primary">{value}</p>
+      </div>
+    </div>);
+
+}
 
 export function AnimalProfile() {
   const { id } = useParams<{
@@ -221,6 +260,14 @@ export function AnimalProfile() {
   fosters.find((f) => f.id === activePlacement.person_id) :
   null;
   const isAdopted = animal.status === 'adopted';
+  // Foster placement only applies to animals still in care — hide the placement
+  // controls once an animal is adopted, released, or deceased.
+  const inCare = isInCare(animal.status);
+  // Released/deceased are terminal cases: the AI Summary is reframed as a "Case
+  // Summary" (still useful history), and the adoption-marketing profile is hidden.
+  const isTerminalCase =
+  animal.status === 'released' || animal.status === 'deceased';
+  const canHaveAdoptionProfile = !isTerminalCase;
   const adopter = animal.adopted_by_id ?
   people.find((p) => p.id === animal.adopted_by_id) :
   null;
@@ -697,7 +744,7 @@ export function AnimalProfile() {
                       Start Adoption
                     </Button>
                   }
-                  {canManageFosters && !isAdopted &&
+                  {canManageFosters && inCare &&
                   <Button
                     variant={
                     animal.status === 'adoptable' ? 'outline' : 'primary'
@@ -711,7 +758,7 @@ export function AnimalProfile() {
                   }
                   {/* The assigned foster can't reassign themselves — they ask a
                       coordinator to find a new placement. */}
-                  {fosterOnly && !isAdopted &&
+                  {fosterOnly && inCare &&
                   <Button
                     variant="outline"
                     size="sm"
@@ -1010,6 +1057,9 @@ export function AnimalProfile() {
                   </span>
                 }
               </button>
+              {/* Adoption marketing copy is only meaningful pre-adoption —
+                  hidden entirely for released/deceased animals. */}
+              {canHaveAdoptionProfile &&
               <button
                 data-tabkey="adoption"
                 onClick={() => setActiveTab('adoption')}
@@ -1017,6 +1067,7 @@ export function AnimalProfile() {
 
                 <MegaphoneIcon className="w-4 h-4" /> Adoption Profile
               </button>
+              }
               </div>
             </ScrollableTabs>
 
@@ -1052,6 +1103,7 @@ export function AnimalProfile() {
           <SummaryTab
             animalId={animal.id}
             canManage={canCollaborate}
+            caseMode={isTerminalCase}
             traitCount={animalTraitList.length}
             noteCount={animalNotes.length}
             medicalCount={animalMedical.length}
@@ -1224,7 +1276,8 @@ export function AnimalProfile() {
             onAddOpenChange={setIsAddFileOpen} />
           }
 
-          {activeTab === 'adoption' &&
+          {activeTab === 'adoption' && (
+          canHaveAdoptionProfile ?
           <AdoptionProfileTab
             animalId={animal.id}
             canManage={canCollaborate}
@@ -1233,14 +1286,29 @@ export function AnimalProfile() {
             fosterUpdateCount={
             animalNotes.filter((n) => n.note_type === 'foster_update').length
             }
-            medicalCount={animalMedical.length} />
+            medicalCount={animalMedical.length} /> :
+
+          // Reachable only if the tab was open when the status changed — the tab
+          // is otherwise hidden. Explain rather than showing invalid marketing copy.
+          <Card className="p-8 text-center">
+              <MegaphoneIcon className="w-8 h-8 mx-auto mb-3 text-text-secondary opacity-40" />
+              <p className="font-medium text-text-primary mb-1">
+                Adoption Profile unavailable
+              </p>
+              <p className="text-sm text-text-secondary max-w-md mx-auto">
+                Adoption profiles can only be generated for animals currently
+                being prepared for adoption.
+              </p>
+            </Card>)
           }
           </div>
         </div>
 
         {/* Right Column: Sidebar Widgets */}
         <div className="space-y-6">
-          {/* Adoption Readiness */}
+          {/* Right-sidebar outcome card — Adoption Readiness while in care, then
+              a status-specific summary once the animal reaches a final outcome. */}
+          {inCare &&
           <Card className="p-6">
             <h3 className="text-lg font-heading font-bold mb-4">
               Adoption Readiness
@@ -1319,6 +1387,93 @@ export function AnimalProfile() {
                 </Button>
             }
           </Card>
+          }
+
+          {/* Adopted → Adoption Summary (no CTA). */}
+          {animal.status === 'adopted' &&
+          <Card className="p-6">
+              <h3 className="text-lg font-heading font-bold mb-4">
+                Adoption Summary
+              </h3>
+              <div className="space-y-3">
+                {adopter &&
+              <SummaryValueRow
+                icon={<HeartIcon className="w-5 h-5" />}
+                label="Adopter"
+                value={`${adopter.first_name} ${adopter.last_name}`.trim()} />
+              }
+                {animal.adopted_at &&
+              <SummaryValueRow
+                icon={<CalendarIcon className="w-5 h-5" />}
+                label="Adopted"
+                value={formatDate(animal.adopted_at)} />
+              }
+                <div className="pt-3 border-t border-border space-y-3">
+                  {checklist.map((item, i) =>
+                <SummaryCheckRow key={i} done={item.done} label={item.label} />
+                )}
+                </div>
+              </div>
+            </Card>
+          }
+
+          {/* Released → Release Summary (no CTA). */}
+          {animal.status === 'released' &&
+          <Card className="p-6">
+              <h3 className="text-lg font-heading font-bold mb-4">
+                Release Summary
+              </h3>
+              <div className="space-y-3">
+                {checklist.map((item, i) =>
+              <SummaryCheckRow key={i} done={item.done} label={item.label} />
+              )}
+                <div className="pt-3 border-t border-border">
+                  <SummaryValueRow
+                  icon={<CalendarIcon className="w-5 h-5" />}
+                  label="Released"
+                  value={
+                  animal.released_at ?
+                  formatDate(animal.released_at) :
+                  'Date not recorded'
+                  } />
+                </div>
+              </div>
+            </Card>
+          }
+
+          {/* Deceased → Case Summary (no CTA). */}
+          {animal.status === 'deceased' &&
+          <Card className="p-6">
+              <h3 className="text-lg font-heading font-bold mb-4">Case Summary</h3>
+              <div className="space-y-3">
+                <SummaryValueRow
+                icon={<CalendarIcon className="w-5 h-5" />}
+                label="Date of death"
+                value={
+                animal.date_of_death ?
+                formatDate(animal.date_of_death) :
+                'Not recorded'
+                } />
+                {animal.cause_of_death?.trim() &&
+              <SummaryValueRow
+                icon={<FileTextIcon className="w-5 h-5" />}
+                label="Cause of death"
+                value={animal.cause_of_death} />
+              }
+                <div className="pt-3 border-t border-border space-y-3">
+                  <SummaryCheckRow
+                  done={animalMedical.some((m) => m.procedure_type === 'necropsy')}
+                  label="Necropsy performed" />
+
+                  <SummaryCheckRow done={hasMicrochip} label="Microchipped" />
+                  <SummaryCheckRow
+                  done={animalMedical.length > 0}
+                  label="Medical records on file" />
+
+                </div>
+              </div>
+            </Card>
+          }
 
           {/* External adoption listings (Petfinder, the org's site, social…) */}
           <ExternalListingsCard animalId={animal.id} canManage={canManageListings} />

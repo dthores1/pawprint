@@ -26,6 +26,7 @@ export const PROCEDURE_TYPE_LABELS: Record<ProcedureType, string> = {
   surgery: 'Surgery',
   diagnostic_test: 'Diagnostic Test',
   medication: 'Medication',
+  necropsy: 'Necropsy',
   other: 'Other'
 };
 
@@ -81,6 +82,8 @@ export const PROCEDURE_LABELS: Record<Procedure, string> = {
   wound_repair: 'Wound Repair',
   eye_surgery: 'Eye Surgery',
   orthopedic_surgery: 'Orthopedic Surgery',
+  // necropsy
+  necropsy: 'Necropsy',
   // catch-all
   other: 'Other'
 };
@@ -145,6 +148,9 @@ const PROCEDURE_OPTIONS_BY_TYPE: Partial<Record<ProcedureType, Option<Procedure>
     opt('sedative'),
     opt('other')
   ],
+  // Single option → auto-selected, so the type behaves as "just Necropsy" and
+  // the standard record fields (date, vet/clinic, notes, attachments) apply.
+  necropsy: [opt('necropsy')],
   other: [opt('other')]
 };
 

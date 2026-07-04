@@ -138,6 +138,12 @@ export interface Animal {
   adopted_by_id?: string;
   /** Timestamp the adoption was finalized. */
   adopted_at?: string;
+  /** Release date (yyyy-MM-dd), set when status → released. */
+  released_at?: string;
+  /** Deceased-outcome details, set when status → deceased. */
+  date_of_death?: string;
+  cause_of_death?: string;
+  death_notes?: string;
   /** Staff-only notes, separate from the public-facing `description` blurb. */
   internal_notes?: string;
   created_at: string;
@@ -442,6 +448,7 @@ export type ProcedureType =
 'surgery' |
 'diagnostic_test' |
 'medication' |
+'necropsy' |
 'other';
 
 /**
@@ -469,6 +476,8 @@ export type Procedure =
 // surgery
 'dental_surgery' | 'mass_removal' | 'wound_repair' |
 'eye_surgery' | 'orthopedic_surgery' |
+// necropsy (post-mortem exam)
+'necropsy' |
 // catch-all
 'other';
 

@@ -102,6 +102,11 @@ export function ChangeStatusModal({
   const [photoUrl, setPhotoUrl] = useState('');
   const [microchipNumber, setMicrochipNumber] = useState('');
   const [description, setDescription] = useState('');
+  // Terminal-outcome details, shown when the status is Released / Deceased.
+  const [releasedAt, setReleasedAt] = useState('');
+  const [dateOfDeath, setDateOfDeath] = useState('');
+  const [causeOfDeath, setCauseOfDeath] = useState('');
+  const [deathNotes, setDeathNotes] = useState('');
   const [intakeDateError, setIntakeDateError] = useState<string | undefined>();
   const [reason, setReason] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -171,6 +176,10 @@ export function ChangeStatusModal({
     setPhotoUrl(animal.primary_photo_url ?? '');
     setMicrochipNumber(animal.microchip_number ?? '');
     setDescription(animal.description ?? '');
+    setReleasedAt(animal.released_at ?? '');
+    setDateOfDeath(animal.date_of_death ?? '');
+    setCauseOfDeath(animal.cause_of_death ?? '');
+    setDeathNotes(animal.death_notes ?? '');
     setIntakeDateError(undefined);
     setReason('');
     setInternalNotes(animal.internal_notes ?? '');
@@ -187,6 +196,14 @@ export function ChangeStatusModal({
     // intentionally excluded from deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, animal]);
+
+  // When the user switches to Released / Deceased, pre-fill the outcome date with
+  // today (only if empty — never clobber an already-recorded date).
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0];
+    if (status === 'released') setReleasedAt((cur) => cur || today);
+    if (status === 'deceased') setDateOfDeath((cur) => cur || today);
+  }, [status]);
 
   if (!animal) return null;
 
@@ -294,7 +311,21 @@ export function ChangeStatusModal({
     flagChange('behavior concern', behaviorConcern, animal.has_behavior_concern);
     flagChange('medical concern', medicalConcern, animal.has_medical_concern);
 
+    // Outcome fields only apply to their status — write just the relevant ones so
+    // a status change doesn't clobber the others ('' → null via animalUpdateToRow).
+    const outcomeFields =
+    status === 'released' ?
+    { released_at: releasedAt } :
+    status === 'deceased' ?
+    {
+      date_of_death: dateOfDeath,
+      cause_of_death: causeOfDeath.trim(),
+      death_notes: deathNotes.trim()
+    } :
+    {};
+
     updateAnimal(animalId, {
+      ...outcomeFields,
       name: name.trim() || undefined,
       rescue_id: rescueId.trim() || undefined,
       species,
@@ -576,6 +607,46 @@ export function ChangeStatusModal({
               </Select>
             </div>
           </div>
+          {/* Outcome details — captured here so a status change records the
+              relevant date/context in the same save. Surfaced in the profile's
+              Release Summary / Case Summary. */}
+          {status === 'released' &&
+          <div>
+              <Label htmlFor="edit_released_at">Release date</Label>
+              <DatePicker
+              id="edit_released_at"
+              value={releasedAt}
+              onChange={setReleasedAt} />
+            </div>
+          }
+          {status === 'deceased' &&
+          <div className="space-y-4">
+              <div>
+                <Label htmlFor="edit_date_of_death">Date of death</Label>
+                <DatePicker
+                id="edit_date_of_death"
+                value={dateOfDeath}
+                onChange={setDateOfDeath} />
+              </div>
+              <div>
+                <Label htmlFor="edit_cause_of_death">Cause of death</Label>
+                <Input
+                id="edit_cause_of_death"
+                value={causeOfDeath}
+                onChange={(e) => setCauseOfDeath(e.target.value)}
+                placeholder="e.g. Euthanized (illness), FeLV, trauma…" />
+              </div>
+              <div>
+                <Label htmlFor="edit_death_notes">Death notes</Label>
+                <Textarea
+                id="edit_death_notes"
+                value={deathNotes}
+                onChange={(e) => setDeathNotes(e.target.value)}
+                placeholder="Any additional context (optional)."
+                rows={2} />
+              </div>
+            </div>
+          }
           {/* Inline action item — appears once the priority is elevated so the
               "what's the next step" can be captured in the same save. Required
               for a non-normal priority. */}

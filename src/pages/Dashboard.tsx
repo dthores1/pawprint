@@ -10,14 +10,12 @@ import { GlobalSearch } from '../components/search/GlobalSearch';
 import {
   AlertCircleIcon,
   BirdIcon,
-  CalendarIcon,
   HomeIcon,
   ActivityIcon,
   ChevronRightIcon,
-  PackageOpenIcon,
-  StethoscopeIcon,
-  HeartHandshakeIcon,
-  MapPinIcon } from
+  HeartIcon,
+  UserPlusIcon,
+  StethoscopeIcon } from
 'lucide-react';
 import {
   getDaysUntil,
@@ -29,9 +27,65 @@ import {
 '../lib/utils';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Priority, Animal } from '../types';
+import { Priority, Animal, PersonRole } from '../types';
+import { ADOPTION_STATUS_LABELS } from '../lib/adoptions';
 import { BoneIcon } from '../components/ui/BoneIcon';
 import { HelpNeededWidget } from '../components/dashboard/HelpNeededWidget';
+
+// Adoption stages that are still "in the pipeline" (not a terminal outcome).
+const ADOPTION_TERMINAL: string[] = ['completed', 'cancelled', 'returned'];
+
+// One short label per person, for the "New Contacts" widget. Picks the most
+// descriptive role; "Volunteer"/"Contact" are the neutral fallbacks (we don't
+// assume everyone is a volunteer).
+const ROLE_LABEL: Partial<Record<PersonRole, string>> = {
+  foster_parent: 'Foster',
+  adopter: 'Adopter',
+  vet: 'Vet',
+  rescue_staff: 'Staff',
+  trapper: 'Trapper',
+  transport: 'Transport',
+  event_support: 'Event Support',
+  social_media: 'Social Media',
+  donor: 'Donor',
+  community_contact: 'Community Contact',
+  volunteer: 'Volunteer'
+};
+const ROLE_PRIORITY: PersonRole[] = [
+'foster_parent', 'adopter', 'vet', 'rescue_staff', 'trapper', 'transport',
+'event_support', 'social_media', 'donor', 'community_contact', 'volunteer'];
+function primaryRoleLabel(roles: PersonRole[]): string {
+  const hit = ROLE_PRIORITY.find((r) => roles.includes(r));
+  return hit ? ROLE_LABEL[hit]! : 'Contact';
+}
+
+/** "Joined today / yesterday / N days ago / Mon D" from a timestamp. */
+function joinedLabel(iso: string): string {
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  if (days <= 0) return 'Joined today';
+  if (days === 1) return 'Joined yesterday';
+  if (days < 7) return `Joined ${days} days ago`;
+  return `Joined ${new Date(iso).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric'
+  })}`;
+}
+
+/** Relative time for the activity feed ("2 hours ago / Yesterday / Jul 2"). */
+function activityTimeLabel(iso: string): string {
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hour${hrs === 1 ? '' : 's'} ago`;
+  const days = Math.floor(hrs / 24);
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days} days ago`;
+  return new Date(iso).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric'
+  });
+}
 const PRIORITY_RANK: Record<Priority, number> = {
   critical: 4,
   urgent: 3,
@@ -41,16 +95,16 @@ const PRIORITY_RANK: Record<Priority, number> = {
 export function Dashboard() {
   const {
     animals,
+    animalsIndex,
     medicalRecords,
     fosters,
     placements,
     actionItems,
-    supplyRequests,
-    sittingRequests,
-    sittingRequestPlacements,
+    adoptions,
+    notes,
     clinicEvents,
-    clinicSlots,
-    people
+    people,
+    peopleIndex
   } = useWhisker();
   const { currentOrg, user, currentPersonId } = useAuth();
   // Greet the user by name. Prefer the self-record's first_name (which captures
@@ -150,32 +204,77 @@ export function Dashboard() {
     },
     {} as Record<string, number>
   );
-  const urgentSupplyRequests = supplyRequests.filter(
-    (r) =>
-    r.priority === 'urgent' ||
-    r.priority === 'critical' &&
-    r.status !== 'fulfilled' &&
-    r.status !== 'cancelled' &&
-    r.status !== 'denied'
-  );
-  const pendingReviewRequests = supplyRequests.filter(
-    (r) => r.status === 'submitted'
-  );
-  const awaitingDeliveryRequests = supplyRequests.filter(
-    (r) => r.status === 'in_progress'
-  );
   const now = Date.now();
-  const upcomingClinics = clinicEvents.
+
+  // — Pending Adoptions — active adoption pipelines, most recently touched first.
+  const pendingAdoptions = adoptions.
+  filter((a) => !ADOPTION_TERMINAL.includes(a.status)).
+  sort(
+    (a, b) =>
+    new Date(b.updated_at ?? b.created_at).getTime() -
+    new Date(a.updated_at ?? a.created_at).getTime()
+  ).
+  slice(0, 5);
+
+  // — New Contacts — real contacts (not app-account self records or support)
+  // created in the last 30 days. "Contact", not "Volunteer": they may be
+  // fosters, adopters, vets, staff, or partners.
+  const NEW_CONTACT_DAYS = 30;
+  const newContactCutoff = now - NEW_CONTACT_DAYS * 86400000;
+  const newContacts = peopleIndex.
+  filter((p) => !p.user_id).
+  filter((p) => !(p.email ?? '').toLowerCase().endsWith('@whiskerville.app')).
+  filter((p) => new Date(p.created_at).getTime() >= newContactCutoff).
+  sort(
+    (a, b) =>
+    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  ).
+  slice(0, 5);
+
+  // — Upcoming Care — clinic events + individual medical appointments, merged
+  // and sorted by date (replaces the separate Clinics + Upcoming Medical cards).
+  const careItems = [
+  ...clinicEvents.
   filter(
     (e) =>
     new Date(e.date_time).getTime() >= now && e.status !== 'cancelled'
   ).
+  map((e) => ({
+    key: `clinic-${e.id}`,
+    time: new Date(e.date_time).getTime(),
+    dateLabel: new Date(e.date_time).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
+    }),
+    title: e.location || 'Clinic',
+    subtitle: 'Clinic',
+    to: '/medical',
+    animal: null as Animal | null
+  })),
+  ...upcomingMedical.map((m) => {
+    const animal = animalsIndex.find((a) => a.id === m.animal_id) ?? null;
+    return {
+      key: `med-${m.id}`,
+      time: parseLocalDate(m.due_date!).getTime(),
+      dateLabel: formatDate(m.due_date!).replace(/,\s*\d{4}$/, ''),
+      title: animal ? animalDisplayName(animal) : 'Animal',
+      subtitle: m.procedure_name,
+      to: animal ? `/animals/${animal.id}` : '/medical',
+      animal
+    };
+  })].
+  sort((a, b) => a.time - b.time).
+  slice(0, 5);
+
+  // — Recent Activity — the org-wide notes feed (status changes, foster updates,
+  // adoption + medical notes), newest first. The "pulse of the rescue".
+  const recentActivity = [...notes].
   sort(
     (a, b) =>
-    new Date(a.date_time).getTime() - new Date(b.date_time).getTime()
+    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   ).
-  slice(0, 2);
-  const unclaimedSitting = sittingRequests.filter((s) => s.status === 'open');
+  slice(0, 6);
+
   const container = {
     hidden: {
       opacity: 0
@@ -387,143 +486,53 @@ export function Dashboard() {
               gap); the widget owns its own heading + card. */}
           <HelpNeededWidget />
 
-          {/* Clinics — between Needs Action and Upcoming Medical */}
+          {/* Recent Activity — the org-wide notes feed (status changes, foster
+              updates, adoption/medical notes). The "pulse of the rescue". */}
           <motion.div variants={item}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-heading font-bold flex items-center gap-2">
-                <StethoscopeIcon className="w-5 h-5 text-primary" />
-                Clinics
-              </h2>
-              <Link
-                to="/medical"
-                className="text-sm font-medium text-primary hover:underline">
-
-                View all
-              </Link>
-            </div>
-            <Card>
-              {upcomingClinics.length === 0 ?
-              <div className="p-8 text-center text-text-secondary">
-                  <p>No upcoming clinics on the calendar.</p>
-                </div> :
-
-              <div className="divide-y divide-border">
-                  {upcomingClinics.map((e) => {
-                  const slotsFilled = clinicSlots.filter(
-                    (s) =>
-                    s.clinic_event_id === e.id &&
-                    s.status !== 'cancelled'
-                  ).length;
-                  const vet = e.veterinarian_person_id ?
-                  people.find((p) => p.id === e.veterinarian_person_id) :
-                  undefined;
-                  const date = new Date(e.date_time);
-                  const dayLabel = date.toLocaleString('en-US', {
-                    weekday: 'short',
-                    month: 'short',
-                    day: 'numeric'
-                  });
-                  const timeLabel = date.toLocaleTimeString('en-US', {
-                    hour: 'numeric',
-                    minute: '2-digit'
-                  });
-                  const percent = Math.min(
-                    100,
-                    Math.round(
-                      slotsFilled / Math.max(1, e.slot_capacity) * 100
-                    )
-                  );
-                  return (
-                    <Link
-                      key={e.id}
-                      to="/medical"
-                      className="block p-4 hover:bg-background transition-colors">
-
-                        <div className="flex items-start justify-between gap-3 mb-2">
-                          <div>
-                            <p className="font-semibold text-text-primary">
-                              {dayLabel} · {timeLabel}
-                            </p>
-                            <p className="text-sm text-text-secondary flex items-center gap-1.5 mt-0.5 truncate">
-                              <MapPinIcon className="w-3.5 h-3.5 shrink-0" />
-                              <span className="truncate">{e.location}</span>
-                            </p>
-                            {vet &&
-                          <p className="text-xs text-text-secondary mt-0.5">
-                                {vet.first_name} {vet.last_name}
-                              </p>
-                          }
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className="text-sm font-semibold text-text-primary tabular-nums">
-                              {slotsFilled} / {e.slot_capacity}
-                            </p>
-                            <p className="text-xs text-text-secondary">
-                              slots
-                            </p>
-                          </div>
-                        </div>
-                        <div className="w-full bg-background rounded-full h-1.5 overflow-hidden">
-                          <div
-                          className="h-1.5 rounded-full bg-primary transition-all duration-500"
-                          style={{ width: `${percent}%` }} />
-
-                        </div>
-                      </Link>);
-
-                })}
-                </div>
-              }
-            </Card>
-          </motion.div>
-
-          {/* Upcoming Medical */}
-          <motion.div variants={item}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-heading font-bold flex items-center gap-2">
-                <CalendarIcon className="w-5 h-5 text-primary" />
-                Upcoming Medical (14 days)
+                <ActivityIcon className="w-5 h-5 text-primary" />
+                Recent Activity
               </h2>
             </div>
             <Card>
-              {upcomingMedical.length === 0 ?
+              {recentActivity.length === 0 ?
               <div className="p-8 text-center text-text-secondary">
-                  <p>No upcoming medical appointments.</p>
+                  <p>No recent activity yet.</p>
                 </div> :
 
               <div className="divide-y divide-border">
-                  {upcomingMedical.map((record) => {
-                  const animal = animals.find(
-                    (a) => a.id === record.animal_id
+                  {recentActivity.map((note) => {
+                  const animal = animalsIndex.find(
+                    (a) => a.id === note.animal_id
                   );
-                  if (!animal) return null;
-                  const days = getDaysUntil(record.due_date!);
                   return (
                     <Link
-                      key={record.id}
-                      to={`/animals/${animal.id}`}
-                      className="flex items-center justify-between p-4 hover:bg-background transition-colors group">
+                      key={note.id}
+                      to={animal ? `/animals/${animal.id}` : '/animals'}
+                      className="flex items-start gap-4 p-4 hover:bg-background transition-colors">
 
-                        <div className="flex items-center gap-4">
+                        <div className="relative shrink-0">
                           <Avatar
-                          src={animal.primary_photo_url}
+                          src={animal?.primary_photo_url}
                           type="animal"
+                          species={animal?.species}
                           size="sm" />
 
-                          <div>
-                            <p className="font-medium text-text-primary">
-                              {animalDisplayName(animal)}{' '}
-                              <span className="text-text-secondary font-normal">
-                                — {record.procedure_name}
-                              </span>
-                            </p>
-                            <p className="text-sm text-text-secondary">
-                              Due {formatDate(record.due_date!)}
-                            </p>
+                          <div className="absolute -bottom-1 -right-1 ring-2 ring-card rounded-full">
+                            <SpeciesBadge species={animal?.species ?? ''} />
                           </div>
                         </div>
-                        <div className="text-sm font-medium text-primary bg-primary/10 px-3 py-1 rounded-full">
-                          In {days} day{days !== 1 ? 's' : ''}
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-text-primary truncate">
+                            {animal ? animalDisplayName(animal) : 'Animal'}
+                          </p>
+                          <p className="text-sm text-text-secondary line-clamp-2">
+                            {formatDatesInText(note.body)}
+                          </p>
+                          <p className="text-xs text-text-secondary mt-0.5">
+                            {activityTimeLabel(note.created_at)}
+                          </p>
                         </div>
                       </Link>);
 
@@ -534,7 +543,7 @@ export function Dashboard() {
           </motion.div>
         </div>
 
-        {/* Right Column: Animals by Status → Supply Requests → Sitting Requests */}
+        {/* Right Column: Animal Pipline → Supply Requests → Sitting Requests */}
         <div className="space-y-8">
           {/* Status Breakdown */}
           <motion.div variants={item}>
@@ -542,7 +551,7 @@ export function Dashboard() {
           <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-heading font-bold flex items-center gap-2">
                 <BirdIcon className="w-5 h-5 text-[#356A9A]" />
-                Animals by Status
+                Animal Pipeline
               </h2>
 
               <Link
@@ -598,141 +607,165 @@ export function Dashboard() {
             </Card>
           </motion.div>
 
-          {/* Supply Requests Widget */}
+          {/* Pending Adoptions — active adoption pipelines. */}
           <motion.div variants={item}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-heading font-bold flex items-center gap-2">
-                <PackageOpenIcon className="w-5 h-5 text-[#D98C5F]" />
-                Supply Requests
+                <HeartIcon className="w-5 h-5 text-[#9B3A3A]" />
+                Pending Adoptions
               </h2>
               <Link
-                to="/requests"
-                className="text-sm font-medium text-primary hover:underline">
-
-                View all
-              </Link>
-            </div>
-            <Card className="p-4">
-              <div className="space-y-3">
-                <Link
-                  to="/requests"
-                  className="flex items-center justify-between p-3 rounded-lg bg-background hover:bg-background/80 transition-colors group">
-
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full bg-[#9B3A3A]" />
-                    <span className="text-sm font-medium text-text-primary group-hover:text-primary transition-colors">
-                      Urgent requests
-                    </span>
-                  </div>
-                  <span className="text-sm font-bold text-text-primary">
-                    {urgentSupplyRequests.length}
-                  </span>
-                </Link>
-                <Link
-                  to="/requests"
-                  className="flex items-center justify-between p-3 rounded-lg bg-background hover:bg-background/80 transition-colors group">
-
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full bg-[#A36B00]" />
-                    <span className="text-sm font-medium text-text-primary group-hover:text-primary transition-colors">
-                      Pending review
-                    </span>
-                  </div>
-                  <span className="text-sm font-bold text-text-primary">
-                    {pendingReviewRequests.length}
-                  </span>
-                </Link>
-                <Link
-                  to="/requests"
-                  className="flex items-center justify-between p-3 rounded-lg bg-background hover:bg-background/80 transition-colors group">
-
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full bg-[#356A9A]" />
-                    <span className="text-sm font-medium text-text-primary group-hover:text-primary transition-colors">
-                      Awaiting delivery
-                    </span>
-                  </div>
-                  <span className="text-sm font-bold text-text-primary">
-                    {awaitingDeliveryRequests.length}
-                  </span>
-                </Link>
-              </div>
-            </Card>
-          </motion.div>
-
-          {/* Sitting Requests Widget */}
-          <motion.div variants={item}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-heading font-bold flex items-center gap-2">
-                <HeartHandshakeIcon className="w-5 h-5 text-primary" />
-                Sitting Requests
-              </h2>
-              <Link
-                to="/requests?tab=sitting"
+                to="/adoptions"
                 className="text-sm font-medium text-primary hover:underline">
 
                 View all
               </Link>
             </div>
             <Card>
-              {unclaimedSitting.length === 0 ?
+              {pendingAdoptions.length === 0 ?
               <div className="p-6 text-center text-text-secondary text-sm">
-                  No coverage needed right now.
+                  No adoptions in progress.
                 </div> :
 
               <div className="divide-y divide-border">
-                  {unclaimedSitting.slice(0, 3).map((s) => {
-                  // Resolve covered animals via the join table.
-                  const coveredAnimals = sittingRequestPlacements.
-                  filter((srp) => srp.sitting_request_id === s.id).
-                  map((srp) =>
-                  placements.find((p) => p.id === srp.foster_placement_id)
-                  ).
-                  filter((p) => !!p).
-                  map((p) => animals.find((a) => a.id === p!.animal_id)).
-                  filter((a): a is NonNullable<typeof a> => !!a);
-                  const lead = coveredAnimals[0];
-                  const moreCount = coveredAnimals.length - 1;
-                  const labelNames = lead ?
-                  moreCount > 0 ?
-                  `${lead.name} + ${moreCount} more` :
-                  lead.name :
-                  'Unknown';
-                  const start = parseLocalDate(s.start_date);
-                  const end = parseLocalDate(s.end_date);
-                  const sameYear = start.getFullYear() === end.getFullYear();
-                  const startStr = start.toLocaleString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: sameYear ? undefined : 'numeric'
-                  });
-                  const endStr = end.toLocaleString('en-US', {
-                    month: 'short',
-                    day: 'numeric'
-                  });
+                  {pendingAdoptions.map((a) => {
+                  const animal = animalsIndex.find((x) => x.id === a.animal_id);
+                  const applicant = peopleIndex.find(
+                    (p) => p.id === a.adopter_id
+                  );
                   return (
                     <Link
-                      key={s.id}
-                      to="/requests?tab=sitting"
+                      key={a.id}
+                      to={animal ? `/animals/${animal.id}` : '/adoptions'}
                       className="flex items-center gap-3 p-4 hover:bg-background transition-colors">
 
-                        <Avatar
-                        src={lead?.primary_photo_url}
-                        type="animal"
-                        species={lead?.species}
-                        size="sm" />
+                        <div className="relative shrink-0">
+                          <Avatar
+                          src={animal?.primary_photo_url}
+                          type="animal"
+                          species={animal?.species}
+                          size="sm" />
 
+                          <div className="absolute -bottom-1 -right-1 ring-2 ring-card rounded-full">
+                            <SpeciesBadge species={animal?.species ?? ''} />
+                          </div>
+                        </div>
                         <div className="min-w-0 flex-1">
                           <p className="font-medium text-text-primary truncate">
-                            {labelNames}
+                            {animal ? animalDisplayName(animal) : 'Animal'}
                           </p>
-                          <p className="text-xs text-text-secondary">
-                            {startStr} – {endStr}
+                          <p className="text-xs text-text-secondary truncate">
+                            {applicant ?
+                          `${applicant.first_name} ${applicant.last_name}`.trim() :
+                          'Applicant'}
                           </p>
                         </div>
+                        <span className="shrink-0 text-xs font-medium text-primary bg-primary/10 px-2.5 py-1 rounded-full">
+                          {ADOPTION_STATUS_LABELS[a.status]}
+                        </span>
                       </Link>);
 
                 })}
+                </div>
+              }
+            </Card>
+          </motion.div>
+
+          {/* Upcoming Care — clinic events + individual medical appointments. */}
+          <motion.div variants={item}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-heading font-bold flex items-center gap-2">
+                <StethoscopeIcon className="w-5 h-5 text-primary" />
+                Upcoming Care
+              </h2>
+            </div>
+            <Card>
+              {careItems.length === 0 ?
+              <div className="p-6 text-center text-text-secondary text-sm">
+                  Nothing scheduled.
+                </div> :
+
+              <>
+                  <div className="divide-y divide-border">
+                    {careItems.map((c) =>
+                  <Link
+                    key={c.key}
+                    to={c.to}
+                    className="flex items-center gap-3 p-4 hover:bg-background transition-colors">
+
+                        <div className="shrink-0 w-14 text-sm font-semibold text-text-primary tabular-nums">
+                          {c.dateLabel}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-text-primary truncate">
+                            {c.title}
+                          </p>
+                          <p className="text-xs text-text-secondary truncate">
+                            {c.subtitle}
+                          </p>
+                        </div>
+                      </Link>
+                  )}
+                  </div>
+                  <Link
+                  to="/medical"
+                  className="flex items-center justify-center gap-1.5 p-3 border-t border-border text-sm font-medium text-primary hover:bg-background transition-colors">
+
+                    View calendar
+                    <ChevronRightIcon className="w-4 h-4" />
+                  </Link>
+                </>
+              }
+            </Card>
+          </motion.div>
+
+          {/* New Contacts — recently added people (fosters, adopters, vets,
+              staff, partners). Deliberately not "New Volunteers". */}
+          <motion.div variants={item}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-heading font-bold flex items-center gap-2">
+                <UserPlusIcon className="w-5 h-5 text-[#356A9A]" />
+                New Contacts
+              </h2>
+              <Link
+                to="/contacts"
+                className="text-sm font-medium text-primary hover:underline">
+
+                View all
+              </Link>
+            </div>
+            <Card>
+              {newContacts.length === 0 ?
+              <div className="p-6 text-center text-text-secondary text-sm">
+                  No new contacts in the last 30 days.
+                </div> :
+
+              <div className="divide-y divide-border">
+                  {newContacts.map((p) =>
+                <Link
+                  key={p.id}
+                  to={`/contacts/${p.id}`}
+                  className="flex items-center gap-3 p-4 hover:bg-background transition-colors">
+
+                      <Avatar
+                    src={p.photo_url}
+                    name={`${p.first_name} ${p.last_name}`}
+                    colorKey={p.id}
+                    size="sm" />
+
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-text-primary truncate">
+                          {p.first_name} {p.last_name}
+                        </p>
+                        <p className="text-xs text-text-secondary truncate">
+                          {joinedLabel(p.created_at)}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-xs font-medium text-text-secondary bg-background px-2.5 py-1 rounded-full">
+                        {primaryRoleLabel(p.roles)}
+                      </span>
+                    </Link>
+                )}
                 </div>
               }
             </Card>

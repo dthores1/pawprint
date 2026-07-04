@@ -6,6 +6,7 @@ import { Card } from '../components/ui/Card';
 import { GuidanceLink } from '../components/guidance/GuidanceLink';
 import { Button } from '../components/ui/Button';
 import { VirtualizedGrid } from '../components/ui/VirtualizedGrid';
+import { FilterDropdown } from '../components/ui/FilterDropdown';
 import { NewSiteModal } from '../components/sites/NewSiteModal';
 import {
   MapPinnedIcon,
@@ -26,6 +27,19 @@ const TABS: { key: SitesTab; label: string }[] = [
 { key: 'mine', label: 'My Sites' },
 { key: 'all', label: 'All Sites' }];
 
+// Distance options for the Nearby tab. Values are the mile threshold; 'all'
+// keeps every located site (no distance cap). Labelled "Within: …" in the UI.
+const RADIUS_OPTIONS = [
+{ value: '1', label: '1 mile' },
+{ value: '5', label: '5 miles' },
+{ value: '10', label: '10 miles' },
+{ value: '25', label: '25 miles' },
+{ value: 'all', label: 'Any distance' }];
+const DEFAULT_RADIUS = '5';
+// Persisted so the chosen distance sticks across visits (mirrors how the current
+// org is stored — see AuthContext CURRENT_ORG_KEY).
+const RADIUS_KEY = 'whiskerville.sitesNearbyRadius';
+
 export function SitesList() {
   const { sites, peopleIndex, siteVolunteers } = useWhisker();
   const { currentPersonId } = useAuth();
@@ -36,6 +50,23 @@ export function SitesList() {
   const tab: SitesTab =
   param === 'nearby' || param === 'mine' || param === 'all' ? param : 'new';
   const [isNewOpen, setIsNewOpen] = useState(false);
+  // Nearby-tab distance threshold ('all' = no cap). Restored from localStorage,
+  // defaulting to 5 mi; `setRadius` writes the choice back so it persists.
+  const [radius, setRadiusState] = useState(() => {
+    const saved =
+    typeof localStorage !== 'undefined' ? localStorage.getItem(RADIUS_KEY) : null;
+    return saved && RADIUS_OPTIONS.some((o) => o.value === saved) ?
+    saved :
+    DEFAULT_RADIUS;
+  });
+  const setRadius = (v: string) => {
+    setRadiusState(v);
+    try {
+      localStorage.setItem(RADIUS_KEY, v);
+    } catch {
+      // Ignore storage failures (private mode, quota) — the choice still applies.
+    }
+  };
 
   const setTab = (next: SitesTab) =>
   setSearchParams(next === 'new' ? {} : { tab: next }, { replace: true });
@@ -62,15 +93,6 @@ export function SitesList() {
       filter((s) => new Date(s.created_at).getTime() >= cutoff).
       sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
     }
-    if (tab === 'nearby') {
-      // Sites with coordinates, nearest first. Falls back to all sites when
-      // we can't compute a distance (no viewer location).
-      const withDist = sites.map((s) => ({ s, d: distanceFor(s) }));
-      return withDist.
-      filter((x) => (location ? x.d != null : true)).
-      sort((a, b) => (a.d ?? Infinity) - (b.d ?? Infinity)).
-      map((x) => x.s);
-    }
     if (tab === 'mine') {
       // Sites where I'm the lead or a listed volunteer.
       const myVolunteerSiteIds = new Set(
@@ -87,8 +109,28 @@ export function SitesList() {
       sort((a, b) => a.name.localeCompare(b.name));
     }
     return [...sites].sort((a, b) => a.name.localeCompare(b.name));
+  }, [sites, tab, siteVolunteers, currentPersonId]);
+
+  // Nearby = "sites by proximity", not just "sites with a distance". Located
+  // sites (within the chosen radius) sort nearest-first; sites we can't place
+  // (no address, or no viewer location) still belong — shown last with no
+  // distance line. Note: distanceFor() returns null for every site when the
+  // viewer has no location, so they all land in `unknown` (the old fallback).
+  const nearby = useMemo(() => {
+    const limit = radius === 'all' ? null : Number(radius);
+    const withDist = sites.map((s) => ({ s, d: distanceFor(s) }));
+    const located = withDist.
+    filter((x): x is { s: Site; d: number } => x.d != null).
+    sort((a, b) => a.d - b.d);
+    const inRadius = (limit == null ? located : located.filter((x) => x.d <= limit)).
+    map((x) => x.s);
+    const unknown = withDist.
+    filter((x) => x.d == null).
+    map((x) => x.s).
+    sort((a, b) => a.name.localeCompare(b.name));
+    return { located: inRadius, unknown };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sites, tab, location, siteVolunteers, currentPersonId]);
+  }, [sites, radius, location]);
 
   const renderCard = (s: Site) => {
     const meta = SITE_STATUS_META[s.status];
@@ -140,6 +182,16 @@ export function SitesList() {
 
   };
 
+  const nearbyTotal = nearby.located.length + nearby.unknown.length;
+  const isEmpty = tab === 'nearby' ? nearbyTotal === 0 : visible.length === 0;
+  // Only break out a labelled "Distance unknown" group once there are several
+  // such sites (and some located ones to separate them from) — for one or two,
+  // they just trail the list without ceremony.
+  const showUnknownDivider =
+  tab === 'nearby' &&
+  nearby.located.length > 0 &&
+  nearby.unknown.length >= 3;
+
   return (
     <div className="space-y-6 pb-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -181,14 +233,23 @@ export function SitesList() {
         )}
       </div>
 
-      {tab === 'nearby' && !location &&
+      {tab === 'nearby' && (
+      location ?
+      <div className="flex items-center gap-2">
+          <FilterDropdown
+          label="Within"
+          value={radius}
+          options={RADIUS_OPTIONS}
+          onChange={setRadius} />
+        </div> :
+
       <p className="text-sm text-text-secondary">
           Enable location access or add an address to your profile to sort sites
           by distance. Showing all sites for now.
-        </p>
+        </p>)
       }
 
-      {visible.length === 0 ?
+      {isEmpty ?
       <Card className="p-12 text-center text-text-secondary">
           <MapPinnedIcon className="w-12 h-12 mx-auto mb-3 opacity-30" />
           <p className="font-medium text-text-primary mb-1">
@@ -196,6 +257,8 @@ export function SitesList() {
           'No new sites' :
           tab === 'mine' ?
           'No sites assigned to you' :
+          tab === 'nearby' && location && radius !== 'all' ?
+          `No sites within ${radius} mi` :
           'No sites yet'}
           </p>
           <p className="text-sm">
@@ -203,9 +266,40 @@ export function SitesList() {
           'Sites added in the last 7 days will show up here.' :
           tab === 'mine' ?
           "Sites you lead or volunteer at will appear here." :
+          tab === 'nearby' && location && radius !== 'all' ?
+          'Try a larger distance, or Any distance.' :
           'Create a site when someone reports animals at a location.'}
           </p>
         </Card> :
+      tab === 'nearby' ?
+      <div className="space-y-4">
+          <VirtualizedGrid
+          items={
+          showUnknownDivider ?
+          nearby.located :
+          [...nearby.located, ...nearby.unknown]
+          }
+          getKey={(s) => s.id}
+          renderItem={renderCard}
+          pageScroll />
+
+          {showUnknownDivider &&
+          <>
+              <div className="flex items-center gap-3 pt-1">
+                <span className="h-px flex-1 bg-border" />
+                <span className="text-xs font-medium uppercase tracking-wide text-text-secondary">
+                  Distance unknown
+                </span>
+                <span className="h-px flex-1 bg-border" />
+              </div>
+              <VirtualizedGrid
+              items={nearby.unknown}
+              getKey={(s) => s.id}
+              renderItem={renderCard}
+              pageScroll />
+            </>
+          }
+        </div> :
 
       <VirtualizedGrid
         items={visible}
