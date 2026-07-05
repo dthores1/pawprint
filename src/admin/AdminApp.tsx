@@ -8,6 +8,7 @@ import { fetchIsPlatformAdmin } from '../lib/adminApi';
 import { AdminShell } from './AdminShell';
 import { AdminDashboard } from './AdminDashboard';
 import { AdminOrgDetail } from './AdminOrgDetail';
+import { AdminUsers } from './AdminUsers';
 
 // The Owner Console (admin.whiskerville.app): a read-only, platform-wide view
 // for Whiskerville staff. It reuses the production AuthProvider (same Supabase
@@ -90,6 +91,7 @@ function AdminGate() {
     <Routes>
       <Route path="/" element={<AdminShell />}>
         <Route index element={<AdminDashboard />} />
+        <Route path="users" element={<AdminUsers />} />
         <Route path="orgs/:id" element={<AdminOrgDetail />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

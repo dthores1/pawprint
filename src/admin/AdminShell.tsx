@@ -1,9 +1,10 @@
 import React from 'react';
-import { Link, Outlet } from 'react-router-dom';
+import { Link, NavLink, Outlet } from 'react-router-dom';
 import { ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { LogoMark } from '../components/ui/Logo';
 import { Button } from '../components/ui/Button';
+import { cn } from '../lib/utils';
 
 // Chrome for the Owner Console: a single top bar instead of the customer app's
 // sidebar — the console is two screens deep at most, and visually distinct
@@ -24,6 +25,28 @@ export function AdminShell() {
               Owner Console
             </span>
           </Link>
+          <nav className="flex items-center gap-1">
+            {[
+            { to: '/', label: 'Overview', end: true },
+            { to: '/users', label: 'Users', end: false }].
+            map((item) =>
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              className={({ isActive }) =>
+              cn(
+                'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+                isActive ?
+                'bg-primary/10 text-primary' :
+                'text-text-secondary hover:text-text-primary hover:bg-background'
+              )
+              }>
+
+                {item.label}
+              </NavLink>
+            )}
+          </nav>
           <div className="flex items-center gap-3">
             <span className="text-sm text-text-secondary hidden sm:block">
               {user?.email}
