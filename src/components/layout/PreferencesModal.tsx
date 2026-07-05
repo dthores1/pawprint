@@ -11,6 +11,7 @@ import {
   ShareState } from
 '../contacts/ContactVisibilityFields';
 import { PasskeysSection } from './PasskeysSection';
+import { AccountSection } from './AccountSection';
 import { isDemoMode } from '../../lib/appMode';
 import { passkeysSupported } from '../../lib/supabase';
 
@@ -92,7 +93,8 @@ export function PreferencesModal({
           }
         </div>
 
-        {/* Passkeys need real Supabase auth + WebAuthn support. */}
+        {/* Account credentials + passkeys need real Supabase auth. */}
+        {!isDemoMode && <AccountSection />}
         {!isDemoMode && passkeysSupported && <PasskeysSection />}
       </div>
     </Modal>);
