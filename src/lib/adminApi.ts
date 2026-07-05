@@ -74,6 +74,26 @@ export interface AdminOrgDetail {
   recent_activity: AdminOrgAuditEvent[];
 }
 
+export interface AdminUserMembership {
+  org_id: string;
+  org_name: string;
+  role: string;
+  is_support: boolean;
+  expires_at: string | null;
+}
+
+export interface AdminUserRow {
+  id: string;
+  email: string;
+  name: string | null;
+  created_at: string;
+  last_sign_in_at: string | null;
+  email_confirmed_at: string | null;
+  providers: string[];
+  banned_until: string | null;
+  memberships: AdminUserMembership[];
+}
+
 export async function fetchIsPlatformAdmin(): Promise<boolean> {
   const { data, error } = await supabase.rpc('is_platform_admin');
   if (error) throw new Error(error.message);
@@ -90,6 +110,12 @@ export async function fetchAdminOrganizations(): Promise<AdminOrgRow[]> {
   const { data, error } = await supabase.rpc('admin_list_organizations');
   if (error) throw new Error(error.message);
   return (data ?? []) as AdminOrgRow[];
+}
+
+export async function fetchAdminUsers(): Promise<AdminUserRow[]> {
+  const { data, error } = await supabase.rpc('admin_list_users');
+  if (error) throw new Error(error.message);
+  return (data ?? []) as AdminUserRow[];
 }
 
 export async function fetchAdminOrgDetail(
