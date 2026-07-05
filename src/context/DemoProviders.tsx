@@ -124,6 +124,9 @@ const demoAuthValue: AuthContextType = {
   signInWithPassword: async () => ({ error: null }),
   signUpWithPassword: async () => ({ error: null, needsConfirmation: false }),
   signOut: async () => {},
+  // Account credential changes need real Supabase auth — inert in the demo.
+  updateEmail: async () => ({ error: 'Not available in the demo.' }),
+  updatePassword: async () => ({ error: 'Not available in the demo.' }),
   // Passkeys need real Supabase auth; demo mode exposes inert stubs (the UI that
   // calls these is hidden in demo).
   signInWithPasskey: async () => ({ error: null }),

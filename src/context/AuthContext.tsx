@@ -90,6 +90,15 @@ export interface AuthContextType {
   fullName?: string)
   => Promise<{ error: string | null; needsConfirmation: boolean }>;
   signOut: () => Promise<void>;
+  /** Change the login email. Supabase emails a confirmation link to the new
+   *  address; the change only takes effect once the user clicks it. */
+  updateEmail: (newEmail: string) => Promise<{ error: string | null }>;
+  /** Set/change the login password. When the account already has a password,
+   *  pass `currentPassword` to re-verify before changing. */
+  updatePassword: (
+  newPassword: string,
+  currentPassword?: string)
+  => Promise<{ error: string | null }>;
   /** Sign in with a registered passkey (discoverable — no email needed). */
   signInWithPasskey: () => Promise<{ error: string | null }>;
   /** Register a passkey for the signed-in user. */
@@ -518,6 +527,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setCurrentOrgIdState(null);
   }, []);
 
+  // ── Account credentials ────────────────────────────────────────────────
+  // Email changes are verified: Supabase sends a confirmation link to the NEW
+  // address (and, per project config, a notice to the old). The auth email only
+  // updates once that link is clicked, so the UI promises "verification sent",
+  // not an instant change.
+  const updateEmail = useCallback(async (newEmail: string) => {
+    const email = newEmail.trim();
+    if (!email) return { error: 'Enter an email address.' };
+    const { error } = await supabase.auth.updateUser(
+      { email },
+      { emailRedirectTo: `${window.location.origin}/` }
+    );
+    if (error) {
+      console.error('[account] email update failed:', error.message);
+      return { error: error.message };
+    }
+    return { error: null };
+  }, []);
+
+  // Password change. When the account already has a password (an 'email'
+  // identity), re-verify the current one first so an open session alone can't
+  // silently reset it. OAuth-only accounts have no password to verify — this
+  // path sets one.
+  const updatePassword = useCallback(
+    async (newPassword: string, currentPassword?: string) => {
+      if (newPassword.length < 8) {
+        return { error: 'Password must be at least 8 characters.' };
+      }
+      if (currentPassword && user?.email) {
+        const { error: reauthErr } = await supabase.auth.signInWithPassword({
+          email: user.email,
+          password: currentPassword
+        });
+        if (reauthErr) return { error: 'Current password is incorrect.' };
+      }
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) {
+        console.error('[account] password update failed:', error.message);
+        return { error: error.message };
+      }
+      return { error: null };
+    },
+    [user]
+  );
+
   // ── Passkeys (experimental Supabase API; enabled in lib/supabase.ts) ───────
   // On success signInWithPasskey emits SIGNED_IN, so onAuthStateChange advances
   // the gate — nothing to set here beyond surfacing an error string.
@@ -592,6 +646,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signInWithPassword,
         signUpWithPassword,
         signOut,
+        updateEmail,
+        updatePassword,
         signInWithPasskey,
         registerPasskey,
         listPasskeys,
