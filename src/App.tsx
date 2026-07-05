@@ -3,7 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { WhiskerProvider } from './context/WhiskerContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DemoAuthProvider, DemoWhiskerProvider } from './context/DemoProviders';
-import { isDemoMode } from './lib/appMode';
+import { isDemoMode, isAdminConsole } from './lib/appMode';
+import { AdminApp } from './admin/AdminApp';
 import { AppShell } from './components/layout/AppShell';
 import { Dashboard } from './pages/Dashboard';
 import { AnimalsList } from './pages/AnimalsList';
@@ -236,5 +237,9 @@ function ProductionApp() {
 }
 
 export function App() {
-  return isDemoMode ? <DemoApp /> : <ProductionApp />;
+  if (isDemoMode) return <DemoApp />;
+  // Owner Console: same build served from admin.whiskerville.app (or forced
+  // locally with VITE_APP_MODE=admin). Read-only staff surface — see src/admin.
+  if (isAdminConsole) return <AdminApp />;
+  return <ProductionApp />;
 }
