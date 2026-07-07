@@ -369,12 +369,13 @@ export function AnimalProfile() {
     color: 'bg-[#F3E4D7] text-[#D98C5F]',
     medical: { id: m.id }
   })),
-  ...animalPlacements.map((p) => {
+  ...animalPlacements.flatMap((p) => {
     const foster = fosters.find((f) => f.id === p.person_id);
     const fosterName = foster ?
     `${foster.first_name} ${foster.last_name}` :
     'unknown foster';
-    return {
+    const events: TimelineEvent[] = [
+    {
       id: p.id,
       date: p.start_date.split('T')[0],
       ts: p.start_date,
@@ -396,7 +397,24 @@ export function AnimalProfile() {
       placement: p.placement_status !== 'active' ?
       { id: p.id, fosterName } :
       undefined
-    };
+    }];
+
+    // A completed placement also gets an end event (reassignment, adoption,
+    // or an explicit End Placement) — with the reason as the trailing text.
+    if (p.placement_status === 'completed' && p.end_date) {
+      events.push({
+        id: `${p.id}-ended`,
+        date: p.end_date.split('T')[0],
+        ts: p.end_date,
+        type: 'placement' as const,
+        title: 'Foster Placement Ended',
+        description: `With ${fosterName}`,
+        descriptionTail: p.reason_ended || undefined,
+        icon: HomeIcon,
+        color: 'bg-[#E5E2DC] text-[#6B6B6B]'
+      });
+    }
+    return events;
   }),
   ...animalNotes.map((n) => ({
     id: n.id,
@@ -941,7 +959,7 @@ export function AnimalProfile() {
                   <button
                     type="button"
                     onClick={() => setIsEndPlacementOpen(true)}
-                    className="text-xs font-medium text-text-secondary hover:text-[#9B3A3A] underline underline-offset-2 mt-0.5">
+                    className="block text-xs font-medium text-text-secondary hover:text-[#9B3A3A] underline underline-offset-2 mt-0.5">
 
                         End placement
                       </button>
