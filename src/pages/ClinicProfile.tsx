@@ -33,8 +33,10 @@ import {
   Trash2Icon,
   Edit2Icon,
   CheckCircle2Icon,
-  UsersIcon } from
+  UsersIcon,
+  AlertTriangleIcon } from
 'lucide-react';
+import { duplicateSlotTypeWarning } from '../lib/medicalDuplicates';
 
 const PROCEDURE_LABEL: Record<ClinicSlotProcedureType, string> = {
   spay_neuter: 'Spay/Neuter',
@@ -431,6 +433,33 @@ export function ClinicProfile() {
                       Pick at least one procedure.
                     </p>
                 }
+                  {/* Soft duplicate hints for one-shot procedures (spay/neuter,
+                      microchip). Warn, never block — the prior record may
+                      itself be wrong. */}
+                  {newAnimalId &&
+                (() => {
+                  const animal = animals.find((a) => a.id === newAnimalId);
+                  const warnings = [
+                  ...new Set(
+                    newProcedures.
+                    map((p) =>
+                    duplicateSlotTypeWarning(medicalRecords, animal, p, {
+                      excludeClinicId: event.id
+                    })
+                    ).
+                    filter(Boolean) as string[]
+                  )];
+
+                  return warnings.map((w) =>
+                  <p
+                    key={w}
+                    className="mt-1.5 flex items-start gap-1.5 text-xs text-status-medical-text">
+
+                          <AlertTriangleIcon className="w-3.5 h-3.5 shrink-0 mt-px" />
+                          <span>{w}</span>
+                        </p>
+                  );
+                })()}
                 </div>
                 <div>
                   <Label htmlFor="add_notes">Notes (optional)</Label>
@@ -511,6 +540,35 @@ export function ClinicProfile() {
                         }
                         onRemove={(proc) => deleteClinicSlotProcedure(proc.id)}
                         onAdd={(type) => addClinicSlotProcedure(s.id, type)} />
+                      }
+
+                        {/* Persistent duplicate hints for planned one-shot
+                            procedures — visible to anyone reviewing the
+                            clinic, not just whoever scheduled the slot. */}
+                        {!isCompleted && animal &&
+                      [
+                      ...new Set(
+                        clinicSlotProcedures.
+                        filter((p) => p.clinic_slot_id === s.id).
+                        map((p) =>
+                        duplicateSlotTypeWarning(
+                          medicalRecords,
+                          animal,
+                          p.procedure_type,
+                          { excludeClinicId: event.id }
+                        )
+                        ).
+                        filter(Boolean) as string[]
+                      )].
+                      map((w) =>
+                      <p
+                        key={w}
+                        className="mt-1.5 flex items-start gap-1.5 text-xs text-status-medical-text">
+
+                            <AlertTriangleIcon className="w-3.5 h-3.5 shrink-0 mt-px" />
+                            <span>{w}</span>
+                          </p>
+                      )
                       }
 
                         {s.notes &&

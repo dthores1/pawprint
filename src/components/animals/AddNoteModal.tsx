@@ -6,6 +6,7 @@ import { Button } from '../ui/Button';
 import { useWhisker } from '../../context/WhiskerContext';
 import { Animal, NoteType } from '../../types';
 import { animalDisplayName } from '../../lib/utils';
+import { useFostersEnabled } from '../../lib/useFostersEnabled';
 interface AddNoteModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -14,6 +15,7 @@ interface AddNoteModalProps {
 }
 export function AddNoteModal({ isOpen, onClose, animalId, animal }: AddNoteModalProps) {
   const { addNote } = useWhisker();
+  const fostersEnabled = useFostersEnabled();
   const [formData, setFormData] = useState({
     note_type: 'general' as NoteType,
     body: ''
@@ -73,7 +75,9 @@ export function AddNoteModal({ isOpen, onClose, animalId, animal }: AddNoteModal
             }>
             
             <option value="general">General</option>
+            {fostersEnabled &&
             <option value="foster_update">Foster Update</option>
+            }
           </Select>
         </div>
 

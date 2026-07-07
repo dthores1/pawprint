@@ -48,6 +48,7 @@ import { Animal, Person, AnimalStatus } from '../types';
 import { PawPrintIcon as PawPrintGlyph } from '../components/ui/PawPrintIcon';
 import { STATUS_LABELS, IN_CARE_STATUSES } from '../lib/animalStatus';
 import { useCanManageAnimals } from '../lib/useAnimalPermissions';
+import { useFostersEnabled } from '../lib/useFostersEnabled';
 // Stable string[] view of the in-care statuses for membership checks (module
 // scope so it doesn't re-create each render and churn the filter memo).
 const IN_CARE_SET: string[] = IN_CARE_STATUSES;
@@ -100,6 +101,7 @@ export function AnimalsList() {
   const { currentPersonId } = useAuth();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const canManageAnimals = useCanManageAnimals();
+  const fostersEnabled = useFostersEnabled();
   const [view, setView] = useState<'animals' | 'litters'>('animals');
   const isMobile = useIsMobile();
   // On phones the filter controls collapse behind a "Filters" toggle (closed by
@@ -293,6 +295,7 @@ export function AnimalsList() {
               {calculateAge(animal.estimated_birth_date)} · {animal.sex}
             </span>
           </div>
+          {fostersEnabled &&
           <div className="flex items-baseline justify-between gap-3">
             <span className="text-text-secondary shrink-0">Current Foster</span>
             {foster ?
@@ -306,6 +309,7 @@ export function AnimalsList() {
             <span className="text-text-secondary text-right">—</span>
             }
           </div>
+          }
           <div className="flex items-baseline justify-between gap-3">
             <span className="text-text-secondary shrink-0">Next Medical</span>
             {nextMedical ?
@@ -325,7 +329,7 @@ export function AnimalsList() {
   const matchesAllButSpecies = useCallback(
     (animal: Animal) => {
       const q = searchQuery.toLowerCase();
-      const foster = fosterByAnimal.get(animal.id);
+      const foster = fostersEnabled ? fosterByAnimal.get(animal.id) : null;
       const fosterName = foster ?
       `${foster.first_name} ${foster.last_name}`.toLowerCase() :
       '';
@@ -343,6 +347,7 @@ export function AnimalsList() {
       const matchesStatus =
       statusFilter.length === 0 || statusFilter.includes(animal.status);
       const matchesMyAnimals =
+      !fostersEnabled ||
       !flagFilters.includes('my_animals') ||
       currentPersonId != null &&
       fosterByAnimal.get(animal.id)?.id === currentPersonId;
@@ -392,7 +397,8 @@ export function AnimalsList() {
     traitFilter,
     traitIdsByAnimal,
     fosterByAnimal,
-    currentPersonId]
+    currentPersonId,
+    fostersEnabled]
   );
   const speciesPool = useMemo(
     () => animals.filter(matchesAllButSpecies),
@@ -535,7 +541,7 @@ export function AnimalsList() {
   // Count of active filter selections — shown on the mobile "Filters" toggle so
   // a collapsed panel still signals that filters are applied.
   const activeFilterCount =
-  activeChips.length + flagFilters.length + (includeHistorical ? 1 : 0);
+  activeChips.length + (fostersEnabled ? flagFilters.length : 0) + (includeHistorical ? 1 : 0);
   // Larger, full-width filter triggers on phones; compact inline at md+.
   // `!h-12` overrides the dropdown's built-in `h-9` (the project's `cn` doesn't
   // tailwind-merge, so a plain `h-12` wouldn't reliably win).
@@ -553,13 +559,18 @@ export function AnimalsList() {
   { header: 'Age', value: (a) => calculateAge(a.estimated_birth_date) },
   { header: 'Status', value: (a) => STATUS_LABELS[a.status] },
   { header: 'Microchip', value: (a) => a.microchip_number },
+  // Foster column only for foster-enabled orgs.
+  ...(fostersEnabled ?
+  [
   {
     header: 'Current Foster',
-    value: (a) => {
+    value: (a: Animal) => {
       const f = fosterByAnimal.get(a.id);
       return f ? `${f.first_name} ${f.last_name}` : '';
     }
-  },
+  }] :
+
+  []),
   { header: 'Intake Date', value: (a) => a.intake_date },
   { header: 'Intake Source', value: (a) => a.intake_source },
   { header: 'On Hold', value: (a) => !!a.is_on_hold },
@@ -721,7 +732,7 @@ export function AnimalsList() {
           className="hidden md:inline-block w-px h-6 bg-border mx-1"
           aria-hidden="true" />
 
-        {FLAG_FILTERS.map((f) =>
+        {fostersEnabled && FLAG_FILTERS.map((f) =>
         <button
           key={f.key}
           type="button"
@@ -836,7 +847,9 @@ export function AnimalsList() {
                   <SortableHeader label="Animal" sortKey="name" sort={sort} onSort={onSort} />
                   <SortableHeader label="Status" sortKey="status" sort={sort} onSort={onSort} />
                   <SortableHeader label="Age & Sex" sortKey="age" sort={sort} onSort={onSort} />
-                  <SortableHeader label="Current Foster" sortKey="foster" sort={sort} onSort={onSort} />
+                  {fostersEnabled &&
+                <SortableHeader label="Current Foster" sortKey="foster" sort={sort} onSort={onSort} />
+                }
                   <SortableHeader label="Next Medical" sortKey="medical" sort={sort} onSort={onSort} />
                 </tr>
               </thead>
@@ -844,7 +857,7 @@ export function AnimalsList() {
                 {rows.paddingTop > 0 &&
               <tr aria-hidden="true">
                     <td
-                  colSpan={5}
+                  colSpan={fostersEnabled ? 5 : 4}
                   style={{ height: rows.paddingTop, padding: 0, border: 0 }} />
 
                   </tr>
@@ -928,7 +941,8 @@ export function AnimalsList() {
                           {animal.sex}
                         </p>
                       </td>
-                      <td className="py-4 px-6">
+                      {fostersEnabled &&
+                    <td className="py-4 px-6">
                         {foster ?
                       <Link
                         to={`/fosters/${foster.id}`}
@@ -940,6 +954,7 @@ export function AnimalsList() {
                       <span className="text-sm text-text-secondary">—</span>
                       }
                       </td>
+                    }
                       <td className="py-4 px-6">
                         {nextMedical ?
                       <div>
@@ -962,7 +977,7 @@ export function AnimalsList() {
                 {rows.paddingBottom > 0 &&
               <tr aria-hidden="true">
                     <td
-                  colSpan={5}
+                  colSpan={fostersEnabled ? 5 : 4}
                   style={{ height: rows.paddingBottom, padding: 0, border: 0 }} />
 
                   </tr>

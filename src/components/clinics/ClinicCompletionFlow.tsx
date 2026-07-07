@@ -19,6 +19,7 @@ import {
 import { cn, formatDate, calculateAge } from '../../lib/utils';
 import { deriveAgeInfo } from '../../lib/age';
 import { isInCare } from '../../lib/animalStatus';
+import { duplicateDraftWarning } from '../../lib/medicalDuplicates';
 import {
   deriveProcedureName,
   getProcedureOptions,
@@ -400,6 +401,17 @@ export function ClinicCompletionFlow({ clinicEventId, onClose }: Props) {
 
   const validRecordsFor = (key: string) =>
   (state[key]?.records ?? []).filter(isDraftComplete);
+
+  // Soft duplicate hint for one-shot procedures (spay/neuter, microchip):
+  // the animal already has a completed record of this from outside this
+  // clinic. Warn, never block — see lib/medicalDuplicates.
+  const duplicateWarningFor = (animalId: string, d: RecordDraft) =>
+  duplicateDraftWarning(
+    medicalRecords,
+    animals.find((x) => x.id === animalId),
+    d.procedure,
+    { excludeClinicId: event?.id }
+  );
   const recordsToCreate = attendingAttendees.reduce(
     (sum, a) => sum + validRecordsFor(a.key).length,
     0
@@ -654,7 +666,8 @@ export function ClinicCompletionFlow({ clinicEventId, onClose }: Props) {
             onSetSex={setAnimalSex}
             sexTouchedIds={sexTouched}
             onSetAge={setAnimalAge}
-            ageTouchedIds={ageTouched} />
+            ageTouchedIds={ageTouched}
+            duplicateWarningFor={duplicateWarningFor} />
 
           }
 
@@ -666,7 +679,9 @@ export function ClinicCompletionFlow({ clinicEventId, onClose }: Props) {
             addedNeedingRecord={addedNeedingRecord}
             recordsToCreate={recordsToCreate}
             animals={animals}
-            state={state} />
+            state={state}
+            duplicateWarningFor={duplicateWarningFor}
+            removeRecord={removeRecord} />
 
           }
 
@@ -955,7 +970,8 @@ function Step2({
   onSetSex,
   sexTouchedIds,
   onSetAge,
-  ageTouchedIds
+  ageTouchedIds,
+  duplicateWarningFor
 }: {
   attendingAttendees: Attendee[];
   animals: any[];
@@ -968,6 +984,7 @@ function Step2({
   sexTouchedIds: Set<string>;
   onSetAge: (animalId: string, estimate: { value: number; unit: AgeUnit } | null) => void;
   ageTouchedIds: Set<string>;
+  duplicateWarningFor: (animalId: string, draft: RecordDraft) => string | undefined;
 }) {
   return (
     <div>
@@ -1043,6 +1060,7 @@ function Step2({
                   draft={d}
                   species={animal?.species}
                   sex={animal?.sex}
+                  warning={duplicateWarningFor(a.animal_id, d)}
                   onChange={(next) => updateRecord(a.key, next)}
                   onRemove={() => removeRecord(a.key, d.id)} />
 
@@ -1305,12 +1323,15 @@ function RecordDraftRow({
   draft,
   species,
   sex,
+  warning,
   onChange,
   onRemove
 }: {
   draft: RecordDraft;
   species?: string | null;
   sex?: Sex | null;
+  /** Soft duplicate hint (one-shot procedure already on record). */
+  warning?: string;
   onChange: (next: RecordDraft) => void;
   onRemove: () => void;
 }) {
@@ -1386,6 +1407,12 @@ function RecordDraftRow({
 
         <XIcon className="w-4 h-4" />
       </button>
+      {warning &&
+      <p className="w-full flex items-start gap-1.5 text-xs text-status-medical-text">
+          <AlertTriangleIcon className="w-3.5 h-3.5 shrink-0 mt-px" />
+          <span>{warning}</span>
+        </p>
+      }
     </div>);
 
 }
@@ -1399,7 +1426,9 @@ function Step3({
   addedNeedingRecord,
   recordsToCreate,
   animals,
-  state
+  state,
+  duplicateWarningFor,
+  removeRecord
 }: {
   attendingAttendees: Attendee[];
   didNotAttend: Attendee[];
@@ -1408,6 +1437,8 @@ function Step3({
   recordsToCreate: number;
   animals: any[];
   state: Record<string, AttendeeState>;
+  duplicateWarningFor: (animalId: string, draft: RecordDraft) => string | undefined;
+  removeRecord: (key: string, id: string) => void;
 }) {
   return (
     <div className="space-y-4">
@@ -1465,21 +1496,57 @@ function Step3({
                     </p>
                   </div>
                   {valid.length > 0 ?
-                <div className="flex flex-wrap gap-1.5 mt-2 pl-11">
-                      {valid.map((d) =>
-                  <span
-                    key={d.id}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-status-adoptable-bg text-status-adoptable-text">
+                <>
+                    <div className="flex flex-wrap gap-1.5 mt-2 pl-11">
+                      {valid.map((d) => {
+                    const dupe = duplicateWarningFor(a.animal_id, d);
+                    return (
+                      <span
+                        key={d.id}
+                        className={cn(
+                          'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium',
+                          dupe ?
+                          'bg-status-medical-bg text-status-medical-text' :
+                          'bg-status-adoptable-bg text-status-adoptable-text'
+                        )}>
 
-                          <CheckIcon className="w-3 h-3" />
+                          {dupe ?
+                      <AlertTriangleIcon className="w-3 h-3" /> :
+
+                      <CheckIcon className="w-3 h-3" />
+                      }
                           {deriveProcedureName({
-                      procedure_type: d.procedure_type,
-                      procedure: d.procedure || undefined,
-                      custom_procedure_name: d.custom_procedure_name
-                    })}
-                        </span>
-                  )}
-                    </div> :
+                        procedure_type: d.procedure_type,
+                        procedure: d.procedure || undefined,
+                        custom_procedure_name: d.custom_procedure_name
+                      })}
+                        </span>);
+
+                  })}
+                    </div>
+                    {valid.map((d) => {
+                    const dupe = duplicateWarningFor(a.animal_id, d);
+                    if (!dupe) return null;
+                    return (
+                      <p
+                        key={`warn-${d.id}`}
+                        className="flex items-start gap-1.5 text-xs text-status-medical-text mt-1.5 pl-11">
+
+                          <AlertTriangleIcon className="w-3.5 h-3.5 shrink-0 mt-px" />
+                          <span>
+                            {dupe}{' '}
+                            <button
+                            type="button"
+                            onClick={() => removeRecord(a.key, d.id)}
+                            className="font-semibold underline hover:no-underline">
+
+                              Skip this record
+                            </button>
+                          </span>
+                        </p>);
+
+                  })}
+                  </> :
 
                 <p className="text-xs text-text-secondary italic mt-1 pl-11">
                       No records

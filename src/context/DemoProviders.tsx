@@ -96,7 +96,8 @@ const DEMO_ORG: Org = {
   role: 'owner',
   timezone: 'America/Los_Angeles',
   show_all_reports: false,
-  show_guidance: true
+  show_guidance: true,
+  foster_management_enabled: true
 };
 
 // 'p_dan' is a seed Person, so attribution reads as a real name.
@@ -112,6 +113,7 @@ const demoAuthValue: AuthContextType = {
   updateOrgTimezone: async () => {},
   updateOrgShowAllReports: async () => {},
   updateOrgShowGuidance: async () => {},
+  updateOrgFosterManagement: async () => {},
   currentPersonId: 'p_dan',
   currentMemberId: 'm_dan',
   // "View as" needs real multi-member orgs + auth; inert in demo.
@@ -136,8 +138,20 @@ const demoAuthValue: AuthContextType = {
 };
 
 export function DemoAuthProvider({ children }: { children: React.ReactNode }) {
+  // Foster management is toggleable in-memory so demo visitors can preview
+  // the shelter (non-foster) persona from Settings; resets on refresh.
+  const [fosterEnabled, setFosterEnabled] = useState(true);
+  const value = useMemo<AuthContextType>(() => {
+    const org = { ...DEMO_ORG, foster_management_enabled: fosterEnabled };
+    return {
+      ...demoAuthValue,
+      organizations: [org],
+      currentOrg: org,
+      updateOrgFosterManagement: async (v: boolean) => setFosterEnabled(v)
+    };
+  }, [fosterEnabled]);
   return (
-    <AuthContext.Provider value={demoAuthValue}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>);
 
@@ -1235,6 +1249,22 @@ export function DemoWhiskerProvider({
       updateAnimal(animal_id, {
         current_foster_id: new_person_id
       });
+    },
+
+    endPlacement: async (animal_id, end_date, reason_ended) => {
+      setPlacements((prev) =>
+      prev.map((p) =>
+      p.animal_id === animal_id && p.placement_status === 'active' ?
+      {
+        ...p,
+        placement_status: 'completed' as const,
+        end_date,
+        reason_ended: reason_ended?.trim() || 'Returned to the organization.'
+      } :
+      p
+      )
+      );
+      updateAnimal(animal_id, { current_foster_id: undefined });
     },
 
     addProduct: async (product) => {

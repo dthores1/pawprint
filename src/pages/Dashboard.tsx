@@ -29,6 +29,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Priority, Animal, PersonRole } from '../types';
 import { ADOPTION_STATUS_LABELS } from '../lib/adoptions';
+import { useFostersEnabled } from '../lib/useFostersEnabled';
 import { BoneIcon } from '../components/ui/BoneIcon';
 import { HelpNeededWidget } from '../components/dashboard/HelpNeededWidget';
 
@@ -140,6 +141,17 @@ export function Dashboard() {
   // "In foster" is derived from the current_foster_id cache, not the status.
   const animalsInFoster = animals.filter((a) => !!a.current_foster_id);
   const availableSpots = totalCapacity - activePlacementsCount;
+  const fostersEnabled = useFostersEnabled();
+  // Shelter-persona replacements for the two foster stat cards (In Foster and
+  // Intake Capacity are both placement/foster-capacity math).
+  const adoptableCount = animals.filter((a) => a.status === 'adoptable').length;
+  const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+  const adopted30d = adoptions.filter(
+    (a) =>
+    a.status === 'completed' &&
+    a.completed_at &&
+    Date.now() - new Date(a.completed_at).getTime() <= THIRTY_DAYS_MS
+  ).length;
 
   // Animals needing action: elevated priority OR an open action item (the
   // literal next step — e.g. a foster reassignment request). An open item always
@@ -327,10 +339,21 @@ export function Dashboard() {
           color: 'text-primary',
           bg: 'bg-primary/10'
         },
+        // Foster orgs see placement stats; shelters see adoption-pipeline
+        // stats in the same two slots (In Foster and Intake Capacity are
+        // both foster/placement math).
+        fostersEnabled ?
         {
           label: 'In Foster',
           value: animalsInFoster.length,
           icon: HomeIcon,
+          color: 'text-[#356A9A]',
+          bg: 'bg-[#DCEAF7]'
+        } :
+        {
+          label: 'Adoptable',
+          value: adoptableCount,
+          icon: HeartIcon,
           color: 'text-[#356A9A]',
           bg: 'bg-[#DCEAF7]'
         },
@@ -341,9 +364,17 @@ export function Dashboard() {
           color: 'text-[#9B3A3A]',
           bg: 'bg-[#F5D7D7]'
         },
+        fostersEnabled ?
         {
           label: 'Intake Capacity',
           value: availableSpots,
+          icon: HomeIcon,
+          color: 'text-[#3E7B52]',
+          bg: 'bg-[#DDEFE2]'
+        } :
+        {
+          label: 'Adopted (30 days)',
+          value: adopted30d,
           icon: HomeIcon,
           color: 'text-[#3E7B52]',
           bg: 'bg-[#DDEFE2]'
@@ -419,7 +450,7 @@ export function Dashboard() {
                             <p className="text-sm text-text-secondary line-clamp-1">
                               {actionDesc ?
                             formatDatesInText(actionDesc) :
-                            !hasActivePlacement ?
+                            fostersEnabled && !hasActivePlacement ?
                             'Needs placement' :
                             'Needs review'}
                             </p>

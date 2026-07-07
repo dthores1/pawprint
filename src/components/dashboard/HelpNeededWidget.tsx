@@ -10,6 +10,7 @@ import {
 import { Card } from '../ui/Card';
 import { useWhisker } from '../../context/WhiskerContext';
 import { useCanManageSupplyRequests } from '../../lib/useSupplyPermissions';
+import { useFostersEnabled } from '../../lib/useFostersEnabled';
 import { cn, animalDisplayName } from '../../lib/utils';
 import { TransportRequest, SittingRequest } from '../../types';
 
@@ -102,6 +103,7 @@ export function HelpNeededWidget() {
   } = useWhisker();
   // Supply requests are only shown to people who can fulfill them.
   const canFulfillSupply = useCanManageSupplyRequests();
+  const fostersEnabled = useFostersEnabled();
 
   const animalName = (id?: string | null) => {
     if (!id) return undefined;
@@ -154,7 +156,8 @@ export function HelpNeededWidget() {
     filter((n): n is string => Boolean(n));
     return names.length ? names.join(', ') : 'Sitting request';
   };
-  const sittingItems: HelpItem[] = sittingRequests.
+  // Sitting rides on foster placements — hidden along with foster management.
+  const sittingItems: HelpItem[] = (fostersEnabled ? sittingRequests : []).
   filter((s) => s.status === 'open' && !isSittingPast(s)).
   map((s) => ({
     id: `sitting-${s.id}`,

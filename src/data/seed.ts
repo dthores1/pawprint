@@ -81,13 +81,14 @@ export const seedOrganizationSpecies: OrganizationSpecies[] = seedSpecies.map((s
 }));
 export const seedOrganizationBreeds: OrganizationBreed[] = [];
 
-// Per-org trait definitions (mirrors the migration 0045 default seed).
+// Per-org trait definitions (mirrors the migration 0045 default seed, minus
+// Bonded Pair — removed in 0092; bonded pairs are relationships, not tags).
 const TRAIT_DEFAULTS: [string, string | null][] = [
 ['Affectionate', null], ['Playful', null], ['Shy', null], ['Independent', null],
 ['High Energy', null], ['Low Energy', null], ['Dog Friendly', null],
 ['Cat Friendly', null], ['Kid Friendly', null], ['Senior Friendly', null],
 ['Food Motivated', null], ['Needs Quiet Home', null],
-['Needs Experienced Adopter', null], ['Bonded Pair', null], ['Special Needs', null],
+['Needs Experienced Adopter', null], ['Special Needs', null],
 ['House Trained', 'dog'], ['Crate Trained', 'dog'], ['Leash Trained', 'dog'],
 ['Litter Box Trained', 'cat']];
 

@@ -245,6 +245,7 @@ export function ReportsPage() {
   // The org-wide "Show All Reports to Everyone" setting opens everything.
   const { currentOrg } = useAuth();
   const showAllReports = !!currentOrg?.show_all_reports;
+  const fostersEnabled = currentOrg?.foster_management_enabled !== false;
   const canViewSites = useCanManageSites() || showAllReports;
   const canViewSupply = useCanViewSupplyFinancials(); // already folds in showAll
 
@@ -559,7 +560,9 @@ export function ReportsPage() {
             Reports
           </h1>
           <p className="text-text-secondary mt-1">
-            Operational metrics across adoptions, animals, fosters, and clinics.
+            {fostersEnabled ?
+            'Operational metrics across adoptions, animals, fosters, and clinics.' :
+            'Operational metrics across adoptions, animals, and clinics.'}
           </p>
         </div>
         <ReportsDateFilter
@@ -676,7 +679,9 @@ export function ReportsPage() {
         <SectionTitle>Animals</SectionTitle>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           <MetricCard label="Adoptable" value={adoptableCount} />
+          {fostersEnabled &&
           <MetricCard label="Fostered" value={fosteredCount} />
+          }
           <MetricCard label="Adoption pending" value={adoptionPendingCount} />
           <MetricCard label="Released" value={releasedCount} />
         </div>
@@ -821,7 +826,8 @@ export function ReportsPage() {
       </section>
       }
 
-      {/* Fosters */}
+      {/* Fosters — hidden entirely for non-foster orgs. */}
+      {fostersEnabled &&
       <section>
         <SectionTitle>Fosters</SectionTitle>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -841,6 +847,7 @@ export function ReportsPage() {
 
         </div>
       </section>
+      }
 
       {/* Clinic */}
       <section>

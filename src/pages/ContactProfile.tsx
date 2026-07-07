@@ -14,7 +14,7 @@ import { StatusBadge } from '../components/ui/Badge';
 import { EditContactModal } from '../components/contacts/EditContactModal';
 import { AddressDisplay } from '../components/ui/AddressDisplay';
 import { personToAddressValue } from '../lib/address';
-import { animalDisplayName } from '../lib/utils';
+import { animalDisplayName, hasStatedCapacity } from '../lib/utils';
 import {
   ArrowLeftIcon,
   MapPinIcon,
@@ -283,7 +283,11 @@ export function ContactProfile() {
                 <div>
                   <span className="text-text-secondary">Capacity: </span>
                   <span className="font-medium text-text-primary">
-                    {activePlacements.length} / {cap}
+                    {hasStatedCapacity(person.max_capacity) ?
+                    `${activePlacements.length} / ${cap}` :
+                    activePlacements.length > 0 ?
+                    `${activePlacements.length} in foster` :
+                    'Not specified'}
                   </span>
                 </div>
                 {(person.preferred_species ?? []).length > 0 &&

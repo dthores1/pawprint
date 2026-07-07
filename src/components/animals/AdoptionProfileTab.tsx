@@ -490,7 +490,8 @@ export function AdoptionProfileTab({
       <p className="mt-5 pt-4 border-t border-border text-xs text-text-secondary">
         Generated {formatDate(profile.generated_at)}
         {profile.model ? ` · ${profile.model}` : ''}. Fixed sections come from
-        your organization's template. Review before publishing.
+        your organization's template. AI-generated drafts should
+        be reviewed before publishing.
       </p>
     </Card>
     {confirmRegen &&

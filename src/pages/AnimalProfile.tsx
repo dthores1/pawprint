@@ -80,6 +80,8 @@ import {
   useIsActiveFosterOf } from
 '../lib/useAnimalPermissions';
 import { RequestReassignmentModal } from '../components/animals/RequestReassignmentModal';
+import { EndPlacementModal } from '../components/animals/EndPlacementModal';
+import { useFostersEnabled } from '../lib/useFostersEnabled';
 
 // A done/pending checklist row, shared by the outcome summary cards below.
 function SummaryCheckRow({ done, label }: { done: boolean; label: string }) {
@@ -153,6 +155,7 @@ export function AnimalProfile() {
   const canManageMedical = useCanManageMedical();
   const canManageListings = useCanManageExternalListings();
   const canManageFosters = useCanManageFosters();
+  const fostersEnabled = useFostersEnabled();
   const canManageAdoptions = useCanManageAdoptions();
   const isActiveFoster = useIsActiveFosterOf(id);
   // "Foster-only": the current user is the assigned foster but cannot manage
@@ -169,6 +172,7 @@ export function AnimalProfile() {
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isPlaceModalOpen, setIsPlaceModalOpen] = useState(false);
+  const [isEndPlacementOpen, setIsEndPlacementOpen] = useState(false);
   const [isStartAdoptionOpen, setIsStartAdoptionOpen] = useState(false);
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
   const [isAddPhotoOpen, setIsAddPhotoOpen] = useState(false);
@@ -671,8 +675,15 @@ export function AnimalProfile() {
           </div>
           <div className="flex-1 p-6 md:p-8 flex flex-col justify-between min-w-0">
             <div>
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-4">
-                <div className="min-w-0">
+              {/* Name + actions. Content-driven wrap instead of a viewport
+                  breakpoint: this column's width depends on the sidebar and
+                  hero image, not the viewport, so breakpoints misfire on
+                  tablets. The name block reserves a 16rem basis and grows;
+                  when the actions can't fit beside it they wrap onto their
+                  own line as a group (and wrap internally if still tight) —
+                  the name is never squeezed under the buttons. */}
+              <div className="flex flex-wrap items-start gap-4 mb-4">
+                <div className="grow shrink basis-64 min-w-0">
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-2">
                     {animal.name ?
                     <h1 className="text-4xl font-heading font-bold text-text-primary break-words">
@@ -733,7 +744,7 @@ export function AnimalProfile() {
 
                   })()}
                 </div>
-                <div className="flex flex-wrap gap-2 sm:shrink-0">
+                <div className="flex flex-wrap gap-2">
                   {canManageAdoptions && animal.status === 'adoptable' && !activeAdoption &&
                   <Button
                     variant="primary"
@@ -744,7 +755,7 @@ export function AnimalProfile() {
                       Start Adoption
                     </Button>
                   }
-                  {canManageFosters && inCare &&
+                  {fostersEnabled && canManageFosters && inCare &&
                   <Button
                     variant={
                     animal.status === 'adoptable' ? 'outline' : 'primary'
@@ -758,7 +769,7 @@ export function AnimalProfile() {
                   }
                   {/* The assigned foster can't reassign themselves — they ask a
                       coordinator to find a new placement. */}
-                  {fosterOnly && inCare &&
+                  {fostersEnabled && fosterOnly && inCare &&
                   <Button
                     variant="outline"
                     size="sm"
@@ -855,6 +866,12 @@ export function AnimalProfile() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-6 border-t border-border">
+              {/* With foster management off, the Current Foster cell is hidden
+                  — EXCEPT while an active placement exists (grandfathered:
+                  the animal is physically in someone's home, so who has it
+                  must stay visible until the placement is ended). The
+                  Adopted By variant always shows once adopted. */}
+              {(isAdopted || fostersEnabled || !!currentFoster) &&
               <div className="flex items-center gap-2.5">
                 <div className="p-1.5 bg-[#DCEAF7] text-[#356A9A] rounded-lg shrink-0">
                   <HomeIcon className="w-4 h-4" />
@@ -877,12 +894,19 @@ export function AnimalProfile() {
                 <div>
                     <p className="text-sm text-text-secondary">Current Foster</p>
                     {currentFoster ?
+                  fostersEnabled ?
                   <Link
                     to={`/fosters/${currentFoster.id}`}
                     className="font-medium text-primary hover:underline">
 
                         {currentFoster.first_name} {currentFoster.last_name}
                       </Link> :
+
+                  // Grandfathered (fosters off): the profile route is
+                  // gated, so show the name unlinked.
+                  <p className="font-medium text-text-primary">
+                        {currentFoster.first_name} {currentFoster.last_name}
+                      </p> :
 
                   <p className="font-medium text-text-primary">
                         None (Needs Placement)
@@ -909,9 +933,23 @@ export function AnimalProfile() {
                         </p> :
                     null;
                   })()}
+                    {/* The "no new foster" exit — the animal returns to the
+                        org's direct care. Reassignment stays in the header
+                        button; this covers foster-unavailable and program
+                        wind-down (incl. when foster management is off). */}
+                    {currentFoster && canManageFosters &&
+                  <button
+                    type="button"
+                    onClick={() => setIsEndPlacementOpen(true)}
+                    className="text-xs font-medium text-text-secondary hover:text-[#9B3A3A] underline underline-offset-2 mt-0.5">
+
+                        End placement
+                      </button>
+                  }
                   </div>
                 }
               </div>
+              }
               {originSite &&
               <div className="flex items-center gap-2.5">
                   <div className="p-1.5 bg-primary/10 text-primary rounded-lg shrink-0">
@@ -1546,6 +1584,12 @@ export function AnimalProfile() {
         isOpen={isPlaceModalOpen}
         onClose={() => setIsPlaceModalOpen(false)}
         animalId={animal.id} />
+
+      <EndPlacementModal
+        isOpen={isEndPlacementOpen}
+        onClose={() => setIsEndPlacementOpen(false)}
+        animal={animal}
+        foster={currentFoster} />
 
       <RequestReassignmentModal
         isOpen={isReassignRequestOpen}

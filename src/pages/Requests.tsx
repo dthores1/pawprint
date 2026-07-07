@@ -11,6 +11,7 @@ import { NewTransportRequestModal } from '../components/transports/NewTransportR
 import { NewSittingRequestModal } from '../components/sitting/NewSittingRequestModal';
 import { useCanManageSupplyRequests } from '../lib/useSupplyPermissions';
 import { GuidanceLink } from '../components/guidance/GuidanceLink';
+import { useFostersEnabled } from '../lib/useFostersEnabled';
 
 type RequestsTab = 'supply' | 'transport' | 'sitting';
 const TABS: { key: RequestsTab; label: string }[] = [
@@ -26,9 +27,15 @@ const NEW_LABEL: Record<RequestsTab, string> = {
 
 export function Requests() {
   const [searchParams, setSearchParams] = useSearchParams();
+  // Sitting requests cover foster placements, so the whole tab follows the
+  // org's foster-management setting (a shelter has no placements to sit).
+  const fostersEnabled = useFostersEnabled();
+  const tabs = fostersEnabled ? TABS : TABS.filter((t) => t.key !== 'sitting');
   const param = searchParams.get('tab');
   const tab: RequestsTab =
-  param === 'transport' || param === 'sitting' ? param : 'supply';
+  param === 'transport' || param === 'sitting' && fostersEnabled ?
+  param as RequestsTab :
+  'supply';
   const [isNewOpen, setIsNewOpen] = useState(false);
   const canManageSupply = useCanManageSupplyRequests();
   // Deep-link target: ?request=<id> asks the active tab's view to focus/open that
@@ -59,7 +66,9 @@ export function Requests() {
             Requests
           </h1>
           <p className="text-text-secondary mt-1">
-            Coordinate supplies, transportation, and sitting across the org.
+            {fostersEnabled ?
+            'Coordinate supplies, transportation, and sitting across the org.' :
+            'Coordinate supplies and transportation across the org.'}
           </p>
           <GuidanceLink guidanceKey="requests_intro" />
         </div>
@@ -80,7 +89,7 @@ export function Requests() {
       </div>
 
       <div className="flex items-center gap-1 border-b border-border">
-        {TABS.map((t) =>
+        {tabs.map((t) =>
         <button
           key={t.key}
           type="button"

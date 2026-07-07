@@ -29,6 +29,12 @@ interface SupplyRequestDetailModalProps {
   requestId: string | null;
 }
 
+// Money display for the Total Cost input: two decimals, so a stored 15.5
+// renders as "15.50" instead of dropping the trailing zero.
+function formatCost(value: number | null | undefined): string {
+  return value != null ? value.toFixed(2) : '';
+}
+
 const STATUS_LABELS: Record<SupplyRequestStatus, string> = {
   submitted: 'Submitted',
   in_progress: 'In Progress',
@@ -78,7 +84,7 @@ export function SupplyRequestDetailModal({
   // Fulfillment fields are inline-editable; save on blur to keep things simple.
   const [supplier, setSupplier] = useState<string>(request?.supplier ?? '');
   const [totalCost, setTotalCost] = useState<string>(
-    request?.total_cost != null ? String(request.total_cost) : ''
+    formatCost(request?.total_cost)
   );
   const [addressCopied, setAddressCopied] = useState(false);
   const [denyMode, setDenyMode] = useState(false);
@@ -100,9 +106,7 @@ export function SupplyRequestDetailModal({
 
   useEffect(() => {
     setSupplier(request?.supplier ?? '');
-    setTotalCost(
-      request?.total_cost != null ? String(request.total_cost) : ''
-    );
+    setTotalCost(formatCost(request?.total_cost));
     setAddressCopied(false);
     setDenyMode(false);
     setDenyReason('');
@@ -139,6 +143,10 @@ export function SupplyRequestDetailModal({
       patch.fulfilled_date = new Date().toISOString();
     }
     updateSupplyRequest(request.id, patch);
+    // Fulfillment and cancellation are terminal (like denial below) — close
+    // the modal so the user returns to the list instead of staring at a
+    // finished request.
+    if (next === 'fulfilled' || next === 'cancelled') onClose();
   };
 
   const handleConfirmDeny = () => {
@@ -166,6 +174,8 @@ export function SupplyRequestDetailModal({
     const trimmed = totalCost.trim();
     const parsed = trimmed === '' ? undefined : Number(trimmed);
     if (parsed != null && isNaN(parsed)) return;
+    // Normalize the display to money format on blur (15.5 → 15.50).
+    setTotalCost(formatCost(parsed));
     if (parsed === request.total_cost) return;
     updateSupplyRequest(request.id, { total_cost: parsed });
   };

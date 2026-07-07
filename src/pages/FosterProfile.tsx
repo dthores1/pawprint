@@ -10,7 +10,7 @@ import { PlaceAnimalModal } from '../components/animals/PlaceAnimalModal';
 import { EditFosterModal } from '../components/fosters/EditFosterModal';
 import { AddressDisplay } from '../components/ui/AddressDisplay';
 import { personToAddressValue } from '../lib/address';
-import { animalDisplayName } from '../lib/utils';
+import { animalDisplayName, hasStatedCapacity } from '../lib/utils';
 import {
   ArrowLeftIcon,
   MapPinIcon,
@@ -239,22 +239,31 @@ export function FosterProfile() {
                   {activeCount}
                 </span>
                 <span className="text-text-secondary text-lg">
-                  {' '}
-                  / {cap}
+                  {hasStatedCapacity(foster.max_capacity) ?
+                  ` / ${cap}` :
+                  ' in care'}
                 </span>
               </div>
             </div>
-            <div className="w-full bg-background rounded-full h-4 overflow-hidden mb-2">
-              <div
-                className={`h-4 rounded-full transition-all duration-1000 ${isFull ? 'bg-status-urgent-text' : 'bg-[#3E7B52]'}`}
-                style={{
-                  width: `${Math.min(100, capacityPercent)}%`
-                }} />
-              
-            </div>
-            {isFull &&
-            <p className="text-sm text-status-urgent-text font-medium text-right">
-                At maximum capacity
+            {hasStatedCapacity(foster.max_capacity) ?
+            <>
+                <div className="w-full bg-background rounded-full h-4 overflow-hidden mb-2">
+                  <div
+                  className={`h-4 rounded-full transition-all duration-1000 ${isFull ? 'bg-status-urgent-text' : 'bg-[#3E7B52]'}`}
+                  style={{
+                    width: `${Math.min(100, capacityPercent)}%`
+                  }} />
+
+                </div>
+                {isFull &&
+              <p className="text-sm text-status-urgent-text font-medium text-right">
+                    At maximum capacity
+                  </p>
+              }
+              </> :
+
+            <p className="text-sm text-text-secondary">
+                No capacity limit specified.
               </p>
             }
           </Card>

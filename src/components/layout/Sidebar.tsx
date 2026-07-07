@@ -19,6 +19,7 @@ import { LogoMark } from '../ui/Logo';
 import { useAuth } from '../../context/AuthContext';
 import { useWhisker } from '../../context/WhiskerContext';
 import { isDemoMode } from '../../lib/appMode';
+import { useFostersEnabled } from '../../lib/useFostersEnabled';
 
 export interface NavItem {
   to: string;
@@ -103,7 +104,14 @@ export const navItems: NavItem[] = [
 /** The nav items an org has chosen to show (locked items always included). */
 export function useVisibleNavItems(): NavItem[] {
   const { isTabVisible } = useWhisker();
-  return navItems.filter((item) => item.locked || isTabVisible(item.key));
+  const fostersEnabled = useFostersEnabled();
+  return navItems.filter(
+    (item) =>
+    // "Enable Foster Management" (Settings → General) force-hides the
+    // Fosters tab regardless of per-tab navigation settings.
+    (item.key !== 'fosters' || fostersEnabled) && (
+    item.locked || isTabVisible(item.key))
+  );
 }
 
 export function Sidebar() {

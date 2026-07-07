@@ -29,7 +29,7 @@ import {
 import { useWindowRowVirtualizer } from '../lib/useWindowRowVirtualizer';
 import { Person } from '../types';
 import { enabledSpeciesList } from '../lib/orgCatalog';
-import { cn } from '../lib/utils';
+import { cn, hasStatedCapacity } from '../lib/utils';
 import { ExportButton } from '../components/ui/ExportButton';
 import { CsvColumn } from '../lib/csv';
 
@@ -86,6 +86,8 @@ export function FostersList() {
   activeCountByFoster.get(fosterId) ?? 0;
   const getAvailability = (foster: Person): Availability => {
     if (foster.active === false) return 'inactive';
+    // No stated capacity means "no limit", not "full".
+    if (!hasStatedCapacity(foster.max_capacity)) return 'available';
     const cap = foster.max_capacity ?? 0;
     return getActivePlacementsCount(foster.id) >= cap ? 'full' : 'available';
   };
@@ -101,7 +103,8 @@ export function FostersList() {
       `${foster.first_name} ${foster.last_name} ${foster.email} ${foster.phone ?? ''} ${foster.address ?? ''}`.toLowerCase();
       if (!haystack.includes(q)) return false;
       if (activeOnly && foster.active === false) return false;
-      if (hasCapacityOnly) {
+      if (hasCapacityOnly && hasStatedCapacity(foster.max_capacity)) {
+        // No stated capacity → assume they have room (nothing says otherwise).
         const cap = foster.max_capacity ?? 0;
         if (getActivePlacementsCount(foster.id) >= cap) return false;
       }
@@ -136,7 +139,10 @@ export function FostersList() {
         case 'location':
           return (f.address ?? '').toLowerCase();
         case 'capacity':
-          return (f.max_capacity ?? 0) - getActivePlacementsCount(f.id);
+          // No stated capacity sorts as unlimited open spots.
+          return hasStatedCapacity(f.max_capacity) ?
+          (f.max_capacity ?? 0) - getActivePlacementsCount(f.id) :
+          Number.MAX_SAFE_INTEGER;
         case 'preferences':
           return (f.preferred_species ?? []).join(', ').toLowerCase();
         default:
@@ -158,7 +164,7 @@ export function FostersList() {
   { header: 'Roles', value: (f) => f.roles.join('; ') },
   { header: 'Availability', value: (f) => getAvailability(f) },
   { header: 'Active Placements', value: (f) => getActivePlacementsCount(f.id) },
-  { header: 'Max Capacity', value: (f) => f.max_capacity ?? 0 },
+  { header: 'Max Capacity', value: (f) => f.max_capacity || '' },
   { header: 'Preferred Species', value: (f) => (f.preferred_species ?? []).join('; ') },
   { header: 'Address', value: (f) => f.address_formatted ?? f.address },
   { header: 'City', value: (f) => f.address_city },
@@ -333,7 +339,8 @@ export function FostersList() {
         renderItem={(foster) => {
           const activeCount = getActivePlacementsCount(foster.id);
           const cap = foster.max_capacity ?? 0;
-          const isFull = activeCount >= cap;
+          const capStated = hasStatedCapacity(foster.max_capacity);
+          const isFull = capStated && activeCount >= cap;
           const capacityPercent = cap > 0 ? activeCount / cap * 100 : 0;
           return (
             <Link to={`/fosters/${foster.id}`} className="block h-full group">
@@ -373,10 +380,15 @@ export function FostersList() {
                     <div className="flex justify-between text-sm mb-2">
                       <span className="text-text-secondary">Capacity</span>
                       <span className="font-medium text-text-primary">
-                        {activeCount} / {cap}
+                        {capStated ?
+                    `${activeCount} / ${cap}` :
+                    activeCount > 0 ?
+                    `${activeCount} in foster` :
+                    'Not specified'}
                       </span>
                     </div>
-                    <div className="w-full bg-background rounded-full h-2 overflow-hidden">
+                    {capStated &&
+                <div className="w-full bg-background rounded-full h-2 overflow-hidden">
                       <div
                     className={`h-2 rounded-full transition-all duration-500 ${isFull ? 'bg-status-urgent-text' : 'bg-[#3E7B52]'}`}
                     style={{
@@ -384,6 +396,7 @@ export function FostersList() {
                     }} />
 
                     </div>
+                }
                     <div className="mt-3 flex gap-1 flex-wrap">
                       {(foster.preferred_species ?? []).map((s) =>
                   <span
@@ -440,7 +453,8 @@ export function FostersList() {
                   const foster = sortedFosters[vr.index];
                   const activeCount = getActivePlacementsCount(foster.id);
                   const cap = foster.max_capacity ?? 0;
-                  const isFull = activeCount >= cap;
+                  const capStated = hasStatedCapacity(foster.max_capacity);
+                  const isFull = capStated && activeCount >= cap;
                   const capacityPercent = cap > 0 ? activeCount / cap * 100 : 0;
                   const availability = getAvailability(foster);
                   return (
@@ -490,7 +504,8 @@ export function FostersList() {
                           </p>
                         </td>
                         <td className="py-4 px-6">
-                          <div className="flex items-center gap-3">
+                          {capStated ?
+                      <div className="flex items-center gap-3">
                             <span className="text-sm font-medium text-text-primary w-8">
                               {activeCount}/{cap}
                             </span>
@@ -500,9 +515,16 @@ export function FostersList() {
                             style={{
                               width: `${Math.min(100, capacityPercent)}%`
                             }} />
-                          
+
                             </div>
-                          </div>
+                          </div> :
+
+                      <span className="text-sm text-text-secondary">
+                            {activeCount > 0 ?
+                        `${activeCount} in foster` :
+                        'Not specified'}
+                          </span>
+                      }
                         </td>
                         <td className="py-4 px-6">
                           <div className="flex gap-1 flex-wrap">

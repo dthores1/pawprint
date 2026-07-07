@@ -352,8 +352,7 @@ export function SummaryTab({
 
       <p className="mt-5 pt-4 border-t border-border text-xs text-text-secondary">
         Generated {formatDate(summary.generated_at)}
-        {summary.model ? ` · ${summary.model}` : ''}. AI-generated drafts should
-        be reviewed before publishing.
+        {summary.model ? ` · ${summary.model}` : ''}. AI-generated from animal records.
       </p>
     </Card>
     {confirmRegen &&

@@ -32,6 +32,11 @@ export interface Org {
   /** Org-wide kill switch for in-app guidance banners/empty-state copy.
    *  Default true; admins turn it off on Settings. */
   show_guidance: boolean;
+  /** Whether the org uses foster workflows (default true). When false, the
+   *  UI hides the Foster Network tab, placement actions, foster stats/
+   *  filters, and the placement-based Sitting workflow — brick-and-mortar
+   *  shelters don't foster. UI-level only; no data or permission changes. */
+  foster_management_enabled: boolean;
 }
 
 export interface AuthContextType {
@@ -51,6 +56,8 @@ export interface AuthContextType {
   updateOrgShowAllReports: (value: boolean) => Promise<void>;
   /** Toggle org-wide in-app guidance banners (admin-gated by RLS). */
   updateOrgShowGuidance: (value: boolean) => Promise<void>;
+  /** Toggle org-wide foster management workflows (admin-gated by RLS). */
+  updateOrgFosterManagement: (value: boolean) => Promise<void>;
 
   /**
    * The signed-in user's `people` row id in the current org, used to attribute
@@ -176,7 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setOrgsLoading(true);
     const { data, error } = await supabase.
     from('organization_members').
-    select('role, organizations ( id, name, timezone, show_all_reports, show_guidance )').
+    select('role, organizations ( id, name, timezone, show_all_reports, show_guidance, foster_management_enabled )').
     eq('user_id', uid);
     if (!error && data) {
       const orgs: Org[] = data.
@@ -185,7 +192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const o = Array.isArray(row.organizations) ?
         row.organizations[0] :
         row.organizations;
-        return o ? { id: o.id, name: o.name, role: row.role, timezone: o.timezone ?? 'America/Los_Angeles', show_all_reports: o.show_all_reports ?? false, show_guidance: o.show_guidance ?? true } : null;
+        return o ? { id: o.id, name: o.name, role: row.role, timezone: o.timezone ?? 'America/Los_Angeles', show_all_reports: o.show_all_reports ?? false, show_guidance: o.show_guidance ?? true, foster_management_enabled: o.foster_management_enabled ?? true } : null;
       }).
       filter((o): o is Org => o !== null).
       sort((a, b) => a.name.localeCompare(b.name));
@@ -299,6 +306,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       eq('id', orgId);
       if (error) {
         console.error('[organizations] show_guidance update failed:', error.message);
+        return;
+      }
+      await refreshOrganizations();
+    },
+    [currentOrg?.id, refreshOrganizations]
+  );
+
+  const updateOrgFosterManagement = useCallback(
+    async (value: boolean) => {
+      const orgId = currentOrg?.id;
+      if (!orgId) return;
+      const { error } = await supabase.
+      from('organizations').
+      update({ foster_management_enabled: value }).
+      eq('id', orgId);
+      if (error) {
+        console.error(
+          '[organizations] foster_management_enabled update failed:',
+          error.message
+        );
         return;
       }
       await refreshOrganizations();
@@ -635,6 +662,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updateOrgTimezone,
         updateOrgShowAllReports,
         updateOrgShowGuidance,
+        updateOrgFosterManagement,
         currentPersonId: effectivePersonId,
         currentMemberId: effectiveMemberId,
         isViewingAs: !!viewAs,

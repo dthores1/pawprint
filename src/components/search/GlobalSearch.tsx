@@ -12,6 +12,7 @@ import {
 'lucide-react';
 import { useWhisker } from '../../context/WhiskerContext';
 import { animalDisplayName } from '../../lib/utils';
+import { useFostersEnabled } from '../../lib/useFostersEnabled';
 import { Avatar } from '../ui/Avatar';
 import { StatusBadge, PriorityBadge, STATUS_LABELS } from '../ui/Badge';
 import { SpeciesBadge } from '../ui/SpeciesBadge';
@@ -39,9 +40,13 @@ export function GlobalSearch({
     placements,
     actionItems
   } = useWhisker();
+  const fostersEnabled = useFostersEnabled();
   const fosters = useMemo(
-    () => people.filter((p) => p.roles.includes('foster_parent')),
-    [people]
+    () =>
+    fostersEnabled ?
+    people.filter((p) => p.roles.includes('foster_parent')) :
+    [],
+    [people, fostersEnabled]
   );
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -147,11 +152,11 @@ export function GlobalSearch({
         actionItems.find(
           (it) => it.animal_id === a.id && it.status === 'open'
         )?.description || (
-        !hasPlacement ? 'Needs placement' : 'Needs review')
+        fostersEnabled && !hasPlacement ? 'Needs placement' : 'Needs review')
       };
     });
     return [...overdue, ...highPriority].slice(0, 5);
-  }, [animals, medicalRecords, placements, actionItems, q]);
+  }, [animals, medicalRecords, placements, actionItems, q, fostersEnabled]);
   const hasResults =
   animalResults.length > 0 ||
   fosterResults.length > 0 ||
@@ -188,7 +193,11 @@ export function GlobalSearch({
           value={query}
           placeholder={
           placeholder || (
-          isHero ? 'Search animals, fosters, overdue items…' : 'Search…')
+          isHero ?
+          fostersEnabled ?
+          'Search animals, fosters, overdue items…' :
+          'Search animals, contacts, overdue items…' :
+          'Search…')
           }
           onChange={(e) => {
             setQuery(e.target.value);

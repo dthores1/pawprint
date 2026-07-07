@@ -105,6 +105,31 @@ export function generateId(): string {
 }
 
 /**
+ * A foster's max_capacity of 0 (or unset) means "no limit specified", not
+ * "no room" — never treat it as full and never warn about exceeding it.
+ */
+export function hasStatedCapacity(maxCapacity?: number | null): boolean {
+  return (maxCapacity ?? 0) > 0;
+}
+
+/**
+ * Standard wording for a foster's capacity line: "2 of 3 spots filled" when a
+ * capacity is stated, "2 animals in foster" / "Capacity not specified" when not.
+ */
+export function fosterCapacityLabel(
+activeCount: number,
+maxCapacity?: number | null)
+: string {
+  if (hasStatedCapacity(maxCapacity)) {
+    return `${activeCount} of ${maxCapacity} spots filled`;
+  }
+  if (activeCount > 0) {
+    return `${activeCount} ${activeCount === 1 ? 'animal' : 'animals'} in foster`;
+  }
+  return 'Capacity not specified';
+}
+
+/**
  * Turns a snake_case enum value into a human label, e.g.
  * `foster_update` → `Foster Update`, `general` → `General`.
  */

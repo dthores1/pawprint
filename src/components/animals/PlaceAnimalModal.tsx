@@ -10,7 +10,12 @@ import { StatusBadge } from '../ui/Badge';
 import { useWhisker } from '../../context/WhiskerContext';
 import { SearchIcon, XIcon, CheckIcon, AlertTriangleIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { animalDisplayName, cn } from '../../lib/utils';
+import {
+  animalDisplayName,
+  cn,
+  fosterCapacityLabel,
+  hasStatedCapacity } from
+'../../lib/utils';
 import { useTypeaheadKeyboard } from '../../lib/useTypeaheadKeyboard';
 
 // Placement can be launched from either side of the relationship:
@@ -102,16 +107,18 @@ export function PlaceAnimalModal({
   getActivePlacementsCount(anchorFoster.id) :
   0;
   const anchorFosterFull = anchorFoster ?
+  hasStatedCapacity(anchorFoster.max_capacity) &&
   anchorFosterActive >= (anchorFoster.max_capacity ?? 0) :
   false;
   // Animal mode: a selected existing foster who's already at/over their stated
   // capacity — placing another animal pushes them past it. Over-capacity
   // placements are allowed (exceptions happen), so this is a soft, non-blocking
-  // hint, not a confirmation gate.
+  // hint, not a confirmation gate. No stated capacity → nothing to exceed.
   const selectedFosterOverCapacity =
   mode === 'animal' &&
   !!selectedFoster &&
   selectedIsFoster &&
+  hasStatedCapacity(selectedFoster.max_capacity) &&
   getActivePlacementsCount(selectedFoster.id) >= (selectedFoster.max_capacity ?? 0);
 
   // Foster results (animal mode): active foster parents, excluding the current
@@ -128,7 +135,8 @@ export function PlaceAnimalModal({
     ).
     map((f) => {
       const active = getActivePlacementsCount(f.id);
-      const isFull = active >= (f.max_capacity ?? 0);
+      const isFull =
+      hasStatedCapacity(f.max_capacity) && active >= (f.max_capacity ?? 0);
       return { foster: f, active, isFull };
     }).
     sort((a, b) => Number(a.isFull) - Number(b.isFull));
@@ -352,8 +360,9 @@ export function PlaceAnimalModal({
             anchorFosterFull ? 'text-status-medical-text' : 'text-text-primary'}`
             }>
 
-              {anchorFosterActive} / {anchorFoster.max_capacity ?? 0}
-              {anchorFosterFull ? ' · at capacity' : ' spots filled'}
+              {anchorFosterFull ?
+            `${anchorFosterActive} / ${anchorFoster.max_capacity} · at capacity` :
+            fosterCapacityLabel(anchorFosterActive, anchorFoster.max_capacity)}
             </span>
           </div>
         }
@@ -384,8 +393,10 @@ export function PlaceAnimalModal({
                   </p>
                   <p className="text-xs text-text-secondary truncate">
                     {selectedIsFoster ?
-                    `${getActivePlacementsCount(selectedFoster.id)} of ${
-                    selectedFoster.max_capacity ?? 0} spots filled` :
+                    fosterCapacityLabel(
+                      getActivePlacementsCount(selectedFoster.id),
+                      selectedFoster.max_capacity
+                    ) :
                     'Will be added as a foster parent'}
                   </p>
                 </div>
@@ -501,16 +512,26 @@ export function PlaceAnimalModal({
                                           </p>
                                           <p className="text-xs text-text-secondary truncate">
                                             {(foster.preferred_species ?? []).join(', ')} ·{' '}
-                                            {active}/{foster.max_capacity ?? 0} in care
+                                            {hasStatedCapacity(foster.max_capacity) ?
+                                    `${active}/${foster.max_capacity} in care` :
+                                    `${active} in care`}
                                           </p>
                                         </div>
                                       </div>
                                       <span
-                              className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${isFull ? 'bg-status-medical-bg text-status-medical-text' : 'bg-[#DDEFE2] text-[#3E7B52]'}`}>
+                              className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${
+                              isFull ?
+                              'bg-status-medical-bg text-status-medical-text' :
+                              hasStatedCapacity(foster.max_capacity) ?
+                              'bg-[#DDEFE2] text-[#3E7B52]' :
+                              'bg-[#E5E2DC] text-[#6B6B6B]'}`
+                              }>
 
                                         {isFull ?
                               'At capacity' :
-                              `${(foster.max_capacity ?? 0) - active} open`}
+                              hasStatedCapacity(foster.max_capacity) ?
+                              `${(foster.max_capacity ?? 0) - active} open` :
+                              'No limit set'}
                                       </span>
                                     </button>
                                   </li>

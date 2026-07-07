@@ -9,6 +9,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { SpeciesBadge } from '../components/ui/SpeciesBadge';
 import { StatusBadge, PriorityBadge, AnimalFlags } from '../components/ui/Badge';
 import { EditLitterModal } from '../components/animals/EditLitterModal';
+import { useFostersEnabled } from '../lib/useFostersEnabled';
 import { AddLitterMemberModal } from '../components/animals/AddLitterMemberModal';
 import {
   ArrowLeftIcon,
@@ -39,6 +40,7 @@ export function LitterProfile() {
   const [archiving, setArchiving] = useState(false);
   const navigate = useNavigate();
   const canArchive = useCanArchive('litters', { id: id ?? 'na' });
+  const fostersEnabled = useFostersEnabled();
 
   const litter = litters.find((l) => l.id === id);
   if (!litter) {
@@ -156,7 +158,8 @@ export function LitterProfile() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {members.map((animal) => {
-            const foster = animal.current_foster_id ?
+            const foster =
+            fostersEnabled && animal.current_foster_id ?
             fosters.find((f) => f.id === animal.current_foster_id) :
             null;
             return (

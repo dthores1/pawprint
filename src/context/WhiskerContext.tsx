@@ -546,6 +546,17 @@ export interface WhiskerContextType {
   expected_end_date?: string,
   placement_purpose?: PlacementPurpose)
   => void;
+  /**
+   * End an animal's active placement WITHOUT a new foster — the animal
+   * returned to the org's direct care (foster unavailable, program wind-down…).
+   * Closes the placement (end_date + reason_ended, history preserved) and
+   * clears animal.current_foster_id. No-op if there's no active placement.
+   */
+  endPlacement: (
+  animal_id: string,
+  end_date: string,
+  reason_ended?: string)
+  => Promise<void>;
   addSupplyRequest: (
   req: Omit<SupplyRequest, 'id' | 'created_at' | 'updated_at'>)
   => Promise<string>;
@@ -3781,6 +3792,47 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       current_foster_id: new_person_id
     });
   };
+  const endPlacement = async (
+  animal_id: string,
+  end_date: string,
+  reason_ended?: string) =>
+  {
+    const active = placements.find(
+      (p) => p.animal_id === animal_id && p.placement_status === 'active'
+    );
+    if (!active) return;
+    const closedReason = reason_ended?.trim() || 'Returned to the organization.';
+    const { error } = await supabase.
+    from('foster_placements').
+    update({
+      placement_status: 'completed',
+      end_date,
+      reason_ended: closedReason
+    }).
+    eq('id', active.id);
+    if (error) {
+      console.error('[placements] end failed:', error.message);
+      return;
+    }
+    setPlacements((prev) =>
+    prev.map((p) =>
+    p.id === active.id ?
+    {
+      ...p,
+      placement_status: 'completed' as const,
+      end_date,
+      reason_ended: closedReason
+    } :
+    p
+    )
+    );
+    // Clear the denormalized cache; lifecycle status is independent. Explicit
+    // null (not undefined) so the update payload actually writes the column —
+    // same pattern as completeAdoption.
+    const animalUpdates: Partial<Animal> = {};
+    (animalUpdates as Record<string, unknown>).current_foster_id = null;
+    updateAnimal(animal_id, animalUpdates);
+  };
   // Returns an error message string on failure, or null on success — so the
   // Add Product form can show "already exists" inline instead of failing
   // silently against the (organization_id, lower(name)) unique index.
@@ -4854,6 +4906,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         deleteExternalListing,
         placeAnimal,
         reassignFoster,
+        endPlacement,
         addSupplyRequest,
         updateSupplyRequest,
         cancelSupplyRequest,

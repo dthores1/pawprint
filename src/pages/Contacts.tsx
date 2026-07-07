@@ -30,6 +30,7 @@ import { Person, PersonRole } from '../types';
 import { cn } from '../lib/utils';
 import { ExportButton } from '../components/ui/ExportButton';
 import { CsvColumn } from '../lib/csv';
+import { useFostersEnabled } from '../lib/useFostersEnabled';
 
 const ACTIVE_BADGE = {
   active: {
@@ -44,6 +45,7 @@ const ACTIVE_BADGE = {
 export function Contacts() {
   const { people, peopleIndex, peopleLoading, ensureInactiveLoaded, inactiveLoaded } =
   useWhisker();
+  const fostersEnabled = useFostersEnabled();
   const [searchParams] = useSearchParams();
   // Allow deep-linking to a contact, e.g. /contacts?q=Jane Doe (used by the
   // "Adopted By" link on an animal profile).
@@ -130,7 +132,11 @@ export function Contacts() {
   }[] = [
   { id: 'all', label: 'All Contacts' },
   { id: 'vet', label: 'Veterinarians' },
-  { id: 'foster_parent', label: 'Foster Parents' },
+  // The role itself stays assignable (a shelter may still tag foster
+  // contacts); only the directory filter tab follows the workflow toggle.
+  ...(fostersEnabled ?
+  [{ id: 'foster_parent' as PersonRole, label: 'Foster Parents' }] :
+  []),
   { id: 'adopter', label: 'Adopters' },
   { id: 'donor', label: 'Donors' },
   { id: 'trapper', label: 'Trappers' },

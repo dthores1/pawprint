@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { DemoAuthProvider, DemoWhiskerProvider } from './context/DemoProviders';
 import { isDemoMode, isAdminConsole } from './lib/appMode';
 import { AdminApp } from './admin/AdminApp';
+import { useFostersEnabled } from './lib/useFostersEnabled';
 import { AppShell } from './components/layout/AppShell';
 import { Dashboard } from './pages/Dashboard';
 import { AnimalsList } from './pages/AnimalsList';
@@ -59,6 +60,9 @@ function Splash() {
 
 // The routed application shell — identical for demo and production.
 function AppRoutes() {
+  // Foster routes are gated (not just the nav tab): with foster management
+  // off, direct URLs bounce to the dashboard.
+  const fostersEnabled = useFostersEnabled();
   return (
     <Routes>
       <Route path="/" element={<AppShell />}>
@@ -67,8 +71,12 @@ function AppRoutes() {
         <Route path="animals/:id" element={<AnimalProfile />} />
         <Route path="litters/:id" element={<LitterProfile />} />
         <Route path="adoptions" element={<Adoptions />} />
-        <Route path="fosters" element={<FostersList />} />
-        <Route path="fosters/:id" element={<FosterProfile />} />
+        <Route
+          path="fosters"
+          element={fostersEnabled ? <FostersList /> : <Navigate to="/" replace />} />
+        <Route
+          path="fosters/:id"
+          element={fostersEnabled ? <FosterProfile /> : <Navigate to="/" replace />} />
         <Route path="requests" element={<Requests />} />
         <Route path="supplies/options" element={<ManageSupplyOptions />} />
         {/* Back-compat: old catalog path → new Manage Supply Options */}

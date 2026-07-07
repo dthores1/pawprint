@@ -9,6 +9,7 @@ import {
   LifeBuoyIcon } from
 'lucide-react';
 import { Tooltip } from '../components/ui/Tooltip';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { NewSupportTicketModal } from '../components/support/NewSupportTicketModal';
 import { SupportAccessCard } from '../components/support/SupportAccessCard';
 import { SupportRequestAccessBanner } from '../components/support/SupportRequestAccessBanner';
@@ -115,16 +116,19 @@ export function Settings() {
     restoreNavigationDefaults,
     supportTickets,
     supportTicketsLoaded,
-    ensureSupportTicketsLoaded
+    ensureSupportTicketsLoaded,
+    placements
   } = useWhisker();
   const {
     currentOrg,
     updateOrgTimezone,
     updateOrgShowAllReports,
-    updateOrgShowGuidance
+    updateOrgShowGuidance,
+    updateOrgFosterManagement
   } = useAuth();
   const isAdmin =
   currentOrg?.role === 'owner' || currentOrg?.role === 'admin';
+  const fostersEnabled = currentOrg?.foster_management_enabled !== false;
   const [traitForm, setTraitForm] = useState<{ open: boolean; trait?: Trait }>({
     open: false
   });
@@ -136,6 +140,12 @@ export function Settings() {
     open: boolean;
     category?: SupportTicketCategory;
   }>({ open: false });
+  // Turning foster management OFF while animals are in foster homes deserves
+  // a heads-up (their placements stay, grandfathered on each profile).
+  const [confirmFosterOff, setConfirmFosterOff] = useState(false);
+  const activeFosterPlacements = placements.filter(
+    (p) => p.placement_status === 'active'
+  ).length;
   // Three tabs: Animal Options (catalog/traits/adoption), Locations (saved
   // places), and Permissions (member access grants — admin-only).
   const [tab, setTab] = useState<
@@ -180,11 +190,18 @@ export function Settings() {
     (s) => isEnabled(s.id) && breeds.some((b) => b.species_id === s.id)
   );
 
-  // Navigation summary — so admins don't forget what they've hidden.
-  const visibleTabCount = navItems.filter(
+  // Navigation summary — so admins don't forget what they've hidden. With
+  // foster management off, the Fosters tab is force-hidden by that setting,
+  // so it's excluded here rather than shown as a second, competing toggle.
+  const settingsNavItems = fostersEnabled ?
+  navItems :
+  navItems.filter((i) => i.key !== 'fosters');
+  const visibleTabCount = settingsNavItems.filter(
     (i) => i.locked || isTabVisible(i.key)
   ).length;
-  const hiddenTabs = navItems.filter((i) => !i.locked && !isTabVisible(i.key));
+  const hiddenTabs = settingsNavItems.filter(
+    (i) => !i.locked && !isTabVisible(i.key)
+  );
 
   return (
     <div className="max-w-3xl mx-auto p-6 md:p-8 space-y-6">
@@ -579,7 +596,7 @@ export function Settings() {
         </div>
         <div className="px-5 py-3 border-b border-border bg-background/40 text-sm">
           <span className="font-medium text-text-primary">
-            {visibleTabCount} of {navItems.length} tabs visible
+            {visibleTabCount} of {settingsNavItems.length} tabs visible
           </span>
           {hiddenTabs.length > 0 &&
           <span className="text-text-secondary">
@@ -588,7 +605,7 @@ export function Settings() {
           }
         </div>
         <ul className="divide-y divide-border">
-          {navItems.map((item) => {
+          {settingsNavItems.map((item) => {
             const visible = item.locked || isTabVisible(item.key);
             return (
               <li
@@ -652,10 +669,14 @@ export function Settings() {
             title="Animal Management"
             description="Add, edit, and delete animals and litters, and manage relationships." />
 
+          {/* Hidden (not revoked) when foster management is off — existing
+              grants keep their MANAGE_ANIMALS implication server-side. */}
+          {fostersEnabled &&
           <MemberPermissionManager
             permissionType="MANAGE_FOSTERS"
             title="Foster Management"
             description="Place animals with fosters, reassign, and end placements. Also includes Animal Management." />
+          }
 
           <MemberPermissionManager
             permissionType="MANAGE_ADOPTIONS"
@@ -802,6 +823,53 @@ export function Settings() {
       </Card>
       }
 
+      {/* Foster management — org-wide workflow switch. Admin-only. */}
+      {tab === 'general' && isAdmin &&
+      <Card className="p-0 overflow-hidden">
+        <div className="p-5 flex items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-1.5">
+              <h2 className="font-heading font-semibold text-lg text-text-primary">
+                Enable Foster Management
+              </h2>
+              <Tooltip
+                content="When off, foster features are hidden across Whiskerville, including foster placements, the Foster Network tab, foster-related stats and filters, and foster placement requests. Existing foster data is preserved and will reappear if this setting is turned back on.">
+                <InfoIcon className="w-4 h-4 text-text-secondary" />
+              </Tooltip>
+            </div>
+            <p className="text-sm text-text-secondary mt-1">
+              Track foster homes, placements, and foster-specific workflows. Turn this off if your organization does not manage animal foster placements in Whiskerville. On by default.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={fostersEnabled}
+            aria-label="Enable foster management"
+            onClick={() => {
+              // Disabling with animals still in foster homes → confirm first.
+              if (fostersEnabled && activeFosterPlacements > 0) {
+                setConfirmFosterOff(true);
+              } else {
+                updateOrgFosterManagement(!fostersEnabled);
+              }
+            }}
+            className={cn(
+              'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 shrink-0',
+              fostersEnabled ? 'bg-primary' : 'bg-border'
+            )}>
+
+            <span
+              className={cn(
+                'inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform',
+                fostersEnabled ? 'translate-x-6' : 'translate-x-1'
+              )} />
+
+          </button>
+        </div>
+      </Card>
+      }
+
       {/* Support — file a ticket + see your recent requests. All members. */}
       {tab === 'support' &&
       <Card className="p-0 overflow-hidden">
@@ -914,6 +982,22 @@ export function Settings() {
         onClose={() => setLocationForm({ open: false })}
         location={locationForm.location} />
 
+      <ConfirmDialog
+        isOpen={confirmFosterOff}
+        onClose={() => setConfirmFosterOff(false)}
+        onConfirm={() => updateOrgFosterManagement(false)}
+        title="Turn off foster management?"
+        confirmLabel="Turn Off"
+        cancelLabel="Keep On">
+
+        {activeFosterPlacements === 1 ?
+        '1 animal is currently in a foster home.' :
+        `${activeFosterPlacements} animals are currently in foster homes.`}{' '}
+        Their placements stay in place and remain visible on each animal’s
+        profile, where you can end them as animals return — but the rest of
+        the foster workflows will be hidden. Nothing is deleted, and you can
+        turn this back on at any time.
+      </ConfirmDialog>
     </div>);
 
 }
