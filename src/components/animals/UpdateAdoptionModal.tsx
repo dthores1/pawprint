@@ -9,6 +9,7 @@ import {
   ADOPTION_STATUS_LABELS,
   adoptionStatusPatch } from
 '../../lib/adoptions';
+import { track } from '../../lib/analytics';
 
 interface UpdateAdoptionModalProps {
   isOpen: boolean;
@@ -54,6 +55,7 @@ export function UpdateAdoptionModal({
       undefined,
       notes: notes.trim() || undefined
     });
+    track('adoption_updated', { animal_id: adoption.animal_id });
     onClose();
   };
 

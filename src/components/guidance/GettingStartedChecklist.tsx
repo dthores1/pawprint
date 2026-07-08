@@ -15,6 +15,7 @@ import {
 import { Card } from '../ui/Card';
 import { useWhisker } from '../../context/WhiskerContext';
 import { useAuth } from '../../context/AuthContext';
+import { track } from '../../lib/analytics';
 
 export function GettingStartedChecklist() {
   const {
@@ -86,7 +87,10 @@ export function GettingStartedChecklist() {
         <button
           type="button"
           aria-label="Dismiss checklist"
-          onClick={dismissChecklist}
+          onClick={() => {
+            track('checklist_dismissed');
+            dismissChecklist();
+          }}
           className="p-1.5 -mr-1.5 -mt-1 text-text-secondary/60 hover:text-text-secondary hover:bg-background rounded-full transition-colors shrink-0">
 
           <XIcon className="w-4 h-4" />

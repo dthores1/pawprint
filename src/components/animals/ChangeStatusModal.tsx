@@ -16,6 +16,7 @@ import { deriveAgeInfo } from '../../lib/age';
 import { animalDisplayName } from '../../lib/utils';
 import { breedFieldLabel } from '../../lib/speciesIcons';
 import { enabledSpeciesList } from '../../lib/orgCatalog';
+import { track } from '../../lib/analytics';
 
 function ConcernCheckbox({
   label,
@@ -349,6 +350,11 @@ export function ChangeStatusModal({
       microchip_number: microchipNumber.trim() || undefined,
       description: description.trim(),
       internal_notes: internalNotes.trim() || undefined
+    });
+    track('animal_status_changed', {
+      animal_id: animalId,
+      new_status: status,
+      new_priority: priority
     });
 
     setAnimalTraits(animalId, traitIds);

@@ -24,6 +24,7 @@ import { PillTabs } from '../ui/PillTabs';
 import { FilterDropdown } from '../ui/FilterDropdown';
 import { VirtualizedGrid } from '../ui/VirtualizedGrid';
 import { cn, formatDate } from '../../lib/utils';
+import { track } from '../../lib/analytics';
 import { useFocusRequest } from '../../lib/useFocusRequest';
 import { cancelRequestConfirm } from '../../lib/requestCopy';
 import { useAuth } from '../../context/AuthContext';
@@ -483,10 +484,11 @@ export function TransportsView({
           effectiveStatus(r) === 'open' &&
           r.requested_by_person_id !== currentPersonId
           }
-          onClaim={() =>
-          currentPersonId &&
-          claimTransportRequest(r.id, currentPersonId)
-          }
+          onClaim={() => {
+            if (!currentPersonId) return;
+            claimTransportRequest(r.id, currentPersonId);
+            track('transport_claimed');
+          }}
           canAssign={isAdmin && effectiveStatus(r) === 'open'}
           onAssign={() => setAssigning(r)}
           canRespond={
@@ -494,8 +496,14 @@ export function TransportsView({
           r.status === 'assigned' &&
           r.assigned_volunteer_person_id === currentPersonId
           }
-          onAccept={() => acceptTransportRequest(r.id)}
-          onDecline={() => unassignTransportRequest(r.id)}
+          onAccept={() => {
+            acceptTransportRequest(r.id);
+            track('transport_accepted');
+          }}
+          onDecline={() => {
+            unassignTransportRequest(r.id);
+            track('transport_unassigned');
+          }}
           canReassign={
           isAdmin &&
           (r.status === 'assigned' ||
@@ -503,7 +511,10 @@ export function TransportsView({
           r.status === 'claimed')
           }
           onReassign={() => setAssigning(r)}
-          onRemoveAssignment={() => unassignTransportRequest(r.id)}
+          onRemoveAssignment={() => {
+            unassignTransportRequest(r.id);
+            track('transport_unassigned');
+          }}
           canComplete={
           !!currentPersonId &&
           (r.requested_by_person_id === currentPersonId ||
@@ -520,7 +531,10 @@ export function TransportsView({
           r.status !== 'cancelled' &&
           transportStaleInfo(r) !== null))
           }
-          onComplete={() => completeTransportRequest(r.id)}
+          onComplete={() => {
+            completeTransportRequest(r.id);
+            track('transport_completed');
+          }}
           canCancel={
           !!currentPersonId &&
           r.requested_by_person_id === currentPersonId &&

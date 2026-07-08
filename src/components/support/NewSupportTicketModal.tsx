@@ -6,6 +6,7 @@ import { Button } from '../ui/Button';
 import { useWhisker } from '../../context/WhiskerContext';
 import { SupportTicketCategory } from '../../types';
 import { focusFirstError } from '../../lib/focusFirstError';
+import { track } from '../../lib/analytics';
 
 const CATEGORIES: { value: SupportTicketCategory; label: string }[] = [
 { value: 'bug', label: '🐞 Report a bug' },
@@ -95,6 +96,7 @@ export function NewSupportTicketModal({ isOpen, onClose, category: initial }: Pr
       setFormError(error);
       return;
     }
+    track('support_ticket_created');
     setDone(true);
   };
 

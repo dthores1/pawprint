@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useCanManageSupplyRequests } from '../../lib/useSupplyPermissions';
 import { SupplyRequestStatus, SupplySupplier } from '../../types';
 import { formatDate, cn } from '../../lib/utils';
+import { track } from '../../lib/analytics';
 import {
   BanIcon,
   CheckIcon,
@@ -143,6 +144,7 @@ export function SupplyRequestDetailModal({
       patch.fulfilled_date = new Date().toISOString();
     }
     updateSupplyRequest(request.id, patch);
+    track('supply_request_status_changed', { new_status: next });
     // Fulfillment and cancellation are terminal (like denial below) — close
     // the modal so the user returns to the list instead of staring at a
     // finished request.
@@ -158,6 +160,7 @@ export function SupplyRequestDetailModal({
     };
     if (currentPersonId) patch.approved_by_person_id = currentPersonId;
     updateSupplyRequest(request.id, patch);
+    track('supply_request_status_changed', { new_status: 'denied' });
     setDenyMode(false);
     setDenyReason('');
     // Denial is terminal — close the detail modal so the user returns to the list.

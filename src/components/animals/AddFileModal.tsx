@@ -7,6 +7,7 @@ import { AnimalFileCategory } from '../../types';
 import { FILE_CATEGORY_LABELS, FILE_ACCEPT, MAX_FILE_BYTES } from '../../lib/filesApi';
 import { UploadIcon } from 'lucide-react';
 import { focusFirstError } from '../../lib/focusFirstError';
+import { track } from '../../lib/analytics';
 
 interface AddFileModalProps {
   isOpen: boolean;
@@ -79,6 +80,7 @@ export function AddFileModal({ isOpen, onClose, animalId }: AddFileModalProps) {
         notes: notes.trim() || undefined,
         file
       });
+      track('file_added', { animal_id: animalId });
       setSubmitting(false);
       close();
     } catch {

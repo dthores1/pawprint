@@ -9,6 +9,7 @@ import { legacyRoleFor } from '../../lib/peopleApi';
 import { animalDisplayName } from '../../lib/utils';
 import { isActiveAdoption } from '../../lib/adoptions';
 import { focusFirstError } from '../../lib/focusFirstError';
+import { track } from '../../lib/analytics';
 
 interface StartAdoptionModalProps {
   isOpen: boolean;
@@ -130,6 +131,7 @@ export function StartAdoptionModal({
       adopterId = created.id;
     }
     await addAdoption({ animal_id: animalId, adopter_id: adopterId });
+    track('adoption_started', { animal_id: animalId });
     onClose();
   };
 

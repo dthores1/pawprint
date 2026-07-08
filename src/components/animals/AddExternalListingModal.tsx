@@ -8,6 +8,7 @@ import {
   ExternalListingProvider,
   ExternalListingStatus } from
 '../../types';
+import { track } from '../../lib/analytics';
 
 const URL_RE = /^https?:\/\/[^\s.]+\.[^\s]+$/i;
 
@@ -82,6 +83,7 @@ export function AddExternalListingModal({
         status,
         notes: notes.trim() || undefined
       });
+      track('external_listing_added', { platform: provider });
     }
     onClose();
   };

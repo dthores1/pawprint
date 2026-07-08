@@ -7,6 +7,7 @@ import { Avatar } from '../ui/Avatar';
 import { useWhisker } from '../../context/WhiskerContext';
 import { Animal, Person } from '../../types';
 import { animalDisplayName } from '../../lib/utils';
+import { track } from '../../lib/analytics';
 
 // End an active foster placement WITHOUT reassigning — the animal returns to
 // the org's direct care (foster unavailable, program wind-down…). The
@@ -34,6 +35,7 @@ export function EndPlacementModal({
   const handleConfirm = async () => {
     setSubmitting(true);
     await endPlacement(animal.id, endDate, reason);
+    track('placement_ended', { animal_id: animal.id });
     setSubmitting(false);
     onClose();
   };

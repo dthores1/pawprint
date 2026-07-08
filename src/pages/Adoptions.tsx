@@ -19,6 +19,7 @@ import { UpdateAdoptionModal } from '../components/animals/UpdateAdoptionModal';
 import { CompleteAdoptionModal } from '../components/animals/CompleteAdoptionModal';
 import { CancelAdoptionModal } from '../components/animals/CancelAdoptionModal';
 import { AdoptionReturnModal } from '../components/animals/AdoptionReturnModal';
+import { track } from '../lib/analytics';
 
 type AdoptionsTab = 'pending' | 'completed' | 'returned' | 'all';
 const TABS: { key: AdoptionsTab; label: string }[] = [
@@ -60,6 +61,11 @@ export function Adoptions() {
   'pending';
   const [isStartOpen, setIsStartOpen] = useState(false);
   const [modal, setModal] = useState<ModalState>(null);
+  // Analytics wrapper — fires only when a modal opens (not when cleared).
+  const openModal = (next: NonNullable<ModalState>) => {
+    track('modal_opened', { page: 'adoptions', modal: next.kind });
+    setModal(next);
+  };
 
   const setTab = (next: AdoptionsTab) => {
     setSearchParams(next === 'pending' ? {} : { tab: next }, { replace: true });
@@ -93,7 +99,12 @@ export function Adoptions() {
           <GuidanceLink guidanceKey="adoptions_intro" />
         </div>
         {canManage &&
-        <Button onClick={() => setIsStartOpen(true)} className="gap-2">
+        <Button
+          onClick={() => {
+            track('modal_opened', { page: 'adoptions', modal: 'start_adoption' });
+            setIsStartOpen(true);
+          }}
+          className="gap-2">
             <PlusIcon className="w-4 h-4" />
             Start Adoption
           </Button>
@@ -232,7 +243,7 @@ export function Adoptions() {
                             <button
                               type="button"
                               onClick={() =>
-                              setModal({ kind: 'complete', adoptionId: a.id })
+                              openModal({ kind: 'complete', adoptionId: a.id })
                               }
                               className="text-xs font-medium text-[#3E7B52] hover:underline">
 
@@ -242,7 +253,7 @@ export function Adoptions() {
                             <button
                               type="button"
                               onClick={() =>
-                              setModal({ kind: 'update', adoptionId: a.id })
+                              openModal({ kind: 'update', adoptionId: a.id })
                               }
                               className="text-xs font-medium text-primary hover:underline">
 
@@ -252,7 +263,7 @@ export function Adoptions() {
                               <button
                               type="button"
                               onClick={() =>
-                              setModal({ kind: 'cancel', adoptionId: a.id })
+                              openModal({ kind: 'cancel', adoptionId: a.id })
                               }
                               className="text-xs font-medium text-[#9B3A3A] hover:underline">
 
@@ -264,7 +275,7 @@ export function Adoptions() {
                           <button
                             type="button"
                             onClick={() =>
-                            setModal({ kind: 'return', animalId: a.animal_id })
+                            openModal({ kind: 'return', animalId: a.animal_id })
                             }
                             className="text-xs font-medium text-[#6E4E80] hover:underline">
 

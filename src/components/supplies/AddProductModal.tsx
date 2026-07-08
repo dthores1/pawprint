@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { useWhisker } from '../../context/WhiskerContext';
 import { Product, ProductCategory } from '../../types';
 import { focusFirstError } from '../../lib/focusFirstError';
+import { track } from '../../lib/analytics';
 
 const CATEGORIES: { value: ProductCategory; label: string }[] = [
 { value: 'food', label: 'Food' },
@@ -84,6 +85,7 @@ export function AddProductModal({ isOpen, onClose, product }: Props) {
       requestAnimationFrame(() => focusFirstError(['product_name']));
       return;
     }
+    track('product_added');
     onClose();
   };
 

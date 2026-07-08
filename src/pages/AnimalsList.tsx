@@ -49,6 +49,7 @@ import { PawPrintIcon as PawPrintGlyph } from '../components/ui/PawPrintIcon';
 import { STATUS_LABELS, IN_CARE_STATUSES } from '../lib/animalStatus';
 import { useCanManageAnimals } from '../lib/useAnimalPermissions';
 import { useFostersEnabled } from '../lib/useFostersEnabled';
+import { track } from '../lib/analytics';
 // Stable string[] view of the in-care statuses for membership checks (module
 // scope so it doesn't re-create each render and churn the filter memo).
 const IN_CARE_SET: string[] = IN_CARE_STATUSES;
@@ -154,6 +155,7 @@ export function AnimalsList() {
   }, [includeHistorical, historicalLoaded, ensureHistoricalLoaded]);
   const historicalLoading = includeHistorical && !historicalLoaded;
   const toggleHistorical = (next: boolean) => {
+    track('history_toggled', { page: 'animals', shown: next });
     setIncludeHistorical(next);
     // Drop any historical status selections so the chips/filter stay coherent.
     if (!next) {

@@ -7,6 +7,7 @@ import { loadGoogleMaps, isGoogleMapsConfigured } from '../../lib/googleMaps';
 import { placeResultToAddressValue, rawAddressValue } from '../../lib/address';
 import { cn } from '../../lib/utils';
 import { useTypeaheadKeyboard } from '../../lib/useTypeaheadKeyboard';
+import { track } from '../../lib/analytics';
 
 interface Props {
   value: AddressValue | null;
@@ -152,6 +153,7 @@ export function AddressAutocomplete({
       (place: any, status: string) => {
         if (place && status === googleRef.current?.maps?.places?.PlacesServiceStatus?.OK) {
           const addr = placeResultToAddressValue(place);
+          track('address_selected');
           setQuery(addr.formatted);
           onChange(addr);
         }

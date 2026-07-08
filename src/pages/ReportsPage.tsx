@@ -40,6 +40,7 @@ import { AnimalStatus, SiteStatus } from '../types';
 import { SITE_STATUS_META, SITE_STATUS_ORDER } from '../lib/siteStatus';
 import { formatDate } from '../lib/utils';
 import { speciesIconByName } from '../lib/speciesIcons';
+import { track } from '../lib/analytics';
 
 const STATUS_LABEL: Record<AnimalStatus, string> = {
   intake: 'Intake',
@@ -569,6 +570,7 @@ export function ReportsPage() {
           preset={preset}
           range={range}
           onChange={(next) => {
+            track('report_range_changed', { preset: next.preset });
             setPreset(next.preset);
             setRange(next.range);
           }} />
@@ -603,7 +605,10 @@ export function ReportsPage() {
               </h3>
               <ChartTypeToggle
                 value={appsChartType}
-                onChange={setAppsChartType} />
+                onChange={(v) => {
+                  track('report_chart_changed', { chart: 'apps', chart_type: v });
+                  setAppsChartType(v);
+                }} />
 
             </div>
             {applicationsByStatus.length === 0 ?
@@ -693,7 +698,13 @@ export function ReportsPage() {
               </h3>
               <ChartTypeToggle
                 value={animalsChartType}
-                onChange={setAnimalsChartType} />
+                onChange={(v) => {
+                  track('report_chart_changed', {
+                    chart: 'animals',
+                    chart_type: v
+                  });
+                  setAnimalsChartType(v);
+                }} />
 
             </div>
             {animalsByStatus.length === 0 ?
@@ -813,7 +824,10 @@ export function ReportsPage() {
               </h3>
               <ChartTypeToggle
                 value={sitesChartType}
-                onChange={setSitesChartType} />
+                onChange={(v) => {
+                  track('report_chart_changed', { chart: 'sites', chart_type: v });
+                  setSitesChartType(v);
+                }} />
 
             </div>
             {sitesByStatus.length === 0 ?

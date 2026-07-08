@@ -6,6 +6,7 @@ import { useWhisker } from '../../context/WhiskerContext';
 import { Trait } from '../../types';
 import { cn } from '../../lib/utils';
 import { focusFirstError } from '../../lib/focusFirstError';
+import { track } from '../../lib/analytics';
 
 interface Props {
   isOpen: boolean;
@@ -46,6 +47,7 @@ export function TraitFormModal({ isOpen, onClose, trait }: Props) {
     };
     if (isEdit && trait) updateTrait(trait.id, payload);else
     addTrait(payload);
+    track('setting_changed', { setting: 'trait_saved' });
     onClose();
   };
 

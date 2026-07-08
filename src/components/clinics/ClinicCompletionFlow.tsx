@@ -17,6 +17,7 @@ import {
   Animal } from
 '../../types';
 import { cn, formatDate, calculateAge } from '../../lib/utils';
+import { track } from '../../lib/analytics';
 import { deriveAgeInfo } from '../../lib/age';
 import { isInCare } from '../../lib/animalStatus';
 import { duplicateDraftWarning } from '../../lib/medicalDuplicates';
@@ -547,6 +548,7 @@ export function ClinicCompletionFlow({ clinicEventId, onClose }: Props) {
 
       // 4. Flip the event to completed.
       updateClinicEvent(event.id, { status: 'completed' });
+      track('clinic_completed', { clinic_id: event.id });
       setInitFor(null);
       onClose();
     } finally {

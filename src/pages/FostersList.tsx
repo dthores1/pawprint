@@ -30,6 +30,7 @@ import { useWindowRowVirtualizer } from '../lib/useWindowRowVirtualizer';
 import { Person } from '../types';
 import { enabledSpeciesList } from '../lib/orgCatalog';
 import { cn, hasStatedCapacity } from '../lib/utils';
+import { track } from '../lib/analytics';
 import { ExportButton } from '../components/ui/ExportButton';
 import { CsvColumn } from '../lib/csv';
 
@@ -256,7 +257,11 @@ export function FostersList() {
         </button>
         <button
           type="button"
-          onClick={() => setActiveOnly((v) => !v)}
+          onClick={() => {
+            // shown = inactive fosters now visible (Active unchecked).
+            track('history_toggled', { page: 'fosters', shown: activeOnly });
+            setActiveOnly((v) => !v);
+          }}
           className={cn(
             'inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-medium border transition-colors',
             activeOnly ?

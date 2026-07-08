@@ -6,6 +6,7 @@ import { CheckIcon, CopyIcon } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { Person } from '../../types';
+import { track } from '../../lib/analytics';
 
 interface Props {
   isOpen: boolean;
@@ -71,6 +72,7 @@ export function InviteToAppModal({ isOpen, onClose, person }: Props) {
       }
     }).
     catch((err) => console.warn('[invite to Whiskerville] email send failed:', err));
+    track('app_invite_sent', { roles: person.roles });
     setLink(`${window.location.origin}/invite/${token}`);
   };
 

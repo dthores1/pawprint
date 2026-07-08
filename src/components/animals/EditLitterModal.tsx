@@ -9,6 +9,7 @@ import { useWhisker } from '../../context/WhiskerContext';
 import { litterMembers } from '../../lib/litters';
 import { enabledSpeciesList } from '../../lib/orgCatalog';
 import { focusFirstError } from '../../lib/focusFirstError';
+import { track } from '../../lib/analytics';
 
 interface EditLitterModalProps {
   isOpen: boolean;
@@ -75,6 +76,7 @@ export function EditLitterModal({
       mother_animal_id: motherId || undefined,
       notes: notes.trim() || undefined
     });
+    track('litter_updated', { litter_id: litterId });
     onClose();
   };
 

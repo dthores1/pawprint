@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { Label, Textarea } from '../ui/Forms';
 import { useWhisker } from '../../context/WhiskerContext';
 import { animalDisplayName } from '../../lib/utils';
+import { track } from '../../lib/analytics';
 
 interface CancelAdoptionModalProps {
   isOpen: boolean;
@@ -30,6 +31,7 @@ export function CancelAdoptionModal({
   const handleConfirm = async () => {
     setSubmitting(true);
     cancelAdoption(adoptionId, reason.trim() || undefined);
+    if (adoption) track('adoption_cancelled', { animal_id: adoption.animal_id });
     setSubmitting(false);
     setReason('');
     onClose();

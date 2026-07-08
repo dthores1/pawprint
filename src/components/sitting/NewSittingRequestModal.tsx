@@ -9,6 +9,7 @@ import { useWhisker } from '../../context/WhiskerContext';
 import { useAuth } from '../../context/AuthContext';
 import { SittingCoverageScope, SittingRequest } from '../../types';
 import { animalDisplayName } from '../../lib/utils';
+import { track } from '../../lib/analytics';
 
 interface Props {
   isOpen: boolean;
@@ -180,6 +181,7 @@ export function NewSittingRequestModal({ isOpen, onClose, request }: Props) {
       },
       placementIds
     );
+    track('sitting_request_created');
     onClose();
   };
 

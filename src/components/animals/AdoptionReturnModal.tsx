@@ -12,6 +12,7 @@ import {
   ADOPTION_RETURN_REASON_LABELS } from
 '../../lib/adoptions';
 import { AdoptionReturnReason } from '../../types';
+import { track } from '../../lib/analytics';
 
 interface AdoptionReturnModalProps {
   isOpen: boolean;
@@ -120,6 +121,7 @@ export function AdoptionReturnModal({
         return_notes: notes.trim() || undefined
       });
     }
+    track('adoption_returned', { animal_id: animal.id });
     onClose();
   };
 

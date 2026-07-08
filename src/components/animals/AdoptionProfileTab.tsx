@@ -6,6 +6,7 @@ import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Button } from '../ui/Button';
 import { Select } from '../ui/Forms';
 import { formatDate } from '../../lib/utils';
+import { track } from '../../lib/analytics';
 import {
   MegaphoneIcon,
   CheckCircle2Icon,
@@ -187,10 +188,16 @@ export function AdoptionProfileTab({
   const runGenerate = async () => {
     setError(null);
     setIsGenerating(true);
+    track('ai_generation_started', {
+      asset_type: 'adoption_profile',
+      regenerate: !!profile
+    });
     try {
       await generateAdoptionProfile(animalId, guidance, effectiveTemplateId);
+      track('ai_generation_succeeded', { asset_type: 'adoption_profile' });
       setIsEditing(false);
     } catch (e) {
+      track('ai_generation_failed', { asset_type: 'adoption_profile' });
       setError(
         e instanceof Error ?
         e.message :

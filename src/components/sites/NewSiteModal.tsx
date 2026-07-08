@@ -9,6 +9,7 @@ import { useWhisker } from '../../context/WhiskerContext';
 import { useAuth } from '../../context/AuthContext';
 import { AddressValue, Site, SiteStatus } from '../../types';
 import { focusFirstError } from '../../lib/focusFirstError';
+import { track } from '../../lib/analytics';
 import { SITE_STATUS_META, SITE_STATUS_ORDER } from '../../lib/siteStatus';
 
 interface Props {
@@ -76,8 +77,10 @@ export function NewSiteModal({ isOpen, onClose, site }: Props) {
     };
     if (site) {
       updateSite(site.id, payload);
+      track('site_updated');
     } else {
       addSite({ ...payload, organization_id: '' });
+      track('site_created');
     }
     onClose();
   };

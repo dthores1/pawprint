@@ -24,6 +24,7 @@ import {
   ArrowUpRightIcon } from
 'lucide-react';
 import { cn, animalDisplayName, parseLocalDate } from '../../lib/utils';
+import { track } from '../../lib/analytics';
 import { useFocusRequest } from '../../lib/useFocusRequest';
 import { cancelRequestConfirm } from '../../lib/requestCopy';
 import { useAuth } from '../../context/AuthContext';
@@ -380,16 +381,20 @@ export function SittingRequestsView({
               s.status === 'open' &&
               s.requested_by_person_id !== currentPersonId
               }
-              onAccept={() =>
-              currentPersonId &&
-              acceptSittingRequest(s.id, currentPersonId)
-              }
+              onAccept={() => {
+                if (!currentPersonId) return;
+                acceptSittingRequest(s.id, currentPersonId);
+                track('sitting_accepted');
+              }}
               canRelease={
               !!currentPersonId &&
               s.sitter_person_id === currentPersonId &&
               !SITTING_TERMINAL.includes(s.status)
               }
-              onRelease={() => releaseSittingRequest(s.id)}
+              onRelease={() => {
+                releaseSittingRequest(s.id);
+                track('sitting_released');
+              }}
               canComplete={
               !!currentPersonId &&
               (s.requested_by_person_id === currentPersonId ||
@@ -403,7 +408,10 @@ export function SittingRequestsView({
               s.status !== 'cancelled' &&
               sittingStaleInfo(s) !== null))
               }
-              onComplete={() => completeSittingRequest(s.id)}
+              onComplete={() => {
+                completeSittingRequest(s.id);
+                track('sitting_completed');
+              }}
               transportNeeded={s.transport_needed}
               linkedTransportId={
               transportRequests.find(

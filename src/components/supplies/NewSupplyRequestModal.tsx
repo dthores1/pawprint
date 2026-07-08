@@ -3,6 +3,7 @@ import { Modal } from '../ui/Modal';
 import { FieldError, Input, Select, Textarea, Label } from '../ui/Forms';
 import { ProductSearchPicker } from '../ui/ProductSearchPicker';
 import { focusFirstError } from '../../lib/focusFirstError';
+import { track } from '../../lib/analytics';
 import { Button } from '../ui/Button';
 import { useWhisker } from '../../context/WhiskerContext';
 import { useAuth } from '../../context/AuthContext';
@@ -317,6 +318,7 @@ export function NewSupplyRequestModal({
       })
       )
     );
+    track('supply_request_created', { item_count: validItems.length });
     // Bump the source template's last-used time (don't otherwise touch it):
     // either the one explicitly reused, or the matching duplicate we collapsed
     // into when "save as common" had no real changes.

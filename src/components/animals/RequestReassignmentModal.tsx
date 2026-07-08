@@ -6,6 +6,7 @@ import { DatePicker } from '../ui/DatePicker';
 import { useWhisker } from '../../context/WhiskerContext';
 import { Animal } from '../../types';
 import { animalDisplayName } from '../../lib/utils';
+import { track } from '../../lib/analytics';
 
 interface RequestReassignmentModalProps {
   isOpen: boolean;
@@ -72,6 +73,7 @@ export function RequestReassignmentModal({
       note_type: 'general',
       body: bodyParts.join(' ')
     });
+    track('reassignment_requested', { animal_id: animal.id });
     onClose();
   };
 

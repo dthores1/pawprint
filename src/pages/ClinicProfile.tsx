@@ -19,6 +19,7 @@ import {
   ClinicSlotProcedureType } from
 '../types';
 import { cn, formatDate } from '../lib/utils';
+import { track } from '../lib/analytics';
 import { isInCare } from '../lib/animalStatus';
 import {
   ArrowLeftIcon,
@@ -204,6 +205,7 @@ export function ClinicProfile() {
       },
       newProcedures
     );
+    track('clinic_slot_added', { procedure_count: newProcedures.length });
     setNewAnimalId('');
     setNewProcedures(['spay_neuter']);
     setNewNotes('');
@@ -533,11 +535,14 @@ export function ClinicProfile() {
                           (p) => p.clinic_slot_id === s.id
                         )}
                         readOnly={!canManageMedical}
-                        onToggle={(proc) =>
-                        updateClinicSlotProcedure(proc.id, {
-                          completed: !proc.completed
-                        })
-                        }
+                        onToggle={(proc) => {
+                          updateClinicSlotProcedure(proc.id, {
+                            completed: !proc.completed
+                          });
+                          track('clinic_procedure_toggled', {
+                            completed: !proc.completed
+                          });
+                        }}
                         onRemove={(proc) => deleteClinicSlotProcedure(proc.id)}
                         onAdd={(type) => addClinicSlotProcedure(s.id, type)} />
                       }

@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { PersonSearchPicker } from '../ui/PersonSearchPicker';
 import { useWhisker } from '../../context/WhiskerContext';
 import { focusFirstError } from '../../lib/focusFirstError';
+import { track } from '../../lib/analytics';
 import { TransportRequest } from '../../types';
 
 interface AssignTransportModalProps {
@@ -50,6 +51,7 @@ export function AssignTransportModal({
       return;
     }
     assignTransportRequest(request.id, selectedId);
+    track('transport_assigned');
     onClose();
   };
 

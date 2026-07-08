@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { useWhisker } from '../../context/WhiskerContext';
 import { Sex } from '../../types';
 import { litterMembers, memberNoun, litterLabel } from '../../lib/litters';
+import { track } from '../../lib/analytics';
 
 interface AddLitterMemberModalProps {
   isOpen: boolean;
@@ -55,6 +56,7 @@ export function AddLitterMemberModal({
       description: description.trim(),
       litter_id: litterId
     } as Parameters<typeof addAnimal>[0]);
+    track('litter_member_added', { litter_id: litterId });
     onClose();
   };
 

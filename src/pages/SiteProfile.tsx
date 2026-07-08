@@ -28,6 +28,7 @@ import {
   PawPrintIcon } from
 'lucide-react';
 import { cn, animalDisplayName, formatDateLong } from '../lib/utils';
+import { track } from '../lib/analytics';
 import { SITE_STATUS_META } from '../lib/siteStatus';
 import { useCanManageSites } from '../lib/useSitePermissions';
 import { useAuth } from '../context/AuthContext';
@@ -122,6 +123,7 @@ export function SiteProfile() {
   const handleAddNote = () => {
     if (!noteBody.trim()) return;
     addSiteNote({ site_id: site.id, body: noteBody.trim() });
+    track('site_note_added', { site_id: site.id });
     setNoteBody('');
     setIsAddingNote(false);
   };

@@ -18,6 +18,7 @@ import { StatusBadge, PriorityBadge, STATUS_LABELS } from '../ui/Badge';
 import { SpeciesBadge } from '../ui/SpeciesBadge';
 import { getDaysUntil } from '../../lib/utils';
 import { cn } from '../../lib/utils';
+import { track } from '../../lib/analytics';
 interface GlobalSearchProps {
   variant?: 'hero' | 'compact';
   placeholder?: string;
@@ -75,6 +76,7 @@ export function GlobalSearch({
       // Cmd/Ctrl + K opens & focuses
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
+        track('search_opened');
         inputRef.current?.focus();
         setOpen(true);
       }
@@ -162,7 +164,11 @@ export function GlobalSearch({
   fosterResults.length > 0 ||
   contactResults.length > 0 ||
   needsAttention.length > 0;
-  function go(path: string) {
+  function go(
+  path: string,
+  resultType: 'animal' | 'foster' | 'contact' | 'attention')
+  {
+    track('search_result_selected', { result_type: resultType });
     setOpen(false);
     setQuery('');
     navigate(path);
@@ -257,7 +263,7 @@ export function GlobalSearch({
                 {needsAttention.map((r) =>
             <button
               key={r.id}
-              onClick={() => go(`/animals/${r.animal.id}`)}
+              onClick={() => go(`/animals/${r.animal.id}`, 'attention')}
               className="w-full flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-background transition-colors text-left group">
               
                     <div className="flex items-center gap-3 min-w-0">
@@ -291,7 +297,7 @@ export function GlobalSearch({
                 {animalResults.map((a) =>
             <button
               key={a.id}
-              onClick={() => go(`/animals/${a.id}`)}
+              onClick={() => go(`/animals/${a.id}`, 'animal')}
               className="w-full flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-background transition-colors text-left">
               
                     <div className="flex items-center gap-3 min-w-0">
@@ -339,7 +345,7 @@ export function GlobalSearch({
                 {fosterResults.map((f) =>
             <button
               key={f.id}
-              onClick={() => go(`/fosters/${f.id}`)}
+              onClick={() => go(`/fosters/${f.id}`, 'foster')}
               className="w-full flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-background transition-colors text-left">
               
                     <div className="flex items-center gap-3 min-w-0">
@@ -373,7 +379,7 @@ export function GlobalSearch({
                 {contactResults.map((p) =>
             <button
               key={p.id}
-              onClick={() => go('/contacts')}
+              onClick={() => go('/contacts', 'contact')}
               className="w-full flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-background transition-colors text-left">
               
                     <div className="flex items-center gap-3 min-w-0">

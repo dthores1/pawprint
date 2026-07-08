@@ -7,6 +7,7 @@ import { useWhisker } from '../../context/WhiskerContext';
 import { AddressValue, SavedLocation } from '../../types';
 import { cn } from '../../lib/utils';
 import { focusFirstError } from '../../lib/focusFirstError';
+import { track } from '../../lib/analytics';
 
 interface Props {
   isOpen: boolean;
@@ -45,6 +46,7 @@ export function SavedLocationFormModal({ isOpen, onClose, location }: Props) {
     const payload = { name: name.trim(), address, active };
     if (isEdit && location) updateSavedLocation(location.id, payload);else
     addSavedLocation(payload);
+    track('setting_changed', { setting: 'saved_location' });
     onClose();
   };
 

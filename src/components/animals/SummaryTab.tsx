@@ -4,6 +4,7 @@ import { Card } from '../ui/Card';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Button } from '../ui/Button';
 import { formatDate } from '../../lib/utils';
+import { track } from '../../lib/analytics';
 import {
   SparklesIcon,
   CheckCircle2Icon,
@@ -124,10 +125,16 @@ export function SummaryTab({
   const runGenerate = async () => {
     setError(null);
     setIsGenerating(true);
+    track('ai_generation_started', {
+      asset_type: 'summary',
+      regenerate: !!summary
+    });
     try {
       await generateAiSummary(animalId);
+      track('ai_generation_succeeded', { asset_type: 'summary' });
       setIsEditing(false);
     } catch {
+      track('ai_generation_failed', { asset_type: 'summary' });
       setError("There was an issue generating the summary. Please try again later.");
     } finally {
       setIsGenerating(false);
