@@ -10,6 +10,7 @@ import { legacyRoleFor } from '../../lib/peopleApi';
 import { addressValueToPersonFields } from '../../lib/address';
 import { focusFirstError } from '../../lib/focusFirstError';
 import { useIsAdmin } from '../../lib/useIsAdmin';
+import { track } from '../../lib/analytics';
 import {
   ContactVisibilityFields,
   ShareState } from
@@ -123,6 +124,9 @@ export function AddContactModal({
       {}),
       ...addressValueToPersonFields(address)
     });
+    if (created) {
+      track('contact_added', { roles: form.roles });
+    }
     if (created && onCreated) onCreated(created);
     handleClose();
   };

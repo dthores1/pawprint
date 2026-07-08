@@ -17,6 +17,7 @@ import {
   hasStatedCapacity } from
 '../../lib/utils';
 import { useTypeaheadKeyboard } from '../../lib/useTypeaheadKeyboard';
+import { track } from '../../lib/analytics';
 
 // Placement can be launched from either side of the relationship:
 //   • animal-anchored (pass animalId): search for a foster to place this animal
@@ -231,6 +232,7 @@ export function PlaceAnimalModal({
         expectedEnd,
         placementPurpose
       );
+      track('animal_placed', { animal_id: selectedId, reassignment: false });
     } else {
       if (!anchorAnimal) return;
       if (isReassign) {
@@ -243,6 +245,10 @@ export function PlaceAnimalModal({
           expectedEnd,
           placementPurpose
         );
+        track('animal_placed', {
+          animal_id: anchorAnimal.id,
+          reassignment: true
+        });
       } else {
         placeAnimal(
           anchorAnimal.id,
@@ -252,6 +258,10 @@ export function PlaceAnimalModal({
           expectedEnd,
           placementPurpose
         );
+        track('animal_placed', {
+          animal_id: anchorAnimal.id,
+          reassignment: false
+        });
       }
     }
     onClose();

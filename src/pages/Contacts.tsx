@@ -31,6 +31,7 @@ import { cn } from '../lib/utils';
 import { ExportButton } from '../components/ui/ExportButton';
 import { CsvColumn } from '../lib/csv';
 import { useFostersEnabled } from '../lib/useFostersEnabled';
+import { track } from '../lib/analytics';
 
 const ACTIVE_BADGE = {
   active: {
@@ -210,7 +211,13 @@ export function Contacts() {
             <input
               type="checkbox"
               checked={showInactive}
-              onChange={(e) => setShowInactive(e.target.checked)}
+              onChange={(e) => {
+                track('history_toggled', {
+                  page: 'contacts',
+                  shown: e.target.checked
+                });
+                setShowInactive(e.target.checked);
+              }}
               className="h-4 w-4 rounded border-border text-primary focus:ring-primary/40 cursor-pointer" />
 
             <span className="text-text-secondary">Show Inactive</span>

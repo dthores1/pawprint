@@ -65,6 +65,7 @@ import { PawPrintIcon as PawPrintGlyph } from '../components/ui/PawPrintIcon';
 import { animalBreedLabel } from '../lib/breedsApi';
 import { litterLabel } from '../lib/litters';
 import { isInCare } from '../lib/animalStatus';
+import { track } from '../lib/analytics';
 import { PROCEDURE_TYPE_LABELS } from '../lib/medicalOptions';
 import { speciesIconByName } from '../lib/speciesIcons';
 import {
@@ -181,6 +182,17 @@ export function AnimalProfile() {
     'summary' | 'timeline' | 'medical' | 'photos' | 'files' | 'adoption'>(
     'summary'
   );
+  // Analytics wrappers — fire only on user interaction (not default state).
+  const selectTab = (
+  tab: 'summary' | 'timeline' | 'medical' | 'photos' | 'files' | 'adoption') =>
+  {
+    track('tab_viewed', { page: 'animal_profile', tab });
+    setActiveTab(tab);
+  };
+  const openModal = (modal: string, setOpen: (open: boolean) => void) => {
+    track('modal_opened', { page: 'animal_profile', modal });
+    setOpen(true);
+  };
   const [archivingNote, setArchivingNote] = useState<
     {id: string;preview: string;} | null>(
     null);
@@ -767,7 +779,7 @@ export function AnimalProfile() {
                   <Button
                     variant="primary"
                     size="sm"
-                    onClick={() => setIsStartAdoptionOpen(true)}>
+                    onClick={() => openModal('start_adoption', setIsStartAdoptionOpen)}>
 
                       <HeartIcon className="w-4 h-4 mr-2" />
                       Start Adoption
@@ -779,7 +791,7 @@ export function AnimalProfile() {
                     animal.status === 'adoptable' ? 'outline' : 'primary'
                     }
                     size="sm"
-                    onClick={() => setIsPlaceModalOpen(true)}>
+                    onClick={() => openModal('place_animal', setIsPlaceModalOpen)}>
 
                       <HomeIcon className="w-4 h-4 mr-2" />
                       {currentFoster ? 'Reassign Foster' : 'Place in Foster'}
@@ -791,7 +803,7 @@ export function AnimalProfile() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setIsReassignRequestOpen(true)}>
+                    onClick={() => openModal('reassign_request', setIsReassignRequestOpen)}>
 
                       <HomeIcon className="w-4 h-4 mr-2" />
                       Request Reassignment
@@ -801,7 +813,7 @@ export function AnimalProfile() {
                   <Button
                     variant="primary"
                     size="sm"
-                    onClick={() => setIsReturnModalOpen(true)}>
+                    onClick={() => openModal('adoption_return', setIsReturnModalOpen)}>
 
                       <FrownIcon className="w-4 h-4 mr-2" />
                       Adoption Return
@@ -811,7 +823,7 @@ export function AnimalProfile() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setIsStatusModalOpen(true)}>
+                    onClick={() => openModal('change_status', setIsStatusModalOpen)}>
 
                     <Edit2Icon className="w-4 h-4 mr-2" /> Edit
                   </Button>
@@ -825,7 +837,7 @@ export function AnimalProfile() {
               {animalTraitList.length > 0 ?
               <button
                 type="button"
-                onClick={canCollaborate ? () => setIsTraitsModalOpen(true) : undefined}
+                onClick={canCollaborate ? () => openModal('edit_traits', setIsTraitsModalOpen) : undefined}
                 disabled={!canCollaborate}
                 aria-label={canCollaborate ? 'Edit traits' : 'Traits'}
                 className="group w-full text-left flex items-start gap-2 mb-4 disabled:cursor-default">
@@ -851,7 +863,7 @@ export function AnimalProfile() {
               canCollaborate ?
               <button
                 type="button"
-                onClick={() => setIsTraitsModalOpen(true)}
+                onClick={() => openModal('edit_traits', setIsTraitsModalOpen)}
                 className="flex items-center gap-2 mb-4 text-xs font-medium text-primary hover:underline">
 
                   <TagIcon className="w-4 h-4 shrink-0" />
@@ -958,7 +970,7 @@ export function AnimalProfile() {
                     {currentFoster && canManageFosters &&
                   <button
                     type="button"
-                    onClick={() => setIsEndPlacementOpen(true)}
+                    onClick={() => openModal('end_placement', setIsEndPlacementOpen)}
                     className="block text-xs font-medium text-text-secondary hover:text-[#9B3A3A] underline underline-offset-2 mt-0.5">
 
                         End placement
@@ -1065,21 +1077,21 @@ export function AnimalProfile() {
               <div className="inline-flex items-center gap-1 p-1">
               <button
                 data-tabkey="summary"
-                onClick={() => setActiveTab('summary')}
+                onClick={() => selectTab('summary')}
                 className={`flex items-center gap-2 px-3 h-9 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'summary' ? 'bg-primary/10 text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-background'}`}>
 
                 <SparklesIcon className="w-4 h-4" /> Summary
               </button>
               <button
                 data-tabkey="timeline"
-                onClick={() => setActiveTab('timeline')}
+                onClick={() => selectTab('timeline')}
                 className={`flex items-center gap-2 px-3 h-9 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'timeline' ? 'bg-primary/10 text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-background'}`}>
 
                 <ActivityIcon className="w-4 h-4" /> Timeline
               </button>
               <button
                 data-tabkey="medical"
-                onClick={() => setActiveTab('medical')}
+                onClick={() => selectTab('medical')}
                 className={`flex items-center gap-2 px-3 h-9 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'medical' ? 'bg-primary/10 text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-background'}`}>
 
                 <MedicalKitIcon className="w-4 h-4" /> Medical Records
@@ -1091,7 +1103,7 @@ export function AnimalProfile() {
               </button>
               <button
                 data-tabkey="photos"
-                onClick={() => setActiveTab('photos')}
+                onClick={() => selectTab('photos')}
                 className={`flex items-center gap-2 px-3 h-9 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'photos' ? 'bg-primary/10 text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-background'}`}>
 
                 <ImageIcon className="w-4 h-4" /> Photos
@@ -1103,7 +1115,7 @@ export function AnimalProfile() {
               </button>
               <button
                 data-tabkey="files"
-                onClick={() => setActiveTab('files')}
+                onClick={() => selectTab('files')}
                 className={`flex items-center gap-2 px-3 h-9 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'files' ? 'bg-primary/10 text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-background'}`}>
 
                 <FolderIcon className="w-4 h-4" /> Files
@@ -1118,7 +1130,7 @@ export function AnimalProfile() {
               {canHaveAdoptionProfile &&
               <button
                 data-tabkey="adoption"
-                onClick={() => setActiveTab('adoption')}
+                onClick={() => selectTab('adoption')}
                 className={`flex items-center gap-2 px-3 h-9 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'adoption' ? 'bg-primary/10 text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-background'}`}>
 
                 <MegaphoneIcon className="w-4 h-4" /> Adoption Profile
@@ -1134,22 +1146,22 @@ export function AnimalProfile() {
           <div className="space-y-2">
             <div className="flex justify-end empty:hidden">
               {activeTab === 'timeline' && canCollaborate &&
-              <Button variant="soft" size="sm" onClick={() => setIsNoteModalOpen(true)}>
+              <Button variant="soft" size="sm" onClick={() => openModal('add_note', setIsNoteModalOpen)}>
                   <FileTextIcon className="w-4 h-4 mr-2" /> Add Note
                 </Button>
               }
               {activeTab === 'medical' && canManageMedical &&
-              <Button variant="soft" size="sm" onClick={() => setIsMedicalModalOpen(true)}>
+              <Button variant="soft" size="sm" onClick={() => openModal('add_medical', setIsMedicalModalOpen)}>
                   <SyringeIcon className="w-4 h-4 mr-2" /> Add Medical Record
                 </Button>
               }
               {activeTab === 'photos' && canCollaborate &&
-              <Button variant="soft" size="sm" onClick={() => setIsAddPhotoOpen(true)}>
+              <Button variant="soft" size="sm" onClick={() => openModal('add_photo', setIsAddPhotoOpen)}>
                   <ImageIcon className="w-4 h-4 mr-2" /> Add Photo
                 </Button>
               }
               {activeTab === 'files' && canCollaborate &&
-              <Button variant="soft" size="sm" onClick={() => setIsAddFileOpen(true)}>
+              <Button variant="soft" size="sm" onClick={() => openModal('add_file', setIsAddFileOpen)}>
                   <FolderIcon className="w-4 h-4 mr-2" /> Add File
                 </Button>
               }

@@ -15,6 +15,7 @@ import { deriveAgeInfo } from '../../lib/age';
 import { breedFieldLabel } from '../../lib/speciesIcons';
 import { enabledSpeciesList, defaultSpeciesId } from '../../lib/orgCatalog';
 import { focusFirstError } from '../../lib/focusFirstError';
+import { track } from '../../lib/analytics';
 interface AddAnimalModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -231,6 +232,13 @@ export function AddAnimalModal({
     // Assign any chosen traits once the animal row exists.
     if (created && traitIds.length > 0) {
       setAnimalTraits(created.id, traitIds);
+    }
+    if (created) {
+      track('animal_created', {
+        animal_id: created.id,
+        species: formData.species,
+        status: formData.status
+      });
     }
     handleClose();
   };

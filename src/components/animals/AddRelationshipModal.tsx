@@ -6,6 +6,7 @@ import { AnimalSearchPicker } from '../ui/AnimalSearchPicker';
 import { useWhisker } from '../../context/WhiskerContext';
 import { AnimalRelationship } from '../../types';
 import { animalDisplayName } from '../../lib/utils';
+import { track } from '../../lib/analytics';
 interface AddRelationshipModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -102,6 +103,7 @@ export function AddRelationshipModal({
         relationship_type: type,
         notes: notes.trim() || undefined
       });
+      track('relationship_added', { relationship_type: type });
     }
     handleClose();
   };

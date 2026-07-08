@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { CheckIcon } from 'lucide-react';
 import { useWhisker } from '../../context/WhiskerContext';
 import { animalDisplayName } from '../../lib/utils';
+import { track } from '../../lib/analytics';
 
 interface CompleteAdoptionModalProps {
   isOpen: boolean;
@@ -46,6 +47,7 @@ export function CompleteAdoptionModal({
       adoptionId,
       parsed != null && !isNaN(parsed) ? parsed : undefined
     );
+    track('adoption_completed', { animal_id: adoption.animal_id });
     onClose();
   };
 

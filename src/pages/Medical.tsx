@@ -9,6 +9,7 @@ import { AddMedicalRecordModal } from '../components/medical/AddMedicalRecordMod
 import { NewClinicEventModal } from '../components/clinics/NewClinicEventModal';
 import { useCanManageMedical } from '../lib/useAnimalPermissions';
 import { GuidanceLink } from '../components/guidance/GuidanceLink';
+import { track } from '../lib/analytics';
 
 type MedicalTab = 'clinics' | 'records';
 const TABS: { key: MedicalTab; label: string }[] = [
@@ -20,6 +21,7 @@ export function Medical() {
   const tab: MedicalTab =
   searchParams.get('tab') === 'records' ? 'records' : 'clinics';
   const setTab = (next: MedicalTab) => {
+    track('tab_viewed', { page: 'medical', tab: next });
     setSearchParams(next === 'clinics' ? {} : { tab: next }, { replace: true });
   };
   const [isNewClinicOpen, setIsNewClinicOpen] = useState(false);

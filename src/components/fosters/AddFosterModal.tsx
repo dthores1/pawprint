@@ -9,6 +9,7 @@ import { AddressValue, PersonRole } from '../../types';
 import { enabledSpeciesList } from '../../lib/orgCatalog';
 import { focusFirstError } from '../../lib/focusFirstError';
 import { useIsAdmin } from '../../lib/useIsAdmin';
+import { track } from '../../lib/analytics';
 import {
   ContactVisibilityFields,
   ShareState } from
@@ -140,6 +141,7 @@ export function AddFosterModal({ isOpen, onClose }: AddFosterModalProps) {
       } :
       {})
     });
+    track('foster_added');
     handleClose();
   };
   const handleChange = (

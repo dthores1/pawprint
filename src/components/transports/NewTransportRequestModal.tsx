@@ -11,6 +11,7 @@ import { AnimalMultiPicker } from '../ui/AnimalMultiPicker';
 import { PersonSearchPicker } from '../ui/PersonSearchPicker';
 import { AlertTriangleIcon } from 'lucide-react';
 import { animalDisplayName } from '../../lib/utils';
+import { track } from '../../lib/analytics';
 import { useWhisker } from '../../context/WhiskerContext';
 import { useAuth } from '../../context/AuthContext';
 import { useIsAdmin } from '../../lib/useIsAdmin';
@@ -311,6 +312,7 @@ export function NewTransportRequestModal({
         },
         animalIds
       );
+      track('transport_request_created');
     }
     handleClose();
   };

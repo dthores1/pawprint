@@ -6,6 +6,7 @@ import { TraitMultiSelect } from './TraitMultiSelect';
 import { useWhisker } from '../../context/WhiskerContext';
 import { Animal } from '../../types';
 import { animalDisplayName } from '../../lib/utils';
+import { track } from '../../lib/analytics';
 
 interface Props {
   isOpen: boolean;
@@ -34,6 +35,10 @@ export function EditTraitsModal({ isOpen, onClose, animal }: Props) {
 
   const save = () => {
     setAnimalTraits(animal.id, selected);
+    track('traits_updated', {
+      animal_id: animal.id,
+      trait_count: selected.length
+    });
     onClose();
   };
 

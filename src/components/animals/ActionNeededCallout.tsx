@@ -10,6 +10,7 @@ import {
 import { Priority } from '../../types';
 import { useWhisker } from '../../context/WhiskerContext';
 import { cn, formatDatesInText } from '../../lib/utils';
+import { track } from '../../lib/analytics';
 import { ArchiveConfirmDialog } from '../archive/ArchiveConfirmDialog';
 import { useCanArchive } from '../archive/useCanArchive';
 
@@ -124,6 +125,7 @@ export function ActionNeededCallout({
       description: draft.trim(),
       priority: draftPriority
     });
+    track('action_item_added', { animal_id: animalId });
     toView();
   };
 
@@ -267,6 +269,7 @@ export function ActionNeededCallout({
                 type="button"
                 onClick={() => {
                   completeActionItem(openItem.id);
+                  track('action_item_completed', { animal_id: animalId });
                   // The urgent thing is usually over once it's done — offer
                   // to clear the elevated priority instead of leaving it
                   // silently stale (the animal keeps it until told otherwise).
@@ -285,6 +288,7 @@ export function ActionNeededCallout({
                 type="button"
                 onClick={() => {
                   completeActionItem(openItem.id);
+                  track('action_item_completed', { animal_id: animalId });
                   startAdd(openItem.priority);
                 }}
                 className={subtleBtn}>

@@ -27,6 +27,7 @@ import { navItems } from '../components/layout/Sidebar';
 import { AddressDisplay } from '../components/ui/AddressDisplay';
 import { SpeciesIcon } from '../lib/speciesIcons';
 import { cn, formatDate } from '../lib/utils';
+import { track } from '../lib/analytics';
 import {
   Trait,
   SavedLocation,
@@ -190,6 +191,12 @@ export function Settings() {
     (s) => isEnabled(s.id) && breeds.some((b) => b.species_id === s.id)
   );
 
+  // Analytics wrapper — allowed-breed edits happen from three controls.
+  const changeAllowedBreeds = (speciesId: string, breedIds: string[]) => {
+    track('setting_changed', { setting: 'allowed_breeds' });
+    setAllowedBreeds(speciesId, breedIds);
+  };
+
   // Navigation summary — so admins don't forget what they've hidden. With
   // foster management off, the Fosters tab is force-hidden by that setting,
   // so it's excluded here rather than shown as a second, competing toggle.
@@ -215,7 +222,13 @@ export function Settings() {
       </div>
 
       {tabs.length > 1 &&
-      <PillTabs tabs={tabs} value={tab} onChange={(k) => setTab(k as typeof tab)} />
+      <PillTabs
+        tabs={tabs}
+        value={tab}
+        onChange={(k) => {
+          track('tab_viewed', { page: 'settings', tab: k });
+          setTab(k as typeof tab);
+        }} />
       }
 
       {/* Accepted Animal Types ------------------------------------------- */}
@@ -256,7 +269,10 @@ export function Settings() {
                   {enabled && !isDefault &&
                   <button
                     type="button"
-                    onClick={() => setDefaultSpecies(s.id)}
+                    onClick={() => {
+                      track('setting_changed', { setting: 'default_species' });
+                      setDefaultSpecies(s.id);
+                    }}
                     className="text-xs font-medium text-text-secondary hover:text-primary transition-colors">
 
                       Set default
@@ -268,7 +284,13 @@ export function Settings() {
                     aria-checked={enabled}
                     aria-label={`${enabled ? 'Disable' : 'Enable'} ${s.name}`}
                     disabled={lastEnabled}
-                    onClick={() => setSpeciesEnabled(s.id, !enabled)}
+                    onClick={() => {
+                      track('setting_changed', {
+                        setting: 'species_enabled',
+                        value: !enabled
+                      });
+                      setSpeciesEnabled(s.id, !enabled);
+                    }}
                     title={
                     lastEnabled ?
                     'At least one species must stay enabled' :
@@ -339,7 +361,7 @@ export function Settings() {
                     {restricted &&
                   <button
                     type="button"
-                    onClick={() => setAllowedBreeds(s.id, [])}
+                    onClick={() => changeAllowedBreeds(s.id, [])}
                     className="ml-auto text-xs font-medium text-text-secondary hover:text-primary transition-colors">
 
                         Accept all
@@ -362,7 +384,7 @@ export function Settings() {
                           type="button"
                           aria-label={`Remove ${b.name}`}
                           onClick={() =>
-                          setAllowedBreeds(
+                          changeAllowedBreeds(
                             s.id,
                             accepted.filter((x) => x !== bid)
                           )
@@ -383,7 +405,7 @@ export function Settings() {
                   value=""
                   onChange={(e) => {
                     if (e.target.value)
-                    setAllowedBreeds(s.id, [...accepted, e.target.value]);
+                    changeAllowedBreeds(s.id, [...accepted, e.target.value]);
                   }}
                   className="max-w-xs">
 
@@ -468,7 +490,13 @@ export function Settings() {
                   <div className="flex items-center gap-3 shrink-0">
                     <button
                     type="button"
-                    onClick={() => updateTrait(t.id, { active: !t.active })}
+                    onClick={() => {
+                      track('setting_changed', {
+                        setting: 'trait_active',
+                        value: !t.active
+                      });
+                      updateTrait(t.id, { active: !t.active });
+                    }}
                     className="text-xs font-medium text-text-secondary hover:text-primary transition-colors">
 
                       {t.active ? 'Deactivate' : 'Reactivate'}
@@ -547,9 +575,10 @@ export function Settings() {
                   <div className="flex items-center gap-3 shrink-0">
                     <button
                     type="button"
-                    onClick={() =>
-                    updateSavedLocation(loc.id, { active: !loc.active })
-                    }
+                    onClick={() => {
+                      track('setting_changed', { setting: 'saved_location' });
+                      updateSavedLocation(loc.id, { active: !loc.active });
+                    }}
                     className="text-xs font-medium text-text-secondary hover:text-primary transition-colors">
 
                       {loc.active ? 'Deactivate' : 'Reactivate'}
@@ -589,7 +618,10 @@ export function Settings() {
           </div>
           <button
             type="button"
-            onClick={restoreNavigationDefaults}
+            onClick={() => {
+              track('setting_changed', { setting: 'nav_defaults_restored' });
+              restoreNavigationDefaults();
+            }}
             className="shrink-0 text-xs font-medium text-text-secondary hover:text-primary transition-colors">
             Restore defaults
           </button>
@@ -630,7 +662,13 @@ export function Settings() {
                   role="switch"
                   aria-checked={visible}
                   aria-label={`${visible ? 'Hide' : 'Show'} ${item.label}`}
-                  onClick={() => setTabVisible(item.key, !visible)}
+                  onClick={() => {
+                    track('setting_changed', {
+                      setting: 'nav_visibility',
+                      value: !visible
+                    });
+                    setTabVisible(item.key, !visible);
+                  }}
                   className={cn(
                     'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 shrink-0',
                     visible ? 'bg-primary' : 'bg-border'
@@ -718,7 +756,10 @@ export function Settings() {
           <Select
             className="max-w-sm"
             value={currentOrg?.timezone ?? 'America/Los_Angeles'}
-            onChange={(e) => updateOrgTimezone(e.target.value)}>
+            onChange={(e) => {
+              track('setting_changed', { setting: 'org_timezone' });
+              updateOrgTimezone(e.target.value);
+            }}>
             {TIMEZONES.map((tz) =>
             <option key={tz.value} value={tz.value}>
                 {tz.label}
@@ -758,9 +799,13 @@ export function Settings() {
             role="switch"
             aria-checked={!!currentOrg?.show_all_reports}
             aria-label="Show all reports to everyone"
-            onClick={() =>
-            updateOrgShowAllReports(!currentOrg?.show_all_reports)
-            }
+            onClick={() => {
+              track('setting_changed', {
+                setting: 'show_all_reports',
+                value: !currentOrg?.show_all_reports
+              });
+              updateOrgShowAllReports(!currentOrg?.show_all_reports);
+            }}
             className={cn(
               'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 shrink-0',
               currentOrg?.show_all_reports ? 'bg-primary' : 'bg-border'
@@ -802,9 +847,13 @@ export function Settings() {
             role="switch"
             aria-checked={currentOrg?.show_guidance !== false}
             aria-label="Show guidance tips"
-            onClick={() =>
-            updateOrgShowGuidance(!(currentOrg?.show_guidance !== false))
-            }
+            onClick={() => {
+              track('setting_changed', {
+                setting: 'show_guidance',
+                value: !(currentOrg?.show_guidance !== false)
+              });
+              updateOrgShowGuidance(!(currentOrg?.show_guidance !== false));
+            }}
             className={cn(
               'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 shrink-0',
               currentOrg?.show_guidance !== false ? 'bg-primary' : 'bg-border'
@@ -851,6 +900,10 @@ export function Settings() {
               if (fostersEnabled && activeFosterPlacements > 0) {
                 setConfirmFosterOff(true);
               } else {
+                track('setting_changed', {
+                  setting: 'foster_management',
+                  value: !fostersEnabled
+                });
                 updateOrgFosterManagement(!fostersEnabled);
               }
             }}
@@ -985,7 +1038,13 @@ export function Settings() {
       <ConfirmDialog
         isOpen={confirmFosterOff}
         onClose={() => setConfirmFosterOff(false)}
-        onConfirm={() => updateOrgFosterManagement(false)}
+        onConfirm={() => {
+          track('setting_changed', {
+            setting: 'foster_management',
+            value: false
+          });
+          updateOrgFosterManagement(false);
+        }}
         title="Turn off foster management?"
         confirmLabel="Turn Off"
         cancelLabel="Keep On">

@@ -12,6 +12,7 @@ import { NewSittingRequestModal } from '../components/sitting/NewSittingRequestM
 import { useCanManageSupplyRequests } from '../lib/useSupplyPermissions';
 import { GuidanceLink } from '../components/guidance/GuidanceLink';
 import { useFostersEnabled } from '../lib/useFostersEnabled';
+import { track } from '../lib/analytics';
 
 type RequestsTab = 'supply' | 'transport' | 'sitting';
 const TABS: { key: RequestsTab; label: string }[] = [
@@ -42,6 +43,7 @@ export function Requests() {
   // request (from the dashboard "Help Needed" widget or a duplicate warning).
   const requestParam = searchParams.get('request');
   const setTab = (next: RequestsTab) => {
+    track('tab_viewed', { page: 'requests', tab: next });
     setIsNewOpen(false);
     setSearchParams(next === 'supply' ? {} : { tab: next }, { replace: true });
   };

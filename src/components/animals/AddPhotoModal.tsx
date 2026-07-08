@@ -6,6 +6,7 @@ import { useWhisker } from '../../context/WhiskerContext';
 import { PhotoCategory } from '../../types';
 import { UploadIcon, LinkIcon } from 'lucide-react';
 import { focusFirstError } from '../../lib/focusFirstError';
+import { track } from '../../lib/analytics';
 interface AddPhotoModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -121,6 +122,7 @@ export function AddPhotoModal({
         url: url.trim()
       });
     }
+    track('photo_added', { animal_id: animalId });
     setSubmitting(false);
     reset();
     onClose();

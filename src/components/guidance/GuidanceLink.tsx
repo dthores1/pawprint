@@ -14,6 +14,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Button } from '../ui/Button';
 import { HelpDrawer } from './HelpDrawer';
 import { guidanceIcon } from './guidanceIcons';
+import { track } from '../../lib/analytics';
 
 export function GuidanceLink({ guidanceKey }: { guidanceKey: string }) {
   const {
@@ -39,6 +40,7 @@ export function GuidanceLink({ guidanceKey }: { guidanceKey: string }) {
   const Icon = guidanceIcon(message.icon);
 
   const openDrawer = () => {
+    track('help_opened', { guidance_key: guidanceKey });
     setOpen(true);
     markGuidanceSeen(message.key, message.version);
   };

@@ -9,6 +9,7 @@ import { PersonSearchPicker } from '../ui/PersonSearchPicker';
 import { AddContactModal } from '../contacts/AddContactModal';
 import { useWhisker } from '../../context/WhiskerContext';
 import { AddressValue } from '../../types';
+import { track } from '../../lib/analytics';
 
 interface Props {
   isOpen: boolean;
@@ -106,6 +107,7 @@ export function NewClinicEventModal({ isOpen, onClose }: Props) {
       status: 'planning',
       notes: form.notes.trim() || undefined
     });
+    track('clinic_event_created');
     handleClose();
   };
 

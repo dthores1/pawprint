@@ -9,6 +9,7 @@ import { ClinicEventSearchPicker } from '../ui/ClinicEventSearchPicker';
 import { Button } from '../ui/Button';
 import { formatDate, animalDisplayName } from '../../lib/utils';
 import { focusFirstError } from '../../lib/focusFirstError';
+import { track } from '../../lib/analytics';
 import { useWhisker } from '../../context/WhiskerContext';
 import {
   PROCEDURE_TYPE_OPTIONS,
@@ -384,6 +385,10 @@ export function AddMedicalModal({
       updateMedicalRecord(record.id, payload);
     } else {
       addMedicalRecord(payload);
+      track('medical_record_added', {
+        animal_id: animalId,
+        record_type: formData.procedure_type
+      });
     }
     // Mirror the chip number onto the animal record so the readiness checklist
     // flips immediately and the chip badge in the hero reflects reality. We

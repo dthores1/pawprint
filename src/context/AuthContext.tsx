@@ -8,6 +8,13 @@ import React, {
 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import {
+  identifyUser,
+  resetAnalytics,
+  setAnalyticsOrganization,
+  setViewAsActive,
+  track } from
+'../lib/analytics';
 
 /** A member of the current org that the signed-in user can "view as". */
 export interface ViewAsMember {
@@ -174,6 +181,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const userIdRef = useRef<string | null>(null);
   userIdRef.current = userId;
 
+  // Whether a session existed before the latest auth event — distinguishes a
+  // genuine sign-in from Supabase re-emitting SIGNED_IN on tab refocus.
+  const hadSessionRef = useRef(false);
+
+  // Tie analytics to the signed-in user (auth user id, never a person id —
+  // view-as swaps person ids and must not re-identify the session).
+  useEffect(() => {
+    if (userId) identifyUser(userId, user?.email);
+  }, [userId, user?.email]);
+
   const refreshOrganizations = useCallback(async () => {
     const uid = userIdRef.current;
     if (!uid) {
@@ -205,10 +222,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
+      hadSessionRef.current = hadSessionRef.current || !!data.session;
       setLoading(false);
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s);
+      // SIGNED_IN also fires on tab refocus; the ref limits the analytics
+      // event to genuine no-session → session transitions.
+      if (event === 'SIGNED_IN' && s && !hadSessionRef.current) {
+        track('signed_in', {
+          method: s.user.app_metadata?.provider ?? 'password'
+        });
+      }
+      if (event === 'SIGNED_OUT') resetAnalytics();
+      hadSessionRef.current = !!s;
     });
     return () => sub.subscription.unsubscribe();
   }, []);
@@ -261,6 +288,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   organizations.find((o) => o.id === currentOrgId) ??
   organizations[0] ??
   null;
+
+  // Roll usage up to the rescue in PostHog (group analytics); every event
+  // carries organization_id while the group is set. `currentOrg` here is the
+  // real membership — view-as only swaps the role on effectiveCurrentOrg.
+  useEffect(() => {
+    if (currentOrg) {
+      setAnalyticsOrganization(currentOrg.id, currentOrg.name, currentOrg.role);
+    }
+  }, [currentOrg]);
 
   const updateOrgTimezone = useCallback(
     async (timezone: string) => {
@@ -358,6 +394,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setViewAs(null);
   }, [currentOrgId]);
+
+  // Flag analytics events fired while impersonating (writes no-op during
+  // view-as, but navigation/open events still flow — keep them filterable).
+  useEffect(() => {
+    setViewAsActive(!!viewAs);
+  }, [viewAs]);
 
   useEffect(() => {
     let cancelled = false;
@@ -549,6 +591,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const signOut = useCallback(async () => {
+    track('signed_out');
     await supabase.auth.signOut();
     localStorage.removeItem(CURRENT_ORG_KEY);
     setCurrentOrgIdState(null);

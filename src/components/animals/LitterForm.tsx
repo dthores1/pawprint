@@ -10,6 +10,7 @@ import { Sex, AgeUnit } from '../../types';
 import { deriveAgeInfo } from '../../lib/age';
 import { enabledSpeciesList, defaultSpeciesId } from '../../lib/orgCatalog';
 import { focusFirstError } from '../../lib/focusFirstError';
+import { track } from '../../lib/analytics';
 
 interface LitterFormProps {
   onClose: () => void;
@@ -168,6 +169,10 @@ export function LitterForm({
         description: m.description.trim() || undefined
       }))
     );
+    track('litter_created', {
+      member_count: members.length,
+      species
+    });
     onClose();
   };
 

@@ -1,5 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useLocation } from
+'react-router-dom';
+import { trackPageView } from './lib/analytics';
 import { WhiskerProvider } from './context/WhiskerContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DemoAuthProvider, DemoWhiskerProvider } from './context/DemoProviders';
@@ -46,6 +53,18 @@ function DocumentTitle() {
       ? `Whiskerville | ${currentOrg.name}`
       : 'Whiskerville';
   }, [currentOrg]);
+  return null;
+}
+
+// Fires a $pageview on every route change (PostHog's auto-pageview is off —
+// it only sees the initial load in an SPA). Mounted inside BrowserRouter so
+// public pages (/login, /terms) are counted too. No-ops when analytics is
+// disabled (demo mode, admin console, or no key).
+function RouteTracker() {
+  const location = useLocation();
+  useEffect(() => {
+    trackPageView(location.pathname);
+  }, [location.pathname]);
   return null;
 }
 
@@ -221,6 +240,7 @@ function ProductionApp() {
       <WhiskerProvider>
         <DocumentTitle />
         <BrowserRouter>
+          <RouteTracker />
           <Routes>
             {/* Public sign-in route. The signed-out front door is the landing
              page (rendered by the Gate at "/"); this is the explicit /login the

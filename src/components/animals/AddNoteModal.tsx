@@ -7,6 +7,7 @@ import { useWhisker } from '../../context/WhiskerContext';
 import { Animal, NoteType } from '../../types';
 import { animalDisplayName } from '../../lib/utils';
 import { useFostersEnabled } from '../../lib/useFostersEnabled';
+import { track } from '../../lib/analytics';
 interface AddNoteModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -32,6 +33,10 @@ export function AddNoteModal({ isOpen, onClose, animalId, animal }: AddNoteModal
       animal_id: animalId,
       author_name: 'Current User',
       ...formData
+    });
+    track('note_added', {
+      animal_id: animalId,
+      note_type: formData.note_type
     });
     onClose();
     setFormData({
