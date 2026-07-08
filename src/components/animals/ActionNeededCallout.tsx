@@ -55,7 +55,7 @@ const PRIORITY_OPTIONS: ElevatedPriority[] = [
 'critical'];
 
 
-type Mode = 'view' | 'confirm' | 'edit' | 'add';
+type Mode = 'view' | 'confirm' | 'edit' | 'add' | 'resolve';
 
 export function ActionNeededCallout({
   animalId,
@@ -67,7 +67,8 @@ export function ActionNeededCallout({
     actionItems,
     addActionItem,
     updateActionItem,
-    completeActionItem
+    completeActionItem,
+    updateAnimal
   } = useWhisker();
   const [mode, setMode] = useState<Mode>('view');
   const [draft, setDraft] = useState('');
@@ -266,7 +267,14 @@ export function ActionNeededCallout({
                 type="button"
                 onClick={() => {
                   completeActionItem(openItem.id);
-                  toView();
+                  // The urgent thing is usually over once it's done — offer
+                  // to clear the elevated priority instead of leaving it
+                  // silently stale (the animal keeps it until told otherwise).
+                  if (priority !== 'normal') {
+                    setMode('resolve');
+                  } else {
+                    toView();
+                  }
                 }}
                 className={primaryBtn}>
 
@@ -286,6 +294,45 @@ export function ActionNeededCallout({
                 </button>
                 <button type="button" onClick={toView} className={subtleBtn}>
                   Cancel
+                </button>
+              </div>
+            </motion.div> :
+
+          /* — Post-completion resolution: offer to clear the priority.
+               Clearing is the primary action (the common case is "I did the
+               urgent thing → it isn't urgent anymore"); keeping it stays one
+               click away for genuinely ongoing situations. — */
+          mode === 'resolve' && priority !== 'normal' ?
+          <motion.div
+            key="resolve"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="flex items-center justify-between gap-3 flex-wrap">
+
+              <p
+              className={cn(
+                'text-sm',
+                isCritical ? 'text-white/90' : 'text-text-primary'
+              )}>
+
+                Action item completed. {animalName} is still marked{' '}
+                <span className="font-medium">{TONE[priority].label}</span>.
+              </p>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                type="button"
+                onClick={() => {
+                  updateAnimal(animalId, { priority: 'normal' });
+                  toView();
+                }}
+                className={primaryBtn}>
+
+                  <CheckCircle2Icon className="w-3.5 h-3.5" />
+                  Remove {TONE[priority].label} Priority
+                </button>
+                <button type="button" onClick={toView} className={subtleBtn}>
+                  Keep {TONE[priority].label}
                 </button>
               </div>
             </motion.div> :
@@ -363,14 +410,27 @@ export function ActionNeededCallout({
                 active action item.
               </p>
               {canManage &&
-              <button
-              type="button"
-              onClick={() => startAdd(tonePriority)}
-              className={cn(primaryBtn, 'shrink-0')}>
+              <div className="flex items-center gap-2 shrink-0">
+                  {/* The inconsistency is the lingering flag, not the missing
+                      item — so clearing it is the primary answer, with "add
+                      another step" as the alternative. */}
+                  <button
+                type="button"
+                onClick={() => updateAnimal(animalId, { priority: 'normal' })}
+                className={primaryBtn}>
 
-                <PlusIcon className="w-3.5 h-3.5" />
-                Add action item
-              </button>
+                    <CheckCircle2Icon className="w-3.5 h-3.5" />
+                    Remove {tone.label}
+                  </button>
+                  <button
+                type="button"
+                onClick={() => startAdd(tonePriority)}
+                className={subtleBtn}>
+
+                    <PlusIcon className="w-3.5 h-3.5" />
+                    Add Action Item
+                  </button>
+                </div>
               }
             </motion.div>
           }
