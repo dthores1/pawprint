@@ -25,9 +25,8 @@ import {
 import { ArchiveConfirmDialog } from '../components/archive/ArchiveConfirmDialog';
 import { useCanArchive } from '../components/archive/useCanArchive';
 import { useCanManageFosters } from '../lib/useAnimalPermissions';
-import { InviteToAppModal } from '../components/people/InviteToAppModal';
+import { InviteStatusAction } from '../components/people/InviteStatusAction';
 import { useAuth } from '../context/AuthContext';
-import { Send as SendIcon } from 'lucide-react';
 export function FosterProfile() {
   const { id } = useParams<{
     id: string;
@@ -42,12 +41,10 @@ export function FosterProfile() {
   } = useWhisker();
   const [isPlaceModalOpen, setIsPlaceModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const navigate = useNavigate();
   const canArchiveBase = useCanArchive('people', { id: id ?? 'na' });
-  const { currentOrg, currentPersonId } = useAuth();
-  const isAdmin = currentOrg?.role === 'owner' || currentOrg?.role === 'admin';
+  const { currentPersonId } = useAuth();
   const canManageFosters = useCanManageFosters();
   // Block self-archive even for admins — there's no sensible recovery path
   // if an admin removes their own contact / member record from the UI.
@@ -98,15 +95,7 @@ export function FosterProfile() {
           <ArrowLeftIcon className="w-4 h-4" /> Back to Fosters
         </Link>
         <div className="flex items-center gap-2">
-          {isAdmin && !foster.user_id && foster.email &&
-          <Button
-            variant="soft"
-            size="sm"
-            onClick={() => setIsInviteOpen(true)}>
-
-              <SendIcon className="w-4 h-4 mr-2" /> Invite to Whiskerville
-            </Button>
-          }
+          <InviteStatusAction person={foster} />
           {canManageFosters &&
           <Button
             variant="soft"
@@ -419,11 +408,6 @@ export function FosterProfile() {
         onArchived={() => navigate('/fosters')} />
 
       }
-      <InviteToAppModal
-        isOpen={isInviteOpen}
-        onClose={() => setIsInviteOpen(false)}
-        person={foster} />
-
     </div>);
 
 }

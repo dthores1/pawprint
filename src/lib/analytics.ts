@@ -50,6 +50,8 @@ export type AnalyticsEvent =
   | 'contact_added'             // { roles }
   | 'foster_added'
   | 'app_invite_sent'
+  | 'app_invite_resent'
+  | 'app_invite_revoked'
   | 'supply_request_created'    // { item_count }
   | 'supply_request_status_changed' // { new_status }
   | 'product_added'
