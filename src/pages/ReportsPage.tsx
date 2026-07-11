@@ -32,8 +32,7 @@ import {
   lastNMonths,
   meanDaysBetween,
   monthBucketsBetween,
-  thisMonthRange,
-  thisYearRange } from
+  thisMonthRange } from
 '../lib/reports';
 import { ADOPTION_STATUS_LABELS, isActiveAdoption } from '../lib/adoptions';
 import { AnimalStatus, SiteStatus } from '../types';
@@ -267,18 +266,6 @@ export function ReportsPage() {
   const [sitesChartType, setSitesChartType] = useState<ChartType>('pie');
 
   // — Adoptions —————————————————————————————————————————————————————
-  const adoptionsThisMonth = useMemo(() => {
-    const r = thisMonthRange();
-    return adoptions.filter(
-      (a) => a.status === 'completed' && inRange(a.completed_at, r)
-    ).length;
-  }, [adoptions]);
-  const adoptionsThisYear = useMemo(() => {
-    const r = thisYearRange();
-    return adoptions.filter(
-      (a) => a.status === 'completed' && inRange(a.completed_at, r)
-    ).length;
-  }, [adoptions]);
   const adoptionsInRange = useMemo(
     () => adoptions.filter((a) => inRange(a.created_at, range)),
     [adoptions, range]
@@ -324,6 +311,13 @@ export function ReportsPage() {
       new Date(a.adoption.completed_at!).getTime()
     );
   }, [adoptions, animals, range]);
+  // Conversion: completed adoptions ÷ applications, both in the selected
+  // range. Each event buckets when it happened (completed_at vs created_at),
+  // so a range that clears a backlog of older applications can exceed 100%.
+  const conversionRate = useMemo(() => {
+    if (adoptionsInRange.length === 0) return null;
+    return completedAdoptions.length / adoptionsInRange.length;
+  }, [adoptionsInRange, completedAdoptions]);
 
   // — Animals ———————————————————————————————————————————————————————
   const animalsByStatus = useMemo(() => {
@@ -581,8 +575,15 @@ export function ReportsPage() {
       <section>
         <SectionTitle>Adoptions</SectionTitle>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-          <MetricCard label="Adoptions this month" value={adoptionsThisMonth} />
-          <MetricCard label="Adoptions this year" value={adoptionsThisYear} />
+          <MetricCard
+            label="Adoptions in range"
+            value={completedAdoptions.length}
+            hint="Completed in the selected range" />
+
+          <MetricCard
+            label="Applications in range"
+            value={adoptionsInRange.length} />
+
           <MetricCard
             label="Avg days application → adoption"
             value={
@@ -593,8 +594,13 @@ export function ReportsPage() {
             hint="Completed adoptions in the selected range" />
 
           <MetricCard
-            label="Applications in range"
-            value={adoptionsInRange.length} />
+            label="Conversion rate"
+            value={
+            conversionRate != null ?
+            `${Math.round(conversionRate * 100)}%` :
+            '—'
+            }
+            hint="Completed adoptions ÷ applications in range" />
 
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
