@@ -18,7 +18,9 @@ import {
   PencilIcon,
   XIcon,
   ExternalLinkIcon,
-  Trash2Icon } from
+  Trash2Icon,
+  PackageIcon,
+  PawPrintIcon } from
 'lucide-react';
 import { PillTabs } from '../ui/PillTabs';
 import { FilterDropdown } from '../ui/FilterDropdown';
@@ -650,7 +652,8 @@ function TransportCard({
   const subject =
   (animalNames && animalNames.length > 0 ? animalNames.join(', ') : null) || (
   request.type === 'supplies' ?
-  'Supply drop' :
+  // Legacy supplies rows predate supplies_description (migration 0095).
+  request.supplies_description || 'Supply drop' :
   TYPE_LABEL[request.type]);
   // Title shows the destination's friendly shorthand when it's a saved location,
   // else the address text. The full addresses move to the map-pin row below.
@@ -708,6 +711,14 @@ function TransportCard({
             <h3 className="text-lg font-heading font-bold text-text-primary truncate min-w-0">
               {subject} to {dropoffTitle}
             </h3>
+            {/* Cargo-type badge — "Biscuit to Clinic" vs "Dog food to Clinic"
+                read the same without it. */}
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-background border border-border text-text-secondary">
+              {request.type === 'supplies' ?
+              <PackageIcon className="w-3 h-3" /> :
+              <PawPrintIcon className="w-3 h-3" />}
+              {TYPE_LABEL[request.type]}
+            </span>
             {request.urgency !== 'normal' &&
             <span
               className={cn(

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Modal } from '../ui/Modal';
-import { FieldError, Select, Textarea, Label } from '../ui/Forms';
+import { FieldError, Input, Select, Textarea, Label } from '../ui/Forms';
 import { FormSection } from '../ui/FormSection';
 import { focusFirstError } from '../../lib/focusFirstError';
 import { DateTimePicker } from '../ui/DateTimePicker';
@@ -97,6 +97,7 @@ export function NewTransportRequestModal({
     'specific'
   );
   const [selectedAnimalIds, setSelectedAnimalIds] = useState<string[]>([]);
+  const [suppliesDescription, setSuppliesDescription] = useState('');
   const [pickup, setPickup] = useState<AddressValue | null>(null);
   const [dropoff, setDropoff] = useState<AddressValue | null>(null);
   const [pickupSavedLocationId, setPickupSavedLocationId] = useState<string | undefined>();
@@ -109,6 +110,7 @@ export function NewTransportRequestModal({
   const [windowEnd, setWindowEnd] = useState('');
   const [errors, setErrors] = useState<{
     animalId?: string;
+    supplies?: string;
     pickup?: string;
     dropoff?: string;
     pickupTime?: string;
@@ -135,6 +137,7 @@ export function NewTransportRequestModal({
         filter((ta) => ta.transport_request_id === request.id).
         map((ta) => ta.animal_id)
       );
+      setSuppliesDescription(request.supplies_description ?? '');
       setPickup(
         request.pickup_address ??
         (request.pickup_location ?
@@ -169,6 +172,7 @@ export function NewTransportRequestModal({
       setUrgency(prefill?.urgency ?? 'normal');
       setAnimalScope('specific');
       setSelectedAnimalIds(prefill?.animal_ids ?? []);
+      setSuppliesDescription(prefill?.supplies_description ?? '');
       setPickup(null);
       setDropoff(null);
       setPickupSavedLocationId(undefined);
@@ -214,6 +218,11 @@ export function NewTransportRequestModal({
       'No animals are currently in your care.' :
       'Select at least one animal.';
     }
+    // Supplies runs must say what's being moved — the counterpart of the
+    // required animal selection above.
+    if (type === 'supplies' && !suppliesDescription.trim()) {
+      nextErrors.supplies = 'Describe what needs to be transported.';
+    }
     if (!pickup?.formatted.trim())
     nextErrors.pickup = 'Pickup location is required.';
     if (!dropoff?.formatted.trim())
@@ -235,6 +244,7 @@ export function NewTransportRequestModal({
     if (Object.keys(nextErrors).length > 0) {
       const ids = [
       nextErrors.animalId && 'animal',
+      nextErrors.supplies && 'supplies_description',
       nextErrors.pickup && 'pickup',
       nextErrors.dropoff && 'dropoff',
       nextErrors.pickupTime && 'pickup_time',
@@ -274,6 +284,9 @@ export function NewTransportRequestModal({
         {
           type,
           urgency,
+          // '' → null in the API layer, so switching to Animal clears it.
+          supplies_description:
+          type === 'supplies' ? suppliesDescription.trim() : '',
           pickup_location: pickup?.formatted.trim() ?? '',
           dropoff_location: dropoff?.formatted.trim() ?? '',
           pickup_address: pickup ?? undefined,
@@ -301,6 +314,8 @@ export function NewTransportRequestModal({
           assignedVolunteerId :
           undefined,
           sitting_request_id: sittingRequestId,
+          supplies_description:
+          type === 'supplies' ? suppliesDescription.trim() : undefined,
           pickup_location: pickup?.formatted.trim() ?? '',
           dropoff_location: dropoff?.formatted.trim() ?? '',
           pickup_address: pickup,
@@ -464,6 +479,26 @@ export function NewTransportRequestModal({
                 </label>
               </div>
               <FieldError>{errors.animalId}</FieldError>
+            </div>
+          }
+
+          {type === 'supplies' &&
+          <div>
+              <Label htmlFor="supplies_description" required>
+                What needs to be transported?
+              </Label>
+              <Input
+              id="supplies_description"
+              value={suppliesDescription}
+              onChange={(e) => {
+                setSuppliesDescription(e.target.value);
+                if (errors.supplies) {
+                  setErrors((prev) => ({ ...prev, supplies: undefined }));
+                }
+              }}
+              placeholder="e.g. Dog food (3 bags), crates, blankets" />
+
+              <FieldError>{errors.supplies}</FieldError>
             </div>
           }
         </FormSection>

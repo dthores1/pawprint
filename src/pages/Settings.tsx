@@ -151,20 +151,28 @@ export function Settings() {
   // places), and Permissions (member access grants — admin-only).
   const [tab, setTab] = useState<
     'animal' | 'locations' | 'navigation' | 'permissions' | 'general' | 'support'>(
-    'animal'
+    () => isAdmin ? 'animal' : 'support'
   );
   // Support is available to every member (bug reports can't be admin-gated);
-  // the rest stay admin-only.
+  // everything else — including Animal Options, whose species/breed toggles
+  // write org settings — is admin-only (RLS enforces the writes server-side
+  // since migration 0094; this just keeps the UI honest).
   const tabs = [
-  { key: 'animal', label: 'Animal Options' },
   ...isAdmin ?
   [
+  { key: 'animal', label: 'Animal Options' },
   { key: 'navigation', label: 'Navigation' },
   { key: 'locations', label: 'Locations' },
   { key: 'permissions', label: 'Permissions' },
   { key: 'general', label: 'General' }] :
   [],
   { key: 'support', label: 'Support' }];
+
+  // If the effective role drops mid-session (org switch, "view as" a member),
+  // don't leave an admin-only tab selected.
+  useEffect(() => {
+    if (!isAdmin && tab !== 'support') setTab('support');
+  }, [isAdmin, tab]);
 
   // Tickets load lazily — only when the Support tab is first opened.
   useEffect(() => {

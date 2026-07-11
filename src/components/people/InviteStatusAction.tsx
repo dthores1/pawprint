@@ -49,7 +49,7 @@ function isLive(invite: InviteRow) {
 
 export function InviteStatusAction({ person }: { person: Person }) {
   const { currentOrg } = useAuth();
-  const { orgMembers } = useWhisker();
+  const { orgMembers, peopleIndex } = useWhisker();
   const isAdmin = useIsAdmin();
 
   const [isInviteOpen, setIsInviteOpen] = useState(false);
@@ -60,14 +60,27 @@ export function InviteStatusAction({ person }: { person: Person }) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   const email = person.email?.trim().toLowerCase() ?? '';
+  // The invite smart-merge (migration 0033) sets user_id on this contact row
+  // at accept time — but accepts that ran before that function was live, or
+  // re-invites after a member removal (the merge skips when a self-record
+  // already exists), leave the account on a separate hidden self-record
+  // instead. Fall back to matching that self-record by email (self-records
+  // are always loaded — see the people query in WhiskerContext).
+  const linkedUserId =
+  person.user_id ?? (
+  email ?
+  peopleIndex.find(
+    (p) => p.user_id && p.email?.trim().toLowerCase() === email
+  )?.user_id :
+  undefined);
   // orgMembers always includes the signed-in admin once loaded, so an empty
   // list means "still loading" — treat a linked person as a member meanwhile
   // rather than flashing "Reinvite" at every page load.
   const membersLoaded = orgMembers.length > 0;
   const isMember =
-  !!person.user_id && (
-  !membersLoaded || orgMembers.some((m) => m.user_id === person.user_id));
-  const previouslyJoined = !!person.user_id && membersLoaded && !isMember;
+  !!linkedUserId && (
+  !membersLoaded || orgMembers.some((m) => m.user_id === linkedUserId));
+  const previouslyJoined = !!linkedUserId && membersLoaded && !isMember;
 
   const refreshInvites = useCallback(async () => {
     // Demo mode has no Supabase; invites simply stay "none".

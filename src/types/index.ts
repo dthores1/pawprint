@@ -1045,6 +1045,9 @@ export interface TransportRequest {
   supply_request_id?: string;
   /** The sitting request this ride was arranged for (migration 0076), if any. */
   sitting_request_id?: string;
+  /** What's being moved on a supplies run (migration 0095). Required by the
+   *  form when type === 'supplies'; shown as the card title like animal names. */
+  supplies_description?: string;
   /** Legacy single-line locations, kept in sync with the structured addresses. */
   pickup_location: string;
   dropoff_location: string;
