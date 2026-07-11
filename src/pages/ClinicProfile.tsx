@@ -159,8 +159,8 @@ export function ClinicProfile() {
   const transportCoord = event.transport_coordinator_person_id ?
   people.find((p) => p.id === event.transport_coordinator_person_id) :
   undefined;
-  const intakeCoord = event.intake_coordinator_person_id ?
-  people.find((p) => p.id === event.intake_coordinator_person_id) :
+  const coordinator = event.coordinator_person_id ?
+  people.find((p) => p.id === event.coordinator_person_id) :
   undefined;
 
   // Only animals still in the rescue's care can be scheduled — adopted/released/
@@ -342,6 +342,16 @@ export function ClinicProfile() {
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <RoleCard
+                icon={ClipboardListIcon}
+                label="Clinic coordinator"
+                value={
+                coordinator ?
+                `${coordinator.first_name} ${coordinator.last_name}` :
+                '—'
+                }
+                personId={coordinator?.id} />
+
+              <RoleCard
                 icon={UserIcon}
                 label="Veterinarian"
                 value={vet ? `${vet.first_name} ${vet.last_name}` : 'Unassigned'}
@@ -363,16 +373,6 @@ export function ClinicProfile() {
                 '—'
                 }
                 personId={transportCoord?.id} />
-
-              <RoleCard
-                icon={ClipboardListIcon}
-                label="Intake coordinator"
-                value={
-                intakeCoord ?
-                `${intakeCoord.first_name} ${intakeCoord.last_name}` :
-                '—'
-                }
-                personId={intakeCoord?.id} />
 
             </div>
           </Card>

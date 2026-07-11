@@ -40,7 +40,6 @@ type ClinicForm = {
   vetId: string;
   contactId: string;
   transportId: string;
-  intakeId: string;
   capacity: number | '';
   notes: string;
 };
@@ -68,7 +67,6 @@ function fromEvent(e: ClinicEvent): ClinicForm {
     vetId: e.veterinarian_person_id ?? '',
     contactId: e.contact_person_id ?? '',
     transportId: e.transport_coordinator_person_id ?? '',
-    intakeId: e.intake_coordinator_person_id ?? '',
     capacity: e.slot_capacity,
     notes: e.notes ?? ''
   };
@@ -90,8 +88,7 @@ function validateForm(form: ClinicForm): FormErrors {
 const PERSON_FIELD_META = {
   vet: { field: 'vetId', role: 'vet' },
   contact: { field: 'contactId', role: 'rescue_staff' },
-  transport: { field: 'transportId', role: 'transport' },
-  intake: { field: 'intakeId', role: 'rescue_staff' }
+  transport: { field: 'transportId', role: 'transport' }
 } as const;
 type PersonTarget = keyof typeof PERSON_FIELD_META;
 
@@ -145,7 +142,6 @@ export function EditClinicEventModal({ isOpen, onClose, event }: Props) {
       veterinarian_person_id: clear(form.vetId),
       contact_person_id: clear(form.contactId),
       transport_coordinator_person_id: clear(form.transportId),
-      intake_coordinator_person_id: clear(form.intakeId),
       slot_capacity: Number(form.capacity),
       notes: form.notes.trim() || (null as any)
     });
@@ -289,6 +285,20 @@ export function EditClinicEventModal({ isOpen, onClose, event }: Props) {
 
           </div>
           <div>
+            {/* Read-only — the coordinator is whoever created the clinic. */}
+            <Label>Clinic coordinator</Label>
+            <div className="flex h-11 w-full items-center rounded-lg border border-border bg-background/60 px-3.5 text-sm text-text-primary">
+              {(() => {
+                const coord = event.coordinator_person_id ?
+                people.find((p) => p.id === event.coordinator_person_id) :
+                undefined;
+                return coord ?
+                `${coord.first_name} ${coord.last_name}` :
+                'Not recorded';
+              })()}
+            </div>
+          </div>
+          <div>
             <Label htmlFor="transport">Transport coordinator</Label>
             <PersonSearchPicker
               id="transport"
@@ -296,17 +306,6 @@ export function EditClinicEventModal({ isOpen, onClose, event }: Props) {
               value={form.transportId}
               onChange={(value) => set('transportId', value)}
               onCreateNew={() => setCreateTarget('transport')}
-              placeholder="Search people…" />
-
-          </div>
-          <div>
-            <Label htmlFor="intake">Intake coordinator</Label>
-            <PersonSearchPicker
-              id="intake"
-              people={people}
-              value={form.intakeId}
-              onChange={(value) => set('intakeId', value)}
-              onCreateNew={() => setCreateTarget('intake')}
               placeholder="Search people…" />
 
           </div>

@@ -1616,7 +1616,7 @@ export const seedClinicEvents: ClinicEvent[] = [
   contact_person_id: 'pe4', // Brian O'Connor, intake coordinator
   slot_capacity: 8,
   transport_coordinator_person_id: 'pe7', // Rachel Green
-  intake_coordinator_person_id: 'pe4',
+  coordinator_person_id: 'pe4',
   notes: 'Weekly TNR clinic. Drop-off 7:30–8:00am; pickup 4:00–5:00pm.',
   status: 'scheduled',
   created_at: '2026-05-09T10:00:00Z',
@@ -1630,7 +1630,7 @@ export const seedClinicEvents: ClinicEvent[] = [
   contact_person_id: 'pe2',
   slot_capacity: 6,
   transport_coordinator_person_id: 'pe7',
-  intake_coordinator_person_id: 'pe4',
+  coordinator_person_id: 'pe4',
   notes: 'Smaller batch — Dr. Evans is solo this date.',
   status: 'planning',
   created_at: '2026-05-12T10:00:00Z',
@@ -1644,7 +1644,7 @@ export const seedClinicEvents: ClinicEvent[] = [
   contact_person_id: 'pe4',
   slot_capacity: 8,
   transport_coordinator_person_id: 'pe7',
-  intake_coordinator_person_id: 'pe4',
+  coordinator_person_id: 'pe4',
   notes: 'Standard weekly clinic.',
   status: 'completed',
   created_at: '2026-04-11T10:00:00Z',

@@ -1157,7 +1157,10 @@ export interface ClinicEvent {
   contact_person_id?: string;
   slot_capacity: number;
   transport_coordinator_person_id?: string;
-  intake_coordinator_person_id?: string;
+  /** The clinic's owner — set to the CREATOR at create time, read-only after.
+   *  Receives the upcoming-clinic reminder and the overdue "mark it
+   *  completed" nudge. Renamed from intake_coordinator_person_id (0096). */
+  coordinator_person_id?: string;
   notes?: string;
   status: ClinicEventStatus;
   created_at: string;

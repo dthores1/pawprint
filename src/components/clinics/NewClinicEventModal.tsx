@@ -8,6 +8,7 @@ import { Button } from '../ui/Button';
 import { PersonSearchPicker } from '../ui/PersonSearchPicker';
 import { AddContactModal } from '../contacts/AddContactModal';
 import { useWhisker } from '../../context/WhiskerContext';
+import { useAuth } from '../../context/AuthContext';
 import { AddressValue } from '../../types';
 import { track } from '../../lib/analytics';
 
@@ -23,6 +24,7 @@ type ClinicForm = {
   locationMode: LocationMode;
   vetId: string;
   contactId: string;
+  transportId: string;
   // `''` lets the user clear the field while typing; coerced to a number on submit.
   capacity: number | '';
   notes: string;
@@ -35,6 +37,7 @@ const INITIAL: ClinicForm = {
   locationMode: 'address',
   vetId: '',
   contactId: '',
+  transportId: '',
   capacity: 8,
   notes: ''
 };
@@ -55,12 +58,18 @@ function validateForm(form: ClinicForm): FormErrors {
 
 export function NewClinicEventModal({ isOpen, onClose }: Props) {
   const { addClinicEvent, peopleIndex: people, savedLocations } = useWhisker();
+  const { currentPersonId } = useAuth();
+  // The creator becomes the Clinic Coordinator — the accountable owner who
+  // receives the upcoming-clinic reminder and the overdue completion nudge.
+  const me = currentPersonId ?
+  people.find((p) => p.id === currentPersonId) :
+  undefined;
   const [form, setForm] = useState<ClinicForm>(INITIAL);
   const [errors, setErrors] = useState<FormErrors>({});
   // Which person field (if any) is creating a new contact inline.
-  const [createTarget, setCreateTarget] = useState<'vet' | 'contact' | null>(
-    null
-  );
+  const [createTarget, setCreateTarget] = useState<
+    'vet' | 'contact' | 'transport' | null>(
+    null);
 
   // Vet picker filters to people with role 'vet'. Contact picker accepts
   // anyone — some clinics have one person serving both roles, while at
@@ -103,6 +112,8 @@ export function NewClinicEventModal({ isOpen, onClose }: Props) {
       location_saved_location_id: form.locationSavedLocationId ?? null,
       veterinarian_person_id: form.vetId || undefined,
       contact_person_id: form.contactId || undefined,
+      transport_coordinator_person_id: form.transportId || undefined,
+      coordinator_person_id: currentPersonId ?? undefined,
       slot_capacity: Number(form.capacity),
       status: 'planning',
       notes: form.notes.trim() || undefined
@@ -191,28 +202,48 @@ export function NewClinicEventModal({ isOpen, onClose }: Props) {
           <FieldError id="location_error">{errors.location}</FieldError>
         </div>
 
-        <div>
-          <Label htmlFor="vet">Veterinarian</Label>
-          <PersonSearchPicker
-            id="vet"
-            people={people}
-            role="vet"
-            value={form.vetId}
-            onChange={(value) => set('vetId', value)}
-            onCreateNew={() => setCreateTarget('vet')}
-            placeholder="Search veterinarians by name or organization…" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="vet">Veterinarian</Label>
+            <PersonSearchPicker
+              id="vet"
+              people={people}
+              role="vet"
+              value={form.vetId}
+              onChange={(value) => set('vetId', value)}
+              onCreateNew={() => setCreateTarget('vet')}
+              placeholder="Search veterinarians…" />
 
-        </div>
-        <div>
-          <Label htmlFor="contact">Clinic contact (optional)</Label>
-          <PersonSearchPicker
-            id="contact"
-            people={people}
-            value={form.contactId}
-            onChange={(value) => set('contactId', value)}
-            onCreateNew={() => setCreateTarget('contact')}
-            placeholder="Search staff, volunteers, or vets…" />
+          </div>
+          <div>
+            <Label htmlFor="contact">Clinic contact (optional)</Label>
+            <PersonSearchPicker
+              id="contact"
+              people={people}
+              value={form.contactId}
+              onChange={(value) => set('contactId', value)}
+              onCreateNew={() => setCreateTarget('contact')}
+              placeholder="Search staff, volunteers, or vets…" />
 
+          </div>
+          <div>
+            {/* Read-only — the creator becomes the clinic coordinator. */}
+            <Label>Clinic coordinator</Label>
+            <div className="flex h-11 w-full items-center rounded-lg border border-border bg-background/60 px-3.5 text-sm text-text-primary">
+              {me ? `${me.first_name} ${me.last_name}` : 'You'}
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="transport">Transport coordinator</Label>
+            <PersonSearchPicker
+              id="transport"
+              people={people}
+              value={form.transportId}
+              onChange={(value) => set('transportId', value)}
+              onCreateNew={() => setCreateTarget('transport')}
+              placeholder="Search people…" />
+
+          </div>
         </div>
 
         <div>
@@ -231,11 +262,21 @@ export function NewClinicEventModal({ isOpen, onClose }: Props) {
           its state so the new person lands back in the field that opened it. */}
       <AddContactModal
         isOpen={createTarget !== null}
-        defaultRoles={[createTarget === 'vet' ? 'vet' : 'rescue_staff']}
+        defaultRoles={[
+        createTarget === 'vet' ?
+        'vet' :
+        createTarget === 'transport' ?
+        'transport' :
+        'rescue_staff']
+        }
         onCreated={(person) =>
         setForm((prev) => ({
           ...prev,
-          [createTarget === 'vet' ? 'vetId' : 'contactId']: person.id
+          [createTarget === 'vet' ?
+          'vetId' :
+          createTarget === 'transport' ?
+          'transportId' :
+          'contactId']: person.id
         }))
         }
         onClose={() => setCreateTarget(null)} />

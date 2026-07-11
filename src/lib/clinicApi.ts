@@ -14,7 +14,7 @@ export function rowToClinicEvent(r: any): ClinicEvent {
     slot_capacity: r.slot_capacity ?? 0,
     transport_coordinator_person_id:
     r.transport_coordinator_person_id ?? undefined,
-    intake_coordinator_person_id: r.intake_coordinator_person_id ?? undefined,
+    coordinator_person_id: r.coordinator_person_id ?? undefined,
     notes: r.notes ?? undefined,
     status: r.status,
     created_at: r.created_at,
@@ -30,7 +30,7 @@ const CLINIC_EVENT_COLUMNS = [
 'contact_person_id',
 'slot_capacity',
 'transport_coordinator_person_id',
-'intake_coordinator_person_id',
+'coordinator_person_id',
 'notes',
 'status'] as
 const;
