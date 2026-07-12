@@ -21,7 +21,9 @@ import {
   Trash2Icon,
   XIcon,
   AlertTriangleIcon,
-  ArrowUpRightIcon } from
+  ArrowUpRightIcon,
+  UserIcon,
+  CircleCheckIcon } from
 'lucide-react';
 import { cn, animalDisplayName, parseLocalDate } from '../../lib/utils';
 import { track } from '../../lib/analytics';
@@ -369,6 +371,8 @@ export function SittingRequestsView({
               request={s}
               coveredAnimals={animalsForRequest(s.id)}
               requesterName={
+              s.requested_by_person_id === currentPersonId ?
+              'you' :
               requester ?
               `${requester.first_name} ${requester.last_name}` :
               'Unknown'
@@ -628,11 +632,16 @@ function SittingCard({
           <p className="text-sm font-medium text-text-primary">
             {formatDateRange(request.start_date, request.end_date)}
           </p>
-          <p className="text-sm text-text-secondary mt-1">
+          {sitterName &&
+          <p className="text-sm text-text-primary mt-1 flex items-center gap-1.5">
+              <UserIcon className="w-3.5 h-3.5 text-text-secondary shrink-0" />
+              <span className="font-medium">
+                Sitter: <span className="font-semibold">{sitterName}</span>
+              </span>
+            </p>
+          }
+          <p className="text-xs text-text-secondary mt-0.5">
             Requested by {requesterName}
-            {sitterName && (
-              <> · Sitter: <span className="text-text-primary font-medium">{sitterName}</span></>
-            )}
           </p>
 
           <div className="flex flex-wrap gap-2 mt-3">
@@ -720,10 +729,11 @@ function SittingCard({
             <div className="shrink-0 flex flex-col sm:items-end gap-1.5">
               {canComplete &&
               <Button
-                variant="soft"
-                size="xs"
-                onClick={() => setConfirm('complete')}>
+                size="sm"
+                onClick={() => setConfirm('complete')}
+                className="gap-1.5">
 
+                  <CircleCheckIcon className="w-4 h-4" />
                   Mark Complete
                 </Button>
               }

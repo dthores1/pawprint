@@ -16,6 +16,8 @@ export function rowToSite(r: any): Site {
     notes: r.notes ?? undefined,
     address: addressFromColumns(r, 'address'),
     created_by: r.created_by ?? undefined,
+    // Trigger-maintained (0097) — read-only here, never in SITE_COLUMNS.
+    closed_at: r.closed_at ?? undefined,
     created_at: r.created_at,
     updated_at: r.updated_at
   };

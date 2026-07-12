@@ -29,7 +29,7 @@ import {
 'lucide-react';
 import { cn, animalDisplayName, formatDateLong } from '../lib/utils';
 import { track } from '../lib/analytics';
-import { SITE_STATUS_META } from '../lib/siteStatus';
+import { SITE_STATUS_META, siteStatusLabel } from '../lib/siteStatus';
 import { useCanManageSites } from '../lib/useSitePermissions';
 import { useAuth } from '../context/AuthContext';
 import { useUserLocation, haversineMiles, formatDistance } from '../lib/geo';
@@ -173,15 +173,22 @@ export function SiteProfile() {
                   'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
                   meta.tone
                 )}>
-                {meta.label}
+                {siteStatusLabel(site)}
               </span>
               <span className="text-xs text-text-secondary">{meta.description}</span>
             </div>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          {/* Join / Leave — anyone can volunteer, no permissions required. */}
+          {/* Join / Leave — anyone can volunteer, no permissions required.
+              Closed sites take no new volunteers and don't need leaving —
+              anyone who was on the roster just sees the past-tense chip. */}
           {currentPersonId && (
+          site.status === 'closed' ?
+          (isLead || myVolunteerRow) &&
+          <span className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-[#DDEFE2] text-[#3E7B52]">
+                <CheckIcon className="w-4 h-4" /> Previously volunteered
+              </span> :
           isLead ?
           <span className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-[#DDEFE2] text-[#3E7B52]">
               <CheckIcon className="w-4 h-4" /> You're volunteering here

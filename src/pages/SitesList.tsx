@@ -16,9 +16,10 @@ import {
 'lucide-react';
 import { cn } from '../lib/utils';
 import { Site } from '../types';
-import { SITE_STATUS_META } from '../lib/siteStatus';
+import { SITE_STATUS_META, siteStatusLabel } from '../lib/siteStatus';
 import { useCanManageSites } from '../lib/useSitePermissions';
 import { haversineMiles, formatDistance, useUserLocation } from '../lib/geo';
+import { track } from '../lib/analytics';
 
 type SitesTab = 'new' | 'nearby' | 'mine' | 'all';
 const TABS: { key: SitesTab; label: string }[] = [
@@ -50,6 +51,9 @@ export function SitesList() {
   const tab: SitesTab =
   param === 'nearby' || param === 'mine' || param === 'all' ? param : 'new';
   const [isNewOpen, setIsNewOpen] = useState(false);
+  // Closed sites are hidden from browsing by default (same pattern as
+  // historical animals / inactive contacts). Global search still reaches them.
+  const [includeClosed, setIncludeClosed] = useState(false);
   // Nearby-tab distance threshold ('all' = no cap). Restored from localStorage,
   // defaulting to 5 mi; `setRadius` writes the choice back so it persists.
   const [radius, setRadiusState] = useState(() => {
@@ -85,11 +89,17 @@ export function SitesList() {
     return haversineMiles(location, { lat, lng });
   };
 
+  const browsable = useMemo(
+    () =>
+    includeClosed ? sites : sites.filter((s) => s.status !== 'closed'),
+    [sites, includeClosed]
+  );
+
   const visible = useMemo(() => {
     if (tab === 'new') {
       // Sites added in the last 7 days, newest first.
       const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-      return [...sites].
+      return [...browsable].
       filter((s) => new Date(s.created_at).getTime() >= cutoff).
       sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
     }
@@ -100,7 +110,7 @@ export function SitesList() {
         filter((v) => v.contact_id === currentPersonId).
         map((v) => v.site_id)
       );
-      return [...sites].
+      return [...browsable].
       filter(
         (s) =>
         (currentPersonId && s.site_lead === currentPersonId) ||
@@ -108,8 +118,8 @@ export function SitesList() {
       ).
       sort((a, b) => a.name.localeCompare(b.name));
     }
-    return [...sites].sort((a, b) => a.name.localeCompare(b.name));
-  }, [sites, tab, siteVolunteers, currentPersonId]);
+    return [...browsable].sort((a, b) => a.name.localeCompare(b.name));
+  }, [browsable, tab, siteVolunteers, currentPersonId]);
 
   // Nearby = "sites by proximity", not just "sites with a distance". Located
   // sites (within the chosen radius) sort nearest-first; sites we can't place
@@ -118,7 +128,7 @@ export function SitesList() {
   // viewer has no location, so they all land in `unknown` (the old fallback).
   const nearby = useMemo(() => {
     const limit = radius === 'all' ? null : Number(radius);
-    const withDist = sites.map((s) => ({ s, d: distanceFor(s) }));
+    const withDist = browsable.map((s) => ({ s, d: distanceFor(s) }));
     const located = withDist.
     filter((x): x is { s: Site; d: number } => x.d != null).
     sort((a, b) => a.d - b.d);
@@ -130,7 +140,7 @@ export function SitesList() {
     sort((a, b) => a.name.localeCompare(b.name));
     return { located: inRadius, unknown };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sites, radius, location]);
+  }, [browsable, radius, location]);
 
   const renderCard = (s: Site) => {
     const meta = SITE_STATUS_META[s.status];
@@ -161,7 +171,7 @@ export function SitesList() {
                 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
                 meta.tone
               )}>
-              {meta.label}
+              {siteStatusLabel(s)}
             </span>
             {dist != null &&
             <span className="inline-flex items-center gap-1 text-xs font-medium text-text-secondary">
@@ -233,20 +243,38 @@ export function SitesList() {
         )}
       </div>
 
-      {tab === 'nearby' && (
-      location ?
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          {tab === 'nearby' && location &&
           <FilterDropdown
-          label="Within"
-          value={radius}
-          options={RADIUS_OPTIONS}
-          onChange={setRadius} />
-        </div> :
+            label="Within"
+            value={radius}
+            options={RADIUS_OPTIONS}
+            onChange={setRadius} />
+          }
+        </div>
+        <label className="inline-flex items-center gap-2 h-9 px-3 rounded-lg text-sm font-medium border border-border bg-card cursor-pointer select-none hover:bg-background transition-colors">
+          <input
+            type="checkbox"
+            checked={includeClosed}
+            onChange={(e) => {
+              track('history_toggled', {
+                page: 'sites',
+                shown: e.target.checked
+              });
+              setIncludeClosed(e.target.checked);
+            }}
+            className="h-4 w-4 rounded border-border text-primary focus:ring-primary/40 cursor-pointer" />
 
+          Include closed sites
+        </label>
+      </div>
+
+      {tab === 'nearby' && !location &&
       <p className="text-sm text-text-secondary">
           Enable location access or add an address to your profile to sort sites
           by distance. Showing all sites for now.
-        </p>)
+        </p>
       }
 
       {isEmpty ?

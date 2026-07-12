@@ -589,6 +589,9 @@ export interface Site {
   /** Structured address (carries the map pin + lat/long). */
   address?: AddressValue | null;
   created_by?: string;
+  /** When the site was closed (trigger-maintained, migration 0097). Set when
+   *  status flips to 'closed', cleared on reopen. Drives "Closed Jan 2026". */
+  closed_at?: string;
   created_at: string;
   updated_at: string;
 }

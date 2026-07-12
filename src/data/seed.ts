@@ -1838,6 +1838,30 @@ export const seedSites: Site[] = [
   // Recent so the demo "New" (last 7 days) tab has something to show.
   created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
   updated_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+},
+{
+  // Closed site — exercises the "Include closed sites" toggle, the dated
+  // "Closed <Mon YYYY>" pill, and the "Previously volunteered" chip (the
+  // demo user is the lead).
+  id: 'site4',
+  organization_id: 'demo-org',
+  name: 'Georgetown Alley Colony',
+  status: 'closed',
+  contact_id: 'pe1',
+  site_lead: 'p_dan',
+  notes: "All cats TNR'd and relocated; property fenced off. Closed out.",
+  address: {
+    formatted: '1200 S Bailey St, Seattle, WA 98108',
+    city: 'Seattle',
+    state: 'WA',
+    postalCode: '98108',
+    country: 'US',
+    latitude: 47.5484,
+    longitude: -122.3159
+  },
+  closed_at: new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString(),
+  created_at: '2025-09-12T10:00:00Z',
+  updated_at: new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString()
 }];
 
 export const seedSiteNotes: SiteNote[] = [

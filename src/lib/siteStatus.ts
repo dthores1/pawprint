@@ -1,4 +1,5 @@
-import { SiteStatus } from '../types';
+import { format } from 'date-fns';
+import { Site, SiteStatus } from '../types';
 
 // Display label + soft pill tone for each site lifecycle status. Tones mirror
 // the palette used elsewhere (e.g. ManageSupplyOptions category pills).
@@ -33,6 +34,15 @@ export const SITE_STATUS_META: Record<
     description: 'Site is no longer being actively managed.'
   }
 };
+
+/** Status pill text — "Closed Jan 2026" when the closure date is known
+ *  (closed_at, trigger-maintained since 0097), else the plain status label. */
+export function siteStatusLabel(site: Site): string {
+  if (site.status === 'closed' && site.closed_at) {
+    return `Closed ${format(new Date(site.closed_at), 'MMM yyyy')}`;
+  }
+  return SITE_STATUS_META[site.status].label;
+}
 
 export const SITE_STATUS_ORDER: SiteStatus[] = [
   'reported',

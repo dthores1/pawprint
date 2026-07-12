@@ -8,6 +8,7 @@ import {
   HomeIcon,
   UsersIcon,
   CommandIcon,
+  MapPinnedIcon,
   ChevronRightIcon } from
 'lucide-react';
 import { useWhisker } from '../../context/WhiskerContext';
@@ -18,6 +19,7 @@ import { StatusBadge, PriorityBadge, STATUS_LABELS } from '../ui/Badge';
 import { SpeciesBadge } from '../ui/SpeciesBadge';
 import { getDaysUntil } from '../../lib/utils';
 import { cn } from '../../lib/utils';
+import { siteStatusLabel } from '../../lib/siteStatus';
 import { track } from '../../lib/analytics';
 interface GlobalSearchProps {
   variant?: 'hero' | 'compact';
@@ -39,7 +41,8 @@ export function GlobalSearch({
     peopleIndex: people,
     medicalRecords,
     placements,
-    actionItems
+    actionItems,
+    sites
   } = useWhisker();
   const fostersEnabled = useFostersEnabled();
   const fosters = useMemo(
@@ -115,6 +118,17 @@ export function GlobalSearch({
     }).
     slice(0, 4);
   }, [people, q]);
+  // Sites — searched across ALL statuses (closed included): the Sites page
+  // hides closed sites from browsing, so search is how you reach them.
+  const siteResults = useMemo(() => {
+    if (!q) return [];
+    return sites.
+    filter((s) => {
+      const hay = `${s.name} ${s.address?.formatted ?? ''}`.toLowerCase();
+      return hay.includes(q);
+    }).
+    slice(0, 4);
+  }, [sites, q]);
   // Default "Needs Attention" panel when query is empty
   const needsAttention = useMemo(() => {
     if (q) return [];
@@ -163,10 +177,11 @@ export function GlobalSearch({
   animalResults.length > 0 ||
   fosterResults.length > 0 ||
   contactResults.length > 0 ||
+  siteResults.length > 0 ||
   needsAttention.length > 0;
   function go(
   path: string,
-  resultType: 'animal' | 'foster' | 'contact' | 'attention')
+  resultType: 'animal' | 'foster' | 'contact' | 'site' | 'attention')
   {
     track('search_result_selected', { result_type: resultType });
     setOpen(false);
@@ -395,6 +410,38 @@ export function GlobalSearch({
                         </p>
                         <p className="text-xs text-text-secondary truncate">
                           {p.organization_name || p.role.replace('_', ' ')}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+            )}
+              </ResultSection>
+          }
+
+            {/* Sites (closed sites stay findable here) */}
+            {siteResults.length > 0 &&
+          <ResultSection
+            icon={MapPinnedIcon}
+            title="Rescue Sites"
+            count={siteResults.length}>
+
+                {siteResults.map((s) =>
+            <button
+              key={s.id}
+              onClick={() => go(`/sites/${s.id}`, 'site')}
+              className="w-full flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-background transition-colors text-left">
+
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                        <MapPinnedIcon className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-text-primary text-sm truncate">
+                          {s.name}
+                        </p>
+                        <p className="text-xs text-text-secondary truncate">
+                          {siteStatusLabel(s)}
+                          {s.address?.formatted ? ` · ${s.address.formatted}` : ''}
                         </p>
                       </div>
                     </div>
