@@ -51,7 +51,7 @@ function validateForm(form: ClinicForm): FormErrors {
   if (!form.location?.formatted.trim())
   nextErrors.location = 'Location is required.';
   if (form.capacity === '' || form.capacity < 1) {
-    nextErrors.capacity = 'Slot capacity must be at least 1.';
+    nextErrors.capacity = 'Animal slots must be at least 1.';
   }
   return nextErrors;
 }
@@ -156,7 +156,7 @@ export function NewClinicEventModal({ isOpen, onClose }: Props) {
             <FieldError id="datetime_error">{errors.dateTime}</FieldError>
           </div>
           <div>
-            <Label htmlFor="capacity" required>Slot capacity</Label>
+            <Label htmlFor="capacity" required>Animal slots</Label>
             <Input
               id="capacity"
               type="number"
@@ -198,7 +198,7 @@ export function NewClinicEventModal({ isOpen, onClose }: Props) {
               }
             }}
             placeholder="Clinic address…"
-            freeTextHint="No exact address — it won’t show on a map." />
+            freeTextHint="No exact address — it won’t show on the map." />
           <FieldError id="location_error">{errors.location}</FieldError>
         </div>
 

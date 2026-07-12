@@ -60,22 +60,42 @@ export function memberNoun(species: string, count: number): string {
   return plural ? 'animals' : 'animal';
 }
 
-/** Compact status rollup, e.g. "3 in foster · 1 adopted · 1 medical concern". */
-export function summarizeLitterStatuses(members: Animal[]): string {
+export interface LitterStatusSegment {
+  key: 'foster' | 'adoptable' | 'adopted' | 'medical' | 'behavior' | 'hold';
+  label: string;
+}
+
+/**
+ * Status rollup as keyed segments so callers can make individual segments
+ * interactive (LitterProfile turns the foster one into a "place the rest"
+ * link). The foster segment reads "X of Y in foster" — the denominator is
+ * what tells users at a glance that the litter isn't together.
+ */
+export function litterStatusSegments(members: Animal[]): LitterStatusSegment[] {
   const inFoster = members.filter((a) => !!a.current_foster_id).length;
   const adoptable = members.filter((a) => a.status === 'adoptable').length;
   const adopted = members.filter((a) => a.status === 'adopted').length;
   const medical = members.filter((a) => a.has_medical_concern).length;
   const behavior = members.filter((a) => a.has_behavior_concern).length;
   const onHold = members.filter((a) => a.is_on_hold).length;
-  const segs: string[] = [];
-  if (inFoster) segs.push(`${inFoster} in foster`);
-  if (adoptable) segs.push(`${adoptable} adoptable`);
-  if (adopted) segs.push(`${adopted} adopted`);
-  if (medical) segs.push(`${medical} medical concern`);
-  if (behavior) segs.push(`${behavior} behavior concern`);
-  if (onHold) segs.push(`${onHold} on hold`);
-  return segs.join(' · ');
+  const segs: LitterStatusSegment[] = [];
+  if (inFoster) {
+    segs.push({
+      key: 'foster',
+      label: `${inFoster} of ${members.length} in foster`
+    });
+  }
+  if (adoptable) segs.push({ key: 'adoptable', label: `${adoptable} adoptable` });
+  if (adopted) segs.push({ key: 'adopted', label: `${adopted} adopted` });
+  if (medical) segs.push({ key: 'medical', label: `${medical} medical concern` });
+  if (behavior) segs.push({ key: 'behavior', label: `${behavior} behavior concern` });
+  if (onHold) segs.push({ key: 'hold', label: `${onHold} on hold` });
+  return segs;
+}
+
+/** Compact status rollup, e.g. "3 of 6 in foster · 1 adopted · 1 medical concern". */
+export function summarizeLitterStatuses(members: Animal[]): string {
+  return litterStatusSegments(members).map((s) => s.label).join(' · ');
 }
 
 /**

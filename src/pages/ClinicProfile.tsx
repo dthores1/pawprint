@@ -108,6 +108,9 @@ export function ClinicProfile() {
   const { currentPersonId } = useAuth();
 
   const [editing, setEditing] = useState(false);
+  // Set when the edit modal was opened from the slot-count link, so the
+  // Animal slots field starts focused.
+  const [editFocusCapacity, setEditFocusCapacity] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [adding, setAdding] = useState(false);
   const [newAnimalId, setNewAnimalId] = useState('');
@@ -239,7 +242,13 @@ export function ClinicProfile() {
             </Button>
           }
           {canManageMedical &&
-          <Button variant="soft" size="sm" onClick={() => setEditing(true)}>
+          <Button
+            variant="soft"
+            size="sm"
+            onClick={() => {
+              setEditFocusCapacity(false);
+              setEditing(true);
+            }}>
             <Edit2Icon className="w-4 h-4 mr-2" /> Edit
           </Button>
           }
@@ -306,10 +315,24 @@ export function ClinicProfile() {
                 <UsersIcon className="w-5 h-5 text-text-secondary shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <div className="flex items-center justify-between text-xs text-text-secondary mb-1">
-                    <span>Slot capacity</span>
+                    <span>Animal slots</span>
+                    {canManageMedical ?
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditFocusCapacity(true);
+                        setEditing(true);
+                      }}
+                      title="Edit animal slots"
+                      className="tabular-nums font-medium text-primary hover:underline">
+
+                        {filled} / {event.slot_capacity}
+                      </button> :
+
                     <span className="tabular-nums font-medium text-text-primary">
-                      {filled} / {event.slot_capacity}
-                    </span>
+                        {filled} / {event.slot_capacity}
+                      </span>
+                    }
                   </div>
                   <div className="w-full bg-background rounded-full h-1.5 overflow-hidden">
                     <div
@@ -660,7 +683,8 @@ export function ClinicProfile() {
       <EditClinicEventModal
         isOpen={editing}
         onClose={() => setEditing(false)}
-        event={event} />
+        event={event}
+        initialFocus={editFocusCapacity ? 'capacity' : undefined} />
 
 
       {archiving &&

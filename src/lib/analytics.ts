@@ -31,6 +31,7 @@ export type AnalyticsEvent =
   | 'litter_created'            // { member_count, species }
   | 'litter_member_added'
   | 'litter_updated'
+  | 'litter_placed'             // { litter_id, animal_count } — bulk foster placement
   | 'note_added'                // { note_type }
   | 'medical_record_added'      // { record_type }
   | 'photo_added'

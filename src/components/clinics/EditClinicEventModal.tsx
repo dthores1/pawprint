@@ -29,6 +29,8 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   event: ClinicEvent;
+  /** Field to focus when the modal opens (e.g. the card's slot count link). */
+  initialFocus?: 'capacity';
 }
 
 type ClinicForm = {
@@ -78,7 +80,7 @@ function validateForm(form: ClinicForm): FormErrors {
   if (!form.location?.formatted.trim())
   next.location = 'Location is required.';
   if (form.capacity === '' || form.capacity < 1) {
-    next.capacity = 'Slot capacity must be at least 1.';
+    next.capacity = 'Animal slots must be at least 1.';
   }
   return next;
 }
@@ -92,7 +94,7 @@ const PERSON_FIELD_META = {
 } as const;
 type PersonTarget = keyof typeof PERSON_FIELD_META;
 
-export function EditClinicEventModal({ isOpen, onClose, event }: Props) {
+export function EditClinicEventModal({ isOpen, onClose, event, initialFocus }: Props) {
   const { updateClinicEvent, peopleIndex: people, savedLocations } = useWhisker();
   const [form, setForm] = useState<ClinicForm>(() => fromEvent(event));
   const [errors, setErrors] = useState<FormErrors>({});
@@ -102,6 +104,16 @@ export function EditClinicEventModal({ isOpen, onClose, event }: Props) {
     if (isOpen) {
       setForm(fromEvent(event));
       setErrors({});
+      if (initialFocus === 'capacity') {
+        // rAF so the modal's contents have painted before we grab focus.
+        requestAnimationFrame(() => {
+          const el = document.getElementById('capacity');
+          if (el instanceof HTMLInputElement) {
+            el.focus();
+            el.select();
+          }
+        });
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, event.id]);
@@ -183,7 +195,7 @@ export function EditClinicEventModal({ isOpen, onClose, event }: Props) {
             <FieldError id="datetime_error">{errors.dateTime}</FieldError>
           </div>
           <div>
-            <Label htmlFor="capacity" required>Slot capacity</Label>
+            <Label htmlFor="capacity" required>Animal slots</Label>
             <Input
               id="capacity"
               type="number"
@@ -254,7 +266,7 @@ export function EditClinicEventModal({ isOpen, onClose, event }: Props) {
                 }
               }}
               placeholder="Clinic address…"
-              freeTextHint="No exact address — it won’t show on a map." />
+              freeTextHint="No exact address — it won’t show on the map." />
 
             <FieldError id="location_error">{errors.location}</FieldError>
           </div>

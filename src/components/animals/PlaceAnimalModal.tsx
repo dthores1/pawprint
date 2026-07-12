@@ -12,33 +12,55 @@ import { SearchIcon, XIcon, CheckIcon, AlertTriangleIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   animalDisplayName,
+  calculateAge,
   cn,
   fosterCapacityLabel,
   hasStatedCapacity } from
 '../../lib/utils';
+import { isInCare } from '../../lib/animalStatus';
+import { litterMembers, litterLabel } from '../../lib/litters';
 import { useTypeaheadKeyboard } from '../../lib/useTypeaheadKeyboard';
 import { track } from '../../lib/analytics';
 
-// Placement can be launched from either side of the relationship:
+// Placement can be launched from any side of the relationship:
 //   • animal-anchored (pass animalId): search for a foster to place this animal
 //     with — supports reassignment when the animal already has an active placement.
 //   • foster-anchored (pass fosterId): search for an animal to place with this
 //     foster — always a fresh placement.
+//   • litter-anchored (pass litterId): search for a foster and place several of
+//     the litter's members with them in one go — all eligible members by
+//     default, with per-animal opt-out. Fresh placements only; reassigning an
+//     already-fostered member stays on its animal page.
 interface PlaceAnimalModalProps {
   isOpen: boolean;
   onClose: () => void;
   animalId?: string;
   fosterId?: string;
+  litterId?: string;
 }
 export function PlaceAnimalModal({
   isOpen,
   onClose,
   animalId,
-  fosterId
+  fosterId,
+  litterId
 }: PlaceAnimalModalProps) {
-  const { fosters, people, placements, animals, placeAnimal, reassignFoster } =
-  useWhisker();
-  const mode: 'animal' | 'foster' = fosterId ? 'foster' : 'animal';
+  const {
+    fosters,
+    people,
+    placements,
+    animals,
+    animalsIndex,
+    litters,
+    breeds,
+    placeAnimal,
+    reassignFoster
+  } = useWhisker();
+  const mode: 'animal' | 'foster' | 'litter' = fosterId ?
+  'foster' :
+  litterId ?
+  'litter' :
+  'animal';
   // The searched/selected counterpart id (a foster in animal mode, an animal in
   // foster mode).
   const [selectedId, setSelectedId] = useState('');
@@ -70,11 +92,65 @@ export function PlaceAnimalModal({
   const anchorFoster = fosterId ?
   fosters.find((f) => f.id === fosterId) :
   undefined;
+  const anchorLitter = litterId ?
+  litters.find((l) => l.id === litterId) :
+  undefined;
+
+  // Litter mode: the roster with per-member bulk-placement eligibility. Members
+  // come from the index so even historical (adopted/released) ones are listed —
+  // shown disabled with the reason rather than silently missing. Eligible =
+  // still in care and not already in an active placement.
+  const activePlacementAnimalIds = useMemo(
+    () =>
+    new Set(
+      placements.
+      filter((p) => p.placement_status === 'active').
+      map((p) => p.animal_id)
+    ),
+    [placements]
+  );
+  const litterRoster = useMemo(() => {
+    if (!litterId) return [];
+    return litterMembers(animalsIndex, litterId).map((animal) => {
+      const alreadyFostered = activePlacementAnimalIds.has(animal.id);
+      const inCare = isInCare(animal.status);
+      return {
+        animal,
+        eligible: inCare && !alreadyFostered,
+        ineligibleReason: alreadyFostered ?
+        'already fostered' :
+        !inCare ?
+        animal.status.replace('_', ' ') :
+        undefined
+      };
+    });
+  }, [litterId, animalsIndex, activePlacementAnimalIds]);
+  const eligibleMemberIds = litterRoster.
+  filter((m) => m.eligible).
+  map((m) => m.animal.id);
+  const hasIneligibleMembers = litterRoster.some((m) => !m.eligible);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [submitting, setSubmitting] = useState(false);
+  const allEligibleSelected =
+  eligibleMemberIds.length > 0 &&
+  eligibleMemberIds.every((mid) => selectedMemberIds.has(mid));
+  const toggleAllMembers = (checked: boolean) =>
+  setSelectedMemberIds(checked ? new Set(eligibleMemberIds) : new Set());
+  const toggleMember = (mid: string) =>
+  setSelectedMemberIds((prev) => {
+    const next = new Set(prev);
+    if (next.has(mid)) next.delete(mid);else
+    next.add(mid);
+    return next;
+  });
+
   // Animal mode lets you pick ANY active contact (not just existing fosters), so
   // resolve the selection from `people`. A non-foster is granted the
   // foster_parent role on placement (handled in the context's placeAnimal).
   const selectedFoster =
-  mode === 'animal' ? people.find((p) => p.id === selectedId) : undefined;
+  mode !== 'foster' ? people.find((p) => p.id === selectedId) : undefined;
   const selectedIsFoster =
   !!selectedFoster?.roles.includes('foster_parent');
   const selectedAnimal =
@@ -82,6 +158,26 @@ export function PlaceAnimalModal({
   // The animal being placed (the anchor in animal mode, the selection in foster
   // mode) — its intake date is the earliest valid placement start.
   const placementAnimal = mode === 'foster' ? selectedAnimal : anchorAnimal;
+  // Litter mode places several animals at once, so the earliest valid start is
+  // the LATEST intake among the selected members — the one date valid for all.
+  // Slim index rows may lack intake_date; fall back to the heavy row, then the
+  // litter's own intake date.
+  const litterMinStartDate =
+  mode === 'litter' ?
+  litterRoster.
+  filter((m) => selectedMemberIds.has(m.animal.id)).
+  map(
+    (m) =>
+    (animals.find((a) => a.id === m.animal.id) ?? m.animal).intake_date ||
+    anchorLitter?.intake_date
+  ).
+  filter((d): d is string => Boolean(d)).
+  reduce<string | undefined>((a, b) => (a && a > b ? a : b), undefined) :
+  undefined;
+  const minStartDate =
+  mode === 'litter' ?
+  litterMinStartDate :
+  placementAnimal?.intake_date || undefined;
 
   // Species scoping for the animal search (foster mode only).
   const fosterPrefs = anchorFoster?.preferred_species ?? [];
@@ -111,16 +207,19 @@ export function PlaceAnimalModal({
   hasStatedCapacity(anchorFoster.max_capacity) &&
   anchorFosterActive >= (anchorFoster.max_capacity ?? 0) :
   false;
-  // Animal mode: a selected existing foster who's already at/over their stated
-  // capacity — placing another animal pushes them past it. Over-capacity
-  // placements are allowed (exceptions happen), so this is a soft, non-blocking
-  // hint, not a confirmation gate. No stated capacity → nothing to exceed.
+  // Animal/litter mode: a selected existing foster whose stated capacity this
+  // placement would exceed (litter mode counts every selected member).
+  // Over-capacity placements are allowed (exceptions happen), so this is a
+  // soft, non-blocking hint, not a confirmation gate. No stated capacity →
+  // nothing to exceed.
+  const placingCount = mode === 'litter' ? selectedMemberIds.size : 1;
   const selectedFosterOverCapacity =
-  mode === 'animal' &&
+  mode !== 'foster' &&
   !!selectedFoster &&
   selectedIsFoster &&
   hasStatedCapacity(selectedFoster.max_capacity) &&
-  getActivePlacementsCount(selectedFoster.id) >= (selectedFoster.max_capacity ?? 0);
+  getActivePlacementsCount(selectedFoster.id) + placingCount >
+  (selectedFoster.max_capacity ?? 0);
 
   // Foster results (animal mode): active foster parents, excluding the current
   // one. Shown first — they're the primary, expected choice.
@@ -210,18 +309,50 @@ export function PlaceAnimalModal({
       setExpectedEndDate('');
       setPlacementPurpose('general_foster');
       setDateError('');
+      setSubmitting(false);
     }
   }, [isOpen]);
-  const handleSubmit = (e: React.FormEvent) => {
+  // Litter mode: every eligible member starts selected — placing the whole
+  // litter together is the common case; unchecking opts individuals out.
+  useEffect(() => {
+    if (isOpen && mode === 'litter') {
+      setSelectedMemberIds(new Set(eligibleMemberIds));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, litterId]);
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedId) return;
     // A placement can't start before the animal was taken in (UI guard only).
-    if (placementAnimal?.intake_date && startDate < placementAnimal.intake_date) {
+    if (minStartDate && startDate < minStartDate) {
       setDateError('Foster placement cannot occur before intake.');
       return;
     }
     // General Foster hides the end-date field; don't persist a stale value.
     const expectedEnd = isTemporary ? expectedEndDate || undefined : undefined;
+    if (mode === 'litter') {
+      if (selectedMemberIds.size === 0 || submitting) return;
+      setSubmitting(true);
+      // Sequential on purpose: parallel placeAnimal calls would race the
+      // foster-role grant (ensureFosterRole) for the same person.
+      for (const memberId of selectedMemberIds) {
+        await placeAnimal(
+          memberId,
+          selectedId,
+          startDate,
+          notes,
+          expectedEnd,
+          placementPurpose
+        );
+        track('animal_placed', { animal_id: memberId, reassignment: false });
+      }
+      track('litter_placed', {
+        litter_id: litterId,
+        animal_count: selectedMemberIds.size
+      });
+      onClose();
+      return;
+    }
     if (mode === 'foster') {
       if (!anchorFoster) return;
       placeAnimal(
@@ -303,6 +434,8 @@ export function PlaceAnimalModal({
   const title =
   mode === 'foster' && anchorFoster ?
   `Place Animal with ${anchorFoster.first_name} ${anchorFoster.last_name}` :
+  mode === 'litter' && anchorLitter ?
+  `Place ${litterLabel(anchorLitter, breeds)} in Foster Care` :
   isReassign && anchorAnimal ?
   `Reassign Foster for ${anchorAnimal.name}` :
   anchorAnimal ?
@@ -322,9 +455,20 @@ export function PlaceAnimalModal({
           <Button
           type="submit"
           form="place-animal-form"
-          disabled={!selectedId}>
+          disabled={
+          !selectedId || (
+          mode === 'litter' && (selectedMemberIds.size === 0 || submitting))
+          }>
             <CheckIcon className="w-4 h-4 mr-2" />
-            {isReassign ? 'Reassign Foster' : 'Place Animal'}
+            {isReassign ?
+          'Reassign Foster' :
+          mode === 'litter' ?
+          submitting ?
+          'Placing…' :
+          `Place ${selectedMemberIds.size} Animal${
+          selectedMemberIds.size === 1 ? '' : 's'}` :
+
+          'Place Animal'}
           </Button>
         </div>
       }>
@@ -388,7 +532,7 @@ export function PlaceAnimalModal({
           </Label>
 
           {/* Selected counterpart chip */}
-          {mode === 'animal' && selectedFoster ?
+          {mode !== 'foster' && selectedFoster ?
           <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border border-primary/30 bg-primary/5">
               <div className="flex items-center gap-3 min-w-0">
                 <Avatar
@@ -479,9 +623,9 @@ export function PlaceAnimalModal({
                 transition={{ duration: 0.15 }}
                 className="absolute z-10 mt-1.5 w-full bg-card border border-border rounded-xl shadow-soft-lg overflow-hidden max-h-72 overflow-y-auto">
 
-                    {/* Foster + contact results (animal mode), split into two
-                         sections. Empty sections are omitted. */}
-                    {mode === 'animal' && (
+                    {/* Foster + contact results (animal/litter mode), split into
+                         two sections. Empty sections are omitted. */}
+                    {mode !== 'foster' && (
                   fosterResults.length === 0 &&
                   otherContactResults.length === 0 ?
                   <div className="p-4 text-sm text-text-secondary text-center">
@@ -691,6 +835,78 @@ export function PlaceAnimalModal({
           }
         </div>
 
+        {/* Litter mode: which members go. All eligible members are selected by
+            default; the roster is shown when the user opts out of "place all"
+            OR when some members can't come along (already fostered / out of
+            care) — so a partial placement is never a surprise. */}
+        {mode === 'litter' &&
+        <div>
+            <label
+            className={cn(
+              'flex items-center gap-2.5 text-sm font-medium text-text-primary',
+              eligibleMemberIds.length > 0 ? 'cursor-pointer' : 'opacity-60'
+            )}>
+
+              <input
+              type="checkbox"
+              checked={allEligibleSelected}
+              disabled={eligibleMemberIds.length === 0}
+              onChange={(e) => toggleAllMembers(e.target.checked)}
+              className="h-4 w-4 rounded border-border text-primary focus:ring-primary/40 cursor-pointer" />
+
+              Place all {hasIneligibleMembers ? 'eligible ' : ''}animals in this
+              litter
+            </label>
+            {eligibleMemberIds.length === 0 ?
+          <p className="mt-2 text-xs text-text-secondary">
+                Every animal in this litter is already fostered or no longer in
+                care.
+              </p> :
+          (!allEligibleSelected || hasIneligibleMembers) &&
+          <div className="mt-3 border border-border rounded-xl divide-y divide-border overflow-hidden">
+                {litterRoster.map(({ animal, eligible, ineligibleReason }) =>
+            <label
+              key={animal.id}
+              className={cn(
+                'flex items-center gap-3 px-3 py-2.5',
+                eligible ?
+                'cursor-pointer hover:bg-background/60 transition-colors' :
+                'opacity-60'
+              )}>
+
+                    <input
+                type="checkbox"
+                checked={selectedMemberIds.has(animal.id)}
+                disabled={!eligible}
+                onChange={() => toggleMember(animal.id)}
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary/40" />
+
+                    <Avatar
+                src={animal.primary_photo_url}
+                type="animal"
+                species={animal.species}
+                size="sm" />
+
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-text-primary truncate">
+                        {animalDisplayName(animal)}
+                      </p>
+                      <p className="text-xs text-text-secondary truncate">
+                        {calculateAge(animal.estimated_birth_date)} · {animal.sex}
+                      </p>
+                    </div>
+                    {ineligibleReason &&
+              <span className="shrink-0 text-xs text-text-secondary">
+                        {ineligibleReason}
+                      </span>
+              }
+                  </label>
+            )}
+              </div>
+          }
+          </div>
+        }
+
         {/* Placement purpose — drives whether an end date is collected */}
         <div>
           <Label htmlFor="placement_purpose">Placement Purpose</Label>
@@ -726,7 +942,7 @@ export function PlaceAnimalModal({
               id="start_date"
               required
               value={startDate}
-              min={placementAnimal?.intake_date || undefined}
+              min={minStartDate}
               error={Boolean(dateError)}
               onChange={(v) => {
                 setStartDate(v);

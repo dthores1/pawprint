@@ -10,11 +10,14 @@ import { SpeciesBadge } from '../components/ui/SpeciesBadge';
 import { StatusBadge, PriorityBadge, AnimalFlags } from '../components/ui/Badge';
 import { EditLitterModal } from '../components/animals/EditLitterModal';
 import { useFostersEnabled } from '../lib/useFostersEnabled';
+import { useCanManageFosters } from '../lib/useAnimalPermissions';
 import { AddLitterMemberModal } from '../components/animals/AddLitterMemberModal';
+import { PlaceAnimalModal } from '../components/animals/PlaceAnimalModal';
 import {
   ArrowLeftIcon,
   CalendarIcon,
   HeartIcon,
+  HomeIcon,
   PlusIcon,
   Edit2Icon,
   Trash2Icon } from
@@ -24,11 +27,12 @@ import {
   calculateAge,
   animalDisplayName } from
 '../lib/utils';
+import { isInCare } from '../lib/animalStatus';
 import {
   litterMembers,
   litterLabel,
   memberNoun,
-  summarizeLitterStatuses } from
+  litterStatusSegments } from
 '../lib/litters';
 
 export function LitterProfile() {
@@ -37,10 +41,12 @@ export function LitterProfile() {
   const { litters, animalsIndex: animals, fosters, breeds } = useWhisker();
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isPlaceOpen, setIsPlaceOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const navigate = useNavigate();
   const canArchive = useCanArchive('litters', { id: id ?? 'na' });
   const fostersEnabled = useFostersEnabled();
+  const canManageFosters = useCanManageFosters();
 
   const litter = litters.find((l) => l.id === id);
   if (!litter) {
@@ -48,6 +54,14 @@ export function LitterProfile() {
   }
 
   const members = litterMembers(animals, litter.id);
+  // Bulk placement targets members still in care and not already fostered
+  // (current_foster_id is the denormalized active-placement cache). The modal
+  // re-derives eligibility from placements; this just gates the entry points.
+  const placeableCount = members.filter(
+    (m) => isInCare(m.status) && !m.current_foster_id
+  ).length;
+  const canPlaceLitter =
+  fostersEnabled && canManageFosters && placeableCount > 0;
   const mother = litter.mother_animal_id ?
   animals.find((a) => a.id === litter.mother_animal_id) :
   null;
@@ -56,7 +70,7 @@ export function LitterProfile() {
   (litter.breed_id ?
   breeds.find((b) => b.id === litter.breed_id)?.name :
   undefined);
-  const summary = summarizeLitterStatuses(members);
+  const summarySegments = litterStatusSegments(members);
 
   return (
     <div className="space-y-6 pb-12">
@@ -71,6 +85,11 @@ export function LitterProfile() {
           <Button variant="soft" size="sm" onClick={() => setIsAddOpen(true)}>
             <PlusIcon className="w-4 h-4 mr-2" /> Add Animal
           </Button>
+          {canPlaceLitter &&
+          <Button variant="primary" size="sm" onClick={() => setIsPlaceOpen(true)}>
+              <HomeIcon className="w-4 h-4 mr-2" /> Place in Foster
+            </Button>
+          }
           <Button variant="soft" size="sm" onClick={() => setIsEditOpen(true)}>
             <Edit2Icon className="w-4 h-4 mr-2" /> Update Group
           </Button>
@@ -136,9 +155,25 @@ export function LitterProfile() {
           </div>
         </div>
 
-        {summary &&
+        {summarySegments.length > 0 &&
         <p className="text-sm text-text-secondary mt-4 pt-4 border-t border-border">
-            {summary}
+            {summarySegments.map((seg, i) =>
+          <React.Fragment key={seg.key}>
+                {i > 0 && ' · '}
+                {/* "X of Y in foster" doubles as the shortcut to place the
+                    rest of the litter, when there's anyone left to place. */}
+                {seg.key === 'foster' && canPlaceLitter ?
+            <button
+              type="button"
+              onClick={() => setIsPlaceOpen(true)}
+              title="Place the rest of the litter in foster"
+              className="font-medium text-primary hover:underline">
+
+                    {seg.label}
+                  </button> :
+            seg.label}
+              </React.Fragment>
+          )}
           </p>
         }
         {litter.notes &&
@@ -208,6 +243,11 @@ export function LitterProfile() {
         isOpen={isAddOpen}
         litterId={litter.id}
         onClose={() => setIsAddOpen(false)} />
+
+      <PlaceAnimalModal
+        isOpen={isPlaceOpen}
+        litterId={litter.id}
+        onClose={() => setIsPlaceOpen(false)} />
 
       {archiving &&
       <ArchiveConfirmDialog

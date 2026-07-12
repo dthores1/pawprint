@@ -121,7 +121,7 @@ export function ClinicsView() {
   { header: 'Veterinarian', value: (e) => vetNameFor(e) },
   { header: 'Status', value: (e) => EVENT_STATUS_LABEL[e.status] },
   { header: 'Slots Filled', value: (e) => filledFor(e) },
-  { header: 'Slot Capacity', value: (e) => e.slot_capacity },
+  { header: 'Animal Slots', value: (e) => e.slot_capacity },
   { header: 'Notes', value: (e) => e.notes }];
 
   return (
@@ -268,7 +268,7 @@ function ClinicEventCard({
 
         <div>
           <div className="flex items-center justify-between text-xs text-text-secondary mb-1">
-            <span>Slot capacity</span>
+            <span>Animal slots</span>
             <span className="tabular-nums font-medium text-text-primary">
               {slotsFilled} / {event.slot_capacity}
             </span>
