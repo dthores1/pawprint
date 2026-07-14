@@ -42,6 +42,7 @@ import { LegalPage } from './pages/LegalPage';
 import { LandingPage } from './pages/LandingPage';
 import { RequestAccessPage } from './pages/RequestAccessPage';
 import { LogoHero } from './components/ui/Logo';
+import { WriteErrorToastHost } from './components/ui/WriteErrorToast';
 
 // Keeps the browser tab title in sync with the active org.
 // Falls back to a plain product title before an org is selected
@@ -216,6 +217,9 @@ function DemoApp() {
       <DemoWhiskerProvider>
         <DocumentTitle />
         <BrowserRouter>
+          {/* Inert in demo (in-memory writes can't fail) — mounted anyway so
+              demo and production render the same tree. */}
+          <WriteErrorToastHost />
           <Routes>
             {/* Public legal pages render outside the gate in demo mode too. */}
             <Route path="/terms" element={<LegalPage doc="terms" />} />
@@ -241,6 +245,9 @@ function ProductionApp() {
         <DocumentTitle />
         <BrowserRouter>
           <RouteTracker />
+          {/* Global "Something went wrong" toast for failed writes. Inside
+              BrowserRouter — its "report a bug" link routes to Settings. */}
+          <WriteErrorToastHost />
           <Routes>
             {/* Public sign-in route. The signed-out front door is the landing
              page (rendered by the Gate at "/"); this is the explicit /login the

@@ -21,7 +21,13 @@ export function AddLitterMemberModal({
   litterId
 }: AddLitterMemberModalProps) {
   // Index so the existing-member count includes any who aged out of care.
-  const { litters, animalsIndex: animals, addAnimal, breeds } = useWhisker();
+  const {
+    litters,
+    animalsIndex: animals,
+    addAnimal,
+    breeds,
+    species: speciesCatalog
+  } = useWhisker();
   const litter = litters.find((l) => l.id === litterId);
 
   const [name, setName] = useState('');
@@ -45,6 +51,10 @@ export function AddLitterMemberModal({
     addAnimal({
       name: name.trim() || `${noun[0].toUpperCase()}${noun.slice(1)} ${count + 1}`,
       species: litter.species,
+      // Litters store only the catalog species NAME; animals.species_id is
+      // NOT NULL, so resolve it the same way addLitter does for the initial
+      // members.
+      species_id: speciesCatalog.find((s) => s.name === litter.species)?.id,
       sex,
       breed_id: litter.breed_id,
       breed_text: litter.breed_text,

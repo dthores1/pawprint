@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   XIcon,
   PlusIcon,
@@ -173,6 +174,25 @@ export function Settings() {
   useEffect(() => {
     if (!isAdmin && tab !== 'support') setTab('support');
   }, [isAdmin, tab]);
+
+  // Deep link: /settings?support=bug (used by the global error toast's
+  // "report a bug" link) lands on the Support tab with the ticket form open
+  // and the category preselected. The param is consumed immediately so
+  // closing the modal (or refreshing) doesn't reopen it.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const support = searchParams.get('support');
+    if (support === null) return;
+    const category = (['bug', 'feature', 'question'] as const).find(
+      (c) => c === support
+    );
+    setTab('support');
+    setTicketModal({ open: true, category });
+    const next = new URLSearchParams(searchParams);
+    next.delete('support');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // Tickets load lazily — only when the Support tab is first opened.
   useEffect(() => {

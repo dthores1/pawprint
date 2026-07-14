@@ -15,6 +15,7 @@ import {
   setViewAsActive,
   track } from
 '../lib/analytics';
+import { setErrorReportingContext } from '../lib/errorReporting';
 
 /** A member of the current org that the signed-in user can "view as". */
 export interface ViewAsMember {
@@ -191,6 +192,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (userId) identifyUser(userId, user?.email);
   }, [userId, user?.email]);
 
+  // Attribute silent client-error logs to the signed-in user.
+  useEffect(() => {
+    setErrorReportingContext({ userId: userId ?? null });
+  }, [userId]);
+
   const refreshOrganizations = useCallback(async () => {
     const uid = userIdRef.current;
     if (!uid) {
@@ -296,6 +302,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (currentOrg) {
       setAnalyticsOrganization(currentOrg.id, currentOrg.name, currentOrg.role);
     }
+    setErrorReportingContext({ orgId: currentOrg?.id ?? null });
   }, [currentOrg]);
 
   const updateOrgTimezone = useCallback(
