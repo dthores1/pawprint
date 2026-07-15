@@ -1457,12 +1457,15 @@ export function AnimalProfile() {
                 )}
               </div>
             </div>
+            {/* The checklist is advisory, not a gate — the button shows for any
+                in-care animal (readiness < 100% just gets a heads-up below) so
+                promoting to Adoptable never requires Edit → status. */}
             {canManageAnimals &&
-            readinessPercent === 100 &&
             animal.status !== 'adoptable' &&
             animal.status !== 'adopted' &&
-            <Button
-              className="w-full mt-6 bg-[#DDEFE2] text-[#3E7B52] hover:bg-[#C8E6D0]"
+            <div className="mt-6">
+                <Button
+              className="w-full bg-[#DDEFE2] text-[#3E7B52] hover:bg-[#C8E6D0]"
               onClick={() => {
                 updateAnimal(animal.id, { status: 'adoptable' });
                 addNote({
@@ -1471,10 +1474,23 @@ export function AnimalProfile() {
                   note_type: 'general',
                   body: `status: ${animal.status} → adoptable. Marked adoptable from the readiness checklist.`
                 });
+                track('animal_status_changed', {
+                  animal_id: animal.id,
+                  new_status: 'adoptable',
+                  new_priority: animal.priority
+                });
               }}>
 
                   Mark as Adoptable
                 </Button>
+                {readinessPercent < 100 &&
+            <p className="mt-2 text-xs text-text-secondary text-center">
+                    {checklist.filter((c) => !c.done).length} readiness item
+                    {checklist.filter((c) => !c.done).length === 1 ? '' : 's'}{' '}
+                    still open.
+                  </p>
+            }
+              </div>
             }
           </Card>
           }
