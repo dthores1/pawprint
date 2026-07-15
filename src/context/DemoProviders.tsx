@@ -850,6 +850,56 @@ export function DemoWhiskerProvider({
       )
       );
     },
+    recordDirectAdoption: async (input) => {
+      // Born-completed adoption row dated to the (possibly historical)
+      // adoption date; mirrors the Supabase recordDirectAdoption.
+      setAdoptions((prev) => [
+      {
+        id: `ad${generateId()}`,
+        animal_id: input.animal_id,
+        adopter_id: input.adopter_id,
+        status: 'completed',
+        source: 'direct',
+        completed_at: input.adopted_on,
+        notes: input.notes?.trim() || undefined,
+        created_at: now()
+      },
+      ...prev]
+      );
+      updateAnimal(input.animal_id, {
+        status: 'adopted',
+        adopted_by_id: input.adopter_id,
+        adopted_at: input.adopted_on,
+        current_foster_id: undefined,
+        is_on_hold: false
+      });
+      setPlacements((prev) =>
+      prev.map((p) =>
+      p.animal_id === input.animal_id && p.placement_status === 'active' ?
+      {
+        ...p,
+        placement_status: 'completed' as const,
+        end_date: input.adopted_on,
+        reason_ended: 'Adopted'
+      } :
+      p
+      )
+      );
+      if (input.adopter_id) {
+        const adopterId = input.adopter_id;
+        setPeople((prev) =>
+        prev.map((p) =>
+        p.id === adopterId && !p.roles.includes('adopter') ?
+        {
+          ...p,
+          roles: [...p.roles, 'adopter'],
+          role: legacyRoleFor([...p.roles, 'adopter'])
+        } :
+        p
+        )
+        );
+      }
+    },
     cancelAdoption: (id, reason) => {
       const adoption = adoptions.find((a) => a.id === id);
       setAdoptions((prev) =>
@@ -885,7 +935,7 @@ export function DemoWhiskerProvider({
       )
       );
       updateAnimal(adoption.animal_id, {
-        status: 'intake',
+        status: input.new_status ?? 'intake',
         adopted_by_id: undefined,
         adopted_at: undefined,
         is_on_hold: false
@@ -917,7 +967,7 @@ export function DemoWhiskerProvider({
       )
       );
       updateAnimal(input.animal_id, {
-        status: 'intake',
+        status: input.new_status ?? 'intake',
         adopted_by_id: undefined,
         adopted_at: undefined,
         is_on_hold: false

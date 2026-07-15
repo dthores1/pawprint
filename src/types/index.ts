@@ -144,6 +144,13 @@ export interface Animal {
   date_of_death?: string;
   cause_of_death?: string;
   death_notes?: string;
+  /**
+   * The animal is known to have died. True for every status='deceased' animal
+   * (in-care death), and also for adopted animals that later died in their
+   * adopter's home — those keep status 'adopted' (a 'deceased' status would
+   * misreport an in-care death) and surface as "Adopted (Deceased)".
+   */
+  known_to_be_deceased?: boolean;
   /** Staff-only notes, separate from the public-facing `description` blurb. */
   internal_notes?: string;
   created_at: string;
@@ -653,8 +660,16 @@ export type AdoptionReturnReason =
 export interface Adoption {
   id: string;
   animal_id: string;
-  adopter_id: string;
+  /** Optional: direct (historical) adoptions may have an unknown adopter. */
+  adopter_id?: string;
   status: AdoptionStatus;
+  /**
+   * How the record came to exist. 'workflow' rows moved through the application
+   * flow; 'direct' rows were recorded from the Edit modal's status change (born
+   * completed, no application) and are excluded from funnel metrics in Reports.
+   * Optional for back-compat with in-memory/demo rows — missing means 'workflow'.
+   */
+  source?: 'workflow' | 'direct';
   submitted_at?: string;
   approved_at?: string;
   completed_at?: string;

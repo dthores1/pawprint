@@ -45,6 +45,8 @@ export type AnalyticsEvent =
   | 'traits_updated'            // { trait_count }
   | 'adoption_started'
   | 'adoption_completed'
+  | 'adoption_recorded_direct'  // { animal_id, has_adopter }
+  | 'deceased_after_adoption_recorded' // { animal_id }
   | 'adoption_updated'
   | 'adoption_cancelled'
   | 'adoption_returned'

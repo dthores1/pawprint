@@ -484,7 +484,12 @@ export function AnimalProfile() {
     `${adopterPerson.first_name} ${adopterPerson.last_name}` :
     'an adopter';
     const adoptionColor = 'bg-[#F3E4D7] text-[#B8632E]';
-    const evs: TimelineEvent[] = [
+    // Directly-recorded adoptions never had an inquiry — their created_at is
+    // just the day the record was backfilled, so no "started" event.
+    const evs: TimelineEvent[] =
+    ad.source === 'direct' ?
+    [] :
+    [
     {
       id: `adoption-${ad.id}-created`,
       date: ad.created_at.split('T')[0],
@@ -536,7 +541,12 @@ export function AnimalProfile() {
       ts: ad.completed_at,
       type: 'adoption' as const,
       title: 'Adoption completed',
-      description: `Adopted by ${adopterName}.`,
+      description:
+      ad.source === 'direct' ?
+      adopterPerson ?
+      `Adopted by ${adopterName}. Recorded directly.` :
+      'Recorded directly.' :
+      `Adopted by ${adopterName}.`,
       icon: CheckCircle2Icon,
       color: 'bg-[#DDEFE2] text-[#3E7B52]'
     });
@@ -872,11 +882,23 @@ export function AnimalProfile() {
               null
               }
 
-              <div className="flex flex-wrap gap-2 mb-6">
+              <div className="flex flex-wrap items-center gap-2 mb-6">
                 <StatusBadge
                   status={animal.status}
                   className="text-sm px-3 py-1" />
-                
+
+                {/* An adopted animal known to have died in its new home keeps
+                    the Adopted status (deceased = died in OUR care); this quiet
+                    annotation says "don't follow up". */}
+                {animal.status === 'adopted' && animal.known_to_be_deceased &&
+                <span className="text-sm text-text-secondary">
+                    (Deceased
+                    {animal.date_of_death ?
+                  ` ${formatDate(animal.date_of_death)}` :
+                  ''})
+                  </span>
+                }
+
                 <PriorityBadge
                   priority={animal.priority}
                   className="text-sm px-3 py-1" />

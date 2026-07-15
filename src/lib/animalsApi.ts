@@ -40,7 +40,8 @@ const WRITABLE_COLUMNS = [
 'released_at',
 'date_of_death',
 'cause_of_death',
-'death_notes'] as
+'death_notes',
+'known_to_be_deceased'] as
 const;
 
 // uuid columns referencing people; skip non-uuid values (e.g. seed ids).
@@ -106,6 +107,7 @@ export function rowToAnimal(r: any): Animal {
     date_of_death: r.date_of_death ?? undefined,
     cause_of_death: r.cause_of_death ?? undefined,
     death_notes: r.death_notes ?? undefined,
+    known_to_be_deceased: r.known_to_be_deceased ?? false,
     internal_notes: r.internal_notes ?? undefined,
     birthdate_source: r.birthdate_source ?? 'estimated_birthdate',
     estimated_age_value: r.estimated_age_value ?? undefined,
@@ -128,7 +130,8 @@ export function rowToAnimal(r: any): Animal {
 export const ANIMAL_INDEX_COLUMNS =
 'id,organization_id,name,rescue_id,microchip_number,species_id,status,priority,' +
 'sex,estimated_birth_date,primary_photo_url,is_on_hold,has_behavior_concern,' +
-'has_medical_concern,current_foster_id,adopted_by_id,litter_id,site_id,created_at,updated_at';
+'has_medical_concern,current_foster_id,adopted_by_id,known_to_be_deceased,' +
+'litter_id,site_id,created_at,updated_at';
 
 // Read an entire org-scoped table in 1000-row `.range()` pages, concatenating
 // until a short page signals the end. Bypasses the PostgREST max-rows cap

@@ -30,6 +30,7 @@ import {
   AnimalExternalListing,
   AnimalAiContent,
   AiContentType,
+  AnimalStatus,
   OrganizationAdoptionTemplate,
   OrganizationNavigationSetting,
   MemberPermission,
@@ -93,6 +94,7 @@ import {
   adoptionToInsert,
   adoptionReturnToInsert,
   adoptionUpdateToRow,
+  directAdoptionToInsert,
   rowToAdoption } from
 '../lib/adoptionsApi';
 import { adoptionStatusPatch } from '../lib/adoptions';
@@ -437,10 +439,26 @@ export interface WhiskerContextType {
   setAdoptionStatus: (id: string, status: Adoption['status']) => void;
   /** Finalize: animal -> adopted, set adopted_by/at, close active placement. */
   completeAdoption: (id: string, donationAmount?: number) => void;
+  /**
+   * Record an adoption directly, without the application workflow (Edit modal
+   * status change — typically a historical/backfilled adoption). Creates a
+   * `completed` adoption row (source 'direct') dated `adopted_on` and applies
+   * the same animal-side effects as completeAdoption. Adopter may be unknown.
+   */
+  recordDirectAdoption: (
+  input: {
+    animal_id: string;
+    adopter_id?: string;
+    /** yyyy-MM-dd — becomes completed_at/adopted_at and the placement end date. */
+    adopted_on: string;
+    notes?: string;
+  })
+  => Promise<void>;
   cancelAdoption: (id: string, reason?: string) => void;
   /**
    * Reverse a completed adoption: mark the record `returned` (reason/notes) and
-   * bring the animal back into care (status -> intake, clears adopter fields).
+   * bring the animal back into care — status -> new_status (default 'intake'),
+   * clearing the adopter fields.
    */
   returnAdoption: (
   id: string,
@@ -448,6 +466,8 @@ export interface WhiskerContextType {
     returned_at: string;
     return_reason: AdoptionReturnReason;
     return_notes?: string;
+    /** Re-entry status (default 'intake'). */
+    new_status?: AnimalStatus;
   })
   => void;
   /**
@@ -461,6 +481,8 @@ export interface WhiskerContextType {
     returned_at: string;
     return_reason: AdoptionReturnReason;
     return_notes?: string;
+    /** Re-entry status (default 'intake'). */
+    new_status?: AnimalStatus;
   })
   => Promise<void>;
   addPhoto: (input: NewPhotoInput) => Promise<void>;
@@ -728,7 +750,8 @@ const VIEW_AS_BLOCKED_ACTIONS: (keyof WhiskerContextType)[] = [
 'addActionItem', 'updateActionItem', 'completeActionItem', 'cancelActionItem',
 'addPlacement', 'updatePlacement', 'addPerson', 'updatePerson',
 'uploadPersonPhoto', 'addAdoption', 'updateAdoption', 'setAdoptionStatus',
-'completeAdoption', 'cancelAdoption', 'returnAdoption', 'recordAdoptionReturn',
+'completeAdoption', 'recordDirectAdoption', 'cancelAdoption', 'returnAdoption',
+'recordAdoptionReturn',
 'addPhoto', 'deletePhoto', 'addAnimalFile', 'deleteAnimalFile', 'addRelationship',
 'deleteRelationship', 'addExternalListing', 'updateExternalListing',
 'deleteExternalListing', 'placeAnimal', 'reassignFoster', 'addSupplyRequest',
@@ -2920,36 +2943,28 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     if (!adoption) return;
     updateAdoption(id, adoptionStatusPatch(adoption, status));
   };
-  const completeAdoption: WhiskerContextType['completeAdoption'] = (
-  id,
-  donationAmount) =>
+  // Animal-side effects of a finalized adoption, shared by completeAdoption and
+  // recordDirectAdoption: the animal becomes adopted (adopter + date stamped,
+  // foster cache cleared, hold lifted), any active foster placement is closed as
+  // of `endDate`, and the adopter (when known) carries the adopter role.
+  const applyAdoptionOutcomeToAnimal = (
+  animalId: string,
+  adopterId: string | undefined,
+  adoptedAt: string,
+  endDate: string) =>
   {
-    const adoption = adoptions.find((a) => a.id === id);
-    if (!adoption) return;
-    const ts = new Date().toISOString();
-    // 1. The adoption record becomes completed.
-    updateAdoption(id, {
-      status: 'completed',
-      completed_at: ts,
-      ...(donationAmount != null ? { donation_amount: donationAmount } : {})
-    });
-    // 2. The animal becomes adopted; stamp the adopter, clear the foster cache,
-    //    and lift the adoption-driven hold.
     const animalUpdates: Partial<Animal> = {
       status: 'adopted',
-      adopted_by_id: adoption.adopter_id,
-      adopted_at: ts,
+      adopted_by_id: adopterId,
+      adopted_at: adoptedAt,
       is_on_hold: false
     };
     (animalUpdates as Record<string, unknown>).current_foster_id = null;
-    updateAnimal(adoption.animal_id, animalUpdates);
-    // 3. Close any active foster placement.
+    updateAnimal(animalId, animalUpdates);
     const active = placements.find(
-      (p) =>
-      p.animal_id === adoption.animal_id && p.placement_status === 'active'
+      (p) => p.animal_id === animalId && p.placement_status === 'active'
     );
     if (active) {
-      const endDate = ts.split('T')[0];
       setPlacements((cur) =>
       cur.map((p) =>
       p.id === active.id ?
@@ -2977,8 +2992,53 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         }
       });
     }
-    // 4. Make sure the adopter carries the adopter role.
-    ensureAdopterRole(adoption.adopter_id);
+    if (adopterId) ensureAdopterRole(adopterId);
+  };
+  const completeAdoption: WhiskerContextType['completeAdoption'] = (
+  id,
+  donationAmount) =>
+  {
+    const adoption = adoptions.find((a) => a.id === id);
+    if (!adoption) return;
+    const ts = new Date().toISOString();
+    // The adoption record becomes completed…
+    updateAdoption(id, {
+      status: 'completed',
+      completed_at: ts,
+      ...(donationAmount != null ? { donation_amount: donationAmount } : {})
+    });
+    // …and the animal-side effects follow.
+    applyAdoptionOutcomeToAnimal(
+      adoption.animal_id,
+      adoption.adopter_id,
+      ts,
+      ts.split('T')[0]
+    );
+  };
+  const recordDirectAdoption: WhiskerContextType['recordDirectAdoption'] =
+  async (input) => {
+    if (!orgId) {
+      console.error('[adoptions] cannot record — no current organization');
+      return;
+    }
+    // The row is born completed, dated to the (possibly historical) adoption
+    // date rather than today, so Reports bucket it in the right range.
+    const { data, error } = await supabase.
+    from('adoptions').
+    insert(directAdoptionToInsert(input, orgId)).
+    select('*').
+    single();
+    if (error || !data) {
+      console.error('[adoptions] direct record failed:', error?.message);
+      return;
+    }
+    setAdoptions((prev) => [rowToAdoption(data), ...prev]);
+    applyAdoptionOutcomeToAnimal(
+      input.animal_id,
+      input.adopter_id,
+      input.adopted_on,
+      input.adopted_on
+    );
   };
   const cancelAdoption: WhiskerContextType['cancelAdoption'] = (id, reason) => {
     const adoption = adoptions.find((a) => a.id === id);
@@ -2993,11 +3053,14 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     }
   };
   // Shared: bring a returned animal back into the care pipeline. Inverse of the
-  // animal side of completeAdoption — re-enter at 'intake' for reassessment and
-  // drop the now-stale adopter stamps.
-  const bringAnimalBackIntoCare = (animalId: string) => {
+  // animal side of completeAdoption — re-enter at the given status (default
+  // 'intake' for reassessment) and drop the now-stale adopter stamps.
+  const bringAnimalBackIntoCare = (
+  animalId: string,
+  newStatus: AnimalStatus = 'intake') =>
+  {
     const animalUpdates: Partial<Animal> = {
-      status: 'intake',
+      status: newStatus,
       is_on_hold: false
     };
     (animalUpdates as Record<string, unknown>).adopted_by_id = null;
@@ -3013,7 +3076,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       return_reason: input.return_reason,
       return_notes: input.return_notes?.trim() || undefined
     });
-    bringAnimalBackIntoCare(adoption.animal_id);
+    bringAnimalBackIntoCare(adoption.animal_id, input.new_status);
   };
   const recordAdoptionReturn: WhiskerContextType['recordAdoptionReturn'] = async (
   input) =>
@@ -3033,7 +3096,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     }
     setAdoptions((prev) => [rowToAdoption(data), ...prev]);
     ensureAdopterRole(input.adopter_id);
-    bringAnimalBackIntoCare(input.animal_id);
+    bringAnimalBackIntoCare(input.animal_id, input.new_status);
   };
   const addPhoto = async (input: NewPhotoInput) => {
     if (!orgId) {
@@ -4890,6 +4953,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         updateAdoption,
         setAdoptionStatus,
         completeAdoption,
+        recordDirectAdoption,
         cancelAdoption,
         returnAdoption,
         recordAdoptionReturn,

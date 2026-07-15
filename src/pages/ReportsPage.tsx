@@ -266,8 +266,16 @@ export function ReportsPage() {
   const [sitesChartType, setSitesChartType] = useState<ChartType>('pie');
 
   // — Adoptions —————————————————————————————————————————————————————
+  // Directly-recorded adoptions (source 'direct' — Edit-modal status changes,
+  // typically historical backfills) never had an application: their created_at
+  // is just the backfill day. They're excluded from the funnel metrics
+  // (applications, conversion, avg days) but included in completed counts,
+  // the trend chart, and the completed list below.
   const adoptionsInRange = useMemo(
-    () => adoptions.filter((a) => inRange(a.created_at, range)),
+    () =>
+    adoptions.filter(
+      (a) => a.source !== 'direct' && inRange(a.created_at, range)
+    ),
     [adoptions, range]
   );
   const applicationsByStatus = useMemo(() => {
@@ -286,6 +294,7 @@ export function ReportsPage() {
     const pairs = adoptions.
     filter(
       (a) =>
+      a.source !== 'direct' &&
       a.status === 'completed' &&
       !!a.completed_at &&
       inRange(a.completed_at, range)
@@ -314,9 +323,13 @@ export function ReportsPage() {
   // Conversion: completed adoptions ÷ applications, both in the selected
   // range. Each event buckets when it happened (completed_at vs created_at),
   // so a range that clears a backlog of older applications can exceed 100%.
+  // Directly-recorded adoptions are excluded from both sides — no application.
   const conversionRate = useMemo(() => {
     if (adoptionsInRange.length === 0) return null;
-    return completedAdoptions.length / adoptionsInRange.length;
+    const workflowCompleted = completedAdoptions.filter(
+      ({ adoption }) => adoption.source !== 'direct'
+    ).length;
+    return workflowCompleted / adoptionsInRange.length;
   }, [adoptionsInRange, completedAdoptions]);
 
   // — Animals ———————————————————————————————————————————————————————
@@ -667,6 +680,11 @@ export function ReportsPage() {
 
                             <span className="text-text-secondary">
                                   Unknown animal
+                                </span>
+                            }
+                              {adoption.source === 'direct' &&
+                            <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-[#E5E2DC] text-[#6B6B6B]">
+                                  Recorded directly
                                 </span>
                             }
                             </div>

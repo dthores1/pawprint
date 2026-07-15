@@ -99,6 +99,12 @@ wasn't ready (see gotchas).
   bug — production (Supabase) has the full catalog. Seeded animals are dogs/cats.
 - **Portaled popovers:** date pickers and the breed/type list render to
   `document.body` (not inside their field), so query the whole document for them.
+- **`nav()` resets demo state:** it's a full page load, and demo data is
+  in-memory. For flows that mutate data then check another page (e.g. Reports),
+  navigate client-side instead: `document.querySelector('a[href="/reports"]').click()`.
+- **`DatePicker` is a `<button>`, not an input:** its `id` lands on a button
+  showing formatted text (`Jul 15, 2026`); read it via `.textContent`, and don't
+  `setValue()` it — accept the default or drive the portal calendar.
 
 ## Cleanup
 

@@ -4,8 +4,9 @@ export function rowToAdoption(r: any): Adoption {
   return {
     id: r.id,
     animal_id: r.animal_id,
-    adopter_id: r.adopter_id,
+    adopter_id: r.adopter_id ?? undefined,
     status: r.status,
+    source: r.source ?? 'workflow',
     submitted_at: r.submitted_at ?? undefined,
     approved_at: r.approved_at ?? undefined,
     completed_at: r.completed_at ?? undefined,
@@ -33,6 +34,32 @@ organizationId: string)
     adopter_id: input.adopter_id,
     status: 'inquiry',
     notes: input.notes || null
+  };
+}
+
+/**
+ * Build an INSERT for an adoption recorded directly (Edit modal status change,
+ * typically a historical/backfilled adoption). The row is born `completed` on
+ * the given date with source='direct' so Reports can keep it out of the
+ * application-funnel metrics. The adopter may be unknown.
+ */
+export function directAdoptionToInsert(
+input: {
+  animal_id: string;
+  adopter_id?: string;
+  adopted_on: string;
+  notes?: string;
+},
+organizationId: string)
+{
+  return {
+    organization_id: organizationId,
+    animal_id: input.animal_id,
+    adopter_id: input.adopter_id || null,
+    status: 'completed',
+    source: 'direct',
+    completed_at: input.adopted_on,
+    notes: input.notes?.trim() || null
   };
 }
 

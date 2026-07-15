@@ -10,9 +10,23 @@ import { AgeInformationFields, AgeInputMode } from './AgeInformationFields';
 import { focusFirstError } from '../../lib/focusFirstError';
 import { BreedCombobox } from './BreedCombobox';
 import { TraitMultiSelect } from './TraitMultiSelect';
+import { PersonSearchPicker } from '../ui/PersonSearchPicker';
 import { useWhisker } from '../../context/WhiskerContext';
-import { AnimalStatus, Priority, Sex, AgeUnit } from '../../types';
+import {
+  AnimalStatus,
+  Priority,
+  Sex,
+  AgeUnit,
+  AdoptionReturnReason } from
+'../../types';
 import { deriveAgeInfo } from '../../lib/age';
+import {
+  ADOPTION_STATUS_LABELS,
+  ADOPTION_RETURN_REASONS,
+  ADOPTION_RETURN_REASON_LABELS,
+  isActiveAdoption } from
+'../../lib/adoptions';
+import { legacyRoleFor } from '../../lib/peopleApi';
 import { animalDisplayName } from '../../lib/utils';
 import { breedFieldLabel } from '../../lib/speciesIcons';
 import { enabledSpeciesList } from '../../lib/orgCatalog';
@@ -75,7 +89,15 @@ export function ChangeStatusModal({
     setAnimalTraits,
     actionItems,
     addActionItem,
-    updateActionItem
+    updateActionItem,
+    adoptions,
+    peopleIndex,
+    addPerson,
+    completeAdoption,
+    recordDirectAdoption,
+    returnAdoption,
+    recordAdoptionReturn,
+    updateAdoption
   } = useWhisker();
   const navigate = useNavigate();
   const animal = animals.find((a) => a.id === animalId);
@@ -105,6 +127,45 @@ export function ChangeStatusModal({
   const [description, setDescription] = useState('');
   // Terminal-outcome details, shown when the status is Released / Deceased.
   const [releasedAt, setReleasedAt] = useState('');
+  // Adopted-outcome details. Changing status to Adopted never just writes the
+  // status: with an adoption in flight the save completes it (optionally with a
+  // donation); otherwise a completed adoption record is created directly so
+  // reporting and placement invariants hold (date required, adopter optional —
+  // picked from contacts or created inline).
+  const [adoptionDate, setAdoptionDate] = useState('');
+  const [adoptionDateError, setAdoptionDateError] = useState<
+    string | undefined>();
+  const [adopterId, setAdopterId] = useState('');
+  const [creatingAdopter, setCreatingAdopter] = useState(false);
+  const [adopterFirst, setAdopterFirst] = useState('');
+  const [adopterLast, setAdopterLast] = useState('');
+  const [adopterEmail, setAdopterEmail] = useState('');
+  const [adopterPhone, setAdopterPhone] = useState('');
+  const [adopterError, setAdopterError] = useState<string | undefined>();
+  const [adoptionNotes, setAdoptionNotes] = useState('');
+  const [donation, setDonation] = useState('');
+  // Leaving Adopted is intercepted too (the inverse of the flow above): the
+  // change is either an adoption return (recorded, so history and reports stay
+  // accurate) or a correction of a mistaken status — never a silent edit.
+  const [leaveMode, setLeaveMode] = useState<'return' | 'mistake'>('return');
+  const [returnDate, setReturnDate] = useState('');
+  const [returnReason, setReturnReason] = useState<AdoptionReturnReason | ''>(
+    ''
+  );
+  const [returnNotes, setReturnNotes] = useState('');
+  const [returnAdopterId, setReturnAdopterId] = useState('');
+  const [leaveError, setLeaveError] = useState<string | undefined>();
+  // Adopted → Deceased: a death after adoption keeps the status Adopted (a
+  // 'deceased' status would misreport a death in the rescue's care) and sets
+  // known_to_be_deceased instead. A death in care means the animal came back
+  // first, so that branch chains into the return/mistake panel above.
+  const [deathContext, setDeathContext] = useState<'after_adoption' | 'in_care'>(
+    'after_adoption'
+  );
+  // Hydrated flag state — lets a mistaken "(Deceased)" mark be unchecked while
+  // the animal stays Adopted.
+  const [keepKnownDeceased, setKeepKnownDeceased] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [dateOfDeath, setDateOfDeath] = useState('');
   const [causeOfDeath, setCauseOfDeath] = useState('');
   const [deathNotes, setDeathNotes] = useState('');
@@ -181,6 +242,26 @@ export function ChangeStatusModal({
     setDateOfDeath(animal.date_of_death ?? '');
     setCauseOfDeath(animal.cause_of_death ?? '');
     setDeathNotes(animal.death_notes ?? '');
+    setAdoptionDate('');
+    setAdoptionDateError(undefined);
+    setAdopterId('');
+    setCreatingAdopter(false);
+    setAdopterFirst('');
+    setAdopterLast('');
+    setAdopterEmail('');
+    setAdopterPhone('');
+    setAdopterError(undefined);
+    setAdoptionNotes('');
+    setDonation('');
+    setLeaveMode('return');
+    setReturnDate('');
+    setReturnReason('');
+    setReturnNotes('');
+    setReturnAdopterId(animal.adopted_by_id ?? '');
+    setLeaveError(undefined);
+    setDeathContext('after_adoption');
+    setKeepKnownDeceased(!!animal.known_to_be_deceased);
+    setSubmitting(false);
     setIntakeDateError(undefined);
     setReason('');
     setInternalNotes(animal.internal_notes ?? '');
@@ -198,12 +279,18 @@ export function ChangeStatusModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, animal]);
 
-  // When the user switches to Released / Deceased, pre-fill the outcome date with
-  // today (only if empty — never clobber an already-recorded date).
+  // When the user switches to Released / Deceased / Adopted, pre-fill the
+  // outcome date with today (only if empty — never clobber an entered date).
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
     if (status === 'released') setReleasedAt((cur) => cur || today);
     if (status === 'deceased') setDateOfDeath((cur) => cur || today);
+    if (status === 'adopted') setAdoptionDate((cur) => cur || today);
+    // Leaving Adopted: prefill the return date the same way.
+    if (animal?.status === 'adopted' && status !== 'adopted') {
+      setReturnDate((cur) => cur || today);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
   if (!animal) return null;
@@ -224,8 +311,50 @@ export function ChangeStatusModal({
   today :
   animal.estimated_age_as_of || animal.intake_date || today;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Adopted-status derivations. The in-flight adoption (at most one active per
+  // animal) decides which panel shows; enteringAdopted gates both so editing an
+  // already-adopted animal doesn't re-trigger the flow.
+  const enteringAdopted = status === 'adopted' && animal.status !== 'adopted';
+  const activeAdoption = enteringAdopted ?
+  adoptions.find((a) => a.animal_id === animalId && isActiveAdoption(a)) :
+  undefined;
+  const activeAdopter = activeAdoption?.adopter_id ?
+  peopleIndex.find((p) => p.id === activeAdoption.adopter_id) :
+  undefined;
+  // Directory contacts only (account self-records hidden, like Contacts).
+  const adopterCandidates = peopleIndex.filter((p) => !p.user_id);
+
+  // Adopted → Deceased: default to the after-adoption reading (the common
+  // reason staff record this) — status stays Adopted and only the
+  // known_to_be_deceased flag is set, so no return/mistake question applies.
+  const adoptedToDeceased =
+  animal.status === 'adopted' && status === 'deceased';
+  const afterAdoptionDeath =
+  adoptedToDeceased && deathContext === 'after_adoption';
+  // The status actually saved — an after-adoption death never leaves Adopted.
+  const effectiveStatus: AnimalStatus = afterAdoptionDeath ? 'adopted' : status;
+
+  // Leaving Adopted (the inverse): the most recent completed adoption is the
+  // one a return reverses / a mistake-correction cancels. Sort mirrors
+  // AdoptionReturnModal. An after-adoption death isn't a departure.
+  const leavingAdopted =
+  animal.status === 'adopted' && status !== 'adopted' && !afterAdoptionDeath;
+  const returnableAdoption = leavingAdopted ?
+  adoptions.
+  filter((a) => a.animal_id === animalId && a.status === 'completed').
+  sort((a, b) =>
+  (b.completed_at ?? b.created_at).localeCompare(
+    a.completed_at ?? a.created_at
+  )
+  )[0] :
+  undefined;
+  const adoptedBy = animal.adopted_by_id ?
+  peopleIndex.find((p) => p.id === animal.adopted_by_id) :
+  undefined;
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
     // Foster-collaboration save: only the care flags, traits, and a timeline
     // note. These are exactly the columns the RLS trigger allows the assigned
     // foster to change — nothing else is sent, so nothing else can be rejected.
@@ -289,6 +418,49 @@ export function ChangeStatusModal({
       requestAnimationFrame(() => focusFirstError(['edit_intake_date']));
       return;
     }
+    // Recording an adoption directly needs a date; an inline new adopter needs
+    // at least a first and last name (all fields blank = no adopter on record).
+    const wantsNewAdopter =
+    creatingAdopter &&
+    Boolean(
+      adopterFirst.trim() ||
+      adopterLast.trim() ||
+      adopterEmail.trim() ||
+      adopterPhone.trim()
+    );
+    if (enteringAdopted && !activeAdoption) {
+      if (!adoptionDate) {
+        setAdoptionDateError('Adoption date is required.');
+        requestAnimationFrame(() => focusFirstError(['edit_adoption_date']));
+        return;
+      }
+      if (wantsNewAdopter && (!adopterFirst.trim() || !adopterLast.trim())) {
+        setAdopterError(
+          'First and last name are required to add the adopter as a contact.'
+        );
+        requestAnimationFrame(() => focusFirstError(['edit_adopter_first']));
+        return;
+      }
+    }
+    // Leaving Adopted as a return needs the return details (and the original
+    // adopter when there's no adoption record to flip).
+    if (leavingAdopted && leaveMode === 'return') {
+      if (!returnDate) {
+        setLeaveError('A return date is required.');
+        requestAnimationFrame(() => focusFirstError(['edit_return_date']));
+        return;
+      }
+      if (!returnReason) {
+        setLeaveError('A return reason is required.');
+        requestAnimationFrame(() => focusFirstError(['edit_return_reason']));
+        return;
+      }
+      if (!returnableAdoption && !returnAdopterId) {
+        setLeaveError('Select the original adopter.');
+        requestAnimationFrame(() => focusFirstError(['edit_return_adopter']));
+        return;
+      }
+    }
     // An elevated priority must carry a next step, so the Action Needed banner
     // and dashboard never show "no active action item".
     if (priority !== 'normal' && !actionItemText.trim()) {
@@ -297,8 +469,10 @@ export function ChangeStatusModal({
       return;
     }
     const changes: string[] = [];
-    if (status !== animal.status)
-    changes.push(`status: ${animal.status} → ${status}`);
+    if (effectiveStatus !== animal.status)
+    changes.push(`status: ${animal.status} → ${effectiveStatus}`);
+    if (afterAdoptionDeath && !animal.known_to_be_deceased)
+    changes.push('deceased after adoption');
     if (priority !== animal.priority)
     changes.push(`priority: ${animal.priority} → ${priority}`);
     const flagChange = (
@@ -314,6 +488,8 @@ export function ChangeStatusModal({
 
     // Outcome fields only apply to their status — write just the relevant ones so
     // a status change doesn't clobber the others ('' → null via animalUpdateToRow).
+    // Keyed on the SELECTED status: an after-adoption death saves status
+    // 'adopted' but still records the death details.
     const outcomeFields =
     status === 'released' ?
     { released_at: releasedAt } :
@@ -325,7 +501,7 @@ export function ChangeStatusModal({
     } :
     {};
 
-    updateAnimal(animalId, {
+    const animalUpdates = {
       ...outcomeFields,
       name: name.trim() || undefined,
       rescue_id: rescueId.trim() || undefined,
@@ -339,7 +515,16 @@ export function ChangeStatusModal({
       estimated_age_value: ageInfo.estimated_age_value,
       estimated_age_unit: ageInfo.estimated_age_unit,
       estimated_age_as_of: ageInfo.estimated_age_as_of,
-      status,
+      status: effectiveStatus,
+      // True for every death — in care (status conveys it) or after adoption
+      // (status stays adopted; the profile shows "(Deceased)"). The hydrated
+      // checkbox lets a mistaken after-adoption mark be cleared.
+      known_to_be_deceased:
+      effectiveStatus === 'deceased' || afterAdoptionDeath ?
+      true :
+      effectiveStatus === 'adopted' ?
+      keepKnownDeceased :
+      false,
       priority,
       is_on_hold: isOnHold,
       has_behavior_concern: behaviorConcern,
@@ -350,12 +535,102 @@ export function ChangeStatusModal({
       microchip_number: microchipNumber.trim() || undefined,
       description: description.trim(),
       internal_notes: internalNotes.trim() || undefined
-    });
+    };
+    // Correcting a mistaken Adopted status drops the stale adopter stamps in
+    // the same write. (Return-path clears happen inside returnAdoption.)
+    if (leavingAdopted && leaveMode === 'mistake') {
+      (animalUpdates as Record<string, unknown>).adopted_by_id = null;
+      (animalUpdates as Record<string, unknown>).adopted_at = null;
+    }
+    updateAnimal(animalId, animalUpdates);
     track('animal_status_changed', {
       animal_id: animalId,
-      new_status: status,
+      new_status: effectiveStatus,
       new_priority: priority
     });
+    if (afterAdoptionDeath) {
+      track('deceased_after_adoption_recorded', { animal_id: animalId });
+    }
+
+    // Becoming Adopted goes through the adoption layer too, so the record,
+    // adopter stamps, and placement close-out stay consistent (see the panels
+    // in Status & Priority). The plain status write above is harmless — the
+    // adoption action re-writes it along with the stamps.
+    if (enteringAdopted) {
+      if (activeAdoption) {
+        const parsed = donation.trim() === '' ? undefined : Number(donation);
+        completeAdoption(
+          activeAdoption.id,
+          parsed != null && !isNaN(parsed) ? parsed : undefined
+        );
+        track('adoption_completed', { animal_id: animalId });
+      } else {
+        setSubmitting(true);
+        let finalAdopterId: string | undefined = adopterId || undefined;
+        if (wantsNewAdopter) {
+          const created = await addPerson({
+            first_name: adopterFirst.trim(),
+            last_name: adopterLast.trim(),
+            email: adopterEmail.trim(),
+            phone: adopterPhone.trim() || undefined,
+            roles: ['adopter'],
+            role: legacyRoleFor(['adopter']),
+            active: true
+          });
+          if (created) finalAdopterId = created.id;
+        }
+        await recordDirectAdoption({
+          animal_id: animalId,
+          adopter_id: finalAdopterId,
+          adopted_on: adoptionDate,
+          notes: adoptionNotes.trim() || undefined
+        });
+        track('adoption_recorded_direct', {
+          animal_id: animalId,
+          has_adopter: !!finalAdopterId
+        });
+      }
+    }
+
+    // Leaving Adopted goes through the adoption layer as well: a return flips
+    // the record and re-enters care at the chosen status; a mistake cancels the
+    // record (completed_at cleared, so it leaves every "completed" metric) and
+    // the stamp clears above already handled the animal side.
+    if (leavingAdopted) {
+      if (leaveMode === 'return') {
+        if (returnableAdoption) {
+          returnAdoption(returnableAdoption.id, {
+            returned_at: returnDate,
+            return_reason: returnReason as AdoptionReturnReason,
+            return_notes: returnNotes.trim() || undefined,
+            new_status: status
+          });
+        } else {
+          setSubmitting(true);
+          await recordAdoptionReturn({
+            animal_id: animalId,
+            adopter_id: returnAdopterId,
+            returned_at: returnDate,
+            return_reason: returnReason as AdoptionReturnReason,
+            return_notes: returnNotes.trim() || undefined,
+            new_status: status
+          });
+        }
+        track('adoption_returned', { animal_id: animalId });
+      } else if (returnableAdoption) {
+        updateAdoption(returnableAdoption.id, {
+          status: 'cancelled',
+          cancelled_at: new Date().toISOString(),
+          completed_at: undefined,
+          notes: [
+          returnableAdoption.notes,
+          'Marked adopted by mistake; status corrected.'].
+          filter(Boolean).
+          join(' — ')
+        });
+        track('adoption_cancelled', { animal_id: animalId });
+      }
+    }
 
     setAnimalTraits(animalId, traitIds);
 
@@ -426,8 +701,8 @@ export function ChangeStatusModal({
             <Button type="button" variant="ghost" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" form="edit-animal-form">
-              Save Changes
+            <Button type="submit" form="edit-animal-form" disabled={submitting}>
+              {submitting ? 'Saving…' : 'Save Changes'}
             </Button>
           </div>
         </div>
@@ -590,13 +865,19 @@ export function ChangeStatusModal({
                 value={status}
                 onChange={(e) => setStatus(e.target.value as AnimalStatus)}>
 
-                <option value="intake">Intake</option>
-                <option value="in_care">In Care</option>
-                <option value="adoptable">Adoptable</option>
-                <option value="adopted">Adopted</option>
-                <option value="released">Released</option>
-                <option value="hospice">Hospice</option>
-                <option value="deceased">Deceased</option>
+                {/* Grouped: outcomes are business events, not just statuses —
+                    picking one reveals its inline outcome flow below. */}
+                <optgroup label="In care">
+                  <option value="intake">Intake</option>
+                  <option value="in_care">In Care</option>
+                  <option value="adoptable">Adoptable</option>
+                  <option value="hospice">Hospice</option>
+                </optgroup>
+                <optgroup label="Outcomes">
+                  <option value="adopted">Adopted</option>
+                  <option value="released">Released</option>
+                  <option value="deceased">Deceased</option>
+                </optgroup>
               </Select>
             </div>
             <div>
@@ -616,6 +897,15 @@ export function ChangeStatusModal({
           {/* Outcome details — captured here so a status change records the
               relevant date/context in the same save. Surfaced in the profile's
               Release Summary / Case Summary. */}
+          {/* An adopted animal marked as known-deceased stays Adopted; this
+              hydrated checkbox is the escape hatch for a mistaken mark. */}
+          {status === 'adopted' && !!animal.known_to_be_deceased &&
+          <ConcernCheckbox
+            label="Known to be deceased (after adoption)"
+            checked={keepKnownDeceased}
+            onChange={setKeepKnownDeceased}
+            help='Shown as "Adopted (Deceased)" on the profile. Uncheck only if this was recorded in error.' />
+          }
           {status === 'released' &&
           <div>
               <Label htmlFor="edit_released_at">Release date</Label>
@@ -623,6 +913,49 @@ export function ChangeStatusModal({
               id="edit_released_at"
               value={releasedAt}
               onChange={setReleasedAt} />
+            </div>
+          }
+          {/* Adopted → Deceased: where the death happened decides everything.
+              After adoption keeps the status Adopted + sets the flag; in care
+              chains into the return/mistake panel below. */}
+          {adoptedToDeceased &&
+          <div className="space-y-3 p-4 rounded-xl bg-background border border-border">
+              <p className="text-sm text-text-primary">
+                <span className="font-medium">
+                  {animalDisplayName(animal)} has been adopted.
+                </span>{' '}
+                Where did they pass away?
+              </p>
+              <div className="space-y-2.5">
+                <label className="flex items-start gap-2.5 text-sm text-text-primary cursor-pointer">
+                  <input
+                  type="radio"
+                  name="death_context"
+                  checked={deathContext === 'after_adoption'}
+                  onChange={() => setDeathContext('after_adoption')}
+                  className="w-4 h-4 mt-0.5 text-primary focus:ring-primary" />
+                  <span>
+                    <span className="font-medium">
+                      After adoption, in their new home
+                    </span>{' '}
+                    — the status stays Adopted; the profile shows "Adopted
+                    (Deceased)" so no one follows up.
+                  </span>
+                </label>
+                <label className="flex items-start gap-2.5 text-sm text-text-primary cursor-pointer">
+                  <input
+                  type="radio"
+                  name="death_context"
+                  checked={deathContext === 'in_care'}
+                  onChange={() => setDeathContext('in_care')}
+                  className="w-4 h-4 mt-0.5 text-primary focus:ring-primary" />
+                  <span>
+                    <span className="font-medium">While in rescue care</span> —
+                    the status becomes Deceased; record how{' '}
+                    {animalDisplayName(animal)} came back into care below.
+                  </span>
+                </label>
+              </div>
             </div>
           }
           {status === 'deceased' &&
@@ -651,6 +984,281 @@ export function ChangeStatusModal({
                 placeholder="Any additional context (optional)."
                 rows={2} />
               </div>
+            </div>
+          }
+          {/* Becoming Adopted — never just a status write. With an adoption in
+              flight, saving completes it; otherwise the adoption is recorded
+              directly (date + optional adopter) so reports and placements stay
+              consistent. Mirrors the Released/Deceased inline-outcome pattern. */}
+          {enteringAdopted && activeAdoption &&
+          <div className="space-y-3 p-4 rounded-xl bg-background border border-border">
+              <p className="text-sm text-text-primary">
+                <span className="font-medium">
+                  {animalDisplayName(animal)} has an adoption in progress
+                </span>{' '}
+                with{' '}
+                <span className="font-medium">
+                  {activeAdopter ?
+                `${activeAdopter.first_name} ${activeAdopter.last_name}` :
+                'an adopter'}
+                </span>{' '}
+                ({ADOPTION_STATUS_LABELS[activeAdoption.status]}).
+              </p>
+              <p className="text-xs text-text-secondary">
+                Saving will complete that adoption — the adopter is recorded on
+                the profile and any active foster placement is closed.
+              </p>
+              <div>
+                <Label htmlFor="edit_adoption_donation">
+                  Donation Amount (optional)
+                </Label>
+                <Input
+                id="edit_adoption_donation"
+                type="number"
+                min="0"
+                step="0.01"
+                inputMode="decimal"
+                value={donation}
+                onChange={(e) => setDonation(e.target.value)}
+                placeholder="e.g. 75.00" />
+              </div>
+            </div>
+          }
+          {enteringAdopted && !activeAdoption &&
+          <div className="space-y-4 p-4 rounded-xl bg-background border border-border">
+              <div>
+                <Label htmlFor="edit_adoption_date" required>Adoption date</Label>
+                <DatePicker
+                id="edit_adoption_date"
+                required
+                value={adoptionDate}
+                error={Boolean(adoptionDateError)}
+                onChange={(v) => {
+                  setAdoptionDate(v);
+                  if (adoptionDateError) setAdoptionDateError(undefined);
+                }} />
+                <FieldError>{adoptionDateError}</FieldError>
+              </div>
+              <div>
+                <Label>Adopter (optional)</Label>
+                {creatingAdopter ?
+              <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="edit_adopter_first" required>
+                          First Name
+                        </Label>
+                        <Input
+                      id="edit_adopter_first"
+                      value={adopterFirst}
+                      onChange={(e) => {
+                        setAdopterFirst(e.target.value);
+                        if (adopterError) setAdopterError(undefined);
+                      }}
+                      aria-invalid={Boolean(adopterError)} />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit_adopter_last" required>
+                          Last Name
+                        </Label>
+                        <Input
+                      id="edit_adopter_last"
+                      value={adopterLast}
+                      onChange={(e) => {
+                        setAdopterLast(e.target.value);
+                        if (adopterError) setAdopterError(undefined);
+                      }}
+                      aria-invalid={Boolean(adopterError)} />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="edit_adopter_email">Email</Label>
+                        <Input
+                      id="edit_adopter_email"
+                      type="email"
+                      value={adopterEmail}
+                      onChange={(e) => setAdopterEmail(e.target.value)} />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit_adopter_phone">Phone</Label>
+                        <Input
+                      id="edit_adopter_phone"
+                      value={adopterPhone}
+                      onChange={(e) => setAdopterPhone(e.target.value)} />
+                      </div>
+                    </div>
+                    <FieldError>{adopterError}</FieldError>
+                    <button
+                  type="button"
+                  onClick={() => {
+                    setCreatingAdopter(false);
+                    setAdopterFirst('');
+                    setAdopterLast('');
+                    setAdopterEmail('');
+                    setAdopterPhone('');
+                    setAdopterError(undefined);
+                  }}
+                  className="text-xs font-medium text-primary hover:underline">
+                      Search existing contacts instead
+                    </button>
+                  </div> :
+
+              <PersonSearchPicker
+                id="edit_adopter_picker"
+                people={adopterCandidates}
+                value={adopterId}
+                onChange={setAdopterId}
+                placeholder="Search contacts by name or email…"
+                onCreateNew={() => {
+                  setCreatingAdopter(true);
+                  setAdopterId('');
+                }} />
+              }
+              </div>
+              <div>
+                <Label htmlFor="edit_adoption_notes">
+                  Adoption notes (optional)
+                </Label>
+                <Textarea
+                id="edit_adoption_notes"
+                value={adoptionNotes}
+                onChange={(e) => setAdoptionNotes(e.target.value)}
+                placeholder="Anything worth keeping on the adoption record…"
+                rows={2} />
+              </div>
+              <p className="text-xs text-text-secondary">
+                This records a completed adoption directly, so it's included in
+                reports. For new adoptions, prefer Start Adoption on the
+                Adoption tab so the application is tracked.
+              </p>
+            </div>
+          }
+          {/* The inverse: leaving Adopted is either a return (recorded, so
+              history and reports stay accurate) or a mistaken status being
+              corrected — never a silent edit. */}
+          {leavingAdopted &&
+          <div className="space-y-4 p-4 rounded-xl bg-background border border-border">
+              <p className="text-sm text-text-primary">
+                <span className="font-medium">
+                  {animalDisplayName(animal)} is recorded as adopted
+                  {adoptedBy ?
+                ` by ${adoptedBy.first_name} ${adoptedBy.last_name}` :
+                ''}.
+                </span>{' '}
+                What does this status change reflect?
+              </p>
+              <div className="space-y-2.5">
+                <label className="flex items-start gap-2.5 text-sm text-text-primary cursor-pointer">
+                  <input
+                  type="radio"
+                  name="leave_adopted_mode"
+                  checked={leaveMode === 'return'}
+                  onChange={() => {
+                    setLeaveMode('return');
+                    setLeaveError(undefined);
+                  }}
+                  className="w-4 h-4 mt-0.5 text-primary focus:ring-primary" />
+                  <span>
+                    <span className="font-medium">
+                      The adoption was returned
+                    </span>{' '}
+                    — records the return so history and reports stay accurate.
+                  </span>
+                </label>
+                <label className="flex items-start gap-2.5 text-sm text-text-primary cursor-pointer">
+                  <input
+                  type="radio"
+                  name="leave_adopted_mode"
+                  checked={leaveMode === 'mistake'}
+                  onChange={() => {
+                    setLeaveMode('mistake');
+                    setLeaveError(undefined);
+                  }}
+                  className="w-4 h-4 mt-0.5 text-primary focus:ring-primary" />
+                  <span>
+                    <span className="font-medium">This was a mistake</span> —{' '}
+                    {animalDisplayName(animal)} was never actually adopted.
+                  </span>
+                </label>
+              </div>
+              {leaveMode === 'return' ?
+            <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit_return_date" required>
+                        Return date
+                      </Label>
+                      <DatePicker
+                    id="edit_return_date"
+                    required
+                    value={returnDate}
+                    onChange={(v) => {
+                      setReturnDate(v);
+                      setLeaveError(undefined);
+                    }} />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit_return_reason" required>
+                        Return reason
+                      </Label>
+                      <Select
+                    id="edit_return_reason"
+                    value={returnReason}
+                    onChange={(e) => {
+                      setReturnReason(
+                        e.target.value as AdoptionReturnReason | ''
+                      );
+                      setLeaveError(undefined);
+                    }}>
+                        <option value="">Select a reason…</option>
+                        {ADOPTION_RETURN_REASONS.map((r) =>
+                    <option key={r} value={r}>
+                            {ADOPTION_RETURN_REASON_LABELS[r]}
+                          </option>
+                    )}
+                      </Select>
+                    </div>
+                  </div>
+                  {!returnableAdoption &&
+              <div id="edit_return_adopter" style={{ scrollMarginTop: '1rem' }}>
+                      <Label required>Original adopter</Label>
+                      <PersonSearchPicker
+                  people={adopterCandidates}
+                  value={returnAdopterId}
+                  onChange={(id) => {
+                    setReturnAdopterId(id);
+                    setLeaveError(undefined);
+                  }}
+                  placeholder="Search contacts by name or email…" />
+                      <p className="mt-1 text-xs text-text-secondary">
+                        No adoption record is on file, so the return is recorded
+                        against the original adopter.
+                      </p>
+                    </div>
+              }
+                  <div>
+                    <Label htmlFor="edit_return_notes">
+                      Return notes (optional)
+                    </Label>
+                    <Textarea
+                  id="edit_return_notes"
+                  value={returnNotes}
+                  onChange={(e) => setReturnNotes(e.target.value)}
+                  placeholder="Context on the return — condition, circumstances…"
+                  rows={2} />
+                  </div>
+                </div> :
+
+            <p className="text-xs text-status-medical-text">
+                  This removes the adopted status without recording a return
+                  {returnableAdoption ?
+              '; the adoption record is marked cancelled (it can be archived from the timeline)' :
+              ''}
+                  . Only use this if the status was set in error.
+                </p>
+            }
+              <FieldError>{leaveError}</FieldError>
             </div>
           }
           {/* Inline action item — appears once the priority is elevated so the
