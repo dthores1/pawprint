@@ -3773,10 +3773,16 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     }
     if (data) setPlacements((prev) => [rowToPlacement(data), ...prev]);
     ensureFosterRole(person_id);
-    // Fostered is derived from the active placement; only sync the cache here.
-    // Lifecycle status is left untouched (an animal can be in foster at any stage).
+    // Fostered is derived from the active placement; sync the cache here.
+    // Lifecycle status is left untouched (an animal can be in foster at any
+    // stage) — EXCEPT 'intake', which just means "newly in the org's control":
+    // being placed in foster is what moves them to In Care.
+    const placedAnimal = animals.find((a) => a.id === animal_id);
     updateAnimal(animal_id, {
-      current_foster_id: person_id
+      current_foster_id: person_id,
+      ...(placedAnimal?.status === 'intake' ?
+      { status: 'in_care' as const } :
+      {})
     });
   };
   const reassignFoster = async (
@@ -3850,9 +3856,15 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       return data ? [rowToPlacement(data), ...closed] : closed;
     });
     ensureFosterRole(new_person_id);
-    // Only the denormalized cache changes; lifecycle status is independent.
+    // Only the denormalized cache changes; lifecycle status is independent —
+    // except 'intake', which fostering promotes to In Care (same rule as
+    // placeAnimal, for animals placed before that rule existed).
+    const reassignedAnimal = animals.find((a) => a.id === animal_id);
     updateAnimal(animal_id, {
-      current_foster_id: new_person_id
+      current_foster_id: new_person_id,
+      ...(reassignedAnimal?.status === 'intake' ?
+      { status: 'in_care' as const } :
+      {})
     });
   };
   const endPlacement = async (

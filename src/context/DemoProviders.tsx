@@ -1250,9 +1250,14 @@ export function DemoWhiskerProvider({
       p
       )
       );
-      // Fostered is derived from the active placement; lifecycle status is left alone.
+      // Fostered is derived from the active placement; lifecycle status is
+      // left alone — except 'intake', which fostering promotes to In Care.
+      const placedAnimal = animals.find((a) => a.id === animal_id);
       updateAnimal(animal_id, {
-        current_foster_id: person_id
+        current_foster_id: person_id,
+        ...(placedAnimal?.status === 'intake' ?
+        { status: 'in_care' as const } :
+        {})
       });
     },
     reassignFoster: (
@@ -1298,8 +1303,12 @@ export function DemoWhiskerProvider({
       p
       )
       );
+      const reassignedAnimal = animals.find((a) => a.id === animal_id);
       updateAnimal(animal_id, {
-        current_foster_id: new_person_id
+        current_foster_id: new_person_id,
+        ...(reassignedAnimal?.status === 'intake' ?
+        { status: 'in_care' as const } :
+        {})
       });
     },
 
