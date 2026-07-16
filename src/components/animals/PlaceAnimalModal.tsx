@@ -8,7 +8,15 @@ import { Button } from '../ui/Button';
 import { Avatar } from '../ui/Avatar';
 import { StatusBadge } from '../ui/Badge';
 import { useWhisker } from '../../context/WhiskerContext';
-import { SearchIcon, XIcon, CheckIcon, AlertTriangleIcon } from 'lucide-react';
+import { isSupportContact } from '../ui/PersonSearchPicker';
+import { AddContactModal } from '../contacts/AddContactModal';
+import {
+  SearchIcon,
+  XIcon,
+  CheckIcon,
+  AlertTriangleIcon,
+  UserPlusIcon } from
+'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   animalDisplayName,
@@ -66,6 +74,10 @@ export function PlaceAnimalModal({
   const [selectedId, setSelectedId] = useState('');
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
+  // Inline "New Contact" flow (animal/litter mode) — stacks AddContactModal
+  // above this form, mirroring the clinic vet picker; the created person is
+  // selected as the foster parent (and promoted to the role on placement).
+  const [creatingContact, setCreatingContact] = useState(false);
   const [startDate, setStartDate] = useState(
     new Date().toISOString().split('T')[0]
   );
@@ -227,6 +239,7 @@ export function PlaceAnimalModal({
     const q = query.trim().toLowerCase();
     return people.
     filter((p) => p.active && p.roles.includes('foster_parent')).
+    filter((p) => !isSupportContact(p)).
     filter((p) => !currentFoster || p.id !== currentFoster.id).
     filter(
       (p) =>
@@ -244,11 +257,14 @@ export function PlaceAnimalModal({
 
   // Other contacts (animal mode): active people who aren't foster parents yet.
   // Selecting one promotes them to foster parent on placement. Account
-  // self-records (user_id set) are hidden, matching the Contacts directory.
+  // self-records (user_id set) ARE included — org members are the volunteers,
+  // so they must be placeable even before anyone grants them the foster role.
+  // Only vendor support accounts stay hidden.
   const otherContactResults = useMemo(() => {
     const q = query.trim().toLowerCase();
     return people.
-    filter((p) => p.active && !p.roles.includes('foster_parent') && !p.user_id).
+    filter((p) => p.active && !p.roles.includes('foster_parent')).
+    filter((p) => !isSupportContact(p)).
     filter((p) => !currentFoster || p.id !== currentFoster.id).
     filter(
       (p) =>
@@ -302,6 +318,7 @@ export function PlaceAnimalModal({
       setSelectedId('');
       setQuery('');
       setOpen(false);
+      setCreatingContact(false);
       setNotes('');
       setReasonEnded('');
       setShowAllSpecies(false);
@@ -414,14 +431,21 @@ export function PlaceAnimalModal({
     setQuery('');
   };
 
+  const handleCreateContact = () => {
+    setOpen(false);
+    setCreatingContact(true);
+  };
+
   // Flat list of the currently-shown options, in render order, for keyboard nav.
-  // Animal mode lists fosters then other contacts; foster mode lists animals.
+  // Animal mode lists fosters, then other contacts, then the New Contact action;
+  // foster mode lists animals.
   const navChoices: (() => void)[] =
   mode === 'foster' ?
   animalResults.map((a) => () => handleSelectAnimal(a.id)) :
   [
   ...fosterResults.map(({ foster }) => () => handleSelectFoster(foster.id)),
-  ...otherContactResults.map((c) => () => handleSelectFoster(c.id))];
+  ...otherContactResults.map((c) => () => handleSelectFoster(c.id)),
+  handleCreateContact];
 
   const { activeIndex, setActiveIndex, onKeyDown } = useTypeaheadKeyboard({
     open,
@@ -623,8 +647,9 @@ export function PlaceAnimalModal({
                 transition={{ duration: 0.15 }}
                 className="absolute z-10 mt-1.5 w-full bg-card border border-border rounded-xl shadow-soft-lg overflow-hidden max-h-72 overflow-y-auto">
 
-                    {/* Foster + contact results (animal/litter mode), split into
-                         two sections. Empty sections are omitted. */}
+    {/* Foster + contact results (animal/litter mode), split into
+                         two sections. Empty sections are omitted; the New
+                         Contact action always closes the list. */}
                     {mode !== 'foster' && (
                   fosterResults.length === 0 &&
                   otherContactResults.length === 0 ?
@@ -741,6 +766,31 @@ export function PlaceAnimalModal({
                     }
                         </>)
                   }
+                    {mode !== 'foster' &&
+                <div className="border-t border-border">
+                        <button
+                    type="button"
+                    data-ta-index={
+                    fosterResults.length + otherContactResults.length
+                    }
+                    onMouseEnter={() =>
+                    setActiveIndex(
+                      fosterResults.length + otherContactResults.length
+                    )
+                    }
+                    onClick={handleCreateContact}
+                    className={cn(
+                      'w-full flex items-center gap-2 px-3 py-2.5 text-left text-sm font-medium text-primary hover:bg-primary/5 cursor-pointer transition-colors',
+                      activeIndex ===
+                      fosterResults.length + otherContactResults.length &&
+                      'bg-primary/5'
+                    )}>
+
+                          <UserPlusIcon className="w-4 h-4 shrink-0" />
+                          New Contact{query.trim() ? ` "${query.trim()}"` : ''}
+                        </button>
+                      </div>
+                }
 
                     {/* Animal results (foster mode) */}
                     {mode === 'foster' &&
@@ -992,6 +1042,16 @@ export function PlaceAnimalModal({
 
         </div>
       </form>
+
+      {/* Inline "New Contact" flow — stacks above the placement form (which
+          keeps its state) and selects the created person as the foster parent,
+          mirroring the clinic vet picker. */}
+      <AddContactModal
+        isOpen={creatingContact}
+        defaultRoles={['foster_parent']}
+        onCreated={(person) => handleSelectFoster(person.id)}
+        onClose={() => setCreatingContact(false)} />
+
     </Modal>);
 
 }

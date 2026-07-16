@@ -29,7 +29,7 @@ import {
 import { useWindowRowVirtualizer } from '../lib/useWindowRowVirtualizer';
 import { Person } from '../types';
 import { enabledSpeciesList } from '../lib/orgCatalog';
-import { cn, hasStatedCapacity } from '../lib/utils';
+import { cn, formatPhone, hasStatedCapacity } from '../lib/utils';
 import { track } from '../lib/analytics';
 import { ExportButton } from '../components/ui/ExportButton';
 import { CsvColumn } from '../lib/csv';
@@ -373,7 +373,7 @@ export function FostersList() {
 
                   <div className="space-y-2 mb-6 flex-1">
                     <div className="flex items-center gap-2 text-sm text-text-secondary">
-                      <PhoneIcon className="w-4 h-4" /> {foster.phone}
+                      <PhoneIcon className="w-4 h-4" /> {formatPhone(foster.phone)}
                     </div>
                     <div className="flex items-center gap-2 text-sm text-text-secondary">
                       <MailIcon className="w-4 h-4" />{' '}

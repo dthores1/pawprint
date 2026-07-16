@@ -15,6 +15,7 @@ export function rowToMedicalRecord(r: any): MedicalRecord {
     provider_contact_id: r.provider_contact_id ?? undefined,
     provider_name: r.provider_name ?? undefined,
     clinic_id: r.clinic_id ?? undefined,
+    created_at: r.created_at ?? undefined,
     facility_name: r.facility_name ?? undefined,
     microchip_number: r.microchip_number ?? undefined,
     lot_number: r.lot_number ?? undefined,

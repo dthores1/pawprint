@@ -29,50 +29,6 @@ const PRIORITY_OPTIONS = [
 { value: 'normal', label: 'Normal' }];
 
 
-// "Needed By" date buckets, matched against a request's needed_by_date.
-// Requests without a needed-by date only match "Any".
-const NEEDED_BY_OPTIONS = [
-{ value: 'all', label: 'Any' },
-{ value: 'past_due', label: 'Past Due' },
-{ value: 'today', label: 'Today' },
-{ value: 'this_week', label: 'This Week' },
-{ value: 'next_week', label: 'Next Week' }];
-
-
-function startOfDay(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
-// Week starts Sunday (US convention), matching the other request pages.
-function startOfWeekSunday(d: Date): Date {
-  const s = startOfDay(d);
-  s.setDate(s.getDate() - s.getDay());
-  return s;
-}
-function matchesNeededBy(
-r: SupplyRequest,
-filter: string,
-now: Date = new Date())
-: boolean {
-  if (filter === 'all') return true;
-  // needed_by_date is a date-only (yyyy-MM-dd) string → parse as local midnight.
-  const nb = r.needed_by_date ?
-  startOfDay(new Date(`${r.needed_by_date}T00:00:00`)).getTime() :
-  null;
-  const today = startOfDay(now).getTime();
-  if (filter === 'past_due') return nb !== null && nb < today;
-  if (nb === null) return false; // undated requests only match "Any"
-  const DAY = 86400000;
-  if (filter === 'today') return nb === today;
-  if (filter === 'this_week') {
-    const ws = startOfWeekSunday(now).getTime();
-    return nb >= ws && nb < ws + 7 * DAY;
-  }
-  if (filter === 'next_week') {
-    const ws = startOfWeekSunday(now).getTime() + 7 * DAY;
-    return nb >= ws && nb < ws + 7 * DAY;
-  }
-  return true;
-}
 
 interface SupplyRequestsViewProps {
   /** When set, open this request's detail modal (e.g. from a duplicate warning). */
@@ -115,7 +71,6 @@ export function SupplyRequestsView({
   );
   const [requesterFilter, setRequesterFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
-  const [neededByFilter, setNeededByFilter] = useState('all');
 
   // External trigger (e.g. the new-request modal's duplicate warning) asking us
   // to open a specific request's detail. Clear the trigger once handled.
@@ -187,17 +142,14 @@ export function SupplyRequestsView({
   sort((a, b) => a.label.localeCompare(b.label))];
 
   const filtersActive =
-  requesterFilter !== 'all' ||
-  priorityFilter !== 'all' ||
-  neededByFilter !== 'all';
+  requesterFilter !== 'all' || priorityFilter !== 'all';
 
   const displayRequests = (
   activeTab === 'active' ? activeRequests : completedRequests).
   filter(
     (r) =>
     (requesterFilter === 'all' || r.requester_person_id === requesterFilter) &&
-    (priorityFilter === 'all' || r.priority === priorityFilter) &&
-    matchesNeededBy(r, neededByFilter)
+    (priorityFilter === 'all' || r.priority === priorityFilter)
   );
 
   // Common requests — only the current user's saved templates.
@@ -339,12 +291,6 @@ export function SupplyRequestsView({
           value={priorityFilter}
           options={PRIORITY_OPTIONS}
           onChange={setPriorityFilter} />
-
-          <FilterDropdown
-          label="Needed By"
-          value={neededByFilter}
-          options={NEEDED_BY_OPTIONS}
-          onChange={setNeededByFilter} />
 
         </div>
       }

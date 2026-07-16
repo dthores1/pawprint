@@ -13,7 +13,11 @@ import { useWhisker } from '../../context/WhiskerContext';
 import { AnimalStatus, Sex, Priority, AgeUnit } from '../../types';
 import { deriveAgeInfo } from '../../lib/age';
 import { breedFieldLabel } from '../../lib/speciesIcons';
-import { enabledSpeciesList, defaultSpeciesId } from '../../lib/orgCatalog';
+import {
+  enabledSpeciesList,
+  defaultSpeciesId,
+  acceptedBreeds } from
+'../../lib/orgCatalog';
 import { focusFirstError } from '../../lib/focusFirstError';
 import { track } from '../../lib/analytics';
 interface AddAnimalModalProps {
@@ -133,6 +137,8 @@ export function AddAnimalModal({
     setAnimalTraits,
     species: speciesCatalog,
     organizationSpecies,
+    breeds,
+    organizationBreeds,
     sites
   } = useWhisker();
   const [traitIds, setTraitIds] = useState<string[]>([]);
@@ -159,6 +165,22 @@ export function AddAnimalModal({
     setFormData((prev) => ({ ...prev, species: pick.name, species_id: pick.id }));
   }, [speciesCatalog, organizationSpecies, formData.species_id]);
   const selectedSpecies = speciesCatalog.find((s) => s.id === formData.species_id);
+  // When exactly one breed is accepted for the selected species (org
+  // restriction, or a single-breed catalog), prefill it — mirrors the species
+  // auto-default. Keyed on the species only, so clearing the field afterwards
+  // sticks (the effect doesn't re-run until the species changes again).
+  useEffect(() => {
+    if (!formData.species_id) return;
+    const accepted = acceptedBreeds(formData.species_id, breeds, organizationBreeds);
+    if (accepted.length !== 1) return;
+    setFormData((prev) =>
+    prev.breed_id || prev.breed_text ?
+    prev :
+    { ...prev, breed_id: accepted[0].id }
+    );
+    // Deliberately NOT keyed on breed_id/breed_text — see comment above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.species_id, breeds, organizationBreeds]);
   // Open on the requested sub-form each time the modal is shown.
   useEffect(() => {
     if (isOpen) {

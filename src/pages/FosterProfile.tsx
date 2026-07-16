@@ -10,7 +10,7 @@ import { PlaceAnimalModal } from '../components/animals/PlaceAnimalModal';
 import { EditFosterModal } from '../components/fosters/EditFosterModal';
 import { AddressDisplay } from '../components/ui/AddressDisplay';
 import { personToAddressValue } from '../lib/address';
-import { animalDisplayName, hasStatedCapacity } from '../lib/utils';
+import { animalDisplayName, formatPhone, hasStatedCapacity } from '../lib/utils';
 import {
   ArrowLeftIcon,
   MapPinIcon,
@@ -163,7 +163,7 @@ export function FosterProfile() {
                   href={`tel:${foster.phone}`}
                   className="text-primary hover:underline">
 
-                  {foster.phone}
+                  {formatPhone(foster.phone)}
                 </a> :
                 <span className="text-text-primary">—</span>
                 }

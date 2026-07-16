@@ -10,8 +10,9 @@ import { useTypeaheadKeyboard } from '../../lib/useTypeaheadKeyboard';
 // Support accounts (e.g. support@whiskerville.app) are added to an org's people
 // only so Whiskerville support can access it — they aren't real org contacts, so
 // they should never be offered in a contact picker. They're identified by the
-// vendor email domain, which no genuine rescue contact would use.
-function isSupportContact(p: Person): boolean {
+// vendor email domain, which no genuine rescue contact would use. Exported for
+// pickers that roll their own result lists (e.g. PlaceAnimalModal).
+export function isSupportContact(p: Person): boolean {
   return (p.email ?? '').toLowerCase().endsWith('@whiskerville.app');
 }
 

@@ -13,7 +13,7 @@ import { StatusBadge } from '../components/ui/Badge';
 import { EditContactModal } from '../components/contacts/EditContactModal';
 import { AddressDisplay } from '../components/ui/AddressDisplay';
 import { personToAddressValue } from '../lib/address';
-import { animalDisplayName, hasStatedCapacity } from '../lib/utils';
+import { animalDisplayName, formatPhone, hasStatedCapacity } from '../lib/utils';
 import {
   ArrowLeftIcon,
   MapPinIcon,
@@ -205,7 +205,7 @@ export function ContactProfile() {
                   href={`tel:${person.phone}`}
                   className="text-primary hover:underline">
 
-                    {person.phone}
+                    {formatPhone(person.phone)}
                   </a>
                 </div>
               }

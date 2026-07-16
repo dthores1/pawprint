@@ -444,6 +444,8 @@ export interface FosterPlacement {
   /** Free-form reason a placement ended (e.g. "Reassigned", "Adopted"). */
   reason_ended?: string;
   notes?: string;
+  /** Row creation timestamp — used to order same-day timeline events. */
+  created_at?: string;
 }
 
 export type ProcedureType =
@@ -534,6 +536,8 @@ export interface MedicalRecord {
   clinic_id?: string;
   /** Free-text facility fallback (vet office, shelter, hospital, …). */
   facility_name?: string;
+  /** Row creation timestamp — used to order same-day timeline events. */
+  created_at?: string;
   /**
    * Captured chip number when procedure_type === 'microchip'. Optional —
    * the chip may be implanted before the number is registered. The app

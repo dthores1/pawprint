@@ -331,6 +331,13 @@ export function AnimalProfile() {
     date: string;
     /** Full timestamp for ordering — keeps same-day events in real order. */
     ts: string;
+    /**
+     * Tie-breaker for events whose ts is date-only (intake, placements,
+     * medical…): the underlying record's created_at, so same-day events sort
+     * in the order they were actually recorded (newer on top). Falls back
+     * to ts when absent.
+     */
+    seq?: string;
     type: 'intake' | 'medical' | 'placement' | 'note' | 'action' | 'adoption';
     title: string;
     description: string;
@@ -356,6 +363,7 @@ export function AnimalProfile() {
     id: 'intake',
     date: animal.intake_date,
     ts: animal.intake_date,
+    seq: animal.created_at,
     type: 'intake' as const,
     title: 'Intake',
     description: `Source: ${animal.intake_source || 'Not specified'}${
@@ -374,6 +382,7 @@ export function AnimalProfile() {
     id: m.id,
     date: m.performed_date!,
     ts: m.performed_date!,
+    seq: m.created_at,
     type: 'medical' as const,
     title: `Medical: ${m.procedure_name}`,
     description: `Provider: ${m.provider_name || 'Unknown'}${m.notes ? ` - ${m.notes}` : ''}`,
@@ -391,6 +400,7 @@ export function AnimalProfile() {
       id: p.id,
       date: p.start_date.split('T')[0],
       ts: p.start_date,
+      seq: p.created_at,
       type: 'placement' as const,
       title: `Placed in Foster`,
       // Rendered as: "With {name} · [purpose pill] · expected through {date}".
@@ -418,6 +428,9 @@ export function AnimalProfile() {
         id: `${p.id}-ended`,
         date: p.end_date.split('T')[0],
         ts: p.end_date,
+        // The close always postdates everything else recorded that day (the
+        // row has no ended_at timestamp), so pin it to the day's end.
+        seq: `${p.end_date.split('T')[0]}T23:59:59`,
         type: 'placement' as const,
         title: 'Foster Placement Ended',
         description: `With ${fosterName}`,
@@ -539,6 +552,7 @@ export function AnimalProfile() {
       id: `adoption-${ad.id}-completed`,
       date: ad.completed_at.split('T')[0],
       ts: ad.completed_at,
+      seq: ad.created_at,
       type: 'adoption' as const,
       title: 'Adoption completed',
       description:
@@ -567,6 +581,7 @@ export function AnimalProfile() {
       id: `adoption-${ad.id}-returned`,
       date: ad.returned_at.split('T')[0],
       ts: ad.returned_at,
+      seq: ad.updated_at ?? ad.created_at,
       type: 'adoption' as const,
       title: 'Adoption return',
       description: [
@@ -580,7 +595,13 @@ export function AnimalProfile() {
     });
     return evs;
   })].
-  sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime()); // Newest first
+  // Newest first; date-only timestamps tie, so fall back to when the record
+  // was actually created (seq) — e.g. same-day Intake vs Placed in Foster.
+  sort(
+    (a, b) =>
+    new Date(b.ts).getTime() - new Date(a.ts).getTime() ||
+    new Date(b.seq ?? b.ts).getTime() - new Date(a.seq ?? a.ts).getTime()
+  );
   // Readiness Checklist logic
   const hasRabies = animalMedical.some(
     (m) =>

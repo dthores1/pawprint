@@ -1237,7 +1237,8 @@ export function DemoWhiskerProvider({
         placement_status: 'active',
         placement_type: 'foster',
         placement_purpose,
-        notes
+        notes,
+        created_at: now()
       },
       ...prev]
       );
@@ -1284,7 +1285,8 @@ export function DemoWhiskerProvider({
           placement_status: 'active' as const,
           placement_type: 'foster' as const,
           placement_purpose,
-          notes
+          notes,
+          created_at: now()
         },
         ...closed];
 

@@ -105,6 +105,24 @@ export function generateId(): string {
 }
 
 /**
+ * Display formatting for phone numbers. Phones are stored as entered; this
+ * normalizes 10-digit US numbers (optionally with a leading 1 / +1) to
+ * (xxx) xxx-xxxx at render time. Anything else — extensions, international,
+ * partial entries — is shown as entered rather than mangled.
+ */
+export function formatPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  const ten =
+  digits.length === 10 ?
+  digits :
+  digits.length === 11 && digits.startsWith('1') ?
+  digits.slice(1) :
+  null;
+  if (!ten) return phone;
+  return `(${ten.slice(0, 3)}) ${ten.slice(3, 6)}-${ten.slice(6)}`;
+}
+
+/**
  * A foster's max_capacity of 0 (or unset) means "no limit specified", not
  * "no room" — never treat it as full and never warn about exceeding it.
  */

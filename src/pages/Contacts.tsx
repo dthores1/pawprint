@@ -27,7 +27,7 @@ import {
   ListIcon } from
 'lucide-react';
 import { Person, PersonRole } from '../types';
-import { cn } from '../lib/utils';
+import { cn, formatPhone } from '../lib/utils';
 import { ExportButton } from '../components/ui/ExportButton';
 import { CsvColumn } from '../lib/csv';
 import { useFostersEnabled } from '../lib/useFostersEnabled';
@@ -317,7 +317,7 @@ export function Contacts() {
             <div className="flex items-center gap-2 text-sm text-text-secondary">
                     <PhoneIcon className="w-4 h-4" />{' '}
                     <a href={`tel:${person.phone}`} className="hover:text-primary">
-                      {person.phone}
+                      {formatPhone(person.phone)}
                     </a>
                   </div>
             }
@@ -452,7 +452,7 @@ export function Contacts() {
                             href={`tel:${person.phone}`}
                             className="hover:text-primary">
 
-                                  {person.phone}
+                                  {formatPhone(person.phone)}
                                 </a>
                               </p>
                         }

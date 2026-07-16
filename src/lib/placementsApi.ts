@@ -12,7 +12,8 @@ export function rowToPlacement(r: any): FosterPlacement {
     placement_type: r.placement_type ?? 'foster',
     placement_purpose: r.placement_purpose ?? 'general_foster',
     reason_ended: r.reason_ended ?? undefined,
-    notes: r.notes ?? undefined
+    notes: r.notes ?? undefined,
+    created_at: r.created_at ?? undefined
   };
 }
 
