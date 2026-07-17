@@ -23,6 +23,7 @@ import {
   formatDatesInText,
   getGreeting,
   animalDisplayName,
+  hasStatedCapacity,
   parseLocalDate } from
 '../lib/utils';
 import { Link } from 'react-router-dom';
@@ -130,17 +131,29 @@ export function Dashboard() {
   const activePlacements = placements.filter(
     (p) => p.placement_status === 'active'
   );
-  const activePlacementsCount = activePlacements.length;
-  const totalCapacity = fosters.reduce(
-    (sum, f) => sum + (f.active === false ? 0 : f.max_capacity ?? 0),
-    0
+  // Open foster spots. Only fosters with a STATED capacity participate — a
+  // no-limit foster's placements shouldn't subtract from anyone's open spots
+  // (that's what produced negative "Intake Capacity") — and an over-capacity
+  // foster contributes 0, never a negative.
+  const statedCapacityFosters = fosters.filter(
+    (f) => f.active !== false && hasStatedCapacity(f.max_capacity)
   );
+  const availableSpots = statedCapacityFosters.reduce((sum, f) => {
+    const inCare = activePlacements.filter((p) => p.person_id === f.id).length;
+    return sum + Math.max(0, (f.max_capacity ?? 0) - inCare);
+  }, 0);
+  // No stated capacities → nothing to measure; all spots taken → say so.
+  const intakeCapacityValue =
+  statedCapacityFosters.length === 0 ?
+  '—' :
+  availableSpots === 0 ?
+  'At capacity' :
+  availableSpots;
 
   // Calculate the "Total Animals" metric for the animals in our care
   const animalsInCare = animals.filter((a) => a.status !== 'adopted' && a.status !== 'deceased');
   // "In foster" is derived from the current_foster_id cache, not the status.
   const animalsInFoster = animals.filter((a) => !!a.current_foster_id);
-  const availableSpots = totalCapacity - activePlacementsCount;
   const fostersEnabled = useFostersEnabled();
   // Shelter-persona replacements for the two foster stat cards (In Foster and
   // Intake Capacity are both placement/foster-capacity math).
@@ -367,7 +380,7 @@ export function Dashboard() {
         fostersEnabled ?
         {
           label: 'Intake Capacity',
-          value: availableSpots,
+          value: intakeCapacityValue,
           icon: HomeIcon,
           color: 'text-[#3E7B52]',
           bg: 'bg-[#DDEFE2]'

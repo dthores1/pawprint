@@ -33,6 +33,7 @@ type ContactForm = {
   organization_name: string;
   notes: string;
   active: boolean;
+  max_capacity: number | '';
 };
 type FormErrors = Partial<Record<keyof ContactForm, string>>;
 // Validatable fields in visual order; on a blocked submit we scroll to the
@@ -42,7 +43,9 @@ const ERROR_FIELD_ORDER: (keyof ContactForm)[] = [
 'first_name',
 'last_name',
 'email',
-'roles'];
+'phone',
+'roles',
+'max_capacity'];
 
 function fromPerson(p: Person): ContactForm {
   return {
@@ -53,19 +56,41 @@ function fromPerson(p: Person): ContactForm {
     roles: p.roles,
     organization_name: p.organization_name ?? '',
     notes: p.notes ?? '',
-    active: p.active
+    active: p.active,
+    // 0 means "no limit specified" (see hasStatedCapacity) → empty field.
+    max_capacity: p.max_capacity || ''
   };
 }
-function validateForm(form: ContactForm): FormErrors {
+function validateForm(
+form: ContactForm,
+/**
+ * The email-or-phone rule only applies when the editor can see BOTH fields —
+ * a visibility-masked field arrives empty here but may hold a real value.
+ */
+canRequireContactMethod: boolean)
+: FormErrors {
   const nextErrors: FormErrors = {};
   if (!form.first_name.trim()) nextErrors.first_name = 'First name is required.';
   if (!form.last_name.trim()) nextErrors.last_name = 'Last name is required.';
   if (form.roles.length === 0) nextErrors.roles = 'Pick at least one role.';
-  if (
-  form.email.trim() &&
-  !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()))
-  {
+  // At least one contact method — email or phone — mirroring the foster forms.
+  const email = form.email.trim();
+  const phone = form.phone.trim();
+  if (canRequireContactMethod && !email && !phone) {
+    const msg = 'Provide an email or a phone number.';
+    nextErrors.email = msg;
+    nextErrors.phone = msg;
+  } else if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     nextErrors.email = 'Enter a valid email address.';
+  }
+  // Foster parents carry a capacity — same rule as the foster forms.
+  if (
+  form.roles.includes('foster_parent') && (
+  form.max_capacity === '' ||
+  form.max_capacity < 1 ||
+  form.max_capacity > 10))
+  {
+    nextErrors.max_capacity = 'Capacity must be between 1 and 10.';
   }
   return nextErrors;
 }
@@ -117,7 +142,7 @@ export function EditContactModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const nextErrors = validateForm(form);
+    const nextErrors = validateForm(form, canView.email && canView.phone);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       const ids = ERROR_FIELD_ORDER.filter((f) => nextErrors[f]);
@@ -136,6 +161,11 @@ export function EditContactModal({
       notes: form.notes.trim() || undefined,
       active: form.active
     };
+    // Foster parents carry a capacity (validated above). Left untouched when
+    // the role isn't selected, so removing/re-adding it doesn't clear the value.
+    if (form.roles.includes('foster_parent') && form.max_capacity !== '') {
+      updates.max_capacity = Number(form.max_capacity);
+    }
     // Only write back the contact fields the editor could actually see — a
     // hidden field arrived masked (empty), so sending it would erase the value.
     // (Share/visibility flags are managed in My Preferences, not here.)
@@ -225,9 +255,18 @@ export function EditContactModal({
             <Input
               id="phone"
               disabled={!canView.phone}
+              aria-invalid={Boolean(errors.phone)}
+              className={errors.phone && 'border-red-500 focus:ring-red-500'}
               value={canView.phone ? form.phone : ''}
               placeholder={canView.phone ? undefined : 'Hidden by this contact'}
-              onChange={(e) => set('phone', e.target.value)} />
+              onChange={(e) => {
+                set('phone', e.target.value);
+                // The email-or-phone message mirrors on both fields; clear both.
+                if (errors.email === errors.phone) {
+                  setErrors((prev) => ({ ...prev, email: undefined }));
+                }
+              }} />
+            <FieldError>{errors.phone}</FieldError>
           </div>
         </div>
 
@@ -270,6 +309,38 @@ export function EditContactModal({
             id="organization_name"
             value={form.organization_name}
             onChange={(e) => set('organization_name', e.target.value)} />
+          </div>
+        }
+
+        {/* Foster parents carry a capacity — surfaced here so a foster edited
+            from Contacts can't lose (or never gain) it. */}
+        {form.roles.includes('foster_parent') &&
+        <div>
+            <Label htmlFor="max_capacity" required>Max Foster Capacity</Label>
+            <Input
+            id="max_capacity"
+            type="number"
+            min="1"
+            max="10"
+            aria-invalid={Boolean(errors.max_capacity)}
+            className={
+            errors.max_capacity && 'border-red-500 focus:ring-red-500'
+            }
+            value={form.max_capacity}
+            onChange={(e) => {
+              const v = e.target.value;
+              setForm((prev) => ({
+                ...prev,
+                max_capacity: v === '' ? '' : Number(v)
+              }));
+              if (errors.max_capacity) {
+                setErrors((prev) => ({ ...prev, max_capacity: undefined }));
+              }
+            }} />
+            <FieldError>{errors.max_capacity}</FieldError>
+            <p className="mt-1 text-xs text-text-secondary">
+              How many animals they can foster at once.
+            </p>
           </div>
         }
 

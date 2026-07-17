@@ -38,7 +38,8 @@ const INITIAL = {
   phone: '',
   roles: [] as PersonRole[],
   organization_name: '',
-  notes: ''
+  notes: '',
+  max_capacity: '' as number | ''
 };
 type ContactField = keyof typeof INITIAL;
 type FormErrors = Partial<Record<ContactField, string>>;
@@ -49,18 +50,35 @@ const ERROR_FIELD_ORDER: ContactField[] = [
 'first_name',
 'last_name',
 'email',
-'roles'];
+'phone',
+'roles',
+'max_capacity'];
 
 function validateForm(form: typeof INITIAL): FormErrors {
   const nextErrors: FormErrors = {};
   if (!form.first_name.trim()) nextErrors.first_name = 'First name is required.';
   if (!form.last_name.trim()) nextErrors.last_name = 'Last name is required.';
   if (form.roles.length === 0) nextErrors.roles = 'Pick at least one role.';
-  if (
-    form.email.trim() &&
-    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())
-  ) {
+  // At least one contact method — email or phone — is required (mirrors the
+  // foster forms, so a foster created from Contacts can't skip both and get
+  // stuck on a later edit). The shared message shows on both fields.
+  const email = form.email.trim();
+  const phone = form.phone.trim();
+  if (!email && !phone) {
+    const msg = 'Provide an email or a phone number.';
+    nextErrors.email = msg;
+    nextErrors.phone = msg;
+  } else if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     nextErrors.email = 'Enter a valid email address.';
+  }
+  // Foster parents carry a capacity — same rule as the foster forms.
+  if (
+    form.roles.includes('foster_parent') && (
+    form.max_capacity === '' ||
+    form.max_capacity < 1 ||
+    form.max_capacity > 10))
+  {
+    nextErrors.max_capacity = 'Capacity must be between 1 and 10.';
   }
   return nextErrors;
 }
@@ -113,6 +131,10 @@ export function AddContactModal({
       form.roles.includes('vet') ?
       form.organization_name.trim() || undefined :
       undefined,
+      // Foster parents carry a capacity (validated above).
+      ...(form.roles.includes('foster_parent') && form.max_capacity !== '' ?
+      { max_capacity: Number(form.max_capacity) } :
+      {}),
       notes: form.notes.trim() || undefined,
       active: true,
       ...(isAdmin ?
@@ -202,8 +224,18 @@ export function AddContactModal({
             <Label htmlFor="phone">Phone</Label>
             <Input
               id="phone"
+              aria-invalid={Boolean(errors.phone)}
+              aria-describedby={errors.phone ? 'phone_error' : undefined}
+              className={errors.phone && 'border-red-500 focus:ring-red-500'}
               value={form.phone}
-              onChange={(e) => set('phone', e.target.value)} />
+              onChange={(e) => {
+                set('phone', e.target.value);
+                // The email-or-phone message mirrors on both fields; clear both.
+                if (errors.email === errors.phone) {
+                  setErrors((prev) => ({ ...prev, email: undefined }));
+                }
+              }} />
+            <FieldError id="phone_error">{errors.phone}</FieldError>
 
           </div>
         </div>
@@ -241,6 +273,41 @@ export function AddContactModal({
             value={form.organization_name}
             onChange={(e) => set('organization_name', e.target.value)} />
 
+          </div>
+        }
+
+        {/* Foster parents carry a capacity — surfaced here so a foster created
+            from Contacts is complete (the foster forms require it on edit). */}
+        {form.roles.includes('foster_parent') &&
+        <div>
+            <Label htmlFor="max_capacity" required>Max Foster Capacity</Label>
+            <Input
+            id="max_capacity"
+            type="number"
+            min="1"
+            max="10"
+            aria-invalid={Boolean(errors.max_capacity)}
+            aria-describedby={
+            errors.max_capacity ? 'max_capacity_error' : undefined
+            }
+            className={
+            errors.max_capacity && 'border-red-500 focus:ring-red-500'
+            }
+            value={form.max_capacity}
+            onChange={(e) => {
+              const v = e.target.value;
+              setForm((prev) => ({
+                ...prev,
+                max_capacity: v === '' ? '' : Number(v)
+              }));
+              if (errors.max_capacity) {
+                setErrors((prev) => ({ ...prev, max_capacity: undefined }));
+              }
+            }} />
+            <FieldError id="max_capacity_error">{errors.max_capacity}</FieldError>
+            <p className="mt-1 text-xs text-text-secondary">
+              How many animals they can foster at once.
+            </p>
           </div>
         }
 

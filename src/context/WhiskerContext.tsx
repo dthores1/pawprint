@@ -1449,8 +1449,18 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     return merged;
   }, [peopleIndex, people]);
   // Species — global reference catalog (not org-scoped). Read-only here.
+  //
+  // Keyed on the resolved org (NOT run-once): the provider mounts on the Login
+  // screen too, where a run-once load fires UNAUTHENTICATED — the catalog's
+  // authenticated-only RLS returns 0 rows and nothing ever retried, so a fresh
+  // email/password sign-in (an SPA transition, no page reload) ran the whole
+  // session with an empty catalog (no species in Settings, "No types
+  // available" in Add Animal, the "Type" fallback label). An org id only
+  // exists once auth has resolved; re-running on org switch is a cheap
+  // re-read of global data.
   const [species, setSpecies] = useState<SpeciesCatalog[]>([]);
   useEffect(() => {
+    if (!currentOrg?.id) return;
     let cancelled = false;
     (async () => {
       const { data, error } = await supabase.
@@ -1469,10 +1479,12 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [currentOrg?.id]);
   // Breeds — global reference catalog (not org-scoped). Read-only here.
+  // Same auth gating as the species load above.
   const [breeds, setBreeds] = useState<Breed[]>([]);
   useEffect(() => {
+    if (!currentOrg?.id) return;
     let cancelled = false;
     (async () => {
       const { data, error } = await supabase.
@@ -1491,7 +1503,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [currentOrg?.id]);
   // — Coordination collections — all Supabase-backed, org-scoped. —————
   const [products, setProducts] = useState<Product[]>([]);
   const [supplyRequests, setSupplyRequests] = useState<SupplyRequest[]>([]);
@@ -2166,8 +2178,11 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   }, [userId]);
 
   useEffect(() => {
+    // Wait for a session — the provider mounts on the Login screen, and the
+    // messages catalog is authenticated-read (same race as the species load).
+    if (!userId) return;
     loadGuidanceMessages();
-  }, [loadGuidanceMessages]);
+  }, [userId, loadGuidanceMessages]);
   useEffect(() => {
     loadGuidanceState();
   }, [loadGuidanceState]);
