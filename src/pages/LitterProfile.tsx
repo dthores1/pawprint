@@ -76,10 +76,10 @@ export function LitterProfile() {
     <div className="space-y-6 pb-12">
       <div className="flex items-center justify-between gap-3">
         <Link
-          to="/animals"
+          to="/animals?tab=litters"
           className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-text-primary transition-colors">
 
-          <ArrowLeftIcon className="w-4 h-4" /> Back to Animals
+          <ArrowLeftIcon className="w-4 h-4" /> Back to Litters
         </Link>
         <div className="flex gap-2">
           <Button variant="soft" size="sm" onClick={() => setIsAddOpen(true)}>
@@ -257,7 +257,7 @@ export function LitterProfile() {
         id={litter.id}
         typeLabel="litter"
         entityLabel={litterLabel(litter)}
-        onArchived={() => navigate('/animals')} />
+        onArchived={() => navigate('/animals?tab=litters')} />
 
       }
     </div>);

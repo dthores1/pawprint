@@ -6,7 +6,7 @@ import { Avatar } from '../ui/Avatar';
 import { SpeciesBadge } from '../ui/SpeciesBadge';
 import { HeartIcon, PlusIcon, XIcon } from 'lucide-react';
 import { BoneIcon } from '../ui/BoneIcon';
-import { Animal } from '../../types';
+import { Animal, Litter } from '../../types';
 import { calculateAge, animalDisplayName } from '../../lib/utils';
 import { AddRelationshipModal } from './AddRelationshipModal';
 import { ArchiveConfirmDialog } from '../archive/ArchiveConfirmDialog';
@@ -40,14 +40,14 @@ export function RelationshipsCard({
   canManage = true
 }: RelationshipsCardProps) {
   // Index so a historical relative's name/photo still resolves.
-  const { relationships, animalsIndex: animals } = useWhisker();
+  const { relationships, animalsIndex: animals, litters } = useWhisker();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [archiving, setArchiving] = useState<
     {id: string;label: string;animalName: string;} | null>(
     null);
   // Admin gate is the same for every chip; the row id is just a sentinel.
   const canArchive = useCanArchive('animal_relationships', { id: 'na' });
-  const grouped = computeRelationships(animalId, relationships, animals);
+  const grouped = computeRelationships(animalId, relationships, animals, litters);
   const isEmpty =
   !grouped.mother &&
   !grouped.father &&
@@ -243,7 +243,8 @@ function RelationshipRow({
 function computeRelationships(
 animalId: string,
 relationships: ReturnType<typeof useWhisker>['relationships'],
-animals: Animal[])
+animals: Animal[],
+litters: Litter[])
 : GroupedRelationships {
   const result: GroupedRelationships = {
     mother: null,
@@ -312,6 +313,46 @@ animals: Animal[])
       result.littermates.push({
         relationshipId: `litter-${other.id}`,
         animal: other,
+        derived: true
+      });
+    }
+  }
+  // Mother ↔ children via the litter record (litters.mother_animal_id) — like
+  // littermates, derived at render rather than stored, so members added to the
+  // litter later are always covered. Stored relationship rows win on conflict
+  // (they stay removable; derived links aren't).
+  const memberLitter = self?.litter_id ?
+  litters.find((l) => l.id === self.litter_id) :
+  undefined;
+  if (
+  !result.mother &&
+  memberLitter?.mother_animal_id &&
+  memberLitter.mother_animal_id !== animalId)
+  {
+    const mother = find(memberLitter.mother_animal_id);
+    if (mother) {
+      result.mother = {
+        relationshipId: `litter-mother-${mother.id}`,
+        animal: mother,
+        derived: true
+      };
+    }
+  }
+  const childIds = new Set(result.children.map((e) => e.animal.id));
+  for (const l of litters) {
+    if (l.mother_animal_id !== animalId) continue;
+    for (const member of animals) {
+      if (
+      member.litter_id !== l.id ||
+      member.id === animalId ||
+      childIds.has(member.id))
+      {
+        continue;
+      }
+      childIds.add(member.id);
+      result.children.push({
+        relationshipId: `litter-child-${member.id}`,
+        animal: member,
         derived: true
       });
     }

@@ -103,12 +103,20 @@ export function AnimalsList() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const canManageAnimals = useCanManageAnimals();
   const fostersEnabled = useFostersEnabled();
-  const [view, setView] = useState<'animals' | 'litters'>('animals');
   const isMobile = useIsMobile();
   // On phones the filter controls collapse behind a "Filters" toggle (closed by
   // default) to keep the list above the fold; they're always shown at md+.
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  // The Animals | Litters subtab lives in the URL (mirroring Requests and
+  // Adoptions) so the sidebar's bare /animals link resets to the default tab
+  // and Litters is deep-linkable.
+  const view: 'animals' | 'litters' =
+  searchParams.get('tab') === 'litters' ? 'litters' : 'animals';
+  const setView = (next: 'animals' | 'litters') => {
+    track('tab_viewed', { page: 'animals', tab: next });
+    setSearchParams(next === 'animals' ? {} : { tab: next }, { replace: true });
+  };
   // Initialize filters from the URL (e.g. /animals?status=intake,in_care),
   // keeping only values that match a known option.
   const parseParam = (key: string, allowed: readonly string[]) =>
