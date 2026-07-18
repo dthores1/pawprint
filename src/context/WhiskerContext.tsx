@@ -9,6 +9,7 @@ import React, {
 import {
   Animal,
   Adoption,
+  AdoptionCancelReason,
   AdoptionReturnReason,
   Breed,
   SpeciesCatalog,
@@ -97,7 +98,7 @@ import {
   directAdoptionToInsert,
   rowToAdoption } from
 '../lib/adoptionsApi';
-import { adoptionStatusPatch } from '../lib/adoptions';
+import { adoptionStatusPatch, isActiveAdoption } from '../lib/adoptions';
 import { useAuth } from './AuthContext';
 import {
   rowToAnimal,
@@ -437,8 +438,9 @@ export interface WhiskerContextType {
   updateAdoption: (id: string, updates: Partial<Adoption>) => void;
   /** Advance an adoption to a workflow status, stamping milestone timestamps. */
   setAdoptionStatus: (id: string, status: Adoption['status']) => void;
-  /** Finalize: animal -> adopted, set adopted_by/at, close active placement. */
-  completeAdoption: (id: string, donationAmount?: number) => void;
+  /** Finalize: animal -> adopted, set adopted_by/at, close active placement.
+   *  `notes` (when provided) becomes the adoption record's final notes. */
+  completeAdoption: (id: string, donationAmount?: number, notes?: string) => void;
   /**
    * Record an adoption directly, without the application workflow (Edit modal
    * status change — typically a historical/backfilled adoption). Creates a
@@ -454,7 +456,19 @@ export interface WhiskerContextType {
     notes?: string;
   })
   => Promise<void>;
-  cancelAdoption: (id: string, reason?: string) => void;
+  /** Close an adoption unsuccessfully: status -> cancelled with the structured
+   *  outcome, hold lifted. `notes` (when provided) becomes the final notes. */
+  cancelAdoption: (
+  id: string,
+  reason: AdoptionCancelReason,
+  notes?: string)
+  => void;
+  /**
+   * Reopen a cancelled adoption: restore the furthest milestone-backed
+   * in-progress status, clear the cancellation stamps, and put the animal back
+   * on hold. No-op if another adoption is already active for the animal.
+   */
+  reopenAdoption: (id: string) => void;
   /**
    * Reverse a completed adoption: mark the record `returned` (reason/notes) and
    * bring the animal back into care — status -> new_status (default 'intake'),
@@ -750,8 +764,8 @@ const VIEW_AS_BLOCKED_ACTIONS: (keyof WhiskerContextType)[] = [
 'addActionItem', 'updateActionItem', 'completeActionItem', 'cancelActionItem',
 'addPlacement', 'updatePlacement', 'addPerson', 'updatePerson',
 'uploadPersonPhoto', 'addAdoption', 'updateAdoption', 'setAdoptionStatus',
-'completeAdoption', 'recordDirectAdoption', 'cancelAdoption', 'returnAdoption',
-'recordAdoptionReturn',
+'completeAdoption', 'recordDirectAdoption', 'cancelAdoption', 'reopenAdoption',
+'returnAdoption', 'recordAdoptionReturn',
 'addPhoto', 'deletePhoto', 'addAnimalFile', 'deleteAnimalFile', 'addRelationship',
 'deleteRelationship', 'addExternalListing', 'updateExternalListing',
 'deleteExternalListing', 'placeAnimal', 'reassignFoster', 'addSupplyRequest',
@@ -3011,7 +3025,8 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
   };
   const completeAdoption: WhiskerContextType['completeAdoption'] = (
   id,
-  donationAmount) =>
+  donationAmount,
+  notes) =>
   {
     const adoption = adoptions.find((a) => a.id === id);
     if (!adoption) return;
@@ -3020,7 +3035,8 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     updateAdoption(id, {
       status: 'completed',
       completed_at: ts,
-      ...(donationAmount != null ? { donation_amount: donationAmount } : {})
+      ...(donationAmount != null ? { donation_amount: donationAmount } : {}),
+      ...(notes !== undefined ? { notes: notes.trim() || undefined } : {})
     });
     // …and the animal-side effects follow.
     applyAdoptionOutcomeToAnimal(
@@ -3055,17 +3071,48 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       input.adopted_on
     );
   };
-  const cancelAdoption: WhiskerContextType['cancelAdoption'] = (id, reason) => {
+  const cancelAdoption: WhiskerContextType['cancelAdoption'] = (
+  id,
+  reason,
+  notes) =>
+  {
     const adoption = adoptions.find((a) => a.id === id);
     updateAdoption(id, {
       status: 'cancelled',
       cancelled_at: new Date().toISOString(),
-      ...(reason && reason.trim() ? { notes: reason.trim() } : {})
+      cancelled_reason: reason,
+      ...(notes !== undefined ? { notes: notes.trim() || undefined } : {})
     });
     // Lift the adoption-driven hold so the animal is selectable again.
     if (adoption) {
       updateAnimal(adoption.animal_id, { is_on_hold: false });
     }
+  };
+  const reopenAdoption: WhiskerContextType['reopenAdoption'] = (id) => {
+    const adoption = adoptions.find((a) => a.id === id);
+    if (!adoption || adoption.status !== 'cancelled') return;
+    // One active adoption per animal — never reopen alongside another.
+    const hasOtherActive = adoptions.some(
+      (a) =>
+      a.animal_id === adoption.animal_id && a.id !== id && isActiveAdoption(a)
+    );
+    if (hasOtherActive) return;
+    // Re-enter at the furthest stage the milestone timestamps prove was
+    // reached (meet_and_greet has no timestamp, so it re-enters one back).
+    const status: Adoption['status'] = adoption.paperwork_completed_at ?
+    'ready_for_placement' :
+    adoption.paperwork_sent_at ?
+    'pending_paperwork' :
+    adoption.submitted_at ?
+    'application_submitted' :
+    'inquiry';
+    updateAdoption(id, {
+      status,
+      cancelled_at: undefined,
+      cancelled_reason: undefined
+    });
+    // Back in progress — the animal goes back on adoption hold.
+    updateAnimal(adoption.animal_id, { is_on_hold: true });
   };
   // Shared: bring a returned animal back into the care pipeline. Inverse of the
   // animal side of completeAdoption — re-enter at the given status (default
@@ -4982,6 +5029,7 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
         completeAdoption,
         recordDirectAdoption,
         cancelAdoption,
+        reopenAdoption,
         returnAdoption,
         recordAdoptionReturn,
         addPhoto,

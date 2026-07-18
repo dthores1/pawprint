@@ -650,6 +650,15 @@ export type AdoptionStatus =
 'cancelled' |
 'returned';
 
+// Why an adoption was closed unsuccessfully (status='cancelled'). Recorded by
+// the Close Adoption dialog; older cancelled rows predate the field.
+export type AdoptionCancelReason =
+'applicant_withdrew' |
+'application_rejected' |
+'no_response' |
+'duplicate_application' |
+'other';
+
 // Why an adopter returned an animal. Required (DB CHECK) when status='returned'.
 export type AdoptionReturnReason =
 'behavior' |
@@ -678,6 +687,8 @@ export interface Adoption {
   approved_at?: string;
   completed_at?: string;
   cancelled_at?: string;
+  /** Set when the adoption is closed unsuccessfully (status='cancelled'). */
+  cancelled_reason?: AdoptionCancelReason;
   paperwork_sent_at?: string;
   paperwork_completed_at?: string;
   /** Set when a completed adoption is reversed (animal returned to the rescue). */

@@ -4,41 +4,40 @@ import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { useWhisker } from '../../context/WhiskerContext';
 import { UpdateAdoptionModal } from './UpdateAdoptionModal';
-import { CompleteAdoptionModal } from './CompleteAdoptionModal';
-import { CancelAdoptionModal } from './CancelAdoptionModal';
+import { CloseAdoptionModal } from './CloseAdoptionModal';
 import {
   HeartIcon,
   CheckCircle2Icon,
   CircleIcon,
   Edit2Icon,
-  XIcon,
   LockIcon } from
 'lucide-react';
 import { animalDisplayName, formatDate } from '../../lib/utils';
 import {
   ADOPTION_STATUS_LABELS,
   adoptionMilestones,
-  formatDonation } from
+  formatDonation,
+  isActiveAdoption } from
 '../../lib/adoptions';
 
 interface AdoptionPanelProps {
   adoptionId: string;
-  /** Whether the viewer may run the adoption workflow (update/complete/cancel).
+  /** Whether the viewer may run the adoption workflow (update/close).
    *  Adoption management is a manager action (MANAGE_ANIMALS or admin) — fosters
    *  and read-only members see the status but no controls. Defaults to true. */
   canManage?: boolean;
 }
 
-// Shown on the animal profile while an adoption is active (not completed /
-// cancelled). Surfaces the adopter, status, milestones, and the workflow actions.
+// Shown on the animal profile while an adoption is active. Surfaces the
+// adopter, status, milestones, and the workflow actions (update / close).
+// Closed adoptions render in the compact AdoptionHistoryCard instead.
 export function AdoptionPanel({ adoptionId, canManage = true }: AdoptionPanelProps) {
   const { adoptions, people, animals } = useWhisker();
   const [isUpdateOpen, setIsUpdateOpen] = useState(false);
-  const [isCompleteOpen, setIsCompleteOpen] = useState(false);
-  const [isCancelOpen, setIsCancelOpen] = useState(false);
+  const [isCloseOpen, setIsCloseOpen] = useState(false);
 
   const adoption = adoptions.find((a) => a.id === adoptionId);
-  if (!adoption) return null;
+  if (!adoption || !isActiveAdoption(adoption)) return null;
   const adopter = people.find((p) => p.id === adoption.adopter_id);
   const animal = animals.find((a) => a.id === adoption.animal_id);
   const milestones = adoptionMilestones(adoption);
@@ -122,28 +121,17 @@ export function AdoptionPanel({ adoptionId, canManage = true }: AdoptionPanelPro
 
       {canManage &&
       <div className="flex flex-wrap gap-2 pt-4 border-t border-border">
-        {readyToComplete &&
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => setIsCompleteOpen(true)}>
-
-            <CheckCircle2Icon className="w-4 h-4 mr-2" />
-            Complete Adoption
-          </Button>
-        }
         <Button variant="soft" size="sm" onClick={() => setIsUpdateOpen(true)}>
           <Edit2Icon className="w-4 h-4 mr-1.5" />
           Update
         </Button>
         <Button
-          variant="ghost"
+          variant={readyToComplete ? 'primary' : 'ghost'}
           size="sm"
-          onClick={() => setIsCancelOpen(true)}
-          className="text-[#9B3A3A] hover:bg-[#F5D7D7]/60 hover:text-[#9B3A3A]">
+          onClick={() => setIsCloseOpen(true)}>
 
-          <XIcon className="w-4 h-4 mr-1.5" />
-          Cancel Adoption
+          <CheckCircle2Icon className="w-4 h-4 mr-1.5" />
+          Close Adoption
         </Button>
       </div>
       }
@@ -153,15 +141,10 @@ export function AdoptionPanel({ adoptionId, canManage = true }: AdoptionPanelPro
         adoptionId={adoption.id}
         onClose={() => setIsUpdateOpen(false)} />
 
-      <CompleteAdoptionModal
-        isOpen={isCompleteOpen}
+      <CloseAdoptionModal
+        isOpen={isCloseOpen}
         adoptionId={adoption.id}
-        onClose={() => setIsCompleteOpen(false)} />
-
-      <CancelAdoptionModal
-        isOpen={isCancelOpen}
-        adoptionId={adoption.id}
-        onClose={() => setIsCancelOpen(false)} />
+        onClose={() => setIsCloseOpen(false)} />
 
     </Card>);
 

@@ -76,7 +76,7 @@ import {
 '../data/seed';
 import { generateId } from '../lib/utils';
 import { DEFAULT_GUIDANCE } from '../lib/guidanceContent';
-import { adoptionStatusPatch } from '../lib/adoptions';
+import { adoptionStatusPatch, isActiveAdoption } from '../lib/adoptions';
 import {
   assembleAdoptionProfile,
   animalTemplateVars } from
@@ -803,7 +803,7 @@ export function DemoWhiskerProvider({
     a.id === id ? { ...a, ...adoptionStatusPatch(a, status) } : a
     )
     ),
-    completeAdoption: (id, donationAmount) => {
+    completeAdoption: (id, donationAmount, notes) => {
       const adoption = adoptions.find((a) => a.id === id);
       if (!adoption) return;
       const ts = now();
@@ -814,7 +814,8 @@ export function DemoWhiskerProvider({
         ...a,
         status: 'completed',
         completed_at: ts,
-        ...(donationAmount != null ? { donation_amount: donationAmount } : {})
+        ...(donationAmount != null ? { donation_amount: donationAmount } : {}),
+        ...(notes !== undefined ? { notes: notes.trim() || undefined } : {})
       } :
       a
       )
@@ -900,7 +901,7 @@ export function DemoWhiskerProvider({
         );
       }
     },
-    cancelAdoption: (id, reason) => {
+    cancelAdoption: (id, reason, notes) => {
       const adoption = adoptions.find((a) => a.id === id);
       setAdoptions((prev) =>
       prev.map((a) =>
@@ -909,7 +910,8 @@ export function DemoWhiskerProvider({
         ...a,
         status: 'cancelled',
         cancelled_at: now(),
-        ...(reason && reason.trim() ? { notes: reason.trim() } : {})
+        cancelled_reason: reason,
+        ...(notes !== undefined ? { notes: notes.trim() || undefined } : {})
       } :
       a
       )
@@ -917,6 +919,37 @@ export function DemoWhiskerProvider({
       if (adoption) {
         updateAnimal(adoption.animal_id, { is_on_hold: false });
       }
+    },
+    reopenAdoption: (id) => {
+      const adoption = adoptions.find((a) => a.id === id);
+      if (!adoption || adoption.status !== 'cancelled') return;
+      const hasOtherActive = adoptions.some(
+        (a) =>
+        a.animal_id === adoption.animal_id &&
+        a.id !== id &&
+        isActiveAdoption(a)
+      );
+      if (hasOtherActive) return;
+      const status: Adoption['status'] = adoption.paperwork_completed_at ?
+      'ready_for_placement' :
+      adoption.paperwork_sent_at ?
+      'pending_paperwork' :
+      adoption.submitted_at ?
+      'application_submitted' :
+      'inquiry';
+      setAdoptions((prev) =>
+      prev.map((a) =>
+      a.id === id ?
+      {
+        ...a,
+        status,
+        cancelled_at: undefined,
+        cancelled_reason: undefined
+      } :
+      a
+      )
+      );
+      updateAnimal(adoption.animal_id, { is_on_hold: true });
     },
     returnAdoption: (id, input) => {
       const adoption = adoptions.find((a) => a.id === id);

@@ -175,7 +175,7 @@ export function StartAdoptionModal({
             placeholder="Search adoptable animals by name…" />
 
             <p className="text-xs text-text-secondary mt-1.5">
-              Only adoptable animals without an open adoption are shown.
+              Only adoptable animals without an open adoption inquiry are shown.
             </p>
           </div>
         }

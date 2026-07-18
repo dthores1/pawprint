@@ -8,16 +8,17 @@ import { Avatar } from '../components/ui/Avatar';
 import { useWhisker } from '../context/WhiskerContext';
 import { useCanManageAdoptions } from '../lib/useAnimalPermissions';
 import { animalDisplayName, formatDate, cn } from '../lib/utils';
+import { isInCare } from '../lib/animalStatus';
 import {
   ADOPTION_STATUS_LABELS,
+  adoptionOutcomeLabel,
   isActiveAdoption,
   formatDonation } from
 '../lib/adoptions';
 import { Adoption, AdoptionStatus } from '../types';
 import { StartAdoptionModal } from '../components/animals/StartAdoptionModal';
 import { UpdateAdoptionModal } from '../components/animals/UpdateAdoptionModal';
-import { CompleteAdoptionModal } from '../components/animals/CompleteAdoptionModal';
-import { CancelAdoptionModal } from '../components/animals/CancelAdoptionModal';
+import { CloseAdoptionModal } from '../components/animals/CloseAdoptionModal';
 import { AdoptionReturnModal } from '../components/animals/AdoptionReturnModal';
 import { track } from '../lib/analytics';
 
@@ -46,12 +47,13 @@ function matchesTab(a: Adoption, tab: AdoptionsTab): boolean {
 }
 
 type ModalState =
-{ kind: 'complete' | 'cancel' | 'update'; adoptionId: string } |
+{ kind: 'close' | 'update'; adoptionId: string } |
 { kind: 'return'; animalId: string } |
 null;
 
 export function Adoptions() {
-  const { adoptions, animalsIndex, peopleIndex, placements } = useWhisker();
+  const { adoptions, animalsIndex, peopleIndex, placements, reopenAdoption } =
+  useWhisker();
   const canManage = useCanManageAdoptions();
   const [searchParams, setSearchParams] = useSearchParams();
   const param = searchParams.get('tab');
@@ -164,7 +166,18 @@ export function Adoptions() {
                   // TODO - REMOVE IF YOU OPT TO NOT SHOW FOSTER COLUMN
                   // const foster = activeFosterFor(a.animal_id);
                   const donation = formatDonation(a.donation_amount);
-                  const readyToComplete = a.status === 'ready_for_placement';
+                  const active = isActiveAdoption(a);
+                  // Reopening needs the animal still in care with no other
+                  // in-progress adoption (one active per animal).
+                  const canReopen =
+                  a.status === 'cancelled' &&
+                  animal != null &&
+                  isInCare(animal.status) &&
+                  !adoptions.some(
+                    (other) =>
+                    other.animal_id === a.animal_id &&
+                    isActiveAdoption(other)
+                  );
                   return (
                     <tr key={a.id} className="hover:bg-background/60">
                       <td className="px-5 py-3">
@@ -207,7 +220,9 @@ export function Adoptions() {
                             adoptionStatusClasses(a.status)
                           )}>
 
-                          {ADOPTION_STATUS_LABELS[a.status]}
+                          {active ?
+                          ADOPTION_STATUS_LABELS[a.status] :
+                          adoptionOutcomeLabel(a)}
                         </span>
                       </td>
                       <td className="px-5 py-3 text-text-secondary whitespace-nowrap">
@@ -237,39 +252,41 @@ export function Adoptions() {
                               View
                             </Link>
                           }
-                          {canManage && isActiveAdoption(a) &&
+                          {canManage && active &&
                           <>
-                              {readyToComplete ?
-                            <button
-                              type="button"
-                              onClick={() =>
-                              openModal({ kind: 'complete', adoptionId: a.id })
-                              }
-                              className="text-xs font-medium text-[#3E7B52] hover:underline">
-
-                                  Complete
-                                </button> :
-
-                            <button
+                              <button
                               type="button"
                               onClick={() =>
                               openModal({ kind: 'update', adoptionId: a.id })
                               }
                               className="text-xs font-medium text-primary hover:underline">
 
-                                  Update
-                                </button>
-                            }
+                                Update
+                              </button>
                               <button
                               type="button"
                               onClick={() =>
-                              openModal({ kind: 'cancel', adoptionId: a.id })
+                              openModal({ kind: 'close', adoptionId: a.id })
                               }
-                              className="text-xs font-medium text-[#9B3A3A] hover:underline">
+                              className="text-xs font-medium text-[#3E7B52] hover:underline">
 
-                                Cancel
+                                Close
                               </button>
                             </>
+                          }
+                          {canManage && canReopen &&
+                          <button
+                            type="button"
+                            onClick={() => {
+                              reopenAdoption(a.id);
+                              track('adoption_reopened', {
+                                animal_id: a.animal_id
+                              });
+                            }}
+                            className="text-xs font-medium text-primary hover:underline">
+
+                              Reopen
+                            </button>
                           }
                           {canManage && a.status === 'completed' &&
                           <button
@@ -302,14 +319,9 @@ export function Adoptions() {
         adoptionId={modal?.kind === 'update' ? modal.adoptionId : ''}
         onClose={() => setModal(null)} />
 
-      <CompleteAdoptionModal
-        isOpen={modal?.kind === 'complete'}
-        adoptionId={modal?.kind === 'complete' ? modal.adoptionId : ''}
-        onClose={() => setModal(null)} />
-
-      <CancelAdoptionModal
-        isOpen={modal?.kind === 'cancel'}
-        adoptionId={modal?.kind === 'cancel' ? modal.adoptionId : ''}
+      <CloseAdoptionModal
+        isOpen={modal?.kind === 'close'}
+        adoptionId={modal?.kind === 'close' ? modal.adoptionId : ''}
         onClose={() => setModal(null)} />
 
       <AdoptionReturnModal

@@ -1,4 +1,9 @@
-import { Adoption, AdoptionStatus, AdoptionReturnReason } from '../types';
+import {
+  Adoption,
+  AdoptionStatus,
+  AdoptionCancelReason,
+  AdoptionReturnReason } from
+'../types';
 
 // The linear in-progress flow (terminal 'completed'/'cancelled' are reached via
 // dedicated actions, not the regular advance dropdown).
@@ -20,6 +25,36 @@ export const ADOPTION_STATUS_LABELS: Record<AdoptionStatus, string> = {
   cancelled: 'Cancelled',
   returned: 'Returned'
 };
+
+// Unsuccessful-close outcomes for the Close Adoption dialog. Order doubles as
+// the dropdown order ('adopted' — the successful outcome — is offered first,
+// separately, since it maps to status='completed' rather than a cancel reason).
+export const ADOPTION_CANCEL_REASON_LABELS: Record<
+  AdoptionCancelReason,
+  string> =
+{
+  applicant_withdrew: 'Applicant Withdrew',
+  application_rejected: 'Application Rejected',
+  no_response: 'No Response / Ghosted',
+  duplicate_application: 'Duplicate Application',
+  other: 'Other'
+};
+
+export const ADOPTION_CANCEL_REASONS = Object.keys(
+  ADOPTION_CANCEL_REASON_LABELS
+) as AdoptionCancelReason[];
+
+/** The final outcome shown once an adoption is closed (badge/card copy). */
+export function adoptionOutcomeLabel(a: Adoption): string {
+  if (a.status === 'completed') return 'Adopted';
+  if (a.status === 'returned') return 'Returned';
+  if (a.status === 'cancelled') {
+    return a.cancelled_reason ?
+    ADOPTION_CANCEL_REASON_LABELS[a.cancelled_reason] :
+    'Cancelled';
+  }
+  return ADOPTION_STATUS_LABELS[a.status];
+}
 
 // Adopter-facing reasons for a return. Order doubles as the dropdown order.
 export const ADOPTION_RETURN_REASON_LABELS: Record<
@@ -82,7 +117,13 @@ a: Adoption)
   { label: 'Paperwork sent', at: a.paperwork_sent_at },
   { label: 'Paperwork completed', at: a.paperwork_completed_at },
   { label: 'Completed', at: a.completed_at },
-  { label: 'Cancelled', at: a.cancelled_at },
+  // "Close Adoption" is the action; the outcome explains why it was closed.
+  {
+    label: a.cancelled_reason ?
+    `Closed – ${ADOPTION_CANCEL_REASON_LABELS[a.cancelled_reason]}` :
+    'Closed',
+    at: a.cancelled_at
+  },
   { label: 'Returned', at: a.returned_at }].
   filter((m) => m.at);
 }

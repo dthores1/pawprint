@@ -13,6 +13,7 @@ import { PlaceAnimalModal } from '../components/animals/PlaceAnimalModal';
 import { StartAdoptionModal } from '../components/animals/StartAdoptionModal';
 import { AdoptionReturnModal } from '../components/animals/AdoptionReturnModal';
 import { AdoptionPanel } from '../components/animals/AdoptionPanel';
+import { AdoptionHistoryCard } from '../components/animals/AdoptionHistoryCard';
 import { ActionNeededCallout } from '../components/animals/ActionNeededCallout';
 import { RelationshipsCard } from '../components/animals/RelationshipsCard';
 import { ExternalListingsCard } from '../components/animals/ExternalListingsCard';
@@ -69,6 +70,7 @@ import { track } from '../lib/analytics';
 import { PROCEDURE_TYPE_LABELS } from '../lib/medicalOptions';
 import { speciesIconByName } from '../lib/speciesIcons';
 import {
+  ADOPTION_CANCEL_REASON_LABELS,
   ADOPTION_RETURN_REASON_LABELS,
   isActiveAdoption } from
 '../lib/adoptions';
@@ -299,6 +301,11 @@ export function AnimalProfile() {
   // At most one in-progress adoption per animal (terminal ones — completed,
   // cancelled, returned — are history).
   const activeAdoption = animalAdoptions.find(isActiveAdoption);
+  // Closed (terminal) adoptions render as the compact history accordion,
+  // oldest first so the rows read chronologically.
+  const closedAdoptions = animalAdoptions.
+  filter((a) => !isActiveAdoption(a)).
+  sort((a, b) => a.created_at.localeCompare(b.created_at));
   const animalMedical = medicalRecords.filter((m) => m.animal_id === animal.id);
   // Soonest-first by due date (records missing a due date sort last).
   const byDueDate = (
@@ -570,8 +577,13 @@ export function AnimalProfile() {
       date: ad.cancelled_at.split('T')[0],
       ts: ad.cancelled_at,
       type: 'adoption' as const,
-      title: 'Adoption cancelled',
-      description: ad.notes ?? '',
+      title: 'Adoption closed',
+      description: [
+      ad.cancelled_reason ?
+      `Outcome: ${ADOPTION_CANCEL_REASON_LABELS[ad.cancelled_reason]}.` :
+      '',
+      ad.notes ?? ''].
+      filter(Boolean).join(' '),
       icon: CircleIcon,
       color: 'bg-background text-text-secondary',
       adoption: { id: ad.id }
@@ -1108,6 +1120,13 @@ export function AnimalProfile() {
         canManage={canCollaborate} />
 
       {activeAdoption && <AdoptionPanel adoptionId={activeAdoption.id} canManage={canManageAdoptions} />}
+
+      {closedAdoptions.length > 0 &&
+      <AdoptionHistoryCard
+        adoptions={closedAdoptions}
+        canManage={canManageAdoptions}
+        allowReopen={!activeAdoption && isInCare(animal.status)} />
+      }
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Tabs (Timeline / Medical History) */}
