@@ -11,8 +11,11 @@ import { animalDisplayName, formatDate, cn } from '../lib/utils';
 import { isInCare } from '../lib/animalStatus';
 import {
   ADOPTION_STATUS_LABELS,
+  ADOPTION_LOST_STATUSES,
+  adoptionAnimalIds,
   adoptionOutcomeLabel,
   isActiveAdoption,
+  isLostAdoption,
   formatDonation } from
 '../lib/adoptions';
 import { Adoption, AdoptionStatus } from '../types';
@@ -33,7 +36,8 @@ const TABS: { key: AdoptionsTab; label: string }[] = [
 function adoptionStatusClasses(status: AdoptionStatus): string {
   if (status === 'completed') return 'bg-[#DDEFE2] text-[#3E7B52]';
   if (status === 'returned') return 'bg-[#E8DEEC] text-[#6E4E80]';
-  if (status === 'cancelled') return 'bg-[#E0E0E0] text-[#555555]';
+  if (ADOPTION_LOST_STATUSES.includes(status))
+  return 'bg-[#E0E0E0] text-[#555555]';
   return 'bg-[#F3E4D7] text-[#B8632E]'; // any in-progress status
 }
 
@@ -162,6 +166,10 @@ export function Adoptions() {
               <tbody className="divide-y divide-border">
                 {rows.map((a) => {
                   const animal = animalsIndex.find((x) => x.id === a.animal_id);
+                  // Bonded-pair records cover several animals; list them all.
+                  const rowAnimals = adoptionAnimalIds(a).
+                  map((id) => animalsIndex.find((x) => x.id === id)).
+                  filter((x): x is NonNullable<typeof x> => !!x);
                   const adopter = peopleIndex.find((x) => x.id === a.adopter_id);
                   // TODO - REMOVE IF YOU OPT TO NOT SHOW FOSTER COLUMN
                   // const foster = activeFosterFor(a.animal_id);
@@ -170,7 +178,7 @@ export function Adoptions() {
                   // Reopening needs the animal still in care with no other
                   // in-progress adoption (one active per animal).
                   const canReopen =
-                  a.status === 'cancelled' &&
+                  isLostAdoption(a) &&
                   animal != null &&
                   isInCare(animal.status) &&
                   !adoptions.some(
@@ -181,22 +189,27 @@ export function Adoptions() {
                   return (
                     <tr key={a.id} className="hover:bg-background/60">
                       <td className="px-5 py-3">
-                        {animal ?
-                        <Link
-                          to={`/animals/${animal.id}`}
-                          className="flex items-center gap-2.5 min-w-0 group">
+                        {rowAnimals.length > 0 ?
+                        <div className="space-y-1">
+                            {rowAnimals.map((an) =>
+                          <Link
+                            key={an.id}
+                            to={`/animals/${an.id}`}
+                            className="flex items-center gap-2.5 min-w-0 group">
 
-                            <Avatar
-                            name={animalDisplayName(animal)}
-                            src={animal.primary_photo_url}
-                            type="animal"
-                            species={animal.species}
-                            size="sm" />
+                                <Avatar
+                              name={animalDisplayName(an)}
+                              src={an.primary_photo_url}
+                              type="animal"
+                              species={an.species}
+                              size="sm" />
 
-                            <span className="font-medium text-text-primary group-hover:text-primary truncate">
-                              {animalDisplayName(animal)}
-                            </span>
-                          </Link> :
+                                <span className="font-medium text-text-primary group-hover:text-primary truncate">
+                                  {animalDisplayName(an)}
+                                </span>
+                              </Link>
+                          )}
+                          </div> :
 
                         <span className="text-text-secondary">Unknown</span>
                         }

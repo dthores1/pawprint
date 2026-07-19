@@ -16,16 +16,20 @@ import {
 import { formatDate } from '../../lib/utils';
 import { Adoption } from '../../types';
 import {
+  adoptionAnimalIds,
   adoptionMilestones,
   adoptionOutcomeLabel,
+  isLostAdoption,
   formatDonation } from
 '../../lib/adoptions';
+import { animalDisplayName } from '../../lib/utils';
 import { track } from '../../lib/analytics';
 
 interface AdoptionHistoryCardProps {
   /** Closed (terminal) adoptions only, oldest first. */
   adoptions: Adoption[];
-  /** Whether the viewer may reopen a cancelled adoption. Defaults to true. */
+  /** Whether the viewer may reopen a lost (unsuccessfully closed) adoption.
+   *  Defaults to true. */
   canManage?: boolean;
   /** Reopening only makes sense while the animal is still in care with no
    *  other adoption in progress — the caller knows both. */
@@ -53,13 +57,13 @@ export function AdoptionHistoryCard({
   canManage = true,
   allowReopen = false
 }: AdoptionHistoryCardProps) {
-  const { peopleIndex, reopenAdoption } = useWhisker();
+  const { peopleIndex, animalsIndex, reopenAdoption } = useWhisker();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [archiving, setArchiving] = useState<
     {id: string;adopterName: string;} | null>(
     null);
-  // Archiving is admin-gated; the server only allows it on cancelled rows.
+  // Archiving is admin-gated; the server only allows it on lost rows.
   const canArchive = useCanArchive('adoptions', { id: 'na' });
 
   if (adoptions.length === 0) return null;
@@ -83,8 +87,8 @@ export function AdoptionHistoryCard({
           const donation = formatDonation(a.donation_amount);
           const Chevron = expanded ? ChevronDownIcon : ChevronRightIcon;
           const canReopenRow =
-          canManage && allowReopen && a.status === 'cancelled';
-          const canArchiveRow = canArchive && a.status === 'cancelled';
+          canManage && allowReopen && isLostAdoption(a);
+          const canArchiveRow = canArchive && isLostAdoption(a);
           const hasMenu = canReopenRow || canArchiveRow;
           return (
             <div key={a.id}>
@@ -172,6 +176,18 @@ export function AdoptionHistoryCard({
 
               {expanded &&
               <div className="px-6 pb-4 pl-[3.25rem] space-y-3">
+                  {adoptionAnimalIds(a).length > 1 &&
+                <p className="text-sm text-text-secondary">
+                      Bonded pair — one application for{' '}
+                      <span className="text-text-primary font-medium">
+                        {adoptionAnimalIds(a).
+                    map((id) => animalsIndex.find((an) => an.id === id)).
+                    filter(Boolean).
+                    map((an) => animalDisplayName(an!)).
+                    join(' & ')}
+                      </span>
+                    </p>
+                }
                   {(adopter || donation) &&
                 <p className="text-sm">
                       {donation &&
@@ -225,7 +241,7 @@ export function AdoptionHistoryCard({
         table="adoptions"
         id={archiving.id}
         typeLabel="adoption"
-        entityLabel={`cancelled adoption (${archiving.adopterName})`} />
+        entityLabel={`closed adoption (${archiving.adopterName})`} />
       }
     </Card>);
 

@@ -26,6 +26,7 @@ import {
   hasStatedCapacity } from
 '../../lib/utils';
 import { isInCare } from '../../lib/animalStatus';
+import { bondedPartnerIds } from '../../lib/bondedPairs';
 import { litterMembers, litterLabel } from '../../lib/litters';
 import { useTypeaheadKeyboard } from '../../lib/useTypeaheadKeyboard';
 import { track } from '../../lib/analytics';
@@ -61,6 +62,7 @@ export function PlaceAnimalModal({
     animalsIndex,
     litters,
     breeds,
+    relationships,
     placeAnimal,
     reassignFoster
   } = useWhisker();
@@ -208,6 +210,21 @@ export function PlaceAnimalModal({
   undefined;
   const isReassign = mode === 'animal' && !!activePlacement;
 
+  // Bonded pairs are one placement unit: placing/moving one normally brings
+  // the partner to the same foster. Placing separately is an explicit,
+  // discouraged exception (hospitalization etc.) via the checkbox below.
+  const [placeSeparately, setPlaceSeparately] = useState(false);
+  const placedAnimalId =
+  mode === 'animal' ? animalId : mode === 'foster' ? selectedId : undefined;
+  const placedAnimalForBond = placedAnimalId ?
+  animalsIndex.find((a) => a.id === placedAnimalId) :
+  undefined;
+  const bondedCoPlace = placedAnimalId ?
+  bondedPartnerIds(placedAnimalId, relationships).
+  map((id) => animalsIndex.find((a) => a.id === id)).
+  filter((a): a is NonNullable<typeof a> => !!a && isInCare(a.status)) :
+  [];
+
   const getActivePlacementsCount = (fId: string) =>
   placements.filter(
     (p) => p.person_id === fId && p.placement_status === 'active'
@@ -288,7 +305,7 @@ export function PlaceAnimalModal({
     mode === 'foster' && prefs.length > 0 && !showAllSpecies;
     return animals.
     filter((a) => !placedIds.has(a.id)).
-    filter((a) => a.status !== 'adopted' && a.status !== 'deceased').
+    filter((a) => isInCare(a.status)).
     filter((a) => !filterBySpecies || (prefs as string[]).includes(a.species)).
     filter((a) => {
       if (!q) return true;
@@ -327,6 +344,7 @@ export function PlaceAnimalModal({
       setPlacementPurpose('general_foster');
       setDateError('');
       setSubmitting(false);
+      setPlaceSeparately(false);
     }
   }, [isOpen]);
   // Litter mode: every eligible member starts selected — placing the whole
@@ -372,7 +390,7 @@ export function PlaceAnimalModal({
     }
     if (mode === 'foster') {
       if (!anchorFoster) return;
-      placeAnimal(
+      await placeAnimal(
         selectedId,
         anchorFoster.id,
         startDate,
@@ -384,7 +402,7 @@ export function PlaceAnimalModal({
     } else {
       if (!anchorAnimal) return;
       if (isReassign) {
-        reassignFoster(
+        await reassignFoster(
           anchorAnimal.id,
           selectedId,
           startDate,
@@ -398,7 +416,7 @@ export function PlaceAnimalModal({
           reassignment: true
         });
       } else {
-        placeAnimal(
+        await placeAnimal(
           anchorAnimal.id,
           selectedId,
           startDate,
@@ -409,6 +427,47 @@ export function PlaceAnimalModal({
         track('animal_placed', {
           animal_id: anchorAnimal.id,
           reassignment: false
+        });
+      }
+    }
+    // Bonded partner rides along to the same foster (unless explicitly
+    // placed separately): fresh placement if unplaced, reassignment if they're
+    // with someone else, no-op if already with the target foster. Sequential —
+    // parallel calls would race the foster-role grant. (Litter mode returned
+    // above.)
+    if (!placeSeparately) {
+      const targetFosterId =
+      mode === 'foster' ? anchorFoster!.id : selectedId;
+      for (const partner of bondedCoPlace) {
+        const partnerActive = placements.find(
+          (p) =>
+          p.animal_id === partner.id && p.placement_status === 'active'
+        );
+        if (partnerActive?.person_id === targetFosterId) continue;
+        if (partnerActive) {
+          await reassignFoster(
+            partner.id,
+            targetFosterId,
+            startDate,
+            'Moved with bonded partner',
+            notes.trim() || undefined,
+            expectedEnd,
+            placementPurpose
+          );
+        } else {
+          await placeAnimal(
+            partner.id,
+            targetFosterId,
+            startDate,
+            notes,
+            expectedEnd,
+            placementPurpose
+          );
+        }
+        track('animal_placed', {
+          animal_id: partner.id,
+          reassignment: !!partnerActive,
+          bonded: true
         });
       }
     }
@@ -979,6 +1038,38 @@ export function PlaceAnimalModal({
             </p>
           }
         </div>
+
+        {/* Bonded pairs are one placement unit — both go to the same foster
+            unless the user explicitly opts into a separate placement. */}
+        {mode !== 'litter' && placedAnimalForBond && bondedCoPlace.length > 0 &&
+        <div className="p-4 rounded-xl bg-[#F3E4D7]/50 border border-[#EAD3BC] text-sm space-y-2">
+            <p className="font-medium text-text-primary">
+              {animalDisplayName(placedAnimalForBond)} is bonded with{' '}
+              {bondedCoPlace.map((p) => animalDisplayName(p)).join(' & ')}.
+            </p>
+            {!placeSeparately ?
+          <p className="text-text-secondary leading-relaxed">
+                Bonded pairs stay together — both animals will be placed with
+                the same foster.
+              </p> :
+
+          <p className="text-[#9B3A3A] leading-relaxed">
+                Bonded animals are normally placed together. Only place{' '}
+                {animalDisplayName(placedAnimalForBond)} separately for a
+                temporary exception (e.g. hospitalization).
+              </p>
+          }
+            <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
+              <input
+              type="checkbox"
+              checked={placeSeparately}
+              onChange={(e) => setPlaceSeparately(e.target.checked)}
+              className="w-3.5 h-3.5 rounded text-primary focus:ring-primary" />
+              Place {animalDisplayName(placedAnimalForBond)} separately (not
+              recommended)
+            </label>
+          </div>
+        }
 
         {/* Start date + (for temporary purposes) an expected end date */}
         <div

@@ -48,7 +48,9 @@ const STATUS_LABEL: Record<AnimalStatus, string> = {
   adopted: 'Adopted',
   released: 'Released',
   hospice: 'Hospice',
-  deceased: 'Deceased'
+  deceased: 'Deceased',
+  transferred: 'Transferred',
+  returned_to_owner: 'Returned to Owner'
 };
 
 // Palette tuned to the existing status tokens so charts blend with the rest.
@@ -59,7 +61,9 @@ const STATUS_COLORS: Record<AnimalStatus, string> = {
   adopted: '#B8632E',
   released: '#4F7A70',
   hospice: '#7C4A3D',
-  deceased: '#555555'
+  deceased: '#555555',
+  transferred: '#356A9A',
+  returned_to_owner: '#6E4E80'
 };
 const ADOPTION_COLORS: Record<string, string> = {
   inquiry: '#6B6B6B',
@@ -68,7 +72,10 @@ const ADOPTION_COLORS: Record<string, string> = {
   pending_paperwork: '#B4641E',
   ready_for_placement: '#3E7B52',
   completed: '#B8632E',
-  cancelled: '#9B3A3A',
+  rejected: '#9B3A3A',
+  cancelled_by_applicant: '#6E4E80',
+  duplicate: '#4F7A70',
+  cancelled: '#555555',
   returned: '#B5677E'
 };
 const NEUTRAL_BARS = ['#3E7B52', '#356A9A', '#B8632E', '#A36B00', '#6E4E80'];

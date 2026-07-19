@@ -41,6 +41,12 @@ const WRITABLE_COLUMNS = [
 'date_of_death',
 'cause_of_death',
 'death_notes',
+'transferred_to',
+'transferred_at',
+'transfer_notes',
+'returned_to_owner_name',
+'returned_to_owner_at',
+'returned_to_owner_notes',
 'known_to_be_deceased'] as
 const;
 
@@ -54,7 +60,9 @@ const DATE_COLUMNS = new Set([
 'intake_date',
 'adopted_at',
 'released_at',
-'date_of_death']
+'date_of_death',
+'transferred_at',
+'returned_to_owner_at']
 );
 
 // Keep the age-estimate columns consistent with birthdate_source: they're only
@@ -107,6 +115,12 @@ export function rowToAnimal(r: any): Animal {
     date_of_death: r.date_of_death ?? undefined,
     cause_of_death: r.cause_of_death ?? undefined,
     death_notes: r.death_notes ?? undefined,
+    transferred_to: r.transferred_to ?? undefined,
+    transferred_at: r.transferred_at ?? undefined,
+    transfer_notes: r.transfer_notes ?? undefined,
+    returned_to_owner_name: r.returned_to_owner_name ?? undefined,
+    returned_to_owner_at: r.returned_to_owner_at ?? undefined,
+    returned_to_owner_notes: r.returned_to_owner_notes ?? undefined,
     known_to_be_deceased: r.known_to_be_deceased ?? false,
     internal_notes: r.internal_notes ?? undefined,
     birthdate_source: r.birthdate_source ?? 'estimated_birthdate',

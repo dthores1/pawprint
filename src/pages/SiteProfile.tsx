@@ -30,6 +30,7 @@ import {
 import { cn, animalDisplayName, formatDateLong } from '../lib/utils';
 import { track } from '../lib/analytics';
 import { SITE_STATUS_META, siteStatusLabel } from '../lib/siteStatus';
+import { isInCare } from '../lib/animalStatus';
 import { useCanManageSites } from '../lib/useSitePermissions';
 import { useAuth } from '../context/AuthContext';
 import { useUserLocation, haversineMiles, formatDistance } from '../lib/geo';
@@ -93,9 +94,7 @@ export function SiteProfile() {
   const total = linkedAnimals.length;
   const released = linkedAnimals.filter((a) => a.status === 'released').length;
   const adopted = linkedAnimals.filter((a) => a.status === 'adopted').length;
-  const stillInCare = linkedAnimals.filter(
-    (a) => !['released', 'adopted', 'deceased'].includes(a.status)
-  ).length;
+  const stillInCare = linkedAnimals.filter((a) => isInCare(a.status)).length;
 
   const dist =
   location && site.address?.latitude != null && site.address?.longitude != null ?

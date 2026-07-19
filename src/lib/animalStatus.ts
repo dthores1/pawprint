@@ -16,7 +16,9 @@ export const IN_CARE_STATUSES: AnimalStatus[] = [
 export const HISTORICAL_STATUSES: AnimalStatus[] = [
 'adopted',
 'released',
-'deceased'];
+'deceased',
+'transferred',
+'returned_to_owner'];
 
 
 export function isInCare(status: AnimalStatus): boolean {
@@ -32,5 +34,7 @@ export const STATUS_LABELS: Record<AnimalStatus, string> = {
   adopted: 'Adopted',
   released: 'Released',
   hospice: 'Hospice',
-  deceased: 'Deceased'
+  deceased: 'Deceased',
+  transferred: 'Transferred',
+  returned_to_owner: 'Returned to Owner'
 };

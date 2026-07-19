@@ -10,7 +10,9 @@ export type AnimalStatus =
 'adopted' |
 'released' |
 'hospice' |
-'deceased';
+'deceased' |
+'transferred' |
+'returned_to_owner';
 
 export type Priority = 'normal' | 'needs_attention' | 'urgent' | 'critical';
 
@@ -144,6 +146,15 @@ export interface Animal {
   date_of_death?: string;
   cause_of_death?: string;
   death_notes?: string;
+  /** Transferred-outcome details, set when status → transferred. */
+  transferred_to?: string;
+  transferred_at?: string;
+  transfer_notes?: string;
+  /** Returned-to-owner outcome details, set when status → returned_to_owner.
+   *  The owner is free text (not necessarily a contact). */
+  returned_to_owner_name?: string;
+  returned_to_owner_at?: string;
+  returned_to_owner_notes?: string;
   /**
    * The animal is known to have died. True for every status='deceased' animal
    * (in-care death), and also for adopted animals that later died in their
@@ -647,17 +658,60 @@ export type AdoptionStatus =
 'pending_paperwork' |
 'ready_for_placement' |
 'completed' |
-'cancelled' |
+// Unsuccessful ("lost") closes — distinct statuses so reports don't compress
+// every lost application into an org-sounding "Cancelled":
+'rejected' | // the org declined the application
+'cancelled_by_applicant' | // the applicant withdrew / stopped responding
+'duplicate' | // duplicate application
+'cancelled' | // org-side/other closes, mistake corrections, legacy rows
 'returned';
 
-// Why an adoption was closed unsuccessfully (status='cancelled'). Recorded by
-// the Close Adoption dialog; older cancelled rows predate the field.
-export type AdoptionCancelReason =
+/** The unsuccessful-close statuses ("closed lost"). */
+export type AdoptionLostStatus =
+'rejected' |
+'cancelled_by_applicant' |
+'duplicate' |
+'cancelled';
+
+// Finer-grained reason for a lost close, stored in `cancelled_reason`.
+// The vocabulary depends on the status (see src/lib/adoptions.ts).
+export type AdoptionRejectedReason =
+'not_good_fit' |
+'housing_restrictions' |
+'pet_compatibility' |
+'care_requirements' |
+'home_visit_unsuccessful' |
+'incomplete_application' |
+'unable_to_verify' |
+'no_response' |
+'outside_service_area' |
+'other';
+
+export type AdoptionApplicantCancelReason =
+'no_longer_interested' |
+'adopted_elsewhere' |
+'circumstances_changed' |
+'care_requirements' |
+'scheduling' |
+'found_another_pet' |
+'moving' |
+'other';
+
+/** Close-outcome slugs from the first Close Adoption iteration — still on
+ *  rows closed before the lost-status split (migration 0105). */
+export type LegacyAdoptionCancelReason =
 'applicant_withdrew' |
 'application_rejected' |
 'no_response' |
-'duplicate_application' |
-'other';
+'duplicate_application';
+
+export type AdoptionCancelReason =
+AdoptionRejectedReason |
+AdoptionApplicantCancelReason |
+LegacyAdoptionCancelReason |
+// System-recorded generic-cancel reason: an animal on the application died
+// while it was in progress (status 'cancelled', not offered in the dialog).
+'deceased';
 
 // Why an adopter returned an animal. Required (DB CHECK) when status='returned'.
 export type AdoptionReturnReason =
@@ -672,7 +726,14 @@ export type AdoptionReturnReason =
 'other';
 export interface Adoption {
   id: string;
+  /** The primary animal (back-compat; always also present in animal_ids). */
   animal_id: string;
+  /**
+   * Every animal on the record (primary included) — a Bonded Pair moves
+   * through ONE application (adoption_animals child table, migration 0107).
+   * Optional for older in-memory rows; resolve via adoptionAnimalIds().
+   */
+  animal_ids?: string[];
   /** Optional: direct (historical) adoptions may have an unknown adopter. */
   adopter_id?: string;
   status: AdoptionStatus;

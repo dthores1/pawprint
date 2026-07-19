@@ -15,6 +15,7 @@ import {
 import { animalDisplayName, formatDate } from '../../lib/utils';
 import {
   ADOPTION_STATUS_LABELS,
+  adoptionAnimalIds,
   adoptionMilestones,
   formatDonation,
   isActiveAdoption } from
@@ -32,7 +33,7 @@ interface AdoptionPanelProps {
 // adopter, status, milestones, and the workflow actions (update / close).
 // Closed adoptions render in the compact AdoptionHistoryCard instead.
 export function AdoptionPanel({ adoptionId, canManage = true }: AdoptionPanelProps) {
-  const { adoptions, people, animals } = useWhisker();
+  const { adoptions, people, animals, animalsIndex } = useWhisker();
   const [isUpdateOpen, setIsUpdateOpen] = useState(false);
   const [isCloseOpen, setIsCloseOpen] = useState(false);
 
@@ -40,6 +41,10 @@ export function AdoptionPanel({ adoptionId, canManage = true }: AdoptionPanelPro
   if (!adoption || !isActiveAdoption(adoption)) return null;
   const adopter = people.find((p) => p.id === adoption.adopter_id);
   const animal = animals.find((a) => a.id === adoption.animal_id);
+  // A bonded-pair record covers more than one animal — name them all.
+  const recordAnimals = adoptionAnimalIds(adoption).
+  map((id) => animalsIndex.find((a) => a.id === id)).
+  filter((a): a is NonNullable<typeof a> => !!a);
   const milestones = adoptionMilestones(adoption);
   const donation = formatDonation(adoption.donation_amount);
   const readyToComplete = adoption.status === 'ready_for_placement';
@@ -57,6 +62,26 @@ export function AdoptionPanel({ adoptionId, canManage = true }: AdoptionPanelPro
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+        {recordAnimals.length > 1 &&
+        <div className="sm:col-span-2">
+            <p className="text-sm text-text-secondary">
+              Animals (bonded — adopted together)
+            </p>
+            <p className="font-medium text-text-primary">
+              {recordAnimals.map((a, i) =>
+            <React.Fragment key={a.id}>
+                  {i > 0 && ' & '}
+                  <Link
+                to={`/animals/${a.id}`}
+                className="text-primary hover:underline">
+
+                    {animalDisplayName(a)}
+                  </Link>
+                </React.Fragment>
+            )}
+            </p>
+          </div>
+        }
         <div>
           <p className="text-sm text-text-secondary">Adopter</p>
           {adopter ?

@@ -24,9 +24,12 @@ import {
   ADOPTION_STATUS_LABELS,
   ADOPTION_RETURN_REASONS,
   ADOPTION_RETURN_REASON_LABELS,
+  adoptionCoversAnimal,
   isActiveAdoption } from
 '../../lib/adoptions';
 import { legacyRoleFor } from '../../lib/peopleApi';
+import { bondedPartnerIds } from '../../lib/bondedPairs';
+import { isInCare, STATUS_LABELS } from '../../lib/animalStatus';
 import { animalDisplayName } from '../../lib/utils';
 import { breedFieldLabel } from '../../lib/speciesIcons';
 import { enabledSpeciesList } from '../../lib/orgCatalog';
@@ -91,9 +94,14 @@ export function ChangeStatusModal({
     addActionItem,
     updateActionItem,
     adoptions,
+    placements,
+    endPlacement,
+    relationships,
+    animalsIndex,
     peopleIndex,
     addPerson,
     completeAdoption,
+    cancelAdoption,
     recordDirectAdoption,
     returnAdoption,
     recordAdoptionReturn,
@@ -169,6 +177,16 @@ export function ChangeStatusModal({
   const [dateOfDeath, setDateOfDeath] = useState('');
   const [causeOfDeath, setCauseOfDeath] = useState('');
   const [deathNotes, setDeathNotes] = useState('');
+  // Transferred-outcome details (moved to another rescue/shelter).
+  const [transferredTo, setTransferredTo] = useState('');
+  const [transferredToError, setTransferredToError] = useState<
+    string | undefined>();
+  const [transferredAt, setTransferredAt] = useState('');
+  const [transferNotes, setTransferNotes] = useState('');
+  // Returned-to-owner outcome details (owner is free text, not a contact).
+  const [rtoOwnerName, setRtoOwnerName] = useState('');
+  const [rtoAt, setRtoAt] = useState('');
+  const [rtoNotes, setRtoNotes] = useState('');
   const [intakeDateError, setIntakeDateError] = useState<string | undefined>();
   const [reason, setReason] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -242,6 +260,13 @@ export function ChangeStatusModal({
     setDateOfDeath(animal.date_of_death ?? '');
     setCauseOfDeath(animal.cause_of_death ?? '');
     setDeathNotes(animal.death_notes ?? '');
+    setTransferredTo(animal.transferred_to ?? '');
+    setTransferredToError(undefined);
+    setTransferredAt(animal.transferred_at ?? '');
+    setTransferNotes(animal.transfer_notes ?? '');
+    setRtoOwnerName(animal.returned_to_owner_name ?? '');
+    setRtoAt(animal.returned_to_owner_at ?? '');
+    setRtoNotes(animal.returned_to_owner_notes ?? '');
     setAdoptionDate('');
     setAdoptionDateError(undefined);
     setAdopterId('');
@@ -286,6 +311,8 @@ export function ChangeStatusModal({
     if (status === 'released') setReleasedAt((cur) => cur || today);
     if (status === 'deceased') setDateOfDeath((cur) => cur || today);
     if (status === 'adopted') setAdoptionDate((cur) => cur || today);
+    if (status === 'transferred') setTransferredAt((cur) => cur || today);
+    if (status === 'returned_to_owner') setRtoAt((cur) => cur || today);
     // Leaving Adopted: prefill the return date the same way.
     if (animal?.status === 'adopted' && status !== 'adopted') {
       setReturnDate((cur) => cur || today);
@@ -316,7 +343,9 @@ export function ChangeStatusModal({
   // already-adopted animal doesn't re-trigger the flow.
   const enteringAdopted = status === 'adopted' && animal.status !== 'adopted';
   const activeAdoption = enteringAdopted ?
-  adoptions.find((a) => a.animal_id === animalId && isActiveAdoption(a)) :
+  adoptions.find(
+    (a) => adoptionCoversAnimal(a, animalId) && isActiveAdoption(a)
+  ) :
   undefined;
   const activeAdopter = activeAdoption?.adopter_id ?
   peopleIndex.find((p) => p.id === activeAdoption.adopter_id) :
@@ -341,7 +370,9 @@ export function ChangeStatusModal({
   animal.status === 'adopted' && status !== 'adopted' && !afterAdoptionDeath;
   const returnableAdoption = leavingAdopted ?
   adoptions.
-  filter((a) => a.animal_id === animalId && a.status === 'completed').
+  filter(
+    (a) => adoptionCoversAnimal(a, animalId) && a.status === 'completed'
+  ).
   sort((a, b) =>
   (b.completed_at ?? b.created_at).localeCompare(
     a.completed_at ?? a.created_at
@@ -351,6 +382,67 @@ export function ChangeStatusModal({
   const adoptedBy = animal.adopted_by_id ?
   peopleIndex.find((p) => p.id === animal.adopted_by_id) :
   undefined;
+
+  // Bonded pairs are adopted together, so becoming Adoptable syncs the
+  // partner (still-in-care, not-yet-adoptable partners only), and a direct
+  // adoption includes the partner on the same record. Pre-adoption
+  // operational statuses (intake/medical/etc.) stay independent.
+  const bondedPartners = bondedPartnerIds(animalId, relationships).
+  map((id) => animalsIndex.find((a) => a.id === id)).
+  filter((a): a is NonNullable<typeof a> => !!a);
+  const enteringAdoptable =
+  status === 'adoptable' && animal.status !== 'adoptable';
+  const partnersToMakeAdoptable = enteringAdoptable ?
+  bondedPartners.filter(
+    (p) => p.status !== 'adoptable' && isInCare(p.status)
+  ) :
+  [];
+  const partnersForDirectAdoption =
+  enteringAdopted && !activeAdoption ?
+  bondedPartners.filter((p) => p.status !== 'adopted') :
+  [];
+  // The inverse of the adoptable sync: leaving Adoptable for another in-care
+  // status pulls the adoptable partner off the market too — a bonded pair
+  // can't be half-available. (Terminal outcomes are individual and don't
+  // cascade; a death is handled below instead.)
+  const leavingAdoptableInCare =
+  animal.status === 'adoptable' && isInCare(status) && status !== 'adoptable';
+  const partnersToPullFromAdoptable = leavingAdoptableInCare ?
+  bondedPartners.filter((p) => p.status === 'adoptable') :
+  [];
+  // A death cancels any in-progress application covering this animal (reason
+  // 'Deceased') — the other animals on a shared record are released from hold
+  // and keep their own statuses.
+  const activeAdoptionForAnimal = adoptions.find(
+    (a) => adoptionCoversAnimal(a, animalId) && isActiveAdoption(a)
+  );
+  const cancelsAdoptionOnDeath =
+  effectiveStatus === 'deceased' && !!activeAdoptionForAnimal;
+
+  // Terminal outcomes end any active foster placement — the animal has left
+  // the org's care, so nobody should still show as fostering it. Adopted is
+  // excluded: the adoption layer closes the placement itself (reason 'Adopted').
+  const activePlacement = placements.find(
+    (p) => p.animal_id === animalId && p.placement_status === 'active'
+  );
+  const activePlacementFoster = activePlacement ?
+  peopleIndex.find((p) => p.id === activePlacement.person_id) :
+  undefined;
+  const endsPlacement =
+  !isInCare(effectiveStatus) &&
+  effectiveStatus !== 'adopted' &&
+  !!activePlacement;
+  // The placement's end date follows the outcome's own date (fallback: today).
+  const outcomeEndDate =
+  (effectiveStatus === 'released' ?
+  releasedAt :
+  effectiveStatus === 'deceased' ?
+  dateOfDeath :
+  effectiveStatus === 'transferred' ?
+  transferredAt :
+  effectiveStatus === 'returned_to_owner' ?
+  rtoAt :
+  '') || today;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -428,6 +520,12 @@ export function ChangeStatusModal({
       adopterEmail.trim() ||
       adopterPhone.trim()
     );
+    // A transfer must say where the animal went.
+    if (status === 'transferred' && !transferredTo.trim()) {
+      setTransferredToError('Enter where the animal was transferred to.');
+      requestAnimationFrame(() => focusFirstError(['edit_transferred_to']));
+      return;
+    }
     if (enteringAdopted && !activeAdoption) {
       if (!adoptionDate) {
         setAdoptionDateError('Adoption date is required.');
@@ -499,6 +597,18 @@ export function ChangeStatusModal({
       cause_of_death: causeOfDeath.trim(),
       death_notes: deathNotes.trim()
     } :
+    status === 'transferred' ?
+    {
+      transferred_to: transferredTo.trim(),
+      transferred_at: transferredAt,
+      transfer_notes: transferNotes.trim()
+    } :
+    status === 'returned_to_owner' ?
+    {
+      returned_to_owner_name: rtoOwnerName.trim(),
+      returned_to_owner_at: rtoAt,
+      returned_to_owner_notes: rtoNotes.trim()
+    } :
     {};
 
     const animalUpdates = {
@@ -548,6 +658,36 @@ export function ChangeStatusModal({
       new_status: effectiveStatus,
       new_priority: priority
     });
+    // Bonded-pair sync: the partner becomes Adoptable in the same save (the
+    // pair goes on the market together)…
+    for (const p of partnersToMakeAdoptable) {
+      updateAnimal(p.id, { status: 'adoptable' });
+    }
+    // …and comes off the market together when this animal leaves Adoptable
+    // for another in-care status.
+    for (const p of partnersToPullFromAdoptable) {
+      updateAnimal(p.id, { status: 'in_care' });
+    }
+    // A death closes any in-progress application (after the animal write, so
+    // the hold-lift lands last). Other animals on the record are released.
+    if (cancelsAdoptionOnDeath && activeAdoptionForAnimal) {
+      cancelAdoption(activeAdoptionForAnimal.id, 'cancelled', 'deceased');
+      track('adoption_cancelled', {
+        animal_id: animalId,
+        status: 'cancelled',
+        reason: 'deceased'
+      });
+    }
+    // Close the active foster placement on a terminal outcome, stamping the
+    // outcome as the end reason (mirrors the adoption layer's 'Adopted' close).
+    if (endsPlacement) {
+      endPlacement(
+        animalId,
+        outcomeEndDate,
+        STATUS_LABELS[effectiveStatus]
+      );
+      track('placement_ended', { animal_id: animalId });
+    }
     if (afterAdoptionDeath) {
       track('deceased_after_adoption_recorded', { animal_id: animalId });
     }
@@ -583,7 +723,8 @@ export function ChangeStatusModal({
           animal_id: animalId,
           adopter_id: finalAdopterId,
           adopted_on: adoptionDate,
-          notes: adoptionNotes.trim() || undefined
+          notes: adoptionNotes.trim() || undefined,
+          additional_animal_ids: partnersForDirectAdoption.map((p) => p.id)
         });
         track('adoption_recorded_direct', {
           animal_id: animalId,
@@ -876,6 +1017,8 @@ export function ChangeStatusModal({
                 <optgroup label="Outcomes">
                   <option value="adopted">Adopted</option>
                   <option value="released">Released</option>
+                  <option value="transferred">Transferred</option>
+                  <option value="returned_to_owner">Returned to Owner</option>
                   <option value="deceased">Deceased</option>
                 </optgroup>
               </Select>
@@ -894,6 +1037,76 @@ export function ChangeStatusModal({
               </Select>
             </div>
           </div>
+          {/* Bonded pairs go on the market together — say so before saving,
+              not after. */}
+          {partnersToMakeAdoptable.length > 0 &&
+          <div className="p-4 rounded-xl bg-[#F3E4D7]/50 border border-[#EAD3BC] text-sm space-y-1.5">
+              <p className="font-medium text-text-primary">
+                {animalDisplayName(animal)} is bonded with{' '}
+                {partnersToMakeAdoptable.
+              map((p) => animalDisplayName(p)).
+              join(' & ')}
+                .
+              </p>
+              <p className="text-text-secondary leading-relaxed">
+                Bonded pairs are adopted together. Saving will also mark{' '}
+                {partnersToMakeAdoptable.
+              map((p) => animalDisplayName(p)).
+              join(' & ')}{' '}
+                as Adoptable. To manage them separately, remove the Bonded
+                Pair relationship first.
+              </p>
+            </div>
+          }
+          {/* The inverse: leaving Adoptable pulls the bonded partner off the
+              market too. */}
+          {partnersToPullFromAdoptable.length > 0 &&
+          <div className="p-4 rounded-xl bg-[#F3E4D7]/50 border border-[#EAD3BC] text-sm space-y-1.5">
+              <p className="font-medium text-text-primary">
+                {animalDisplayName(animal)} is bonded with{' '}
+                {partnersToPullFromAdoptable.
+              map((p) => animalDisplayName(p)).
+              join(' & ')}
+                .
+              </p>
+              <p className="text-text-secondary leading-relaxed">
+                Bonded pairs come off the adoption market together. Saving
+                will also move{' '}
+                {partnersToPullFromAdoptable.
+              map((p) => animalDisplayName(p)).
+              join(' & ')}{' '}
+                to In Care.
+              </p>
+            </div>
+          }
+          {/* A death closes the in-progress application — never silently. */}
+          {cancelsAdoptionOnDeath && activeAdoptionForAnimal &&
+          <div className="p-4 rounded-xl bg-[#F5D7D7]/40 border border-[#EBC5C5] text-sm space-y-1.5">
+              <p className="font-medium text-text-primary">
+                {animalDisplayName(animal)} has an adoption in progress.
+              </p>
+              <p className="text-text-secondary leading-relaxed">
+                Saving will close the application as Cancelled (reason:
+                Deceased)
+                {(activeAdoptionForAnimal.animal_ids?.length ?? 1) > 1 ?
+              ' — the other animals on the application are released from hold and keep their own statuses.' :
+              '.'}
+              </p>
+            </div>
+          }
+          {/* A terminal outcome ends the active foster placement in the same
+              save — say so up front rather than closing it silently. */}
+          {endsPlacement &&
+          <p className="text-xs text-text-secondary bg-background border border-border rounded-xl px-4 py-3">
+              {animalDisplayName(animal)} is currently in foster
+              {activePlacementFoster ?
+            ` with ${activePlacementFoster.first_name} ${activePlacementFoster.last_name}` :
+            ''}
+              . Saving ends that placement (reason:{' '}
+              {STATUS_LABELS[effectiveStatus]}) — it stays in the animal's
+              history.
+            </p>
+          }
           {/* Outcome details — captured here so a status change records the
               relevant date/context in the same save. Surfaced in the profile's
               Release Summary / Case Summary. */}
@@ -913,6 +1126,76 @@ export function ChangeStatusModal({
               id="edit_released_at"
               value={releasedAt}
               onChange={setReleasedAt} />
+            </div>
+          }
+          {status === 'transferred' &&
+          <div className="space-y-4">
+              <div>
+                <Label htmlFor="edit_transferred_to" required>
+                  Transferred to
+                </Label>
+                <Input
+                id="edit_transferred_to"
+                value={transferredTo}
+                onChange={(e) => {
+                  setTransferredTo(e.target.value);
+                  if (transferredToError) setTransferredToError(undefined);
+                }}
+                aria-invalid={Boolean(transferredToError)}
+                className={
+                transferredToError && 'border-red-500 focus:ring-red-500'
+                }
+                placeholder="e.g. Seattle Humane" />
+                <FieldError>{transferredToError}</FieldError>
+              </div>
+              <div>
+                <Label htmlFor="edit_transferred_at">Transfer date</Label>
+                <DatePicker
+                id="edit_transferred_at"
+                value={transferredAt}
+                onChange={setTransferredAt} />
+              </div>
+              <div>
+                <Label htmlFor="edit_transfer_notes">Transfer notes</Label>
+                <Textarea
+                id="edit_transfer_notes"
+                value={transferNotes}
+                onChange={(e) => setTransferNotes(e.target.value)}
+                placeholder="Destination contact, paperwork, context (optional)."
+                rows={2} />
+              </div>
+            </div>
+          }
+          {status === 'returned_to_owner' &&
+          <div className="space-y-4">
+              <div>
+                <Label htmlFor="edit_rto_owner_name">Owner name</Label>
+                <Input
+                id="edit_rto_owner_name"
+                value={rtoOwnerName}
+                onChange={(e) => setRtoOwnerName(e.target.value)}
+                placeholder="e.g. Maria Lopez" />
+                <p className="mt-1 text-xs text-text-secondary">
+                  Optional free text — the owner doesn't need to be added as a
+                  contact.
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="edit_rto_at">Return date</Label>
+                <DatePicker
+                id="edit_rto_at"
+                value={rtoAt}
+                onChange={setRtoAt} />
+              </div>
+              <div>
+                <Label htmlFor="edit_rto_notes">Notes</Label>
+                <Textarea
+                id="edit_rto_notes"
+                value={rtoNotes}
+                onChange={(e) => setRtoNotes(e.target.value)}
+                placeholder="How the owner was identified, condition, context (optional)."
+                rows={2} />
+              </div>
             </div>
           }
           {/* Adopted → Deceased: where the death happened decides everything.
@@ -1127,6 +1410,17 @@ export function ChangeStatusModal({
                 placeholder="Anything worth keeping on the adoption record…"
                 rows={2} />
               </div>
+              {partnersForDirectAdoption.length > 0 &&
+            <p className="text-xs text-text-secondary">
+                  <span className="font-medium text-text-primary">
+                    Bonded pair:
+                  </span>{' '}
+                  {partnersForDirectAdoption.
+              map((p) => animalDisplayName(p)).
+              join(' & ')}{' '}
+                  will be recorded as adopted on the same record.
+                </p>
+            }
               <p className="text-xs text-text-secondary">
                 This records a completed adoption directly, so it's included in
                 reports. For new adoptions, prefer Start Adoption on the

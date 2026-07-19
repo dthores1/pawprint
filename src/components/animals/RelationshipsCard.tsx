@@ -4,13 +4,15 @@ import { useWhisker } from '../../context/WhiskerContext';
 import { Card } from '../ui/Card';
 import { Avatar } from '../ui/Avatar';
 import { SpeciesBadge } from '../ui/SpeciesBadge';
-import { HeartIcon, PlusIcon, XIcon } from 'lucide-react';
+import { HeartIcon, PlusIcon, XIcon, CheckCircle2Icon } from 'lucide-react';
 import { BoneIcon } from '../ui/BoneIcon';
 import { Animal, Litter } from '../../types';
 import { calculateAge, animalDisplayName } from '../../lib/utils';
 import { AddRelationshipModal } from './AddRelationshipModal';
 import { ArchiveConfirmDialog } from '../archive/ArchiveConfirmDialog';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { useCanArchive } from '../archive/useCanArchive';
+import { adoptionCoversAnimal, isActiveAdoption } from '../../lib/adoptions';
 interface RelationshipsCardProps {
   animalId: string;
   /** Whether the viewer may add relationships (MANAGE_ANIMALS or admin). When
@@ -40,10 +42,15 @@ export function RelationshipsCard({
   canManage = true
 }: RelationshipsCardProps) {
   // Index so a historical relative's name/photo still resolves.
-  const { relationships, animalsIndex: animals, litters } = useWhisker();
+  const { relationships, animalsIndex: animals, litters, adoptions } =
+  useWhisker();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [archiving, setArchiving] = useState<
     {id: string;label: string;animalName: string;} | null>(
+    null);
+  // Removing a bond mid-adoption gets an extra explanation step first.
+  const [bondWarn, setBondWarn] = useState<
+    {entry: RelEntry;label: string;} | null>(
     null);
   // Admin gate is the same for every chip; the row id is just a sentinel.
   const canArchive = useCanArchive('animal_relationships', { id: 'na' });
@@ -57,6 +64,20 @@ export function RelationshipsCard({
   grouped.siblings.length === 0 &&
   grouped.bondedWith.length === 0;
   const handleDelete = (entry: RelEntry, label: string) => {
+    // Removing a bond while the pair shares an in-progress adoption is a real
+    // decision — explain the consequences before the usual archive confirm.
+    const sharedActiveAdoption =
+    label === 'Bonded With' &&
+    adoptions.some(
+      (a) =>
+      isActiveAdoption(a) &&
+      adoptionCoversAnimal(a, animalId) &&
+      adoptionCoversAnimal(a, entry.animal.id)
+    );
+    if (sharedActiveAdoption) {
+      setBondWarn({ entry, label });
+      return;
+    }
     setArchiving({
       id: entry.relationshipId,
       label: label.toLowerCase(),
@@ -147,12 +168,20 @@ export function RelationshipsCard({
 
           }
             {grouped.bondedWith.length > 0 &&
-          <RelationshipRow
-            label="Bonded With"
-            entries={grouped.bondedWith}
-            onDelete={canArchive ? handleDelete : undefined}
-            highlight />
+          <div>
+              <RelationshipRow
+              label="Bonded With"
+              entries={grouped.bondedWith}
+              onDelete={canArchive ? handleDelete : undefined}
+              highlight />
 
+              {/* Teach what the bond DOES — it's a workflow unit, not a tag. */}
+              <p className="mt-2 flex items-start gap-1.5 text-xs text-text-secondary leading-relaxed">
+                <CheckCircle2Icon className="w-3.5 h-3.5 text-[#3E7B52] shrink-0 mt-px" />
+                Managed together — adoptions and foster placements apply to
+                the whole pair.
+              </p>
+            </div>
           }
           </div>
         }
@@ -162,6 +191,31 @@ export function RelationshipsCard({
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         animalId={animalId} />
+
+      {bondWarn &&
+      <ConfirmDialog
+        isOpen={true}
+        onClose={() => setBondWarn(null)}
+        onConfirm={() => {
+          const { entry, label } = bondWarn;
+          setBondWarn(null);
+          setArchiving({
+            id: entry.relationshipId,
+            label: label.toLowerCase(),
+            animalName: animalDisplayName(entry.animal)
+          });
+        }}
+        title="Remove bonded relationship?"
+        confirmLabel="Continue"
+        cancelLabel="Keep Bond"
+        tone="danger">
+
+          These animals are currently in a shared adoption workflow. Removing
+          the bonded relationship will separate future adoption management —
+          the existing adoption record remains unchanged and still covers both
+          animals until it is closed.
+        </ConfirmDialog>
+      }
 
       {archiving &&
       <ArchiveConfirmDialog

@@ -7,7 +7,8 @@ import { AnimalSearchPicker } from '../ui/AnimalSearchPicker';
 import { useWhisker } from '../../context/WhiskerContext';
 import { legacyRoleFor } from '../../lib/peopleApi';
 import { animalDisplayName } from '../../lib/utils';
-import { isActiveAdoption } from '../../lib/adoptions';
+import { isActiveAdoption, adoptionCoversAnimal } from '../../lib/adoptions';
+import { bondedPartnerIds } from '../../lib/bondedPairs';
 import { focusFirstError } from '../../lib/focusFirstError';
 import { track } from '../../lib/analytics';
 
@@ -29,9 +30,11 @@ export function StartAdoptionModal({
 }: StartAdoptionModalProps) {
   const {
     animals,
+    animalsIndex,
     peopleIndex: people,
     placements,
     adoptions,
+    relationships,
     addPerson,
     addAdoption
   } = useWhisker();
@@ -73,16 +76,25 @@ export function StartAdoptionModal({
   }, [isOpen]);
 
   // Eligible animals (picker mode): adoptable, with no open or completed
-  // adoption already on record. Mirrors the PRD eligibility rule.
+  // adoption already on record (shared bonded-pair records count for every
+  // animal they cover). Mirrors the PRD eligibility rule.
   const eligibleAnimals = animals.filter(
     (a) =>
     a.status === 'adoptable' &&
     !adoptions.some(
       (ad) =>
-      ad.animal_id === a.id &&
+      adoptionCoversAnimal(ad, a.id) &&
       (isActiveAdoption(ad) || ad.status === 'completed')
     )
   );
+
+  // Bonded partners ride along on the same application — the pair adopts
+  // together (one shared adoption record).
+  const bondedPartners = animalId ?
+  bondedPartnerIds(animalId, relationships).
+  map((id) => animalsIndex.find((a) => a.id === id)).
+  filter((a): a is NonNullable<typeof a> => !!a) :
+  [];
 
   // Directory contacts only (exclude app-user self records) — but keep the
   // current foster in the pool either way so the "foster wants to adopt"
@@ -130,8 +142,15 @@ export function StartAdoptionModal({
       }
       adopterId = created.id;
     }
-    await addAdoption({ animal_id: animalId, adopter_id: adopterId });
-    track('adoption_started', { animal_id: animalId });
+    await addAdoption({
+      animal_id: animalId,
+      adopter_id: adopterId,
+      additional_animal_ids: bondedPartners.map((p) => p.id)
+    });
+    track('adoption_started', {
+      animal_id: animalId,
+      bonded_animal_count: bondedPartners.length
+    });
     onClose();
   };
 
@@ -176,6 +195,22 @@ export function StartAdoptionModal({
 
             <p className="text-xs text-text-secondary mt-1.5">
               Only adoptable animals without an open adoption inquiry are shown.
+            </p>
+          </div>
+        }
+
+        {/* Bonded pairs are adopted together — say so before the record is
+            created, not after. */}
+        {animal && bondedPartners.length > 0 &&
+        <div className="p-4 rounded-xl bg-[#F3E4D7]/50 border border-[#EAD3BC] text-sm space-y-1.5">
+            <p className="font-medium text-text-primary">
+              {animalDisplayName(animal)} is bonded with{' '}
+              {bondedPartners.map((p) => animalDisplayName(p)).join(' & ')}.
+            </p>
+            <p className="text-text-secondary leading-relaxed">
+              This adoption application will include{' '}
+              {bondedPartners.length === 1 ? 'both animals' : 'all of them'} —
+              every adoption status update applies to the whole pair.
             </p>
           </div>
         }

@@ -14,6 +14,7 @@ import { StartAdoptionModal } from '../components/animals/StartAdoptionModal';
 import { AdoptionReturnModal } from '../components/animals/AdoptionReturnModal';
 import { AdoptionPanel } from '../components/animals/AdoptionPanel';
 import { AdoptionHistoryCard } from '../components/animals/AdoptionHistoryCard';
+import { bondedPartnerIds } from '../lib/bondedPairs';
 import { ActionNeededCallout } from '../components/animals/ActionNeededCallout';
 import { RelationshipsCard } from '../components/animals/RelationshipsCard';
 import { ExternalListingsCard } from '../components/animals/ExternalListingsCard';
@@ -55,7 +56,9 @@ import {
   SparklesIcon,
   MegaphoneIcon,
   CalendarIcon,
-  FolderIcon } from
+  FolderIcon,
+  ArrowRightLeftIcon,
+  UserIcon } from
 'lucide-react';
 import { format } from 'date-fns';
 import { ArchiveConfirmDialog } from '../components/archive/ArchiveConfirmDialog';
@@ -70,8 +73,10 @@ import { track } from '../lib/analytics';
 import { PROCEDURE_TYPE_LABELS } from '../lib/medicalOptions';
 import { speciesIconByName } from '../lib/speciesIcons';
 import {
-  ADOPTION_CANCEL_REASON_LABELS,
   ADOPTION_RETURN_REASON_LABELS,
+  adoptionOutcomeLabel,
+  adoptionCloseReasonLabel,
+  adoptionCoversAnimal,
   isActiveAdoption } from
 '../lib/adoptions';
 import {
@@ -146,6 +151,8 @@ export function AnimalProfile() {
     animalTraits,
     sites,
     externalListings,
+    relationships,
+    animalsIndex,
     addPhoto,
     updateMedicalRecord,
     updateAnimal,
@@ -278,13 +285,15 @@ export function AnimalProfile() {
   fosters.find((f) => f.id === activePlacement.person_id) :
   null;
   const isAdopted = animal.status === 'adopted';
+  const isTransferred = animal.status === 'transferred';
+  const isReturnedToOwner = animal.status === 'returned_to_owner';
   // Foster placement only applies to animals still in care — hide the placement
-  // controls once an animal is adopted, released, or deceased.
+  // controls once an animal has left the org's care (adopted, released,
+  // deceased, transferred, returned to owner).
   const inCare = isInCare(animal.status);
-  // Released/deceased are terminal cases: the AI Summary is reframed as a "Case
+  // Non-adopted terminal outcomes: the AI Summary is reframed as a "Case
   // Summary" (still useful history), and the adoption-marketing profile is hidden.
-  const isTerminalCase =
-  animal.status === 'released' || animal.status === 'deceased';
+  const isTerminalCase = !inCare && !isAdopted;
   const canHaveAdoptionProfile = !isTerminalCase;
   const adopter = animal.adopted_by_id ?
   people.find((p) => p.id === animal.adopted_by_id) :
@@ -297,7 +306,20 @@ export function AnimalProfile() {
   const litter = animal.litter_id ?
   litters.find((l) => l.id === animal.litter_id) :
   null;
-  const animalAdoptions = adoptions.filter((a) => a.animal_id === animal.id);
+  const animalAdoptions = adoptions.filter((a) =>
+  adoptionCoversAnimal(a, animal.id)
+  );
+  // Bonded pairs go on the adoption market together — the readiness CTA syncs
+  // still-in-care, not-yet-adoptable partners, same as the Edit modal.
+  const bondedPartnersToMakeAdoptable = bondedPartnerIds(
+    animal.id,
+    relationships
+  ).
+  map((pid) => animalsIndex.find((a) => a.id === pid)).
+  filter(
+    (p): p is NonNullable<typeof p> =>
+    !!p && p.status !== 'adoptable' && isInCare(p.status)
+  );
   // At most one in-progress adoption per animal (terminal ones — completed,
   // cancelled, returned — are history).
   const activeAdoption = animalAdoptions.find(isActiveAdoption);
@@ -571,23 +593,29 @@ export function AnimalProfile() {
       icon: CheckCircle2Icon,
       color: 'bg-[#DDEFE2] text-[#3E7B52]'
     });
-    if (ad.cancelled_at)
-    evs.push({
-      id: `adoption-${ad.id}-cancelled`,
-      date: ad.cancelled_at.split('T')[0],
-      ts: ad.cancelled_at,
-      type: 'adoption' as const,
-      title: 'Adoption closed',
-      description: [
-      ad.cancelled_reason ?
-      `Outcome: ${ADOPTION_CANCEL_REASON_LABELS[ad.cancelled_reason]}.` :
-      '',
-      ad.notes ?? ''].
-      filter(Boolean).join(' '),
-      icon: CircleIcon,
-      color: 'bg-background text-text-secondary',
-      adoption: { id: ad.id }
-    });
+    if (ad.cancelled_at) {
+      // e.g. "Outcome: Rejected — Home Visit Unsuccessful." (the legacy
+      // generic close resolves outcome and reason to the same label — skip
+      // the duplicate).
+      const outcome = adoptionOutcomeLabel(ad);
+      const closeReason = adoptionCloseReasonLabel(ad);
+      evs.push({
+        id: `adoption-${ad.id}-cancelled`,
+        date: ad.cancelled_at.split('T')[0],
+        ts: ad.cancelled_at,
+        type: 'adoption' as const,
+        title: 'Adoption closed',
+        description: [
+        `Outcome: ${outcome}${
+        closeReason && closeReason !== outcome ? ` — ${closeReason}` : ''
+        }.`,
+        ad.notes ?? ''].
+        filter(Boolean).join(' '),
+        icon: CircleIcon,
+        color: 'bg-background text-text-secondary',
+        adoption: { id: ad.id }
+      });
+    }
     if (ad.returned_at)
     evs.push({
       id: `adoption-${ad.id}-returned`,
@@ -956,7 +984,7 @@ export function AnimalProfile() {
                   the animal is physically in someone's home, so who has it
                   must stay visible until the placement is ended). The
                   Adopted By variant always shows once adopted. */}
-              {(isAdopted || fostersEnabled || !!currentFoster) &&
+              {(isAdopted || isTransferred || isReturnedToOwner || fostersEnabled || !!currentFoster) &&
               <div className="flex items-center gap-2.5">
                 <div className="p-1.5 bg-[#DCEAF7] text-[#356A9A] rounded-lg shrink-0">
                   <HomeIcon className="w-4 h-4" />
@@ -974,6 +1002,20 @@ export function AnimalProfile() {
 
                   <p className="font-medium text-text-primary">Not recorded</p>
                   }
+                  </div> :
+                isTransferred ?
+                <div>
+                    <p className="text-sm text-text-secondary">Transferred To</p>
+                    <p className="font-medium text-text-primary">
+                      {animal.transferred_to || 'Not recorded'}
+                    </p>
+                  </div> :
+                isReturnedToOwner ?
+                <div>
+                    <p className="text-sm text-text-secondary">Returned To</p>
+                    <p className="font-medium text-text-primary">
+                      {animal.returned_to_owner_name || 'Owner'}
+                    </p>
                   </div> :
 
                 <div>
@@ -1508,11 +1550,21 @@ export function AnimalProfile() {
               className="w-full bg-[#DDEFE2] text-[#3E7B52] hover:bg-[#C8E6D0]"
               onClick={() => {
                 updateAnimal(animal.id, { status: 'adoptable' });
+                // Bonded pairs go on the market together — same sync as the
+                // Edit modal's status change.
+                for (const p of bondedPartnersToMakeAdoptable) {
+                  updateAnimal(p.id, { status: 'adoptable' });
+                }
                 addNote({
                   animal_id: animal.id,
                   author_name: 'Current User',
                   note_type: 'general',
-                  body: `status: ${animal.status} → adoptable. Marked adoptable from the readiness checklist.`
+                  body: `status: ${animal.status} → adoptable. Marked adoptable from the readiness checklist.${
+                  bondedPartnersToMakeAdoptable.length > 0 ?
+                  ` Bonded ${bondedPartnersToMakeAdoptable.
+                  map((p) => animalDisplayName(p)).
+                  join(' & ')} marked adoptable too.` :
+                  ''}`
                 });
                 track('animal_status_changed', {
                   animal_id: animal.id,
@@ -1523,6 +1575,15 @@ export function AnimalProfile() {
 
                   Mark as Adoptable
                 </Button>
+                {bondedPartnersToMakeAdoptable.length > 0 &&
+            <p className="mt-2 text-xs text-text-secondary text-center">
+                    Bonded pair — also marks{' '}
+                    {bondedPartnersToMakeAdoptable.
+              map((p) => animalDisplayName(p)).
+              join(' & ')}{' '}
+                    as Adoptable.
+                  </p>
+            }
                 {readinessPercent < 100 &&
             <p className="mt-2 text-xs text-text-secondary text-center">
                     {checklist.filter((c) => !c.done).length} readiness item
@@ -1582,6 +1643,74 @@ export function AnimalProfile() {
                   formatDate(animal.released_at) :
                   'Date not recorded'
                   } />
+                </div>
+              </div>
+            </Card>
+          }
+
+          {/* Transferred → Transfer Summary (no CTA). */}
+          {isTransferred &&
+          <Card className="p-6">
+              <h3 className="text-lg font-heading font-bold mb-4">
+                Transfer Summary
+              </h3>
+              <div className="space-y-3">
+                <SummaryValueRow
+                icon={<ArrowRightLeftIcon className="w-5 h-5" />}
+                label="Transferred to"
+                value={animal.transferred_to || 'Not recorded'} />
+                <SummaryValueRow
+                icon={<CalendarIcon className="w-5 h-5" />}
+                label="Transfer date"
+                value={
+                animal.transferred_at ?
+                formatDate(animal.transferred_at) :
+                'Date not recorded'
+                } />
+                {animal.transfer_notes?.trim() &&
+              <SummaryValueRow
+                icon={<FileTextIcon className="w-5 h-5" />}
+                label="Notes"
+                value={animal.transfer_notes} />
+              }
+                <div className="pt-3 border-t border-border space-y-3">
+                  {checklist.map((item, i) =>
+                <SummaryCheckRow key={i} done={item.done} label={item.label} />
+                )}
+                </div>
+              </div>
+            </Card>
+          }
+
+          {/* Returned to Owner → Return Summary (no CTA). */}
+          {isReturnedToOwner &&
+          <Card className="p-6">
+              <h3 className="text-lg font-heading font-bold mb-4">
+                Return to Owner
+              </h3>
+              <div className="space-y-3">
+                <SummaryValueRow
+                icon={<UserIcon className="w-5 h-5" />}
+                label="Owner"
+                value={animal.returned_to_owner_name || 'Not recorded'} />
+                <SummaryValueRow
+                icon={<CalendarIcon className="w-5 h-5" />}
+                label="Return date"
+                value={
+                animal.returned_to_owner_at ?
+                formatDate(animal.returned_to_owner_at) :
+                'Date not recorded'
+                } />
+                {animal.returned_to_owner_notes?.trim() &&
+              <SummaryValueRow
+                icon={<FileTextIcon className="w-5 h-5" />}
+                label="Notes"
+                value={animal.returned_to_owner_notes} />
+              }
+                <div className="pt-3 border-t border-border space-y-3">
+                  {checklist.map((item, i) =>
+                <SummaryCheckRow key={i} done={item.done} label={item.label} />
+                )}
                 </div>
               </div>
             </Card>
@@ -1761,7 +1890,7 @@ export function AnimalProfile() {
         table="adoptions"
         id={archivingAdoption.id}
         typeLabel="adoption"
-        entityLabel={`cancelled adoption (${archivingAdoption.adopterName})`} />
+        entityLabel={`closed adoption (${archivingAdoption.adopterName})`} />
 
       }
       {archivingAnimal &&
@@ -1867,10 +1996,11 @@ function AnimalArchiveButton({ onClick }: {onClick: () => void;}) {
 
 }
 
-// Adoptions are admin-only. Server only allows archive on status='cancelled',
-// and the consuming code only emits an `event.adoption` field on the cancelled
-// event — so this button is only ever rendered next to an "Adoption cancelled"
-// row, with no extra status guard needed here.
+// Adoptions are admin-only. Server only allows archive on the lost statuses
+// (rejected / cancelled_by_applicant / duplicate / cancelled), and the
+// consuming code only emits an `event.adoption` field on the closed event —
+// so this button is only ever rendered next to an "Adoption closed" row, with
+// no extra status guard needed here.
 function AdoptionArchiveButton({ onClick }: {onClick: () => void;}) {
   const canArchive = useCanArchive('adoptions', { id: 'na' });
   if (!canArchive) return null;

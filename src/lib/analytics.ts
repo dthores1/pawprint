@@ -48,7 +48,7 @@ export type AnalyticsEvent =
   | 'adoption_recorded_direct'  // { animal_id, has_adopter }
   | 'deceased_after_adoption_recorded' // { animal_id }
   | 'adoption_updated'
-  | 'adoption_cancelled'         // { animal_id, reason }
+  | 'adoption_cancelled'         // { animal_id, status, reason }
   | 'adoption_reopened'
   | 'adoption_returned'
   | 'contact_added'             // { roles }

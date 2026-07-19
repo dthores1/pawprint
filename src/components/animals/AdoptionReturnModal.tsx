@@ -9,7 +9,8 @@ import { animalDisplayName } from '../../lib/utils';
 import { focusFirstError } from '../../lib/focusFirstError';
 import {
   ADOPTION_RETURN_REASONS,
-  ADOPTION_RETURN_REASON_LABELS } from
+  ADOPTION_RETURN_REASON_LABELS,
+  adoptionCoversAnimal } from
 '../../lib/adoptions';
 import { AdoptionReturnReason } from '../../types';
 import { track } from '../../lib/analytics';
@@ -49,7 +50,9 @@ export function AdoptionReturnModal({
   // completion timestamp (falling back to created_at) so "latest" is reliable.
   const completedAdoption = useMemo(() => {
     return adoptions.
-    filter((a) => a.animal_id === animalId && a.status === 'completed').
+    filter(
+      (a) => adoptionCoversAnimal(a, animalId) && a.status === 'completed'
+    ).
     sort((a, b) =>
     (b.completed_at ?? b.created_at).localeCompare(
       a.completed_at ?? a.created_at

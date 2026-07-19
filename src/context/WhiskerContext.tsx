@@ -10,6 +10,7 @@ import {
   Animal,
   Adoption,
   AdoptionCancelReason,
+  AdoptionLostStatus,
   AdoptionReturnReason,
   Breed,
   SpeciesCatalog,
@@ -98,7 +99,12 @@ import {
   directAdoptionToInsert,
   rowToAdoption } from
 '../lib/adoptionsApi';
-import { adoptionStatusPatch, isActiveAdoption } from '../lib/adoptions';
+import {
+  adoptionStatusPatch,
+  adoptionAnimalIds,
+  isActiveAdoption,
+  isLostAdoption } from
+'../lib/adoptions';
 import { useAuth } from './AuthContext';
 import {
   rowToAnimal,
@@ -433,7 +439,13 @@ export interface WhiskerContextType {
   uploadPersonPhoto: (personId: string, file: File) => Promise<void>;
   // — Adoptions (operational workflow) —
   addAdoption: (
-  input: { animal_id: string; adopter_id: string; notes?: string })
+  input: {
+    animal_id: string;
+    adopter_id: string;
+    notes?: string;
+    /** Extra animals on the same application (bonded partners). */
+    additional_animal_ids?: string[];
+  })
   => Promise<void>;
   updateAdoption: (id: string, updates: Partial<Adoption>) => void;
   /** Advance an adoption to a workflow status, stamping milestone timestamps. */
@@ -454,19 +466,24 @@ export interface WhiskerContextType {
     /** yyyy-MM-dd — becomes completed_at/adopted_at and the placement end date. */
     adopted_on: string;
     notes?: string;
+    /** Extra animals on the same record (bonded partners). */
+    additional_animal_ids?: string[];
   })
   => Promise<void>;
-  /** Close an adoption unsuccessfully: status -> cancelled with the structured
-   *  outcome, hold lifted. `notes` (when provided) becomes the final notes. */
+  /** Close an adoption unsuccessfully: status -> the given lost status
+   *  (rejected / cancelled_by_applicant / duplicate / cancelled), with an
+   *  optional per-status reason (stored in cancelled_reason), hold lifted.
+   *  `notes` (when provided) becomes the final notes. */
   cancelAdoption: (
   id: string,
-  reason: AdoptionCancelReason,
+  status: AdoptionLostStatus,
+  reason?: AdoptionCancelReason,
   notes?: string)
   => void;
   /**
-   * Reopen a cancelled adoption: restore the furthest milestone-backed
-   * in-progress status, clear the cancellation stamps, and put the animal back
-   * on hold. No-op if another adoption is already active for the animal.
+   * Reopen a lost (unsuccessfully closed) adoption: restore the furthest
+   * milestone-backed in-progress status, clear the close stamps, and put the
+   * animal back on hold. No-op if another adoption is already active.
    */
   reopenAdoption: (id: string) => void;
   /**
@@ -1253,16 +1270,43 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       return;
     }
     setAdoptionsLoading(true);
-    const { data, error } = await supabase.
+    const [{ data, error }, childRes] = await Promise.all([
+    supabase.
     from('adoptions').
     select('*').
     eq('organization_id', orgId).
     eq('is_deleted', false).
-    order('created_at', { ascending: false });
+    order('created_at', { ascending: false }),
+    // Every animal on each record (bonded pairs share one application).
+    supabase.
+    from('adoption_animals').
+    select('adoption_id,animal_id').
+    eq('organization_id', orgId)]
+    );
     if (error) {
       console.error('[adoptions] load failed:', error.message);
     } else {
-      setAdoptions((data ?? []).map(rowToAdoption));
+      if (childRes.error) {
+        console.error(
+          '[adoptions] animals load failed:',
+          childRes.error.message
+        );
+      }
+      const byAdoption = new Map<string, string[]>();
+      for (const row of childRes.data ?? []) {
+        const list = byAdoption.get(row.adoption_id) ?? [];
+        list.push(row.animal_id);
+        byAdoption.set(row.adoption_id, list);
+      }
+      setAdoptions(
+        (data ?? []).map((r) => {
+          const adoption = rowToAdoption(r);
+          adoption.animal_ids = byAdoption.get(adoption.id) ?? [
+          adoption.animal_id];
+
+          return adoption;
+        })
+      );
     }
     setAdoptionsLoading(false);
   }, [orgId]);
@@ -2925,6 +2969,28 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
     const nextRoles: PersonRole[] = [...person.roles, 'adopter'];
     updatePerson(personId, { roles: nextRoles, role: legacyRoleFor(nextRoles) });
   };
+  // The record's animal list — primary + any bonded partners on the same
+  // application. Persisted to the adoption_animals child table.
+  const adoptionAnimalList = (input: {
+    animal_id: string;
+    additional_animal_ids?: string[];
+  }) =>
+  Array.from(
+    new Set([input.animal_id, ...(input.additional_animal_ids ?? [])])
+  );
+  const insertAdoptionAnimals = async (adoptionId: string, ids: string[]) => {
+    if (!orgId) return;
+    const { error } = await supabase.from('adoption_animals').insert(
+      ids.map((animal_id) => ({
+        organization_id: orgId,
+        adoption_id: adoptionId,
+        animal_id
+      }))
+    );
+    if (error) {
+      console.error('[adoptions] animals insert failed:', error.message);
+    }
+  };
   const addAdoption: WhiskerContextType['addAdoption'] = async (input) => {
     if (!orgId) {
       console.error('[adoptions] cannot create — no current organization');
@@ -2939,12 +3005,20 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       console.error('[adoptions] create failed:', error?.message);
       return;
     }
-    setAdoptions((prev) => [rowToAdoption(data), ...prev]);
+    const animalIds = adoptionAnimalList(input);
+    await insertAdoptionAnimals(data.id, animalIds);
+    setAdoptions((prev) => [
+    { ...rowToAdoption(data), animal_ids: animalIds },
+    ...prev]
+    );
     ensureAdopterRole(input.adopter_id);
-    // Mark the animal on hold for the duration of the adoption — this is now
-    // the canonical "adoption pending" signal (replaces the old
-    // status='adoption_pending'). cancelAdoption / completeAdoption clear it.
-    updateAnimal(input.animal_id, { is_on_hold: true });
+    // Mark every animal on the record on hold for the duration of the
+    // adoption — this is the canonical "adoption pending" signal (replaces
+    // the old status='adoption_pending'). cancelAdoption / completeAdoption
+    // clear it.
+    for (const animalId of animalIds) {
+      updateAnimal(animalId, { is_on_hold: true });
+    }
   };
   const updateAdoption: WhiskerContextType['updateAdoption'] = (id, updates) => {
     const prev = adoptions;
@@ -3038,13 +3112,16 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       ...(donationAmount != null ? { donation_amount: donationAmount } : {}),
       ...(notes !== undefined ? { notes: notes.trim() || undefined } : {})
     });
-    // …and the animal-side effects follow.
-    applyAdoptionOutcomeToAnimal(
-      adoption.animal_id,
-      adoption.adopter_id,
-      ts,
-      ts.split('T')[0]
-    );
+    // …and the animal-side effects follow, for every animal on the record
+    // (bonded pairs adopt together).
+    for (const animalId of adoptionAnimalIds(adoption)) {
+      applyAdoptionOutcomeToAnimal(
+        animalId,
+        adoption.adopter_id,
+        ts,
+        ts.split('T')[0]
+      );
+    }
   };
   const recordDirectAdoption: WhiskerContextType['recordDirectAdoption'] =
   async (input) => {
@@ -3063,38 +3140,52 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       console.error('[adoptions] direct record failed:', error?.message);
       return;
     }
-    setAdoptions((prev) => [rowToAdoption(data), ...prev]);
-    applyAdoptionOutcomeToAnimal(
-      input.animal_id,
-      input.adopter_id,
-      input.adopted_on,
-      input.adopted_on
+    const animalIds = adoptionAnimalList(input);
+    await insertAdoptionAnimals(data.id, animalIds);
+    setAdoptions((prev) => [
+    { ...rowToAdoption(data), animal_ids: animalIds },
+    ...prev]
     );
+    for (const animalId of animalIds) {
+      applyAdoptionOutcomeToAnimal(
+        animalId,
+        input.adopter_id,
+        input.adopted_on,
+        input.adopted_on
+      );
+    }
   };
   const cancelAdoption: WhiskerContextType['cancelAdoption'] = (
   id,
+  status,
   reason,
   notes) =>
   {
     const adoption = adoptions.find((a) => a.id === id);
     updateAdoption(id, {
-      status: 'cancelled',
+      status,
       cancelled_at: new Date().toISOString(),
       cancelled_reason: reason,
       ...(notes !== undefined ? { notes: notes.trim() || undefined } : {})
     });
-    // Lift the adoption-driven hold so the animal is selectable again.
+    // Lift the adoption-driven hold so the animals are selectable again.
     if (adoption) {
-      updateAnimal(adoption.animal_id, { is_on_hold: false });
+      for (const animalId of adoptionAnimalIds(adoption)) {
+        updateAnimal(animalId, { is_on_hold: false });
+      }
     }
   };
   const reopenAdoption: WhiskerContextType['reopenAdoption'] = (id) => {
     const adoption = adoptions.find((a) => a.id === id);
-    if (!adoption || adoption.status !== 'cancelled') return;
-    // One active adoption per animal — never reopen alongside another.
+    if (!adoption || !isLostAdoption(adoption)) return;
+    // One active adoption per animal — never reopen alongside another (for
+    // ANY animal on the record).
+    const recordAnimals = adoptionAnimalIds(adoption);
     const hasOtherActive = adoptions.some(
       (a) =>
-      a.animal_id === adoption.animal_id && a.id !== id && isActiveAdoption(a)
+      a.id !== id &&
+      isActiveAdoption(a) &&
+      adoptionAnimalIds(a).some((aid) => recordAnimals.includes(aid))
     );
     if (hasOtherActive) return;
     // Re-enter at the furthest stage the milestone timestamps prove was
@@ -3111,8 +3202,10 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       cancelled_at: undefined,
       cancelled_reason: undefined
     });
-    // Back in progress — the animal goes back on adoption hold.
-    updateAnimal(adoption.animal_id, { is_on_hold: true });
+    // Back in progress — the animals go back on adoption hold.
+    for (const animalId of recordAnimals) {
+      updateAnimal(animalId, { is_on_hold: true });
+    }
   };
   // Shared: bring a returned animal back into the care pipeline. Inverse of the
   // animal side of completeAdoption — re-enter at the given status (default
@@ -3138,7 +3231,10 @@ export function WhiskerProvider({ children }: {children: React.ReactNode;}) {
       return_reason: input.return_reason,
       return_notes: input.return_notes?.trim() || undefined
     });
-    bringAnimalBackIntoCare(adoption.animal_id, input.new_status);
+    // A shared (bonded-pair) adoption returns as a unit.
+    for (const animalId of adoptionAnimalIds(adoption)) {
+      bringAnimalBackIntoCare(animalId, input.new_status);
+    }
   };
   const recordAdoptionReturn: WhiskerContextType['recordAdoptionReturn'] = async (
   input) =>

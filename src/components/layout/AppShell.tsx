@@ -1,5 +1,11 @@
-import { useEffect, useState } from 'react';
-import { Outlet, NavLink, Link, useLocation } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Outlet,
+  NavLink,
+  Link,
+  useLocation,
+  useNavigationType } from
+'react-router-dom';
 import { Sidebar, useVisibleNavItems } from './Sidebar';
 import { DemoBanner } from './DemoBanner';
 import { ViewAsBanner } from './ViewAsBanner';
@@ -31,6 +37,19 @@ export function AppShell() {
   useEffect(() => {
     refreshNotifications();
     // refreshNotifications is stable per render but not memoized; key on pathname.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
+  // <main> is the scroll container, and SPA navigations keep its scroll
+  // position — which reads as "nothing happened" when the destination has the
+  // same shape (e.g. animal → bonded-partner animal from the Relationships
+  // card). Reset to the top on every pathname change, EXCEPT browser
+  // back/forward (POP) — returning to a long list should keep your place.
+  // Search-param-only changes (list filters, tabs) never reset.
+  const mainRef = useRef<HTMLElement>(null);
+  const navigationType = useNavigationType();
+  useEffect(() => {
+    if (navigationType !== 'POP') mainRef.current?.scrollTo(0, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
@@ -160,7 +179,7 @@ export function AppShell() {
         }
 
         {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">
+        <main ref={mainRef} className="flex-1 overflow-y-auto p-4 md:p-8">
           <div className="max-w-6xl mx-auto h-full">
             <Outlet />
           </div>

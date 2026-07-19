@@ -30,6 +30,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Priority, Animal, PersonRole } from '../types';
 import { ADOPTION_STATUS_LABELS } from '../lib/adoptions';
+import { isInCare } from '../lib/animalStatus';
 import { useFostersEnabled } from '../lib/useFostersEnabled';
 import { BoneIcon } from '../components/ui/BoneIcon';
 import { HelpNeededWidget } from '../components/dashboard/HelpNeededWidget';
@@ -151,7 +152,7 @@ export function Dashboard() {
   availableSpots;
 
   // Calculate the "Total Animals" metric for the animals in our care
-  const animalsInCare = animals.filter((a) => a.status !== 'adopted' && a.status !== 'deceased');
+  const animalsInCare = animals.filter((a) => isInCare(a.status));
   // "In foster" is derived from the current_foster_id cache, not the status.
   const animalsInFoster = animals.filter((a) => !!a.current_foster_id);
   const fostersEnabled = useFostersEnabled();
@@ -181,7 +182,7 @@ export function Dashboard() {
     animal.priority;
   };
   const highPriorityAnimals = animals.
-  filter((a) => a.status !== 'adopted' && a.status !== 'deceased').
+  filter((a) => isInCare(a.status)).
   filter(
     (a) =>
     a.priority === 'urgent' ||

@@ -7,6 +7,7 @@ import { Avatar } from '../ui/Avatar';
 import { useWhisker } from '../../context/WhiskerContext';
 import { Animal, Person } from '../../types';
 import { animalDisplayName } from '../../lib/utils';
+import { bondedPartnerIds } from '../../lib/bondedPairs';
 import { track } from '../../lib/analytics';
 
 // End an active foster placement WITHOUT reassigning — the animal returns to
@@ -25,18 +26,48 @@ export function EndPlacementModal({
   animal: Animal;
   foster?: Person;
 }) {
-  const { endPlacement } = useWhisker();
+  const { endPlacement, placements, relationships, animalsIndex } =
+  useWhisker();
   const [endDate, setEndDate] = useState(
     new Date().toISOString().split('T')[0]
   );
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [onlyThisAnimal, setOnlyThisAnimal] = useState(false);
+
+  // Bonded pairs are one placement unit — when the partner lives with the
+  // same foster, ending this placement ends theirs too (opt-out below).
+  const fosterId =
+  foster?.id ??
+  placements.find(
+    (p) => p.animal_id === animal.id && p.placement_status === 'active'
+  )?.person_id;
+  const coPlacedPartners = bondedPartnerIds(animal.id, relationships).
+  map((id) => animalsIndex.find((a) => a.id === id)).
+  filter(
+    (p): p is NonNullable<typeof p> =>
+    !!p &&
+    !!fosterId &&
+    placements.some(
+      (pl) =>
+      pl.animal_id === p.id &&
+      pl.placement_status === 'active' &&
+      pl.person_id === fosterId
+    )
+  );
 
   const handleConfirm = async () => {
     setSubmitting(true);
     await endPlacement(animal.id, endDate, reason);
     track('placement_ended', { animal_id: animal.id });
+    if (!onlyThisAnimal) {
+      for (const partner of coPlacedPartners) {
+        await endPlacement(partner.id, endDate, reason);
+        track('placement_ended', { animal_id: partner.id, bonded: true });
+      }
+    }
     setSubmitting(false);
+    setOnlyThisAnimal(false);
     onClose();
   };
 
@@ -84,6 +115,29 @@ export function EndPlacementModal({
           deleted. To move the animal to a different foster instead, use
           Reassign Foster.
         </p>
+        {coPlacedPartners.length > 0 &&
+        <div className="p-3 rounded-xl bg-[#F3E4D7]/50 border border-[#EAD3BC] text-sm space-y-2">
+            <p className="text-text-primary leading-relaxed">
+              <span className="font-medium">
+                {animalDisplayName(animal)} is bonded with{' '}
+                {coPlacedPartners.map((p) => animalDisplayName(p)).join(' & ')}
+              </span>{' '}
+              — bonded pairs are one placement unit, so{' '}
+              {coPlacedPartners.length === 1 ? 'their' : 'each of their'}{' '}
+              placement{coPlacedPartners.length === 1 ? '' : 's'} with the same
+              foster ends too.
+            </p>
+            <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
+              <input
+              type="checkbox"
+              checked={onlyThisAnimal}
+              onChange={(e) => setOnlyThisAnimal(e.target.checked)}
+              className="w-3.5 h-3.5 rounded text-primary focus:ring-primary" />
+              End only {animalDisplayName(animal)}&rsquo;s placement (not
+              recommended)
+            </label>
+          </div>
+        }
         <div>
           <Label htmlFor="end_date" required>End Date</Label>
           <DatePicker

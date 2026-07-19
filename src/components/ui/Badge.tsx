@@ -13,6 +13,8 @@ const STATUS_STYLES: Record<string, string> = {
   released: 'bg-[#DCEBE7] text-[#4F7A70]',
   hospice: 'bg-[#EDE0DA] text-[#7C4A3D]',
   deceased: 'bg-[#E0E0E0] text-[#555555]',
+  transferred: 'bg-[#DCE7F2] text-[#356A9A]',
+  returned_to_owner: 'bg-[#E8DEEC] text-[#6E4E80]',
   neutral: 'bg-background text-text-secondary border border-border'
 };
 export const STATUS_LABELS: Record<AnimalStatus, string> = {
@@ -22,7 +24,9 @@ export const STATUS_LABELS: Record<AnimalStatus, string> = {
   adopted: 'Adopted',
   released: 'Released',
   hospice: 'Hospice',
-  deceased: 'Deceased'
+  deceased: 'Deceased',
+  transferred: 'Transferred',
+  returned_to_owner: 'Returned to Owner'
 };
 export function Badge({
   status = 'neutral',

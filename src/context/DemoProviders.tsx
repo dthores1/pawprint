@@ -76,7 +76,12 @@ import {
 '../data/seed';
 import { generateId } from '../lib/utils';
 import { DEFAULT_GUIDANCE } from '../lib/guidanceContent';
-import { adoptionStatusPatch, isActiveAdoption } from '../lib/adoptions';
+import {
+  adoptionStatusPatch,
+  adoptionAnimalIds,
+  isActiveAdoption,
+  isLostAdoption } from
+'../lib/adoptions';
 import {
   assembleAdoptionProfile,
   animalTemplateVars } from
@@ -767,11 +772,20 @@ export function DemoWhiskerProvider({
     },
 
     // — Adoptions —
-    addAdoption: async ({ animal_id, adopter_id, notes }) => {
+    addAdoption: async ({
+      animal_id,
+      adopter_id,
+      notes,
+      additional_animal_ids
+    }) => {
+      const animalIds = Array.from(
+        new Set([animal_id, ...(additional_animal_ids ?? [])])
+      );
       setAdoptions((prev) => [
       {
         id: `ad${generateId()}`,
         animal_id,
+        animal_ids: animalIds,
         adopter_id,
         status: 'inquiry',
         notes,
@@ -790,7 +804,9 @@ export function DemoWhiskerProvider({
       p
       )
       );
-      updateAnimal(animal_id, { is_on_hold: true });
+      for (const aid of animalIds) {
+        updateAnimal(aid, { is_on_hold: true });
+      }
     },
     updateAdoption: (id, updates) => {
       setAdoptions((prev) =>
@@ -820,16 +836,20 @@ export function DemoWhiskerProvider({
       a
       )
       );
-      updateAnimal(adoption.animal_id, {
-        status: 'adopted',
-        adopted_by_id: adoption.adopter_id,
-        adopted_at: ts,
-        current_foster_id: undefined,
-        is_on_hold: false
-      });
+      const recordAnimals = adoptionAnimalIds(adoption);
+      for (const aid of recordAnimals) {
+        updateAnimal(aid, {
+          status: 'adopted',
+          adopted_by_id: adoption.adopter_id,
+          adopted_at: ts,
+          current_foster_id: undefined,
+          is_on_hold: false
+        });
+      }
       setPlacements((prev) =>
       prev.map((p) =>
-      p.animal_id === adoption.animal_id && p.placement_status === 'active' ?
+      recordAnimals.includes(p.animal_id) &&
+      p.placement_status === 'active' ?
       {
         ...p,
         placement_status: 'completed' as const,
@@ -854,10 +874,14 @@ export function DemoWhiskerProvider({
     recordDirectAdoption: async (input) => {
       // Born-completed adoption row dated to the (possibly historical)
       // adoption date; mirrors the Supabase recordDirectAdoption.
+      const animalIds = Array.from(
+        new Set([input.animal_id, ...(input.additional_animal_ids ?? [])])
+      );
       setAdoptions((prev) => [
       {
         id: `ad${generateId()}`,
         animal_id: input.animal_id,
+        animal_ids: animalIds,
         adopter_id: input.adopter_id,
         status: 'completed',
         source: 'direct',
@@ -867,16 +891,18 @@ export function DemoWhiskerProvider({
       },
       ...prev]
       );
-      updateAnimal(input.animal_id, {
-        status: 'adopted',
-        adopted_by_id: input.adopter_id,
-        adopted_at: input.adopted_on,
-        current_foster_id: undefined,
-        is_on_hold: false
-      });
+      for (const aid of animalIds) {
+        updateAnimal(aid, {
+          status: 'adopted',
+          adopted_by_id: input.adopter_id,
+          adopted_at: input.adopted_on,
+          current_foster_id: undefined,
+          is_on_hold: false
+        });
+      }
       setPlacements((prev) =>
       prev.map((p) =>
-      p.animal_id === input.animal_id && p.placement_status === 'active' ?
+      animalIds.includes(p.animal_id) && p.placement_status === 'active' ?
       {
         ...p,
         placement_status: 'completed' as const,
@@ -901,14 +927,14 @@ export function DemoWhiskerProvider({
         );
       }
     },
-    cancelAdoption: (id, reason, notes) => {
+    cancelAdoption: (id, status, reason, notes) => {
       const adoption = adoptions.find((a) => a.id === id);
       setAdoptions((prev) =>
       prev.map((a) =>
       a.id === id ?
       {
         ...a,
-        status: 'cancelled',
+        status,
         cancelled_at: now(),
         cancelled_reason: reason,
         ...(notes !== undefined ? { notes: notes.trim() || undefined } : {})
@@ -917,17 +943,20 @@ export function DemoWhiskerProvider({
       )
       );
       if (adoption) {
-        updateAnimal(adoption.animal_id, { is_on_hold: false });
+        for (const aid of adoptionAnimalIds(adoption)) {
+          updateAnimal(aid, { is_on_hold: false });
+        }
       }
     },
     reopenAdoption: (id) => {
       const adoption = adoptions.find((a) => a.id === id);
-      if (!adoption || adoption.status !== 'cancelled') return;
+      if (!adoption || !isLostAdoption(adoption)) return;
+      const recordAnimals = adoptionAnimalIds(adoption);
       const hasOtherActive = adoptions.some(
         (a) =>
-        a.animal_id === adoption.animal_id &&
         a.id !== id &&
-        isActiveAdoption(a)
+        isActiveAdoption(a) &&
+        adoptionAnimalIds(a).some((aid) => recordAnimals.includes(aid))
       );
       if (hasOtherActive) return;
       const status: Adoption['status'] = adoption.paperwork_completed_at ?
@@ -949,7 +978,9 @@ export function DemoWhiskerProvider({
       a
       )
       );
-      updateAnimal(adoption.animal_id, { is_on_hold: true });
+      for (const aid of recordAnimals) {
+        updateAnimal(aid, { is_on_hold: true });
+      }
     },
     returnAdoption: (id, input) => {
       const adoption = adoptions.find((a) => a.id === id);
@@ -967,12 +998,14 @@ export function DemoWhiskerProvider({
       a
       )
       );
-      updateAnimal(adoption.animal_id, {
-        status: input.new_status ?? 'intake',
-        adopted_by_id: undefined,
-        adopted_at: undefined,
-        is_on_hold: false
-      });
+      for (const aid of adoptionAnimalIds(adoption)) {
+        updateAnimal(aid, {
+          status: input.new_status ?? 'intake',
+          adopted_by_id: undefined,
+          adopted_at: undefined,
+          is_on_hold: false
+        });
+      }
     },
     recordAdoptionReturn: async (input) => {
       setAdoptions((prev) => [
