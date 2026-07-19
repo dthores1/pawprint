@@ -33,18 +33,20 @@ interface AdoptionPanelProps {
 // adopter, status, milestones, and the workflow actions (update / close).
 // Closed adoptions render in the compact AdoptionHistoryCard instead.
 export function AdoptionPanel({ adoptionId, canManage = true }: AdoptionPanelProps) {
-  const { adoptions, people, animals, animalsIndex } = useWhisker();
+  const { adoptions, people, animalsIndex } = useWhisker();
   const [isUpdateOpen, setIsUpdateOpen] = useState(false);
   const [isCloseOpen, setIsCloseOpen] = useState(false);
 
   const adoption = adoptions.find((a) => a.id === adoptionId);
   if (!adoption || !isActiveAdoption(adoption)) return null;
   const adopter = people.find((p) => p.id === adoption.adopter_id);
-  const animal = animals.find((a) => a.id === adoption.animal_id);
   // A bonded-pair record covers more than one animal — name them all.
   const recordAnimals = adoptionAnimalIds(adoption).
   map((id) => animalsIndex.find((a) => a.id === id)).
   filter((a): a is NonNullable<typeof a> => !!a);
+  // Every held animal on the record, not just the primary — the callout must
+  // read correctly from either bonded animal's profile.
+  const heldAnimals = recordAnimals.filter((a) => a.is_on_hold);
   const milestones = adoptionMilestones(adoption);
   const donation = formatDonation(adoption.donation_amount);
   const readyToComplete = adoption.status === 'ready_for_placement';
@@ -134,12 +136,15 @@ export function AdoptionPanel({ adoptionId, canManage = true }: AdoptionPanelPro
         </p>
       }
 
-      {animal?.is_on_hold &&
+      {heldAnimals.length > 0 &&
       <div className="flex items-start gap-2 mb-5 px-3 py-2 rounded-md bg-[#E8DEEC]/40 border border-[#D7C5DE] text-sm text-[#6E4E80]">
           <LockIcon className="w-4 h-4 shrink-0 mt-0.5" />
           <p>
-            <span className="font-medium">{animalDisplayName(animal)}</span> is
-            on hold pending the outcome of this adoption.
+            <span className="font-medium">
+              {heldAnimals.map((a) => animalDisplayName(a)).join(' & ')}
+            </span>{' '}
+            {heldAnimals.length === 1 ? 'is' : 'are'} on hold pending the
+            outcome of this adoption.
           </p>
         </div>
       }

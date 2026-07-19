@@ -37,7 +37,7 @@ import {
 import { animalBreedLabel } from '../lib/breedsApi';
 import { SpeciesIcon } from '../lib/speciesIcons';
 import { enabledSpeciesList } from '../lib/orgCatalog';
-import { isActiveAdoption } from '../lib/adoptions';
+import { adoptionAnimalIds, isActiveAdoption } from '../lib/adoptions';
 import { motion } from 'framer-motion';
 import { useWindowRowVirtualizer } from '../lib/useWindowRowVirtualizer';
 import { useIsMobile } from '../lib/useIsMobile';
@@ -182,7 +182,9 @@ export function AnimalsList() {
   const pendingAdoptionAnimalIds = useMemo(() => {
     const ids = new Set<string>();
     for (const a of adoptions) {
-      if (isActiveAdoption(a)) ids.add(a.animal_id);
+      if (!isActiveAdoption(a)) continue;
+      // Every animal on the record — bonded pairs share one application.
+      for (const id of adoptionAnimalIds(a)) ids.add(id);
     }
     return ids;
   }, [adoptions]);

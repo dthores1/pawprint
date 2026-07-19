@@ -29,14 +29,16 @@ import {
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Priority, Animal, PersonRole } from '../types';
-import { ADOPTION_STATUS_LABELS } from '../lib/adoptions';
+import {
+  ADOPTION_STATUS_LABELS,
+  adoptionAnimalIds,
+  isActiveAdoption } from
+'../lib/adoptions';
 import { isInCare } from '../lib/animalStatus';
 import { useFostersEnabled } from '../lib/useFostersEnabled';
 import { BoneIcon } from '../components/ui/BoneIcon';
 import { HelpNeededWidget } from '../components/dashboard/HelpNeededWidget';
 
-// Adoption stages that are still "in the pipeline" (not a terminal outcome).
-const ADOPTION_TERMINAL: string[] = ['completed', 'cancelled', 'returned'];
 
 // One short label per person, for the "New Contacts" widget. Picks the most
 // descriptive role; "Volunteer"/"Contact" are the neutral fallbacks (we don't
@@ -234,7 +236,7 @@ export function Dashboard() {
 
   // — Pending Adoptions — active adoption pipelines, most recently touched first.
   const pendingAdoptions = adoptions.
-  filter((a) => !ADOPTION_TERMINAL.includes(a.status)).
+  filter(isActiveAdoption).
   sort(
     (a, b) =>
     new Date(b.updated_at ?? b.created_at).getTime() -
@@ -697,7 +699,18 @@ export function Dashboard() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="font-medium text-text-primary truncate">
-                            {animal ? animalDisplayName(animal) : 'Animal'}
+                            {(() => {
+                            // Bonded pairs share one application — name both.
+                            const names = adoptionAnimalIds(a).
+                            map((id) =>
+                            animalsIndex.find((x) => x.id === id)
+                            ).
+                            filter(Boolean).
+                            map((x) => animalDisplayName(x!));
+                            return names.length > 0 ?
+                            names.join(' & ') :
+                            'Animal';
+                          })()}
                           </p>
                           <p className="text-xs text-text-secondary truncate">
                             {applicant ?
